@@ -5,6 +5,7 @@ import * as path from "path";
 import * as os from "os";
 import { v4 as uuid } from "uuid";
 import { VIDEO_DEFAULTS } from "@/lib/constants";
+import type { WordTimestamp } from "@/server/services/tts";
 
 const execAsync = promisify(exec);
 
@@ -14,6 +15,7 @@ export interface ComposerScene {
   mediaType: "video" | "image";
   text: string;
   duration: number;
+  wordTimestamps: WordTimestamp[];
 }
 
 export interface ComposerOptions {
@@ -42,56 +44,151 @@ async function getAudioDuration(audioPath: string): Promise<number> {
   }
 }
 
-function wrapText(text: string, maxCharsPerLine: number): string[] {
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let currentLine = "";
-
-  for (const word of words) {
-    if (currentLine.length + word.length + 1 > maxCharsPerLine) {
-      if (currentLine) lines.push(currentLine.trim());
-      currentLine = word;
-    } else {
-      currentLine += (currentLine ? " " : "") + word;
-    }
-  }
-  if (currentLine) lines.push(currentLine.trim());
-
-  return lines.slice(0, 3);
-}
-
-function escapeDrawtext(text: string): string {
+function escapeAss(text: string): string {
   return text
-    .replace(/\\/g, "\\\\\\\\")
-    .replace(/'/g, "'\\''")
-    .replace(/:/g, "\\:")
-    .replace(/%/g, "%%")
-    .replace(/\[/g, "\\[")
-    .replace(/\]/g, "\\]");
+    .replace(/\\/g, "\\\\")
+    .replace(/\{/g, "\\{")
+    .replace(/\}/g, "\\}");
 }
 
-function buildCaptionFilter(text: string, style: string): string {
-  const lines = wrapText(text, 30);
+interface CaptionStyleConfig {
+  primaryColor: string;
+  highlightColor: string;
+  outlineColor: string;
+  fontSize: number;
+  outline: number;
+  shadow: number;
+  bold: boolean;
+}
 
-  const styles: Record<string, { fontsize: number; color: string; borderw: number; bordercolor: string; shadowx: number; shadowy: number; shadowcolor: string }> = {
-    default: { fontsize: 52, color: "white", borderw: 3, bordercolor: "black", shadowx: 2, shadowy: 2, shadowcolor: "black@0.6" },
-    bold: { fontsize: 58, color: "yellow", borderw: 4, bordercolor: "black", shadowx: 3, shadowy: 3, shadowcolor: "black@0.8" },
-    typewriter: { fontsize: 48, color: "white", borderw: 2, bordercolor: "black@0.8", shadowx: 0, shadowy: 0, shadowcolor: "black@0" },
-    neon: { fontsize: 54, color: "#00ffff", borderw: 3, bordercolor: "#003366", shadowx: 0, shadowy: 0, shadowcolor: "#0066ff@0.5" },
+function getCaptionStyle(style: string): CaptionStyleConfig {
+  const styles: Record<string, CaptionStyleConfig> = {
+    default: {
+      primaryColor: "&H00FFFFFF",
+      highlightColor: "&H0000FFFF",
+      outlineColor: "&H00000000",
+      fontSize: 22,
+      outline: 3,
+      shadow: 2,
+      bold: true,
+    },
+    bold: {
+      primaryColor: "&H0000FFFF",
+      highlightColor: "&H000080FF",
+      outlineColor: "&H00000000",
+      fontSize: 26,
+      outline: 4,
+      shadow: 3,
+      bold: true,
+    },
+    typewriter: {
+      primaryColor: "&H00FFFFFF",
+      highlightColor: "&H0000FF00",
+      outlineColor: "&H00000000",
+      fontSize: 20,
+      outline: 2,
+      shadow: 1,
+      bold: false,
+    },
+    neon: {
+      primaryColor: "&H00FFFF00",
+      highlightColor: "&H00FF00FF",
+      outlineColor: "&H00663300",
+      fontSize: 24,
+      outline: 3,
+      shadow: 0,
+      bold: true,
+    },
   };
+  return styles[style] || styles.default;
+}
 
-  const s = styles[style] || styles.default;
-  const lineHeight = s.fontsize + 10;
-  const totalHeight = lines.length * lineHeight;
-  const baseY = `(h - ${totalHeight}) * 3/4`;
+function groupWords(words: WordTimestamp[], wordsPerGroup: number): { text: string; start: number; end: number }[] {
+  const groups: { text: string; start: number; end: number }[] = [];
+  for (let i = 0; i < words.length; i += wordsPerGroup) {
+    const chunk = words.slice(i, i + wordsPerGroup);
+    groups.push({
+      text: chunk.map((w) => w.word).join(" "),
+      start: chunk[0].start,
+      end: chunk[chunk.length - 1].end,
+    });
+  }
+  return groups;
+}
 
-  const filters = lines.map((line, i) => {
-    const escaped = escapeDrawtext(line);
-    const y = `${baseY} + ${i * lineHeight}`;
-    return `drawtext=text='${escaped}':fontsize=${s.fontsize}:fontcolor=${s.color}:borderw=${s.borderw}:bordercolor=${s.bordercolor}:shadowx=${s.shadowx}:shadowy=${s.shadowy}:shadowcolor=${s.shadowcolor}:x=(w-tw)/2:y=${y}`;
-  });
+function estimateWordTimestamps(text: string, duration: number): WordTimestamp[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
 
-  return filters.join(",");
+  const wordDuration = duration / words.length;
+  return words.map((word, i) => ({
+    word,
+    start: i * wordDuration,
+    end: (i + 1) * wordDuration,
+  }));
+}
+
+function generateAssSubtitles(
+  scenes: ComposerScene[],
+  style: CaptionStyleConfig,
+  sceneDurations: number[]
+): string {
+  const W = VIDEO_DEFAULTS.width;
+  const H = VIDEO_DEFAULTS.height;
+
+  let header = `[Script Info]
+Title: Faceless Captions
+ScriptType: v4.00+
+PlayResX: ${W}
+PlayResY: ${H}
+WrapStyle: 0
+ScaledBorderAndShadow: yes
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: WordCaption,Arial,${style.fontSize},${style.primaryColor},${style.highlightColor},${style.outlineColor},&H80000000,${style.bold ? -1 : 0},0,0,0,100,100,0,0,1,${style.outline},${style.shadow},2,40,40,${Math.round(H * 0.2)},1
+Style: HighlightCaption,Arial,${Math.round(style.fontSize * 1.15)},${style.highlightColor},${style.primaryColor},${style.outlineColor},&H80000000,-1,0,0,0,100,100,0,0,1,${style.outline + 1},${style.shadow},2,40,40,${Math.round(H * 0.2)},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`;
+
+  let timeOffset = 0;
+
+  for (let si = 0; si < scenes.length; si++) {
+    const scene = scenes[si];
+    const duration = sceneDurations[si];
+
+    const timestamps = scene.wordTimestamps.length > 0
+      ? scene.wordTimestamps
+      : estimateWordTimestamps(scene.text, duration);
+
+    const groups = groupWords(timestamps, 3);
+
+    for (const group of groups) {
+      const absStart = timeOffset + group.start;
+      const absEnd = timeOffset + group.end;
+
+      const startStr = formatAssTime(absStart);
+      const endStr = formatAssTime(absEnd);
+
+      const escaped = escapeAss(group.text.toUpperCase());
+
+      header += `Dialogue: 0,${startStr},${endStr},HighlightCaption,,0,0,0,,${escaped}\n`;
+    }
+
+    timeOffset += duration;
+  }
+
+  return header;
+}
+
+function formatAssTime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const cs = Math.round((seconds % 1) * 100);
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
 }
 
 export async function composeVideo(
@@ -106,63 +203,58 @@ export async function composeVideo(
 
   try {
     const scenePaths: string[] = [];
+    const sceneDurations: number[] = [];
 
     for (let i = 0; i < scenes.length; i++) {
       const scene = scenes[i];
       const sceneOutput = path.join(workDir, `scene_${i}.mp4`);
 
       const audioDuration = await getAudioDuration(scene.audioPath);
-      const duration = Math.max(audioDuration + 0.3, 2);
+      const duration = Math.max(audioDuration + 0.5, 2);
+      sceneDurations.push(duration);
 
-      const captionFilter = buildCaptionFilter(scene.text, captionStyle);
-      const fadeOutStart = Math.max(0, duration - 0.5);
+      const fadeOutStart = Math.max(0, duration - 0.4);
 
       if (scene.mediaType === "video") {
         const videoFilter = [
-          `[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},setsar=1,fps=${FPS}`,
-          captionFilter,
-          `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.5`,
+          `scale=${W}:${H}:force_original_aspect_ratio=increase`,
+          `crop=${W}:${H}`,
+          `setsar=1`,
+          `fps=${FPS}`,
+          `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`,
         ].join(",");
 
         await execAsync(
           `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
-            `-filter_complex "${videoFilter}[outv];[1:a]aresample=44100[outa]" ` +
+            `-filter_complex "[0:v]${videoFilter}[outv];[1:a]aresample=44100[outa]" ` +
             `-map "[outv]" -map "[outa]" ` +
-            `-c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p ` +
+            `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
             `-t ${duration} -shortest "${sceneOutput}"`
         );
       } else {
         const totalFrames = Math.ceil(duration * FPS);
-        const zoomIncrement = 0.15 / totalFrames;
-        const zoomDirection = i % 2 === 0 ? 1 : -1;
-
-        let zoomExpr: string;
-        let panX: string;
-        let panY: string;
-
-        if (zoomDirection > 0) {
-          zoomExpr = `min(zoom+${zoomIncrement.toFixed(6)},1.15)`;
-          panX = `iw/2-(iw/zoom/2)`;
-          panY = `ih/2-(ih/zoom/2)`;
-        } else {
-          zoomExpr = `if(eq(on,1),1.15,max(zoom-${zoomIncrement.toFixed(6)},1.0))`;
-          panX = `iw/2-(iw/zoom/2)`;
-          panY = `ih/3-(ih/zoom/3)`;
-        }
+        const effects = [
+          { zoom: `min(zoom+0.0008,1.2)`, x: `iw/2-(iw/zoom/2)`, y: `ih/2-(ih/zoom/2)` },
+          { zoom: `if(eq(on,1),1.2,max(zoom-0.0008,1.0))`, x: `iw/2-(iw/zoom/2)`, y: `ih/2-(ih/zoom/2)` },
+          { zoom: `min(zoom+0.0006,1.15)`, x: `iw/4-(iw/zoom/4)`, y: `ih/2-(ih/zoom/2)` },
+          { zoom: `min(zoom+0.0007,1.18)`, x: `iw*3/4-(iw/zoom*3/4)`, y: `ih/3-(ih/zoom/3)` },
+        ];
+        const effect = effects[i % effects.length];
 
         const imageFilter = [
-          `[0:v]scale=${W * 2}:${H * 2}:force_original_aspect_ratio=increase,crop=${W * 2}:${H * 2},setsar=1`,
-          `zoompan=z='${zoomExpr}':x='${panX}':y='${panY}':d=${totalFrames}:s=${W}x${H}:fps=${FPS}`,
-          captionFilter,
-          `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.5`,
+          `scale=${W * 2}:${H * 2}:force_original_aspect_ratio=increase`,
+          `crop=${W * 2}:${H * 2}`,
+          `setsar=1`,
+          `zoompan=z='${effect.zoom}':x='${effect.x}':y='${effect.y}':d=${totalFrames}:s=${W}x${H}:fps=${FPS}`,
+          `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`,
         ].join(",");
 
         await execAsync(
           `ffmpeg -y -loop 1 -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
-            `-filter_complex "${imageFilter}[outv];[1:a]aresample=44100[outa]" ` +
+            `-filter_complex "[0:v]${imageFilter}[outv];[1:a]aresample=44100[outa]" ` +
             `-map "[outv]" -map "[outa]" ` +
-            `-c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p ` +
+            `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
             `-t ${duration} -shortest "${sceneOutput}"`
         );
@@ -171,81 +263,51 @@ export async function composeVideo(
       scenePaths.push(sceneOutput);
     }
 
-    const finalOutput = path.join(workDir, "final.mp4");
+    const rawConcat = path.join(workDir, "raw_concat.mp4");
 
     if (scenePaths.length === 1) {
-      await fs.copyFile(scenePaths[0], finalOutput);
+      await fs.copyFile(scenePaths[0], rawConcat);
     } else {
-      const inputs = scenePaths.map((p) => `-i "${p}"`).join(" ");
-      const n = scenePaths.length;
-      const xfadeDuration = 0.4;
-
-      let filterComplex = "";
-      let currentLabel = "[0:v]";
-      let audioFilter = "";
-
-      for (let i = 1; i < n; i++) {
-        const offset = i === 1
-          ? await getSceneDuration(scenePaths[0]) - xfadeDuration
-          : await getAccumulatedOffset(scenePaths, i, xfadeDuration);
-
-        const outLabel = i < n - 1 ? `[xf${i}]` : `[outv]`;
-        filterComplex += `${currentLabel}[${i}:v]xfade=transition=fade:duration=${xfadeDuration}:offset=${Math.max(0, offset).toFixed(2)}${outLabel};`;
-        currentLabel = outLabel === "[outv]" ? "[outv]" : outLabel;
-      }
-
-      const audioInputs = Array.from({ length: n }, (_, i) => `[${i}:a]`).join("");
-      audioFilter = `${audioInputs}concat=n=${n}:v=0:a=1[outa]`;
-      filterComplex += audioFilter;
+      const concatList = path.join(workDir, "concat.txt");
+      const concatContent = scenePaths.map((p) => `file '${p}'`).join("\n");
+      await fs.writeFile(concatList, concatContent);
 
       await execAsync(
-        `ffmpeg -y ${inputs} -filter_complex "${filterComplex}" ` +
-          `-map "[outv]" -map "[outa]" ` +
-          `-c:v libx264 -preset fast -crf 22 -pix_fmt yuv420p ` +
-          `-c:a aac -b:a 192k -ar 44100 ` +
-          `"${finalOutput}"`
+        `ffmpeg -y -f concat -safe 0 -i "${concatList}" ` +
+          `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
+          `-c:a aac -b:a 192k "${rawConcat}"`
       );
     }
+
+    const styleConfig = getCaptionStyle(captionStyle);
+    const assContent = generateAssSubtitles(scenes, styleConfig, sceneDurations);
+    const assPath = path.join(workDir, "captions.ass");
+    await fs.writeFile(assPath, assContent);
+
+    const withCaptions = path.join(workDir, "with_captions.mp4");
+    const assPathEscaped = assPath.replace(/'/g, "'\\''").replace(/:/g, "\\:");
+    await execAsync(
+      `ffmpeg -y -i "${rawConcat}" ` +
+        `-vf "ass='${assPathEscaped}'" ` +
+        `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
+        `-c:a copy "${withCaptions}"`
+    );
 
     if (backgroundMusicPath) {
-      const withMusicOutput = path.join(workDir, "with_music.mp4");
+      const finalOutput = path.join(workDir, "final.mp4");
       await execAsync(
-        `ffmpeg -y -i "${finalOutput}" -i "${backgroundMusicPath}" ` +
-          `-filter_complex "[1:a]volume=0.12[bg];[0:a][bg]amix=inputs=2:duration=first[outa]" ` +
-          `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${withMusicOutput}"`
+        `ffmpeg -y -i "${withCaptions}" -i "${backgroundMusicPath}" ` +
+          `-filter_complex "[1:a]volume=0.10[bg];[0:a][bg]amix=inputs=2:duration=first[outa]" ` +
+          `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${finalOutput}"`
       );
-      return withMusicOutput;
+      return finalOutput;
     }
 
-    return finalOutput;
+    return withCaptions;
   } catch (error) {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     throw error;
   }
-}
-
-async function getSceneDuration(scenePath: string): Promise<number> {
-  try {
-    const { stdout } = await execAsync(
-      `ffprobe -v error -show_entries format=duration -of csv=p=0 "${scenePath}"`
-    );
-    return parseFloat(stdout.trim()) || 5;
-  } catch {
-    return 5;
-  }
-}
-
-async function getAccumulatedOffset(
-  scenePaths: string[],
-  currentIndex: number,
-  xfadeDuration: number
-): Promise<number> {
-  let totalOffset = 0;
-  for (let i = 0; i < currentIndex; i++) {
-    const dur = await getSceneDuration(scenePaths[i]);
-    totalOffset += dur - (i > 0 ? xfadeDuration : 0);
-  }
-  return totalOffset - xfadeDuration;
 }
 
 export { downloadFile };

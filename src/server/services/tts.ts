@@ -6,11 +6,19 @@ interface TTSOptions {
   voiceId?: string;
   stability?: number;
   similarityBoost?: number;
+  style?: number;
+}
+
+export interface WordTimestamp {
+  word: string;
+  start: number;
+  end: number;
 }
 
 export interface TTSResult {
   audioBuffer: Buffer;
   contentType: string;
+  wordTimestamps: WordTimestamp[];
 }
 
 export async function generateSpeech(
@@ -19,40 +27,88 @@ export async function generateSpeech(
 ): Promise<TTSResult> {
   const {
     voiceId = DEFAULT_VOICE_ID,
-    stability = 0.5,
-    similarityBoost = 0.75,
+    stability = 0.4,
+    similarityBoost = 0.8,
+    style = 0.3,
   } = options;
 
   const response = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
     {
       method: "POST",
       headers: {
         "xi-api-key": ELEVENLABS_API_KEY,
         "Content-Type": "application/json",
-        Accept: "audio/mpeg",
       },
       body: JSON.stringify({
         text,
-        model_id: "eleven_monolingual_v1",
+        model_id: "eleven_multilingual_v2",
         voice_settings: {
           stability,
           similarity_boost: similarityBoost,
+          style,
+          use_speaker_boost: true,
         },
       }),
     }
   );
 
   if (!response.ok) {
+    const errBody = await response.text().catch(() => "");
     throw new Error(
-      `ElevenLabs TTS failed: ${response.status} ${response.statusText}`
+      `ElevenLabs TTS failed: ${response.status} ${response.statusText} - ${errBody}`
     );
   }
 
-  const arrayBuffer = await response.arrayBuffer();
+  const data = await response.json();
+
+  const audioBase64: string = data.audio_base64;
+  const audioBuffer = Buffer.from(audioBase64, "base64");
+
+  const wordTimestamps: WordTimestamp[] = [];
+
+  if (data.alignment) {
+    const { characters, character_start_times_seconds, character_end_times_seconds } = data.alignment;
+
+    let currentWord = "";
+    let wordStart = -1;
+    let wordEnd = 0;
+
+    for (let i = 0; i < characters.length; i++) {
+      const char = characters[i];
+      const startTime = character_start_times_seconds[i];
+      const endTime = character_end_times_seconds[i];
+
+      if (char === " " || char === "\n") {
+        if (currentWord.trim()) {
+          wordTimestamps.push({
+            word: currentWord.trim(),
+            start: wordStart,
+            end: wordEnd,
+          });
+        }
+        currentWord = "";
+        wordStart = -1;
+      } else {
+        if (wordStart === -1) wordStart = startTime;
+        wordEnd = endTime;
+        currentWord += char;
+      }
+    }
+
+    if (currentWord.trim()) {
+      wordTimestamps.push({
+        word: currentWord.trim(),
+        start: wordStart,
+        end: wordEnd,
+      });
+    }
+  }
+
   return {
-    audioBuffer: Buffer.from(arrayBuffer),
+    audioBuffer,
     contentType: "audio/mpeg",
+    wordTimestamps,
   };
 }
 

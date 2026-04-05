@@ -70,42 +70,60 @@ export async function generateVideoScript(
   topicIdea?: string,
   targetDuration = 45
 ): Promise<VideoScript> {
-  const systemPrompt = `You are a viral short-form video scriptwriter specializing in faceless content for TikTok, Reels, and Shorts.
+  const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
 
 Your output must be valid JSON matching this exact schema:
 {
-  "title": "string - catchy video title",
-  "hook": "string - attention-grabbing opening line (first 3 seconds)",
+  "title": "string - SEO-optimized title with emotional trigger words",
+  "hook": "string - the opening 1-2 sentences that create an instant curiosity gap (spoken in first 3 seconds)",
   "scenes": [
     {
-      "text": "string - narration text for this scene (2-3 sentences max)",
-      "visualDescription": "string - detailed description of the visual scene",
-      "searchQuery": "string - 2-4 word search query for finding relevant stock footage (be specific and concrete, e.g. 'ancient roman colosseum' not 'historical building')",
-      "imagePrompt": "string - detailed prompt for AI image generation if stock footage isn't available. Include: subject, setting, mood, lighting, camera angle. Style: ${style}",
-      "duration": number - estimated seconds for this scene based on narration length
+      "text": "string - narration text for this scene. Must be punchy, conversational, and create micro-cliffhangers between scenes. 1-3 sentences max.",
+      "visualDescription": "string - what the viewer sees",
+      "searchQuery": "string - 2-4 specific words for stock footage search",
+      "imagePrompt": "string - AI image generation prompt: describe the exact scene, subject, setting, mood, camera angle, lighting. Must match the narration perfectly. Art style: ${style}.",
+      "duration": number
     }
   ],
-  "cta": "string - call to action at the end",
-  "totalDuration": number - total video duration in seconds
+  "cta": "string - call to action",
+  "totalDuration": number
 }
 
-Critical rules:
-- Hook MUST grab attention in the first 3 seconds with a shocking fact, question, or bold claim
-- Each scene narration should be 2-3 sentences, roughly 5-8 seconds when spoken
-- Total duration should be close to ${targetDuration} seconds
-- searchQuery must be CONCRETE and SPECIFIC to the scene content (e.g. "dark forest fog night" not "scary background")
-- imagePrompt must describe a SPECIFIC image that directly illustrates the narration
-- Use simple, dramatic, conversational language
-- Build suspense throughout
-- End with a compelling CTA that creates FOMO`;
+VIRAL SCRIPT FORMULA (follow this exactly):
+
+1. HOOK (scene 1): Start with a pattern interrupt. Use one of these proven formats:
+   - "This [thing] was hidden for [time] and nobody knew why..."
+   - "Scientists can't explain why [shocking claim]..."
+   - "In [year], something happened that changed everything..."
+   - A bold controversial statement or impossible-sounding fact
+   The hook must make scrolling IMPOSSIBLE.
+
+2. BUILD-UP (scenes 2-3): Layer information that deepens curiosity. Each scene must end with an implicit "but then..." that pulls the viewer to the next scene. Use:
+   - Specific numbers and dates (they feel more credible)
+   - Sensory details ("the room went silent", "a chill ran down...")
+   - Escalating stakes
+
+3. CLIMAX (scene 4-5): The payoff. Reveal the most shocking/interesting part. This is where retention spikes.
+
+4. CTA (final scene): End with something that makes them comment, like, or follow. Best: ask a polarizing question or tease the "Part 2".
+
+CRITICAL RULES:
+- Each scene narration = 15-25 words. Short punchy sentences WIN.
+- NEVER use filler words or generic phrases
+- Write like you're telling a secret to a friend, not giving a lecture
+- Every single sentence must either reveal new info or build tension
+- searchQuery must be HYPER-SPECIFIC (e.g. "abandoned underground bunker" not "dark place")
+- imagePrompt must paint a CINEMATIC scene that perfectly matches the narration. Include: main subject, environment, lighting (dramatic/moody/golden hour), camera angle (close-up/wide/aerial), atmosphere (fog/rain/dust particles). Style: ${style}.
+- Total duration should be ${targetDuration} seconds
+- Aim for 5-7 scenes`;
 
   const userPrompt = topicIdea
-    ? `Create a ${niche} video script about: ${topicIdea}. Visual style: ${style}. Make it dramatic and engaging.`
-    : `Create a ${niche} video script. Visual style: ${style}. Choose a specific, fascinating topic that would go viral. Make it dramatic and engaging.`;
+    ? `Create a ${niche} viral video script about: ${topicIdea}. Visual style: ${style}. Make it impossible to scroll past.`
+    : `Create a ${niche} viral video script. Visual style: ${style}. Pick a topic that will make people STOP scrolling and watch till the end. Think: "I need to know what happens next."`;
 
   const result = await generateText(systemPrompt, userPrompt, {
     maxTokens: 3000,
-    temperature: 0.8,
+    temperature: 0.85,
     jsonMode: true,
   });
 

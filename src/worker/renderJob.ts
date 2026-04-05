@@ -8,7 +8,7 @@ import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { generateVideoScript } from "@/server/services/llm";
-import { generateSpeech } from "@/server/services/tts";
+import { generateSpeech, type WordTimestamp } from "@/server/services/tts";
 import {
   getMediaForScene,
   resetUsedMedia,
@@ -101,13 +101,14 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 25);
     await job.updateProgress(25);
 
-    // Step 2: Generate TTS for each scene individually
+    // Step 2: Generate TTS with word-level timestamps
     await updateVideoStatus(videoProjectId, "GENERATING_ASSETS");
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 30);
     await job.updateProgress(30);
 
     const sceneTexts = script.scenes.map((s) => s.text);
     const audioPaths: string[] = [];
+    const allWordTimestamps: WordTimestamp[][] = [];
 
     for (let i = 0; i < sceneTexts.length; i++) {
       const ttsResult = await generateSpeech(sceneTexts[i], {
@@ -116,13 +117,18 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       const audioPath = path.join(workDir, `audio_${i}.mp3`);
       await fs.writeFile(audioPath, ttsResult.audioBuffer);
       audioPaths.push(audioPath);
+      allWordTimestamps.push(ttsResult.wordTimestamps);
+
+      console.log(
+        `Scene ${i}: TTS done, ${ttsResult.wordTimestamps.length} word timestamps`
+      );
       await job.updateProgress(30 + Math.floor((i / sceneTexts.length) * 20));
     }
 
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 50);
     await job.updateProgress(50);
 
-    // Step 3: Fetch Media using scene-specific search queries and image prompts
+    // Step 3: Fetch Media -- prefer AI-generated images for visual consistency
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 55);
     await job.updateProgress(55);
 
@@ -135,15 +141,16 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
 
       let asset: MediaAsset;
       try {
-        asset = await getMediaForScene(searchQuery, imagePrompt);
+        asset = await getMediaForScene(searchQuery, imagePrompt, true);
       } catch (err) {
         console.warn(
-          `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Using fallback.`
+          `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Trying fallback.`
         );
         try {
           asset = await getMediaForScene(
             seriesRecord.niche,
-            `A cinematic scene related to ${seriesRecord.niche}, dramatic lighting, photorealistic`
+            `A dramatic cinematic scene related to ${seriesRecord.niche}, ${seriesRecord.style} art style, moody lighting, photorealistic, no text`,
+            false
           );
         } catch {
           throw new Error(
@@ -159,6 +166,9 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
         await downloadFile(asset.url, mediaPath);
       }
 
+      console.log(
+        `Scene ${i}: media from ${asset.source} (${asset.type})`
+      );
       mediaPaths.push({ path: mediaPath, type: asset.type });
       await job.updateProgress(
         55 + Math.floor((i / script.scenes.length) * 15)
@@ -168,7 +178,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 70);
     await job.updateProgress(70);
 
-    // Step 4: Compose Video (audio duration is detected by composer via ffprobe)
+    // Step 4: Compose Video with word-synced captions
     await updateVideoStatus(videoProjectId, "RENDERING");
     await updateJobStep(videoProjectId, "COMPOSE", "ACTIVE", 75);
     await job.updateProgress(75);
@@ -179,6 +189,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       mediaType: mediaPaths[i].type,
       text,
       duration: script.scenes[i].duration,
+      wordTimestamps: allWordTimestamps[i],
     }));
 
     const outputPath = await composeVideo({
