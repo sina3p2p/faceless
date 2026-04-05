@@ -229,9 +229,12 @@ export async function composeVideo(
 
       if (scene.mediaType === "video") {
         const videoDuration = await getMediaDuration(scene.mediaPath);
-        const needsLoop = videoDuration > 0 && videoDuration < duration;
+        const speedFactor = videoDuration > 0 && videoDuration < duration
+          ? videoDuration / duration
+          : 1;
 
-        const videoFilter = [
+        const videoFilters = [
+          ...(speedFactor < 1 ? [`setpts=PTS/${speedFactor}`] : []),
           `scale=${W}:${H}:force_original_aspect_ratio=increase`,
           `crop=${W}:${H}`,
           `setsar=1`,
@@ -239,11 +242,9 @@ export async function composeVideo(
           `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`,
         ].join(",");
 
-        const loopFlag = needsLoop ? `-stream_loop -1` : "";
-
         await execAsync(
-          `ffmpeg -y ${loopFlag} -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
-            `-filter_complex "[0:v]${videoFilter}[outv];[1:a]aresample=44100[outa]" ` +
+          `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
+            `-filter_complex "[0:v]${videoFilters}[outv];[1:a]aresample=44100[outa]" ` +
             `-map "[outv]" -map "[outa]" ` +
             `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
