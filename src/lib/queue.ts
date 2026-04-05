@@ -24,8 +24,7 @@ export interface RenderJobData {
 export async function enqueueRenderJob(
   data: RenderJobData
 ): Promise<string> {
-  const job = await renderQueue.add("render-video", data, {
-    jobId: `render-${data.videoProjectId}`,
-  });
+  const jobId = `render-${data.videoProjectId}-${Date.now()}`;
+  const job = await renderQueue.add("render-video", data, { jobId });
   return job.id ?? data.videoProjectId;
 }
