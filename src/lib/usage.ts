@@ -1,6 +1,7 @@
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { users, usageEntries } from "@/server/db/schema";
+import { eq, and, gte, count } from "drizzle-orm";
 import { PLAN_LIMITS } from "./constants";
-import type { PlanTier } from "@prisma/client";
 
 export async function checkUsageLimit(userId: string): Promise<{
   allowed: boolean;
@@ -8,23 +9,29 @@ export async function checkUsageLimit(userId: string): Promise<{
   limit: number;
   remaining: number;
 }> {
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, userId),
   });
+
+  if (!user) throw new Error("User not found");
 
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const usageCount = await prisma.usageEntry.count({
-    where: {
-      userId,
-      action: "video_generated",
-      createdAt: { gte: startOfMonth },
-    },
-  });
+  const [result] = await db
+    .select({ count: count() })
+    .from(usageEntries)
+    .where(
+      and(
+        eq(usageEntries.userId, userId),
+        eq(usageEntries.action, "video_generated"),
+        gte(usageEntries.createdAt, startOfMonth)
+      )
+    );
 
-  const limit = PLAN_LIMITS[user.planTier as PlanTier].videosPerMonth;
+  const usageCount = result?.count ?? 0;
+  const limit = PLAN_LIMITS[user.planTier as keyof typeof PLAN_LIMITS].videosPerMonth;
 
   return {
     allowed: usageCount < limit,
@@ -40,12 +47,10 @@ export async function recordUsage(
   credits = 1,
   metadata?: Record<string, string | number | boolean>
 ): Promise<void> {
-  await prisma.usageEntry.create({
-    data: {
-      userId,
-      action,
-      credits,
-      metadata: metadata ? (metadata as unknown as Parameters<typeof prisma.usageEntry.create>[0]["data"]["metadata"]) : undefined,
-    },
+  await db.insert(usageEntries).values({
+    userId,
+    action,
+    credits,
+    metadata: metadata ?? null,
   });
 }

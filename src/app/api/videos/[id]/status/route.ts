@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { videoProjects, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
+import { eq, desc } from "drizzle-orm";
 
 export async function GET(
   _req: NextRequest,
@@ -11,17 +13,19 @@ export async function GET(
 
   const { id } = await params;
 
-  const video = await prisma.videoProject.findFirst({
-    where: { id, series: { userId: user.id } },
-    select: {
+  const video = await db.query.videoProjects.findFirst({
+    where: eq(videoProjects.id, id),
+    columns: {
       id: true,
       status: true,
       title: true,
       outputUrl: true,
+    },
+    with: {
       renderJobs: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: {
+        orderBy: desc(renderJobs.createdAt),
+        limit: 1,
+        columns: {
           step: true,
           status: true,
           progress: true,
@@ -29,10 +33,12 @@ export async function GET(
           attempts: true,
         },
       },
+      series: { columns: { userId: true } },
     },
   });
 
-  if (!video) return notFound("Video not found");
+  if (!video || video.series.userId !== user.id) return notFound("Video not found");
 
-  return NextResponse.json(video);
+  const { series: _s, ...rest } = video;
+  return NextResponse.json(rest);
 }

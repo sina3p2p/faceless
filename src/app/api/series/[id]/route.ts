@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { series, videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
+import { eq, and, desc } from "drizzle-orm";
 
 export async function GET(
   _req: NextRequest,
@@ -11,16 +13,25 @@ export async function GET(
 
   const { id } = await params;
 
-  const series = await prisma.series.findFirst({
-    where: { id, userId: user.id },
-    include: {
-      videoProjects: { orderBy: { createdAt: "desc" }, take: 20 },
+  const result = await db.query.series.findFirst({
+    where: and(eq(series.id, id), eq(series.userId, user.id)),
+    with: {
+      videoProjects: {
+        orderBy: desc(videoProjects.createdAt),
+        limit: 20,
+        with: {
+          renderJobs: {
+            orderBy: desc(videoProjects.createdAt),
+            limit: 1,
+          },
+        },
+      },
     },
   });
 
-  if (!series) return notFound("Series not found");
+  if (!result) return notFound("Series not found");
 
-  return NextResponse.json(series);
+  return NextResponse.json(result);
 }
 
 export async function DELETE(
@@ -32,13 +43,13 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const series = await prisma.series.findFirst({
-    where: { id, userId: user.id },
+  const existing = await db.query.series.findFirst({
+    where: and(eq(series.id, id), eq(series.userId, user.id)),
   });
 
-  if (!series) return notFound("Series not found");
+  if (!existing) return notFound("Series not found");
 
-  await prisma.series.delete({ where: { id } });
+  await db.delete(series).where(eq(series.id, id));
 
   return NextResponse.json({ deleted: true });
 }

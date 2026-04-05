@@ -3,7 +3,10 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import { v4 as uuid } from "uuid";
-import { PrismaClient } from "@prisma/client";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { eq } from "drizzle-orm";
+import * as schema from "@/server/db/schema";
 import { generateVideoScript } from "@/server/services/llm";
 import { generateSpeech } from "@/server/services/tts";
 import { getMediaForScene, type MediaAsset } from "@/server/services/media";
@@ -16,36 +19,30 @@ import { uploadFile } from "@/lib/storage";
 import { recordUsage } from "@/lib/usage";
 import type { RenderJobData } from "@/lib/queue";
 
-const prisma = new PrismaClient();
+const client = postgres(process.env.DATABASE_URL!);
+const db = drizzle(client, { schema });
 
 async function updateJobStep(
   videoProjectId: string,
-  step: string,
-  status: string,
+  step: typeof schema.renderStepEnum.enumValues[number],
+  status: typeof schema.jobStatusEnum.enumValues[number],
   progress: number
 ) {
-  await prisma.renderJob.updateMany({
-    where: { videoProjectId },
-    data: {
-      step: step as "SCRIPT" | "TTS" | "MEDIA" | "COMPOSE" | "DONE",
-      status: status as "QUEUED" | "ACTIVE" | "COMPLETED" | "FAILED" | "RETRYING",
-      progress,
-    },
-  });
+  await db
+    .update(schema.renderJobs)
+    .set({ step, status, progress })
+    .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
 }
 
 async function updateVideoStatus(
   videoProjectId: string,
-  status: string,
-  extra?: Record<string, unknown>
+  status: typeof schema.videoStatusEnum.enumValues[number],
+  extra?: Partial<typeof schema.videoProjects.$inferInsert>
 ) {
-  await prisma.videoProject.update({
-    where: { id: videoProjectId },
-    data: {
-      status: status as "PENDING" | "GENERATING_SCRIPT" | "GENERATING_ASSETS" | "RENDERING" | "COMPLETED" | "FAILED",
-      ...extra,
-    },
-  });
+  await db
+    .update(schema.videoProjects)
+    .set({ status, ...extra })
+    .where(eq(schema.videoProjects.id, videoProjectId));
 }
 
 export async function renderVideoJob(job: Job<RenderJobData>) {
@@ -54,44 +51,44 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
   await fs.mkdir(workDir, { recursive: true });
 
   try {
-    const series = await prisma.series.findUniqueOrThrow({
-      where: { id: seriesId },
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
     });
+
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
 
     // Step 1: Generate Script
     await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
 
+    const topicIdeas = seriesRecord.topicIdeas as string[];
     const topicIdea =
-      series.topicIdeas.length > 0
-        ? series.topicIdeas[Math.floor(Math.random() * series.topicIdeas.length)]
+      topicIdeas.length > 0
+        ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
         : undefined;
 
     const script = await generateVideoScript(
-      series.niche,
-      series.style,
+      seriesRecord.niche,
+      seriesRecord.style,
       topicIdea
     );
 
-    await prisma.videoProject.update({
-      where: { id: videoProjectId },
-      data: {
+    await db
+      .update(schema.videoProjects)
+      .set({
         title: script.title,
         script: JSON.stringify(script),
         duration: script.totalDuration,
-      },
-    });
+      })
+      .where(eq(schema.videoProjects.id, videoProjectId));
 
-    // Create scene records
     for (let i = 0; i < script.scenes.length; i++) {
-      await prisma.videoScene.create({
-        data: {
-          videoProjectId,
-          sceneOrder: i,
-          text: script.scenes[i].text,
-          duration: script.scenes[i].duration,
-        },
+      await db.insert(schema.videoScenes).values({
+        videoProjectId,
+        sceneOrder: i,
+        text: script.scenes[i].text,
+        duration: script.scenes[i].duration,
       });
     }
 
@@ -108,7 +105,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
 
     for (let i = 0; i < allText.length; i++) {
       const ttsResult = await generateSpeech(allText[i], {
-        voiceId: series.defaultVoiceId ?? undefined,
+        voiceId: seriesRecord.defaultVoiceId ?? undefined,
       });
       const audioPath = path.join(workDir, `audio_${i}.mp3`);
       await fs.writeFile(audioPath, ttsResult.audioBuffer);
@@ -152,18 +149,6 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       }
 
       mediaPaths.push({ path: mediaPath, type: asset.type });
-
-      // Update scene with asset info
-      const sceneRecord = await prisma.videoScene.findFirst({
-        where: { videoProjectId, sceneOrder: i > 0 ? i - 1 : 0 },
-      });
-      if (sceneRecord) {
-        await prisma.videoScene.update({
-          where: { id: sceneRecord.id },
-          data: { assetUrl: asset.url, assetType: asset.type },
-        });
-      }
-
       await job.updateProgress(55 + Math.floor((i / allVisuals.length) * 15));
     }
 
@@ -175,11 +160,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "COMPOSE", "ACTIVE", 75);
     await job.updateProgress(75);
 
-    const durations = [
-      3,
-      ...script.scenes.map((s) => s.duration),
-      3,
-    ];
+    const durations = [3, ...script.scenes.map((s) => s.duration), 3];
 
     const composerScenes: ComposerScene[] = allText.map((text, i) => ({
       audioPath: audioPaths[i],
@@ -191,7 +172,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
 
     const outputPath = await composeVideo({
       scenes: composerScenes,
-      captionStyle: series.captionStyle,
+      captionStyle: seriesRecord.captionStyle,
     });
 
     await job.updateProgress(90);
@@ -201,13 +182,10 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     const s3Key = `videos/${userId}/${videoProjectId}/output.mp4`;
     await uploadFile(s3Key, outputBuffer, "video/mp4");
 
-    await updateVideoStatus(videoProjectId, "COMPLETED", {
-      outputUrl: s3Key,
-    });
+    await updateVideoStatus(videoProjectId, "COMPLETED", { outputUrl: s3Key });
     await updateJobStep(videoProjectId, "DONE", "COMPLETED", 100);
     await job.updateProgress(100);
 
-    // Record usage
     await recordUsage(userId, "video_generated", 1, {
       videoProjectId,
       duration: script.totalDuration,
@@ -216,11 +194,10 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     await updateVideoStatus(videoProjectId, "FAILED");
-    await updateJobStep(videoProjectId, "COMPOSE", "FAILED", 0);
-    await prisma.renderJob.updateMany({
-      where: { videoProjectId },
-      data: { error: errorMessage },
-    });
+    await db
+      .update(schema.renderJobs)
+      .set({ status: "FAILED", error: errorMessage })
+      .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
     throw error;
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});

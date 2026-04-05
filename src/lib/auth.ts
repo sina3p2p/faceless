@@ -1,12 +1,14 @@
 import { NextAuthOptions } from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { users } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
+  adapter: DrizzleAdapter(db) as NextAuthOptions["adapter"],
   providers: [
     ...(process.env.GOOGLE_CLIENT_ID
       ? [
@@ -32,15 +34,23 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email) return null;
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
+
+        const existing = await db.query.users.findFirst({
+          where: eq(users.email, credentials.email),
         });
-        // For MVP, allow any existing user to sign in (password check would go here)
-        if (user) return { id: user.id, email: user.email, name: user.name };
-        // Auto-create user on first sign-in
-        const newUser = await prisma.user.create({
-          data: { email: credentials.email, name: credentials.email.split("@")[0] },
-        });
+
+        if (existing) {
+          return { id: existing.id, email: existing.email, name: existing.name };
+        }
+
+        const [newUser] = await db
+          .insert(users)
+          .values({
+            email: credentials.email,
+            name: credentials.email.split("@")[0],
+          })
+          .returning();
+
         return { id: newUser.id, email: newUser.email, name: newUser.name };
       },
     }),

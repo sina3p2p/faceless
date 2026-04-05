@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { series, videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
+import { eq, desc, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 
 const createSeriesSchema = z.object({
@@ -16,13 +18,28 @@ export async function GET() {
   const user = await getAuthUser();
   if (!user) return unauthorized();
 
-  const series = await prisma.series.findMany({
-    where: { userId: user.id },
-    include: { _count: { select: { videoProjects: true } } },
-    orderBy: { createdAt: "desc" },
-  });
+  const rows = await db
+    .select({
+      id: series.id,
+      name: series.name,
+      niche: series.niche,
+      style: series.style,
+      captionStyle: series.captionStyle,
+      createdAt: series.createdAt,
+      videoCount: sql<number>`count(${videoProjects.id})::int`,
+    })
+    .from(series)
+    .leftJoin(videoProjects, eq(videoProjects.seriesId, series.id))
+    .where(eq(series.userId, user.id))
+    .groupBy(series.id)
+    .orderBy(desc(series.createdAt));
 
-  return NextResponse.json(series);
+  const result = rows.map((r) => ({
+    ...r,
+    _count: { videoProjects: r.videoCount },
+  }));
+
+  return NextResponse.json(result);
 }
 
 export async function POST(req: NextRequest) {
@@ -35,12 +52,13 @@ export async function POST(req: NextRequest) {
     return badRequest(parsed.error.message);
   }
 
-  const series = await prisma.series.create({
-    data: {
+  const [newSeries] = await db
+    .insert(series)
+    .values({
       ...parsed.data,
       userId: user.id,
-    },
-  });
+    })
+    .returning();
 
-  return NextResponse.json(series, { status: 201 });
+  return NextResponse.json(newSeries, { status: 201 });
 }

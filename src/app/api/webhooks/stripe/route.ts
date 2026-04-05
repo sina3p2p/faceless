@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { subscriptions, users } from "@/server/db/schema";
 import { getStripe } from "@/lib/stripe";
+import { eq } from "drizzle-orm";
 
 const PRICE_TO_PLAN: Record<string, "STARTER" | "PRO"> = {
   [process.env.STRIPE_PRICE_ID_STARTER || ""]: "STARTER",
@@ -11,7 +13,6 @@ const PRICE_TO_PLAN: Record<string, "STARTER" | "PRO"> = {
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature") || "";
-
   const stripe = getStripe();
 
   let event: Stripe.Event;
@@ -49,21 +50,21 @@ export async function POST(req: NextRequest) {
         ? new Date(item.current_period_end * 1000)
         : new Date();
 
-      await prisma.subscription.updateMany({
-        where: { userId },
-        data: {
+      await db
+        .update(subscriptions)
+        .set({
           stripeSubscriptionId: sub.id,
           stripePriceId: priceId,
           status: sub.status,
           currentPeriodStart: periodStart,
           currentPeriodEnd: periodEnd,
-        },
-      });
+        })
+        .where(eq(subscriptions.userId, userId));
 
-      await prisma.user.update({
-        where: { id: userId },
-        data: { planTier },
-      });
+      await db
+        .update(users)
+        .set({ planTier })
+        .where(eq(users.id, userId));
       break;
     }
 
@@ -73,11 +74,11 @@ export async function POST(req: NextRequest) {
       const customerId =
         typeof sub.customer === "string" ? sub.customer : sub.customer;
 
-      const subscription = await prisma.subscription.findFirst({
-        where: { stripeCustomerId: customerId as string },
+      const existing = await db.query.subscriptions.findFirst({
+        where: eq(subscriptions.stripeCustomerId, customerId as string),
       });
 
-      if (subscription) {
+      if (existing) {
         const item = sub.items.data[0];
         const periodStart = item?.current_period_start
           ? new Date(item.current_period_start * 1000)
@@ -86,20 +87,20 @@ export async function POST(req: NextRequest) {
           ? new Date(item.current_period_end * 1000)
           : undefined;
 
-        await prisma.subscription.update({
-          where: { id: subscription.id },
-          data: {
+        await db
+          .update(subscriptions)
+          .set({
             status: sub.status,
             ...(periodStart && { currentPeriodStart: periodStart }),
             ...(periodEnd && { currentPeriodEnd: periodEnd }),
-          },
-        });
+          })
+          .where(eq(subscriptions.id, existing.id));
 
         if (sub.status === "canceled" || sub.status === "unpaid") {
-          await prisma.user.update({
-            where: { id: subscription.userId },
-            data: { planTier: "FREE" },
-          });
+          await db
+            .update(users)
+            .set({ planTier: "FREE" })
+            .where(eq(users.id, existing.userId));
         }
       }
       break;

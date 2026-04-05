@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { subscriptions } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { getStripe } from "@/lib/stripe";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser();
@@ -14,11 +16,11 @@ export async function POST(req: NextRequest) {
 
   const stripe = getStripe();
 
-  let subscription = await prisma.subscription.findFirst({
-    where: { userId: user.id },
+  const existing = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.userId, user.id),
   });
 
-  let customerId = subscription?.stripeCustomerId;
+  let customerId = existing?.stripeCustomerId;
 
   if (!customerId) {
     const customer = await stripe.customers.create({
@@ -27,17 +29,15 @@ export async function POST(req: NextRequest) {
     });
     customerId = customer.id;
 
-    if (subscription) {
-      await prisma.subscription.update({
-        where: { id: subscription.id },
-        data: { stripeCustomerId: customerId },
-      });
+    if (existing) {
+      await db
+        .update(subscriptions)
+        .set({ stripeCustomerId: customerId })
+        .where(eq(subscriptions.id, existing.id));
     } else {
-      subscription = await prisma.subscription.create({
-        data: {
-          userId: user.id,
-          stripeCustomerId: customerId,
-        },
+      await db.insert(subscriptions).values({
+        userId: user.id,
+        stripeCustomerId: customerId,
       });
     }
   }

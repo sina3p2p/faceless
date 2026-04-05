@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { getSignedDownloadUrl } from "@/lib/storage";
+import { eq } from "drizzle-orm";
 
 export async function GET(
   _req: NextRequest,
@@ -12,11 +14,12 @@ export async function GET(
 
   const { id } = await params;
 
-  const video = await prisma.videoProject.findFirst({
-    where: { id, series: { userId: user.id } },
+  const video = await db.query.videoProjects.findFirst({
+    where: eq(videoProjects.id, id),
+    with: { series: { columns: { userId: true } } },
   });
 
-  if (!video) return notFound("Video not found");
+  if (!video || video.series.userId !== user.id) return notFound("Video not found");
   if (!video.outputUrl) return badRequest("Video not ready for download");
 
   const url = await getSignedDownloadUrl(video.outputUrl);

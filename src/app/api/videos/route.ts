@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/server/db/prisma";
+import { db } from "@/server/db";
+import { series, videoProjects, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { enqueueRenderJob } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
+import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod/v4";
 
 const createVideoSchema = z.object({
@@ -16,19 +18,31 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const seriesId = searchParams.get("seriesId");
 
-  const videos = await prisma.videoProject.findMany({
-    where: {
-      series: { userId: user.id },
-      ...(seriesId && { seriesId }),
+  const userSeries = await db.query.series.findMany({
+    where: eq(series.userId, user.id),
+    columns: { id: true },
+  });
+  const seriesIds = userSeries.map((s) => s.id);
+
+  if (seriesIds.length === 0) return NextResponse.json([]);
+
+  const videos = await db.query.videoProjects.findMany({
+    where: seriesId
+      ? and(eq(videoProjects.seriesId, seriesId))
+      : undefined,
+    with: {
+      renderJobs: {
+        orderBy: desc(renderJobs.createdAt),
+        limit: 1,
+      },
     },
-    include: {
-      renderJobs: { orderBy: { createdAt: "desc" }, take: 1 },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 50,
+    orderBy: desc(videoProjects.createdAt),
+    limit: 50,
   });
 
-  return NextResponse.json(videos);
+  const filtered = videos.filter((v) => seriesIds.includes(v.seriesId));
+
+  return NextResponse.json(filtered);
 }
 
 export async function POST(req: NextRequest) {
@@ -39,10 +53,10 @@ export async function POST(req: NextRequest) {
   const parsed = createVideoSchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
-  const series = await prisma.series.findFirst({
-    where: { id: parsed.data.seriesId, userId: user.id },
+  const seriesRecord = await db.query.series.findFirst({
+    where: and(eq(series.id, parsed.data.seriesId), eq(series.userId, user.id)),
   });
-  if (!series) return badRequest("Series not found");
+  if (!seriesRecord) return badRequest("Series not found");
 
   const usage = await checkUsageLimit(user.id);
   if (!usage.allowed) {
@@ -56,17 +70,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const videoProject = await prisma.videoProject.create({
-    data: { seriesId: series.id, status: "PENDING" },
-  });
+  const [videoProject] = await db
+    .insert(videoProjects)
+    .values({ seriesId: seriesRecord.id, status: "PENDING" })
+    .returning();
 
-  await prisma.renderJob.create({
-    data: { videoProjectId: videoProject.id },
-  });
+  await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
   await enqueueRenderJob({
     videoProjectId: videoProject.id,
-    seriesId: series.id,
+    seriesId: seriesRecord.id,
     userId: user.id,
   });
 

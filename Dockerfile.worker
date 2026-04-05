@@ -10,9 +10,6 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
-COPY prisma ./prisma
-RUN npx prisma generate
-
 COPY . .
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
