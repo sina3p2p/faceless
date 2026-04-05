@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { renderVideoJob } from "./renderJob";
+import { renderVideoJob, rerenderVideoJob } from "./renderJob";
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 
@@ -16,7 +16,11 @@ const worker = new Worker(
   async (job) => {
     const startTime = Date.now();
     logger.info("Job started", { jobId: job.id, jobName: job.name, data: job.data });
-    await renderVideoJob(job);
+    if (job.name === "rerender-video") {
+      await rerenderVideoJob(job);
+    } else {
+      await renderVideoJob(job);
+    }
     logger.info("Job completed", {
       jobId: job.id,
       durationMs: Date.now() - startTime,

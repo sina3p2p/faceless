@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,7 @@ interface VideoDetail {
 
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const [video, setVideo] = useState<VideoDetail | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -176,9 +177,15 @@ export default function VideoDetailPage() {
                 <p className="text-gray-500">Click download to preview</p>
               </div>
             )}
-            <div className="flex justify-center">
+            <div className="flex justify-center gap-3">
               <Button loading={downloading} onClick={handleDownload}>
                 Download MP4
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => router.push(`/dashboard/videos/${id}/edit`)}
+              >
+                Edit Video
               </Button>
             </div>
           </CardContent>

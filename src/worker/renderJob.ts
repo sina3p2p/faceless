@@ -25,7 +25,7 @@ import {
   downloadFile,
   type ComposerScene,
 } from "@/server/services/composer";
-import { uploadFile } from "@/lib/storage";
+import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { recordUsage } from "@/lib/usage";
 import type { RenderJobData } from "@/lib/queue";
 
@@ -240,13 +240,15 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       })
       .where(eq(schema.videoProjects.id, videoProjectId));
 
+    const sceneIds: string[] = [];
     for (let i = 0; i < script.scenes.length; i++) {
-      await db.insert(schema.videoScenes).values({
+      const [inserted] = await db.insert(schema.videoScenes).values({
         videoProjectId,
         sceneOrder: i,
         text: script.scenes[i].text,
         duration: script.scenes[i].duration,
-      });
+      }).returning({ id: schema.videoScenes.id });
+      sceneIds.push(inserted.id);
     }
 
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 25);
@@ -275,6 +277,33 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 70);
     await job.updateProgress(70);
+
+    // Step 3.5: Upload individual scene assets to R2 for editor
+    await Promise.all(
+      sceneTexts.map(async (_, i) => {
+        const audioBuffer = await fs.readFile(audioPaths[i]);
+        const audioKey = `scenes/${videoProjectId}/audio_${i}.mp3`;
+        await uploadFile(audioKey, audioBuffer, "audio/mpeg");
+
+        const mediaBuffer = await fs.readFile(mediaPaths[i].path);
+        const mediaExt = mediaPaths[i].type === "video" ? "mp4" : "jpg";
+        const mediaMime = mediaPaths[i].type === "video" ? "video/mp4" : "image/jpeg";
+        const mediaKey = `scenes/${videoProjectId}/media_${i}.${mediaExt}`;
+        await uploadFile(mediaKey, mediaBuffer, mediaMime);
+
+        await db
+          .update(schema.videoScenes)
+          .set({
+            audioUrl: audioKey,
+            assetUrl: mediaKey,
+            assetType: mediaPaths[i].type,
+            captionData: ttsResults[i].wordTimestamps,
+          })
+          .where(eq(schema.videoScenes.id, sceneIds[i]));
+      })
+    );
+
+    await job.updateProgress(73);
 
     // Step 4: Compose Video with word-synced captions
     await updateVideoStatus(videoProjectId, "RENDERING");
@@ -319,6 +348,85 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       .update(schema.renderJobs)
       .set({ status: "FAILED", error: errorMessage })
       .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
+    throw error;
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+export async function rerenderVideoJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId, userId } = job.data;
+  const workDir = path.join(os.tmpdir(), `faceless-rerender-${uuid()}`);
+  await fs.mkdir(workDir, { recursive: true });
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    const scenes = await db.query.videoScenes.findMany({
+      where: eq(schema.videoScenes.videoProjectId, videoProjectId),
+      orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
+    });
+
+    if (scenes.length === 0) throw new Error("No scenes to re-render");
+
+    console.log(`Re-render starting: ${scenes.length} scenes for ${videoProjectId}`);
+    await updateVideoStatus(videoProjectId, "RENDERING");
+    await job.updateProgress(10);
+
+    const composerScenes: ComposerScene[] = await Promise.all(
+      scenes.map(async (scene, i) => {
+        const audioPath = path.join(workDir, `audio_${i}.mp3`);
+        const ext = scene.assetType === "video" ? "mp4" : "jpg";
+        const mediaPath = path.join(workDir, `media_${i}.${ext}`);
+
+        const [audioUrl, assetUrl] = await Promise.all([
+          scene.audioUrl ? getSignedDownloadUrl(scene.audioUrl) : null,
+          scene.assetUrl ? getSignedDownloadUrl(scene.assetUrl) : null,
+        ]);
+
+        if (audioUrl) await downloadFile(audioUrl, audioPath);
+        if (assetUrl) await downloadFile(assetUrl, mediaPath);
+
+        return {
+          audioPath,
+          mediaPath,
+          mediaType: (scene.assetType || "image") as "video" | "image",
+          text: scene.text,
+          duration: scene.duration ?? 5,
+          wordTimestamps: (scene.captionData as { word: string; start: number; end: number }[]) || [],
+        };
+      })
+    );
+
+    await job.updateProgress(50);
+
+    const outputPath = await composeVideo({
+      scenes: composerScenes,
+      captionStyle: seriesRecord.captionStyle,
+    });
+
+    await job.updateProgress(85);
+
+    const outputBuffer = await fs.readFile(outputPath);
+    const s3Key = `videos/${userId}/${videoProjectId}/output.mp4`;
+    await uploadFile(s3Key, outputBuffer, "video/mp4");
+
+    const totalDuration = composerScenes.reduce((s, sc) => s + sc.duration, 0);
+    await db
+      .update(schema.videoProjects)
+      .set({ duration: Math.round(totalDuration) })
+      .where(eq(schema.videoProjects.id, videoProjectId));
+
+    await updateVideoStatus(videoProjectId, "COMPLETED", { outputUrl: s3Key });
+    await job.updateProgress(100);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`Re-render failed for ${videoProjectId}:`, errorMessage);
+    await updateVideoStatus(videoProjectId, "FAILED");
     throw error;
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});

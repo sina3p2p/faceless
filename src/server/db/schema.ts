@@ -127,6 +127,7 @@ export const videoScenes = pgTable("video_scenes", {
   sceneOrder: integer("scene_order").notNull(),
   text: text("text").notNull(),
   captionData: json("caption_data"),
+  audioUrl: text("audio_url"),
   assetUrl: text("asset_url"),
   assetType: text("asset_type"),
   duration: real("duration"),
