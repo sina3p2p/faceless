@@ -1,7 +1,7 @@
 export const PLAN_LIMITS = {
-  FREE: { videosPerMonth: 3 },
-  STARTER: { videosPerMonth: 30 },
-  PRO: { videosPerMonth: 100 },
+  FREE: { videosPerMonth: 999999 },
+  STARTER: { videosPerMonth: 999999 },
+  PRO: { videosPerMonth: 999999 },
 } as const;
 
 export const VIDEO_DEFAULTS = {
