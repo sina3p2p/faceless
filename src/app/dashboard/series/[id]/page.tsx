@@ -33,6 +33,7 @@ export default function SeriesDetailPage() {
   const [series, setSeries] = useState<SeriesDetail | null>(null);
   const [generating, setGenerating] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const loadSeries = useCallback(() => {
     fetch(`/api/series/${id}`)
@@ -66,6 +67,15 @@ export default function SeriesDetailPage() {
       loadSeries();
     }
     setGenerating(false);
+  }
+
+  async function handleRetry(videoId: string) {
+    setRetryingId(videoId);
+    const res = await fetch(`/api/videos/${videoId}/retry`, { method: "POST" });
+    if (res.ok) {
+      loadSeries();
+    }
+    setRetryingId(null);
   }
 
   async function handleDelete() {
@@ -181,6 +191,19 @@ export default function SeriesDetailPage() {
                           />
                         </div>
                       )}
+                    {video.status === "FAILED" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        loading={retryingId === video.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleRetry(video.id);
+                        }}
+                      >
+                        Retry
+                      </Button>
+                    )}
                     <Badge variant={statusVariant(video.status)}>
                       {video.status.replace(/_/g, " ")}
                     </Badge>

@@ -39,6 +39,7 @@ export default function VideoDetailPage() {
   const [video, setVideo] = useState<VideoDetail | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   const loadVideo = useCallback(() => {
     fetch(`/api/videos/${id}`)
@@ -56,6 +57,15 @@ export default function VideoDetailPage() {
     const interval = setInterval(loadVideo, 3000);
     return () => clearInterval(interval);
   }, [video, loadVideo]);
+
+  async function handleRetry() {
+    setRetrying(true);
+    const res = await fetch(`/api/videos/${id}/retry`, { method: "POST" });
+    if (res.ok) {
+      loadVideo();
+    }
+    setRetrying(false);
+  }
 
   async function handleDownload() {
     setDownloading(true);
@@ -122,11 +132,16 @@ export default function VideoDetailPage() {
         </Card>
       )}
 
-      {/* Error */}
-      {job?.error && (
+      {/* Error + Retry */}
+      {video.status === "FAILED" && (
         <Card className="mb-8 border-red-500/30">
           <CardContent className="py-4">
-            <p className="text-sm text-red-400">{job.error}</p>
+            {job?.error && (
+              <p className="text-sm text-red-400 mb-4">{job.error}</p>
+            )}
+            <Button loading={retrying} onClick={handleRetry}>
+              Retry Generation
+            </Button>
           </CardContent>
         </Card>
       )}
