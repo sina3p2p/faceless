@@ -11,9 +11,15 @@ import { generateVideoScript } from "@/server/services/llm";
 import { generateSpeech, type WordTimestamp } from "@/server/services/tts";
 import {
   getMediaForScene,
+  generateImage,
   resetUsedMedia,
   type MediaAsset,
 } from "@/server/services/media";
+import {
+  getAIVideoForScene,
+  downloadAIVideo,
+  uploadImageForFal,
+} from "@/server/services/ai-video";
 import {
   composeVideo,
   downloadFile,
@@ -49,6 +55,102 @@ async function updateVideoStatus(
     .where(eq(schema.videoProjects.id, videoProjectId));
 }
 
+async function fetchFacelessMedia(
+  script: Awaited<ReturnType<typeof generateVideoScript>>,
+  seriesRecord: { niche: string; style: string },
+  workDir: string,
+  job: Job<RenderJobData>
+): Promise<{ path: string; type: "video" | "image" }[]> {
+  const mediaPaths: { path: string; type: "video" | "image" }[] = [];
+
+  for (let i = 0; i < script.scenes.length; i++) {
+    const scene = script.scenes[i];
+    const searchQuery = scene.searchQuery || scene.visualDescription;
+    const imagePrompt = scene.imagePrompt || scene.visualDescription;
+
+    let asset: MediaAsset;
+    try {
+      asset = await getMediaForScene(searchQuery, imagePrompt, true);
+    } catch (err) {
+      console.warn(
+        `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Trying fallback.`
+      );
+      try {
+        asset = await getMediaForScene(
+          seriesRecord.niche,
+          `A dramatic cinematic scene related to ${seriesRecord.niche}, ${seriesRecord.style} art style, moody lighting, photorealistic, no text`,
+          false
+        );
+      } catch {
+        throw new Error(
+          `Could not find any media for scene ${i}. Check Pexels API key and OpenAI API key.`
+        );
+      }
+    }
+
+    const ext = asset.type === "video" ? "mp4" : "jpg";
+    const mediaPath = path.join(workDir, `media_${i}.${ext}`);
+
+    if (asset.url) {
+      await downloadFile(asset.url, mediaPath);
+    }
+
+    console.log(`Scene ${i}: media from ${asset.source} (${asset.type})`);
+    mediaPaths.push({ path: mediaPath, type: asset.type });
+    await job.updateProgress(
+      55 + Math.floor((i / script.scenes.length) * 15)
+    );
+  }
+
+  return mediaPaths;
+}
+
+async function fetchAIVideoMedia(
+  script: Awaited<ReturnType<typeof generateVideoScript>>,
+  seriesRecord: { niche: string; style: string },
+  workDir: string,
+  job: Job<RenderJobData>
+): Promise<{ path: string; type: "video" | "image" }[]> {
+  const mediaPaths: { path: string; type: "video" | "image" }[] = [];
+  const totalScenes = script.scenes.length;
+
+  for (let i = 0; i < totalScenes; i++) {
+    const scene = script.scenes[i];
+    const imagePrompt = scene.imagePrompt || scene.visualDescription;
+    const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
+
+    console.log(`Scene ${i}: Generating DALL-E image...`);
+
+    const dalleImage = await generateImage(imagePrompt);
+    if (!dalleImage) {
+      throw new Error(
+        `Could not generate DALL-E image for scene ${i}. Check OpenAI API key.`
+      );
+    }
+
+    const imagePath = path.join(workDir, `ai_img_${i}.jpg`);
+    await downloadFile(dalleImage.url, imagePath);
+
+    console.log(`Scene ${i}: Uploading image to fal.ai...`);
+    const falImageUrl = await uploadImageForFal(imagePath);
+
+    console.log(`Scene ${i}: Generating AI video clip...`);
+    const videoResult = await getAIVideoForScene(falImageUrl, videoPrompt, "5");
+
+    const videoPath = path.join(workDir, `media_${i}.mp4`);
+    await downloadAIVideo(videoResult.videoUrl, videoPath);
+
+    console.log(`Scene ${i}: AI video clip ready`);
+    mediaPaths.push({ path: videoPath, type: "video" });
+
+    await job.updateProgress(
+      55 + Math.floor(((i + 1) / totalScenes) * 15)
+    );
+  }
+
+  return mediaPaths;
+}
+
 export async function renderVideoJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
   const workDir = path.join(os.tmpdir(), `faceless-render-${uuid()}`);
@@ -62,6 +164,9 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     });
 
     if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    const videoType = seriesRecord.videoType || "faceless";
+    console.log(`Render job starting: type=${videoType}, series=${seriesId}`);
 
     // Step 1: Generate Script
     await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
@@ -128,51 +233,16 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 50);
     await job.updateProgress(50);
 
-    // Step 3: Fetch Media -- prefer AI-generated images for visual consistency
+    // Step 3: Fetch Media (branching based on video type)
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 55);
     await job.updateProgress(55);
 
-    const mediaPaths: { path: string; type: "video" | "image" }[] = [];
+    let mediaPaths: { path: string; type: "video" | "image" }[];
 
-    for (let i = 0; i < script.scenes.length; i++) {
-      const scene = script.scenes[i];
-      const searchQuery = scene.searchQuery || scene.visualDescription;
-      const imagePrompt = scene.imagePrompt || scene.visualDescription;
-
-      let asset: MediaAsset;
-      try {
-        asset = await getMediaForScene(searchQuery, imagePrompt, true);
-      } catch (err) {
-        console.warn(
-          `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Trying fallback.`
-        );
-        try {
-          asset = await getMediaForScene(
-            seriesRecord.niche,
-            `A dramatic cinematic scene related to ${seriesRecord.niche}, ${seriesRecord.style} art style, moody lighting, photorealistic, no text`,
-            false
-          );
-        } catch {
-          throw new Error(
-            `Could not find any media for scene ${i}. Check Pexels API key and OpenAI API key.`
-          );
-        }
-      }
-
-      const ext = asset.type === "video" ? "mp4" : "jpg";
-      const mediaPath = path.join(workDir, `media_${i}.${ext}`);
-
-      if (asset.url) {
-        await downloadFile(asset.url, mediaPath);
-      }
-
-      console.log(
-        `Scene ${i}: media from ${asset.source} (${asset.type})`
-      );
-      mediaPaths.push({ path: mediaPath, type: asset.type });
-      await job.updateProgress(
-        55 + Math.floor((i / script.scenes.length) * 15)
-      );
+    if (videoType === "ai_video") {
+      mediaPaths = await fetchAIVideoMedia(script, seriesRecord, workDir, job);
+    } else {
+      mediaPaths = await fetchFacelessMedia(script, seriesRecord, workDir, job);
     }
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 70);

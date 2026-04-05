@@ -11,6 +11,7 @@ const createSeriesSchema = z.object({
   style: z.string().default("cinematic"),
   defaultVoiceId: z.string().optional(),
   captionStyle: z.string().default("default"),
+  videoType: z.enum(["faceless", "ai_video"]).default("faceless"),
   topicIdeas: z.array(z.string()).default([]),
 });
 

@@ -102,6 +102,7 @@ export const series = pgTable("series", {
   style: text("style").default("cinematic").notNull(),
   defaultVoiceId: text("default_voice_id"),
   captionStyle: text("caption_style").default("default").notNull(),
+  videoType: text("video_type").default("faceless").notNull(),
   topicIdeas: json("topic_ideas").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

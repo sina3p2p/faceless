@@ -35,4 +35,9 @@ export const CAPTION_STYLES = [
   { id: "neon", label: "Neon Glow", description: "Glowing neon-style captions" },
 ] as const;
 
+export const VIDEO_TYPES = [
+  { id: "faceless", label: "Faceless", description: "Stock footage and AI images with voiceover" },
+  { id: "ai_video", label: "AI Video", description: "AI-generated animated video clips per scene (higher cost)" },
+] as const;
+
 export const RENDER_QUEUE_NAME = "video-render";
