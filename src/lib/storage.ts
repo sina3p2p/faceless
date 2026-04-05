@@ -5,9 +5,11 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+const endpoint = process.env.S3_ENDPOINT || undefined;
+
 const s3 = new S3Client({
-  endpoint: process.env.S3_ENDPOINT || undefined,
-  region: process.env.S3_REGION || "us-east-1",
+  endpoint,
+  region: process.env.S3_REGION || "auto",
   credentials: {
     accessKeyId: process.env.S3_ACCESS_KEY_ID || "",
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || "",
@@ -16,6 +18,7 @@ const s3 = new S3Client({
 });
 
 const BUCKET = process.env.S3_BUCKET || "faceless-media";
+const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || "";
 
 export async function uploadFile(
   key: string,
@@ -37,6 +40,22 @@ export async function getSignedDownloadUrl(
   key: string,
   expiresIn = 3600
 ): Promise<string> {
+  if (R2_PUBLIC_URL) {
+    const base = R2_PUBLIC_URL.replace(/\/$/, "");
+    return `${base}/${key}`;
+  }
+
   const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-  return getSignedUrl(s3, command, { expiresIn });
+  const url = await getSignedUrl(s3, command, { expiresIn });
+
+  if (endpoint && url.includes("s3.amazonaws.com")) {
+    const parsed = new URL(url);
+    const r2 = new URL(endpoint);
+    parsed.hostname = r2.hostname;
+    parsed.protocol = r2.protocol;
+    parsed.port = r2.port;
+    return parsed.toString();
+  }
+
+  return url;
 }

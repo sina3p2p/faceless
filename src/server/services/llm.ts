@@ -56,6 +56,8 @@ export interface VideoScript {
   scenes: Array<{
     text: string;
     visualDescription: string;
+    searchQuery: string;
+    imagePrompt: string;
     duration: number;
   }>;
   cta: string;
@@ -68,7 +70,7 @@ export async function generateVideoScript(
   topicIdea?: string,
   targetDuration = 45
 ): Promise<VideoScript> {
-  const systemPrompt = `You are a viral short-form video scriptwriter. You create engaging faceless video scripts for social media (TikTok, Reels, Shorts).
+  const systemPrompt = `You are a viral short-form video scriptwriter specializing in faceless content for TikTok, Reels, and Shorts.
 
 Your output must be valid JSON matching this exact schema:
 {
@@ -76,29 +78,33 @@ Your output must be valid JSON matching this exact schema:
   "hook": "string - attention-grabbing opening line (first 3 seconds)",
   "scenes": [
     {
-      "text": "string - narration text for this scene",
-      "visualDescription": "string - description of what should be shown visually",
-      "duration": number - seconds for this scene
+      "text": "string - narration text for this scene (2-3 sentences max)",
+      "visualDescription": "string - detailed description of the visual scene",
+      "searchQuery": "string - 2-4 word search query for finding relevant stock footage (be specific and concrete, e.g. 'ancient roman colosseum' not 'historical building')",
+      "imagePrompt": "string - detailed prompt for AI image generation if stock footage isn't available. Include: subject, setting, mood, lighting, camera angle. Style: ${style}",
+      "duration": number - estimated seconds for this scene based on narration length
     }
   ],
   "cta": "string - call to action at the end",
   "totalDuration": number - total video duration in seconds
 }
 
-Rules:
-- Hook must grab attention in the first 3 seconds
-- Each scene should be 5-10 seconds
+Critical rules:
+- Hook MUST grab attention in the first 3 seconds with a shocking fact, question, or bold claim
+- Each scene narration should be 2-3 sentences, roughly 5-8 seconds when spoken
 - Total duration should be close to ${targetDuration} seconds
-- Use simple, conversational language
-- Create curiosity and suspense
-- End with a clear CTA`;
+- searchQuery must be CONCRETE and SPECIFIC to the scene content (e.g. "dark forest fog night" not "scary background")
+- imagePrompt must describe a SPECIFIC image that directly illustrates the narration
+- Use simple, dramatic, conversational language
+- Build suspense throughout
+- End with a compelling CTA that creates FOMO`;
 
   const userPrompt = topicIdea
-    ? `Create a ${niche} video script about: ${topicIdea}. Style: ${style}.`
-    : `Create a ${niche} video script. Style: ${style}. Choose an interesting topic that would go viral.`;
+    ? `Create a ${niche} video script about: ${topicIdea}. Visual style: ${style}. Make it dramatic and engaging.`
+    : `Create a ${niche} video script. Visual style: ${style}. Choose a specific, fascinating topic that would go viral. Make it dramatic and engaging.`;
 
   const result = await generateText(systemPrompt, userPrompt, {
-    maxTokens: 2048,
+    maxTokens: 3000,
     temperature: 0.8,
     jsonMode: true,
   });

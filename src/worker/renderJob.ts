@@ -9,7 +9,11 @@ import { eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { generateVideoScript } from "@/server/services/llm";
 import { generateSpeech } from "@/server/services/tts";
-import { getMediaForScene, type MediaAsset } from "@/server/services/media";
+import {
+  getMediaForScene,
+  resetUsedMedia,
+  type MediaAsset,
+} from "@/server/services/media";
 import {
   composeVideo,
   downloadFile,
@@ -49,6 +53,8 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
   const workDir = path.join(os.tmpdir(), `faceless-render-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
+
+  resetUsedMedia();
 
   try {
     const seriesRecord = await db.query.series.findFirst({
@@ -95,50 +101,55 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 25);
     await job.updateProgress(25);
 
-    // Step 2: Generate TTS
+    // Step 2: Generate TTS for each scene individually
     await updateVideoStatus(videoProjectId, "GENERATING_ASSETS");
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 30);
     await job.updateProgress(30);
 
-    const allText = [script.hook, ...script.scenes.map((s) => s.text), script.cta];
+    const sceneTexts = script.scenes.map((s) => s.text);
     const audioPaths: string[] = [];
 
-    for (let i = 0; i < allText.length; i++) {
-      const ttsResult = await generateSpeech(allText[i], {
+    for (let i = 0; i < sceneTexts.length; i++) {
+      const ttsResult = await generateSpeech(sceneTexts[i], {
         voiceId: seriesRecord.defaultVoiceId ?? undefined,
       });
       const audioPath = path.join(workDir, `audio_${i}.mp3`);
       await fs.writeFile(audioPath, ttsResult.audioBuffer);
       audioPaths.push(audioPath);
-      await job.updateProgress(30 + Math.floor((i / allText.length) * 20));
+      await job.updateProgress(30 + Math.floor((i / sceneTexts.length) * 20));
     }
 
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 50);
     await job.updateProgress(50);
 
-    // Step 3: Fetch Media
+    // Step 3: Fetch Media using scene-specific search queries and image prompts
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 55);
     await job.updateProgress(55);
 
-    const allVisuals = [
-      script.hook,
-      ...script.scenes.map((s) => s.visualDescription),
-      script.cta,
-    ];
     const mediaPaths: { path: string; type: "video" | "image" }[] = [];
 
-    for (let i = 0; i < allVisuals.length; i++) {
+    for (let i = 0; i < script.scenes.length; i++) {
+      const scene = script.scenes[i];
+      const searchQuery = scene.searchQuery || scene.visualDescription;
+      const imagePrompt = scene.imagePrompt || scene.visualDescription;
+
       let asset: MediaAsset;
       try {
-        asset = await getMediaForScene(allVisuals[i]);
-      } catch {
-        asset = {
-          url: "",
-          type: "image",
-          source: "pexels",
-          width: 1080,
-          height: 1920,
-        };
+        asset = await getMediaForScene(searchQuery, imagePrompt);
+      } catch (err) {
+        console.warn(
+          `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Using fallback.`
+        );
+        try {
+          asset = await getMediaForScene(
+            seriesRecord.niche,
+            `A cinematic scene related to ${seriesRecord.niche}, dramatic lighting, photorealistic`
+          );
+        } catch {
+          throw new Error(
+            `Could not find any media for scene ${i}. Check Pexels API key and OpenAI API key.`
+          );
+        }
       }
 
       const ext = asset.type === "video" ? "mp4" : "jpg";
@@ -149,25 +160,25 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       }
 
       mediaPaths.push({ path: mediaPath, type: asset.type });
-      await job.updateProgress(55 + Math.floor((i / allVisuals.length) * 15));
+      await job.updateProgress(
+        55 + Math.floor((i / script.scenes.length) * 15)
+      );
     }
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 70);
     await job.updateProgress(70);
 
-    // Step 4: Compose Video
+    // Step 4: Compose Video (audio duration is detected by composer via ffprobe)
     await updateVideoStatus(videoProjectId, "RENDERING");
     await updateJobStep(videoProjectId, "COMPOSE", "ACTIVE", 75);
     await job.updateProgress(75);
 
-    const durations = [3, ...script.scenes.map((s) => s.duration), 3];
-
-    const composerScenes: ComposerScene[] = allText.map((text, i) => ({
+    const composerScenes: ComposerScene[] = sceneTexts.map((text, i) => ({
       audioPath: audioPaths[i],
       mediaPath: mediaPaths[i].path,
       mediaType: mediaPaths[i].type,
       text,
-      duration: durations[i],
+      duration: script.scenes[i].duration,
     }));
 
     const outputPath = await composeVideo({
@@ -177,7 +188,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
 
     await job.updateProgress(90);
 
-    // Step 5: Upload to S3
+    // Step 5: Upload to S3/R2
     const outputBuffer = await fs.readFile(outputPath);
     const s3Key = `videos/${userId}/${videoProjectId}/output.mp4`;
     await uploadFile(s3Key, outputBuffer, "video/mp4");
@@ -193,6 +204,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
+    console.error(`Render job failed for ${videoProjectId}:`, errorMessage);
     await updateVideoStatus(videoProjectId, "FAILED");
     await db
       .update(schema.renderJobs)

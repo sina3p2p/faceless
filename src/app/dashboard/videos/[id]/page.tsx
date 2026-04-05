@@ -58,6 +58,16 @@ export default function VideoDetailPage() {
     return () => clearInterval(interval);
   }, [video, loadVideo]);
 
+  useEffect(() => {
+    if (video?.status === "COMPLETED" && !downloadUrl) {
+      fetch(`/api/videos/${id}/download`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.url) setDownloadUrl(data.url);
+        });
+    }
+  }, [video?.status, downloadUrl, id]);
+
   async function handleRetry() {
     setRetrying(true);
     const res = await fetch(`/api/videos/${id}/retry`, { method: "POST" });
