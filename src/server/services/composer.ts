@@ -44,6 +44,18 @@ async function getAudioDuration(audioPath: string): Promise<number> {
   }
 }
 
+async function getMediaDuration(mediaPath: string): Promise<number> {
+  try {
+    const { stdout } = await execAsync(
+      `ffprobe -v error -show_entries format=duration -of csv=p=0 "${mediaPath}"`
+    );
+    const duration = parseFloat(stdout.trim());
+    return isNaN(duration) ? 0 : duration;
+  } catch {
+    return 0;
+  }
+}
+
 function escapeAss(text: string): string {
   return text
     .replace(/\\/g, "\\\\")
@@ -216,6 +228,9 @@ export async function composeVideo(
       const fadeOutStart = Math.max(0, duration - 0.4);
 
       if (scene.mediaType === "video") {
+        const videoDuration = await getMediaDuration(scene.mediaPath);
+        const needsLoop = videoDuration > 0 && videoDuration < duration;
+
         const videoFilter = [
           `scale=${W}:${H}:force_original_aspect_ratio=increase`,
           `crop=${W}:${H}`,
@@ -224,13 +239,15 @@ export async function composeVideo(
           `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`,
         ].join(",");
 
+        const loopFlag = needsLoop ? `-stream_loop -1` : "";
+
         await execAsync(
-          `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
+          `ffmpeg -y ${loopFlag} -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
             `-filter_complex "[0:v]${videoFilter}[outv];[1:a]aresample=44100[outa]" ` +
             `-map "[outv]" -map "[outa]" ` +
             `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
-            `-t ${duration} -shortest "${sceneOutput}"`
+            `-t ${duration} "${sceneOutput}"`
         );
       } else {
         const totalFrames = Math.ceil(duration * FPS);
@@ -256,7 +273,7 @@ export async function composeVideo(
             `-map "[outv]" -map "[outa]" ` +
             `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
-            `-t ${duration} -shortest "${sceneOutput}"`
+            `-t ${duration} "${sceneOutput}"`
         );
       }
 

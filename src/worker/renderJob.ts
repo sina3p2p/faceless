@@ -8,7 +8,7 @@ import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { generateVideoScript } from "@/server/services/llm";
-import { generateSpeech, type WordTimestamp } from "@/server/services/tts";
+import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
   getMediaForScene,
   generateImage,
@@ -55,96 +55,142 @@ async function updateVideoStatus(
     .where(eq(schema.videoProjects.id, videoProjectId));
 }
 
-async function fetchFacelessMedia(
+async function generateTTSParallel(
+  sceneTexts: string[],
+  voiceId: string | undefined,
+  workDir: string,
+  concurrency = 3
+): Promise<{ audioPaths: string[]; ttsResults: TTSResult[] }> {
+  const audioPaths: string[] = new Array(sceneTexts.length);
+  const ttsResults: TTSResult[] = new Array(sceneTexts.length);
+
+  const chunks: number[][] = [];
+  for (let i = 0; i < sceneTexts.length; i += concurrency) {
+    chunks.push(
+      Array.from({ length: Math.min(concurrency, sceneTexts.length - i) }, (_, j) => i + j)
+    );
+  }
+
+  for (const chunk of chunks) {
+    await Promise.all(
+      chunk.map(async (i) => {
+        const result = await generateSpeech(sceneTexts[i], { voiceId });
+        const audioPath = path.join(workDir, `audio_${i}.mp3`);
+        await fs.writeFile(audioPath, result.audioBuffer);
+        audioPaths[i] = audioPath;
+        ttsResults[i] = result;
+        console.log(`Scene ${i}: TTS done, ${result.wordTimestamps.length} word timestamps`);
+      })
+    );
+  }
+
+  return { audioPaths, ttsResults };
+}
+
+async function fetchFacelessMediaParallel(
   script: Awaited<ReturnType<typeof generateVideoScript>>,
   seriesRecord: { niche: string; style: string },
   workDir: string,
-  job: Job<RenderJobData>
+  concurrency = 3
 ): Promise<{ path: string; type: "video" | "image" }[]> {
-  const mediaPaths: { path: string; type: "video" | "image" }[] = [];
+  const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
 
-  for (let i = 0; i < script.scenes.length; i++) {
-    const scene = script.scenes[i];
-    const searchQuery = scene.searchQuery || scene.visualDescription;
-    const imagePrompt = scene.imagePrompt || scene.visualDescription;
+  const chunks: number[][] = [];
+  for (let i = 0; i < script.scenes.length; i += concurrency) {
+    chunks.push(
+      Array.from({ length: Math.min(concurrency, script.scenes.length - i) }, (_, j) => i + j)
+    );
+  }
 
-    let asset: MediaAsset;
-    try {
-      asset = await getMediaForScene(searchQuery, imagePrompt, true);
-    } catch (err) {
-      console.warn(
-        `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Trying fallback.`
-      );
-      try {
-        asset = await getMediaForScene(
-          seriesRecord.niche,
-          `A dramatic cinematic scene related to ${seriesRecord.niche}, ${seriesRecord.style} art style, moody lighting, photorealistic, no text`,
-          false
-        );
-      } catch {
-        throw new Error(
-          `Could not find any media for scene ${i}. Check Pexels API key and OpenAI API key.`
-        );
-      }
-    }
+  for (const chunk of chunks) {
+    await Promise.all(
+      chunk.map(async (i) => {
+        const scene = script.scenes[i];
+        const searchQuery = scene.searchQuery || scene.visualDescription;
+        const imagePrompt = scene.imagePrompt || scene.visualDescription;
 
-    const ext = asset.type === "video" ? "mp4" : "jpg";
-    const mediaPath = path.join(workDir, `media_${i}.${ext}`);
+        let asset: MediaAsset;
+        try {
+          asset = await getMediaForScene(searchQuery, imagePrompt, true);
+        } catch (err) {
+          console.warn(
+            `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Trying fallback.`
+          );
+          try {
+            asset = await getMediaForScene(
+              seriesRecord.niche,
+              `A dramatic cinematic scene related to ${seriesRecord.niche}, ${seriesRecord.style} art style, moody lighting, photorealistic, no text`,
+              false
+            );
+          } catch {
+            throw new Error(
+              `Could not find any media for scene ${i}. Check Pexels API key and OpenAI API key.`
+            );
+          }
+        }
 
-    if (asset.url) {
-      await downloadFile(asset.url, mediaPath);
-    }
+        const ext = asset.type === "video" ? "mp4" : "jpg";
+        const mediaPath = path.join(workDir, `media_${i}.${ext}`);
 
-    console.log(`Scene ${i}: media from ${asset.source} (${asset.type})`);
-    mediaPaths.push({ path: mediaPath, type: asset.type });
-    await job.updateProgress(
-      55 + Math.floor((i / script.scenes.length) * 15)
+        if (asset.url) {
+          await downloadFile(asset.url, mediaPath);
+        }
+
+        console.log(`Scene ${i}: media from ${asset.source} (${asset.type})`);
+        mediaPaths[i] = { path: mediaPath, type: asset.type };
+      })
     );
   }
 
   return mediaPaths;
 }
 
-async function fetchAIVideoMedia(
+async function fetchAIVideoMediaParallel(
   script: Awaited<ReturnType<typeof generateVideoScript>>,
   seriesRecord: { niche: string; style: string },
   workDir: string,
-  job: Job<RenderJobData>
+  concurrency = 2
 ): Promise<{ path: string; type: "video" | "image" }[]> {
-  const mediaPaths: { path: string; type: "video" | "image" }[] = [];
-  const totalScenes = script.scenes.length;
+  const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
 
-  for (let i = 0; i < totalScenes; i++) {
-    const scene = script.scenes[i];
-    const imagePrompt = scene.imagePrompt || scene.visualDescription;
-    const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
+  const chunks: number[][] = [];
+  for (let i = 0; i < script.scenes.length; i += concurrency) {
+    chunks.push(
+      Array.from({ length: Math.min(concurrency, script.scenes.length - i) }, (_, j) => i + j)
+    );
+  }
 
-    console.log(`Scene ${i}: Generating DALL-E image...`);
+  for (const chunk of chunks) {
+    await Promise.all(
+      chunk.map(async (i) => {
+        const scene = script.scenes[i];
+        const imagePrompt = scene.imagePrompt || scene.visualDescription;
+        const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
 
-    const dalleImage = await generateImage(imagePrompt);
-    if (!dalleImage) {
-      throw new Error(
-        `Could not generate DALL-E image for scene ${i}. Check OpenAI API key.`
-      );
-    }
+        console.log(`Scene ${i}: Generating DALL-E image...`);
+        const dalleImage = await generateImage(imagePrompt);
+        if (!dalleImage) {
+          throw new Error(
+            `Could not generate DALL-E image for scene ${i}. Check OpenAI API key.`
+          );
+        }
 
-    const imagePath = path.join(workDir, `ai_img_${i}.jpg`);
-    await downloadFile(dalleImage.url, imagePath);
+        const imagePath = path.join(workDir, `ai_img_${i}.jpg`);
+        await downloadFile(dalleImage.url, imagePath);
 
-    console.log(`Scene ${i}: Uploading image to fal.ai...`);
-    const falImageUrl = await uploadImageForFal(imagePath);
+        console.log(`Scene ${i}: Uploading image to fal.ai...`);
+        const falImageUrl = await uploadImageForFal(imagePath);
 
-    console.log(`Scene ${i}: Generating AI video clip...`);
-    const videoResult = await getAIVideoForScene(falImageUrl, videoPrompt, "5");
+        console.log(`Scene ${i}: Generating AI video clip...`);
+        const clipDuration: "5" | "10" = scene.duration > 6 ? "10" : "5";
+        const videoResult = await getAIVideoForScene(falImageUrl, videoPrompt, clipDuration);
 
-    const videoPath = path.join(workDir, `media_${i}.mp4`);
-    await downloadAIVideo(videoResult.videoUrl, videoPath);
+        const videoPath = path.join(workDir, `media_${i}.mp4`);
+        await downloadAIVideo(videoResult.videoUrl, videoPath);
 
-    console.log(`Scene ${i}: AI video clip ready`);
-    mediaPaths.push({ path: videoPath, type: "video" });
-
-    await job.updateProgress(
-      55 + Math.floor(((i + 1) / totalScenes) * 15)
+        console.log(`Scene ${i}: AI video clip ready`);
+        mediaPaths[i] = { path: videoPath, type: "video" };
+      })
     );
   }
 
@@ -206,44 +252,26 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 25);
     await job.updateProgress(25);
 
-    // Step 2: Generate TTS with word-level timestamps
+    // Step 2 + 3: Generate TTS and Media in parallel
     await updateVideoStatus(videoProjectId, "GENERATING_ASSETS");
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 30);
     await job.updateProgress(30);
 
     const sceneTexts = script.scenes.map((s) => s.text);
-    const audioPaths: string[] = [];
-    const allWordTimestamps: WordTimestamp[][] = [];
 
-    for (let i = 0; i < sceneTexts.length; i++) {
-      const ttsResult = await generateSpeech(sceneTexts[i], {
-        voiceId: seriesRecord.defaultVoiceId ?? undefined,
-      });
-      const audioPath = path.join(workDir, `audio_${i}.mp3`);
-      await fs.writeFile(audioPath, ttsResult.audioBuffer);
-      audioPaths.push(audioPath);
-      allWordTimestamps.push(ttsResult.wordTimestamps);
+    const ttsPromise = generateTTSParallel(
+      sceneTexts,
+      seriesRecord.defaultVoiceId ?? undefined,
+      workDir
+    );
 
-      console.log(
-        `Scene ${i}: TTS done, ${ttsResult.wordTimestamps.length} word timestamps`
-      );
-      await job.updateProgress(30 + Math.floor((i / sceneTexts.length) * 20));
-    }
+    const mediaPromise = videoType === "ai_video"
+      ? fetchAIVideoMediaParallel(script, seriesRecord, workDir)
+      : fetchFacelessMediaParallel(script, seriesRecord, workDir);
 
-    await updateJobStep(videoProjectId, "TTS", "ACTIVE", 50);
-    await job.updateProgress(50);
+    const [ttsResult, mediaPaths] = await Promise.all([ttsPromise, mediaPromise]);
 
-    // Step 3: Fetch Media (branching based on video type)
-    await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 55);
-    await job.updateProgress(55);
-
-    let mediaPaths: { path: string; type: "video" | "image" }[];
-
-    if (videoType === "ai_video") {
-      mediaPaths = await fetchAIVideoMedia(script, seriesRecord, workDir, job);
-    } else {
-      mediaPaths = await fetchFacelessMedia(script, seriesRecord, workDir, job);
-    }
+    const { audioPaths, ttsResults } = ttsResult;
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 70);
     await job.updateProgress(70);
@@ -259,7 +287,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       mediaType: mediaPaths[i].type,
       text,
       duration: script.scenes[i].duration,
-      wordTimestamps: allWordTimestamps[i],
+      wordTimestamps: ttsResults[i].wordTimestamps,
     }));
 
     const outputPath = await composeVideo({
