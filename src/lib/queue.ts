@@ -1,0 +1,31 @@
+import { Queue } from "bullmq";
+import { redis } from "./redis";
+import { RENDER_QUEUE_NAME } from "./constants";
+
+export const renderQueue = new Queue(RENDER_QUEUE_NAME, {
+  connection: redis,
+  defaultJobOptions: {
+    attempts: 3,
+    backoff: {
+      type: "exponential",
+      delay: 5000,
+    },
+    removeOnComplete: { count: 100 },
+    removeOnFail: { count: 500 },
+  },
+});
+
+export interface RenderJobData {
+  videoProjectId: string;
+  seriesId: string;
+  userId: string;
+}
+
+export async function enqueueRenderJob(
+  data: RenderJobData
+): Promise<string> {
+  const job = await renderQueue.add("render-video", data, {
+    jobId: `render-${data.videoProjectId}`,
+  });
+  return job.id ?? data.videoProjectId;
+}

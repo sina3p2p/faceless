@@ -1,0 +1,198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----- Auth (NextAuth) -----
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ----- Domain Models -----
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  planTier      PlanTier  @default(FREE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  series        Series[]
+  subscriptions Subscription[]
+  usageLedger   UsageEntry[]
+}
+
+enum PlanTier {
+  FREE
+  STARTER
+  PRO
+}
+
+model Series {
+  id              String       @id @default(cuid())
+  userId          String
+  name            String
+  niche           String
+  style           String       @default("cinematic")
+  defaultVoiceId  String?
+  captionStyle    String       @default("default")
+  topicIdeas      String[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoProjects   VideoProject[]
+}
+
+model VideoProject {
+  id          String       @id @default(cuid())
+  seriesId    String
+  status      VideoStatus  @default(PENDING)
+  title       String?
+  script      String?      @db.Text
+  duration    Int?
+  config      Json?
+  outputUrl   String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  series      Series       @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  scenes      VideoScene[]
+  renderJobs  RenderJob[]
+}
+
+enum VideoStatus {
+  PENDING
+  GENERATING_SCRIPT
+  GENERATING_ASSETS
+  RENDERING
+  COMPLETED
+  FAILED
+}
+
+model VideoScene {
+  id             String       @id @default(cuid())
+  videoProjectId String
+  sceneOrder     Int
+  text           String       @db.Text
+  captionData    Json?
+  assetUrl       String?
+  assetType      String?
+  duration       Float?
+  createdAt      DateTime     @default(now())
+
+  videoProject   VideoProject @relation(fields: [videoProjectId], references: [id], onDelete: Cascade)
+}
+
+model RenderJob {
+  id             String      @id @default(cuid())
+  videoProjectId String
+  step           RenderStep  @default(SCRIPT)
+  status         JobStatus   @default(QUEUED)
+  progress       Int         @default(0)
+  attempts       Int         @default(0)
+  maxAttempts    Int         @default(3)
+  error          String?     @db.Text
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  videoProject   VideoProject @relation(fields: [videoProjectId], references: [id], onDelete: Cascade)
+}
+
+enum RenderStep {
+  SCRIPT
+  TTS
+  MEDIA
+  COMPOSE
+  DONE
+}
+
+enum JobStatus {
+  QUEUED
+  ACTIVE
+  COMPLETED
+  FAILED
+  RETRYING
+}
+
+model Asset {
+  id             String   @id @default(cuid())
+  url            String
+  sourceProvider String
+  licenseType    String?
+  mimeType       String?
+  sizeBytes      Int?
+  createdAt      DateTime @default(now())
+}
+
+// ----- Billing -----
+
+model Subscription {
+  id                 String   @id @default(cuid())
+  userId             String
+  stripeCustomerId   String?
+  stripeSubscriptionId String? @unique
+  stripePriceId      String?
+  status             String   @default("inactive")
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model UsageEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  credits   Int
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

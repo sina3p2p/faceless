@@ -1,0 +1,21 @@
+FROM node:20-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY prisma ./prisma
+RUN npx prisma generate
+
+COPY . .
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD node -e "process.exit(0)"
+
+CMD ["npx", "tsx", "src/worker/index.ts"]
