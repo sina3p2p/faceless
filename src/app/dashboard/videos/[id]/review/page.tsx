@@ -26,7 +26,10 @@ interface Scene {
   id: string;
   sceneOrder: number;
   text: string;
+  imagePrompt: string | null;
+  visualDescription: string | null;
   duration: number;
+  assetUrl: string | null;
 }
 
 interface VideoDetail {
@@ -35,7 +38,7 @@ interface VideoDetail {
   title: string | null;
   status: string;
   duration: number | null;
-  series: { name: string; niche: string };
+  series: { name: string; niche: string; imageModel: string | null; videoType: string };
 }
 
 function SortableSceneCard({
@@ -45,6 +48,8 @@ function SortableSceneCard({
   onSelect,
   onDelete,
   onUpdate,
+  onEditPrompt,
+  generatingImage,
 }: {
   scene: Scene;
   index: number;
@@ -52,6 +57,8 @@ function SortableSceneCard({
   onSelect: () => void;
   onDelete: () => void;
   onUpdate: (updates: { text?: string; duration?: number }) => void;
+  onEditPrompt: () => void;
+  generatingImage: boolean;
 }) {
   const {
     attributes,
@@ -98,7 +105,7 @@ function SortableSceneCard({
       className={`rounded-xl border transition-all ${
         isSelected
           ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/20"
-          : "border-white/5 bg-white/[0.02] hover:border-white/10"
+          : "border-white/5 bg-white/2 hover:border-white/10"
       }`}
     >
       <div className="flex gap-3 p-4">
@@ -125,49 +132,83 @@ function SortableSceneCard({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {editing ? (
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onBlur={handleTextSave}
-              onKeyDown={(e) => {
-                if (e.key === "Escape") {
-                  setText(scene.text);
-                  setEditing(false);
-                }
-              }}
-              autoFocus
-              rows={3}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white resize-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
-            />
-          ) : (
-            <p
-              className="text-sm text-gray-300 cursor-text hover:text-white transition-colors leading-relaxed"
-              onClick={(e) => {
-                e.stopPropagation();
-                setEditing(true);
-              }}
-            >
-              {scene.text}
-            </p>
+          {/* Narration text */}
+          <div className="mb-2">
+            <span className="text-[10px] uppercase tracking-wider text-gray-600 font-medium">Narration</span>
+            {editing ? (
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onBlur={handleTextSave}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { setText(scene.text); setEditing(false); }
+                }}
+                autoFocus
+                rows={2}
+                className="w-full mt-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white resize-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+              />
+            ) : (
+              <p
+                className="text-sm text-gray-300 cursor-text hover:text-white transition-colors leading-relaxed mt-0.5"
+                onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+              >
+                {scene.text}
+              </p>
+            )}
+          </div>
+
+          {/* Image prompt preview */}
+          {scene.imagePrompt && (
+            <div className="mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-gray-600 font-medium">Image Prompt</span>
+              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
+                {scene.imagePrompt}
+              </p>
+            </div>
           )}
 
-          <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
+          {/* Preview image */}
+          {scene.assetUrl && (
+            <div className="mt-2 relative group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={scene.assetUrl}
+                alt={`Scene ${index + 1}`}
+                className="w-full max-w-[200px] rounded-lg border border-white/10"
+              />
+              <button
+                onClick={(e) => { e.stopPropagation(); onEditPrompt(); }}
+                className="absolute top-2 right-2 px-2 py-1 rounded-md bg-black/70 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-600"
+              >
+                Edit & Regenerate
+              </button>
+            </div>
+          )}
+
+          {generatingImage && !scene.assetUrl && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-violet-400">
+              <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full" />
+              Generating image...
+            </div>
+          )}
+
+          <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
             <span className="font-mono">{duration.toFixed(1)}s</span>
-            <span className="text-gray-700">&middot;</span>
-            <span className="text-gray-600 hover:text-violet-400 cursor-pointer" onClick={(e) => { e.stopPropagation(); setEditing(true); }}>
-              Click to edit
-            </span>
+            {!scene.assetUrl && !generatingImage && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onEditPrompt(); }}
+                className="text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                Edit prompt
+              </button>
+            )}
           </div>
         </div>
 
         {/* Delete */}
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="w-8 h-8 rounded-lg bg-white/5 text-gray-500 hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center transition-colors flex-shrink-0"
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="w-8 h-8 rounded-lg bg-white/5 text-gray-500 hover:bg-red-500/20 hover:text-red-400 flex items-center justify-center transition-colors shrink-0"
           title="Delete scene"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -200,6 +241,71 @@ function SortableSceneCard({
   );
 }
 
+function PromptEditModal({
+  scene,
+  onClose,
+  onRegenerate,
+  regenerating,
+}: {
+  scene: Scene;
+  onClose: () => void;
+  onRegenerate: (prompt: string) => void;
+  regenerating: boolean;
+}) {
+  const [prompt, setPrompt] = useState(scene.imagePrompt || scene.text);
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6">
+          <h3 className="text-lg font-semibold text-white mb-1">Edit Image Prompt</h3>
+          <p className="text-sm text-gray-400 mb-4">
+            Modify the prompt and regenerate the image until you&apos;re happy with it.
+          </p>
+
+          {scene.assetUrl && (
+            <div className="mb-4">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={scene.assetUrl}
+                alt="Current preview"
+                className="w-full rounded-lg border border-white/10"
+              />
+            </div>
+          )}
+
+          <label className="block text-sm font-medium text-gray-300 mb-1.5">Image Prompt</label>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            rows={6}
+            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white resize-y focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+            placeholder="Describe the image you want to generate..."
+          />
+
+          <div className="flex items-center justify-between mt-2 mb-4">
+            <span className="text-xs text-gray-600">{prompt.length} characters</span>
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={onClose} className="flex-1">
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={regenerating}
+              onClick={() => onRegenerate(prompt)}
+              className="flex-1"
+            >
+              {scene.assetUrl ? "Regenerate Image" : "Generate Image"}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -208,6 +314,10 @@ export default function ReviewPage() {
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [video, setVideo] = useState<VideoDetail | null>(null);
+  const [editingScene, setEditingScene] = useState<Scene | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [generatingAll, setGeneratingAll] = useState(false);
+  const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -283,8 +393,50 @@ export default function ReviewPage() {
   function handleDeleteScene(sceneId: string) {
     setScenes((prev) => prev.filter((s) => s.id !== sceneId));
     if (selectedSceneId === sceneId) setSelectedSceneId(null);
-
     fetch(`/api/videos/${id}/scenes/${sceneId}`, { method: "DELETE" });
+  }
+
+  async function generateImageForScene(sceneId: string, promptOverride?: string) {
+    setGeneratingSceneIds((prev) => new Set(prev).add(sceneId));
+    try {
+      const body: Record<string, string> = {};
+      if (promptOverride) body.imagePrompt = promptOverride;
+
+      const res = await fetch(`/api/videos/${id}/scenes/${sceneId}/generate-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        await loadData();
+      }
+    } finally {
+      setGeneratingSceneIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sceneId);
+        return next;
+      });
+    }
+  }
+
+  async function handleGenerateAllImages() {
+    setGeneratingAll(true);
+    const scenesWithoutImages = scenes.filter((s) => !s.assetUrl);
+
+    await Promise.all(
+      scenesWithoutImages.map((s) => generateImageForScene(s.id))
+    );
+
+    setGeneratingAll(false);
+  }
+
+  async function handleRegenerate(prompt: string) {
+    if (!editingScene) return;
+    setRegenerating(true);
+    await generateImageForScene(editingScene.id, prompt);
+    setRegenerating(false);
+    setEditingScene(null);
   }
 
   async function handleStartRendering() {
@@ -299,6 +451,8 @@ export default function ReviewPage() {
   }
 
   const totalDuration = scenes.reduce((s, sc) => s + sc.duration, 0);
+  const allImagesGenerated = scenes.length > 0 && scenes.every((s) => s.assetUrl);
+  const someImagesGenerated = scenes.some((s) => s.assetUrl);
 
   if (loading) {
     return (
@@ -325,8 +479,7 @@ export default function ReviewPage() {
           {video?.title ?? "Review Script"}
         </h1>
         <p className="text-gray-400 text-sm">
-          Review and edit your scenes before generating the video. You can reorder,
-          edit text, adjust timing, or delete scenes. Click on the text to edit it.
+          Review your script, then generate preview images to approve before creating the video.
         </p>
       </div>
 
@@ -339,20 +492,50 @@ export default function ReviewPage() {
               <span className="text-white font-medium">{scenes.length}</span>
             </div>
             <div>
-              <span className="text-gray-500">Total Duration:</span>{" "}
+              <span className="text-gray-500">Duration:</span>{" "}
               <span className="text-white font-medium font-mono">{totalDuration.toFixed(1)}s</span>
             </div>
+            {someImagesGenerated && (
+              <div>
+                <span className="text-gray-500">Images:</span>{" "}
+                <span className="text-white font-medium">
+                  {scenes.filter((s) => s.assetUrl).length}/{scenes.length}
+                </span>
+              </div>
+            )}
           </div>
-          <Button
-            variant="primary"
-            loading={rendering}
-            onClick={handleStartRendering}
-            disabled={scenes.length === 0}
-          >
-            Generate Video
-          </Button>
+          <div className="flex items-center gap-2">
+            {!allImagesGenerated && (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={generatingAll}
+                onClick={handleGenerateAllImages}
+                disabled={scenes.length === 0}
+              >
+                {someImagesGenerated ? "Generate Remaining" : "Generate Preview Images"}
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              loading={rendering}
+              onClick={handleStartRendering}
+              disabled={scenes.length === 0}
+            >
+              Generate Video
+            </Button>
+          </div>
         </CardContent>
       </Card>
+
+      {!allImagesGenerated && scenes.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <p className="text-sm text-amber-300">
+            Generate preview images to see what each scene will look like before creating the video.
+            You can edit prompts and regenerate until you&apos;re happy.
+          </p>
+        </div>
+      )}
 
       {/* Scene list */}
       <DndContext
@@ -372,12 +555,12 @@ export default function ReviewPage() {
                 index={i}
                 isSelected={scene.id === selectedSceneId}
                 onSelect={() =>
-                  setSelectedSceneId(
-                    scene.id === selectedSceneId ? null : scene.id
-                  )
+                  setSelectedSceneId(scene.id === selectedSceneId ? null : scene.id)
                 }
                 onDelete={() => handleDeleteScene(scene.id)}
                 onUpdate={(updates) => handleUpdateScene(scene.id, updates)}
+                onEditPrompt={() => setEditingScene(scene)}
+                generatingImage={generatingSceneIds.has(scene.id)}
               />
             ))}
           </div>
@@ -392,7 +575,17 @@ export default function ReviewPage() {
 
       {/* Bottom action */}
       {scenes.length > 0 && (
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex justify-center gap-3">
+          {!allImagesGenerated && (
+            <Button
+              variant="outline"
+              size="lg"
+              loading={generatingAll}
+              onClick={handleGenerateAllImages}
+            >
+              Generate Preview Images
+            </Button>
+          )}
           <Button
             variant="primary"
             size="lg"
@@ -402,6 +595,16 @@ export default function ReviewPage() {
             Generate Video ({scenes.length} scenes, {totalDuration.toFixed(0)}s)
           </Button>
         </div>
+      )}
+
+      {/* Prompt edit modal */}
+      {editingScene && (
+        <PromptEditModal
+          scene={editingScene}
+          onClose={() => setEditingScene(null)}
+          onRegenerate={handleRegenerate}
+          regenerating={regenerating}
+        />
       )}
     </div>
   );

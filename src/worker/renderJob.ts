@@ -8,7 +8,7 @@ import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE } from "@/lib/constants";
-import { generateVideoScript, VideoScript } from "@/server/services/llm";
+import { generateVideoScript } from "@/server/services/llm";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
   getMediaForScene,
@@ -89,11 +89,39 @@ async function generateTTSParallel(
   return { audioPaths, ttsResults };
 }
 
+type PreApproved = Map<number, { path: string; type: "video" | "image" }>;
+
+type ScriptInput = Pick<Awaited<ReturnType<typeof generateVideoScript>>, "scenes">;
+
+async function reusePreApprovedImages(
+  scenes: Array<{ assetUrl?: string | null; assetType?: string | null }>,
+  workDir: string
+): Promise<PreApproved> {
+  const result: PreApproved = new Map();
+  await Promise.all(
+    scenes.map(async (scene, i) => {
+      if (!scene.assetUrl) return;
+      try {
+        const signedUrl = await getSignedDownloadUrl(scene.assetUrl);
+        const ext = scene.assetType === "video" ? "mp4" : "jpg";
+        const localPath = path.join(workDir, `media_${i}.${ext}`);
+        await downloadFile(signedUrl, localPath);
+        result.set(i, { path: localPath, type: (scene.assetType as "video" | "image") || "image" });
+        console.log(`Scene ${i}: Reusing pre-approved ${scene.assetType || "image"}`);
+      } catch (err) {
+        console.warn(`Scene ${i}: Could not reuse pre-approved asset, will regenerate:`, err);
+      }
+    })
+  );
+  return result;
+}
+
 async function fetchFacelessMediaParallel(
-  script: Awaited<ReturnType<typeof generateVideoScript>>,
+  script: ScriptInput,
   seriesRecord: { niche: string; style: string; imageModel?: string | null },
   workDir: string,
-  concurrency = 3
+  concurrency = 3,
+  preApproved: PreApproved = new Map()
 ): Promise<{ path: string; type: "video" | "image" }[]> {
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
 
@@ -107,6 +135,11 @@ async function fetchFacelessMediaParallel(
   for (const chunk of chunks) {
     await Promise.all(
       chunk.map(async (i) => {
+        if (preApproved.has(i)) {
+          mediaPaths[i] = preApproved.get(i)!;
+          return;
+        }
+
         const scene = script.scenes[i];
         const searchQuery = scene.searchQuery || scene.visualDescription;
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
@@ -168,10 +201,11 @@ async function generateSceneImage(
 }
 
 async function fetchAIVideoMediaParallel(
-  script: Awaited<ReturnType<typeof generateVideoScript>>,
+  script: ScriptInput,
   seriesRecord: { niche: string; style: string; imageModel?: string | null },
   workDir: string,
-  concurrency = 2
+  concurrency = 2,
+  preApproved: PreApproved = new Map()
 ): Promise<{ path: string; type: "video" | "image" }[]> {
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
   const imageModel = seriesRecord.imageModel || "dall-e-3";
@@ -190,10 +224,18 @@ async function fetchAIVideoMediaParallel(
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
         const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
 
-        const generatedImage = await generateSceneImage(imagePrompt, imageModel, i);
-
         const imagePath = path.join(workDir, `ai_img_${i}.jpg`);
-        await downloadFile(generatedImage.url, imagePath);
+
+        if (preApproved.has(i)) {
+          const approved = preApproved.get(i)!;
+          if (approved.type === "image") {
+            await fs.copyFile(approved.path, imagePath);
+            console.log(`Scene ${i}: Using pre-approved image for I2V`);
+          }
+        } else {
+          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i);
+          await downloadFile(generatedImage.url, imagePath);
+        }
 
         console.log(`Scene ${i}: Uploading image to fal.ai...`);
         const falImageUrl = await uploadImageForFal(imagePath);
@@ -256,6 +298,9 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
         videoProjectId,
         sceneOrder: i,
         text: script.scenes[i].text,
+        imagePrompt: script.scenes[i].imagePrompt,
+        visualDescription: script.scenes[i].visualDescription,
+        searchQuery: script.scenes[i].searchQuery,
         duration: script.scenes[i].duration,
       });
     }
@@ -322,19 +367,22 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
     );
 
     const mediaPromise = (async () => {
-      if (videoType === "ai_video" && script) {
-        return fetchAIVideoMediaParallel(script, seriesRecord, workDir);
-      }
-      const fakeScript = {
+      const sceneScript = {
         scenes: existingScenes.map((s, i) => ({
           text: s.text,
-          visualDescription: script?.scenes?.[i]?.visualDescription || s.text,
-          searchQuery: script?.scenes?.[i]?.searchQuery || s.text.split(" ").slice(0, 4).join(" "),
-          imagePrompt: script?.scenes?.[i]?.imagePrompt || s.text,
+          visualDescription: s.visualDescription || script?.scenes?.[i]?.visualDescription || s.text,
+          searchQuery: s.searchQuery || script?.scenes?.[i]?.searchQuery || s.text.split(" ").slice(0, 4).join(" "),
+          imagePrompt: s.imagePrompt || script?.scenes?.[i]?.imagePrompt || s.text,
           duration: s.duration ?? 5,
         })),
       };
-      return fetchFacelessMediaParallel(fakeScript as VideoScript, seriesRecord, workDir);
+
+      const preApproved = await reusePreApprovedImages(existingScenes, workDir);
+
+      if (videoType === "ai_video") {
+        return fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preApproved);
+      }
+      return fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preApproved);
     })();
 
     const [ttsResult, mediaPaths] = await Promise.all([ttsPromise, mediaPromise]);

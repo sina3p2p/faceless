@@ -7,6 +7,9 @@ import { z } from "zod";
 
 const updateSchema = z.object({
   text: z.string().optional(),
+  imagePrompt: z.string().optional(),
+  visualDescription: z.string().optional(),
+  searchQuery: z.string().optional(),
   duration: z.number().min(1).max(30).optional(),
 });
 
@@ -36,6 +39,9 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   if (parsed.data.text !== undefined) updates.text = parsed.data.text;
+  if (parsed.data.imagePrompt !== undefined) updates.imagePrompt = parsed.data.imagePrompt;
+  if (parsed.data.visualDescription !== undefined) updates.visualDescription = parsed.data.visualDescription;
+  if (parsed.data.searchQuery !== undefined) updates.searchQuery = parsed.data.searchQuery;
   if (parsed.data.duration !== undefined) updates.duration = parsed.data.duration;
 
   if (Object.keys(updates).length === 0) return badRequest("No updates provided");
