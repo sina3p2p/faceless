@@ -47,9 +47,13 @@ export async function generateVideoFromImage(
 
     if (characterRefs && characterRefs.length > 0) {
       input.elements = characterRefs.map((c) => ({
-        type: "subject",
         frontal_image_url: c.url,
       }));
+      const elementTags = characterRefs.map((c, i) => {
+        const label = c.description || `character ${i + 1}`;
+        return `@Element${i + 1} (${label})`;
+      }).join(", ");
+      input.prompt = `${prompt}. Featuring: ${elementTags}`;
     }
   } else if (modelId.includes("kling-video")) {
     input.image_url = imageUrl;
