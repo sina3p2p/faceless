@@ -875,11 +875,14 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
     console.log("Full song generated and downloaded");
     await job.updateProgress(30);
 
-    const sectionAudioPaths = await splitSongIntoSections(
+    const splitResult = await splitSongIntoSections(
       songPath,
       sectionsForMusic,
       workDir
     );
+    const { audioPaths: sectionAudioPaths, actualDurationsMs } = splitResult;
+
+    const actualDurationsSec = actualDurationsMs.map((ms) => Math.round(ms / 1000));
 
     await job.updateProgress(35);
 
@@ -893,7 +896,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
         visualDescription: s.visualDescription || musicScript.sections[i]?.visualDescription || s.text,
         searchQuery: s.searchQuery || musicScript.sections[i]?.sectionName || "cinematic",
         imagePrompt: s.imagePrompt || musicScript.sections[i]?.imagePrompt || s.text,
-        duration: s.duration ?? Math.round((musicScript.sections[i]?.durationMs ?? 8000) / 1000),
+        duration: actualDurationsSec[i] ?? s.duration ?? 5,
       })),
     };
 
@@ -924,7 +927,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
             audioUrl: audioKey,
             assetUrl: mediaKey,
             assetType: mediaPaths[i].type,
-            duration: existingScenes[i].duration,
+            duration: actualDurationsSec[i] ?? existingScenes[i].duration,
           })
           .where(eq(schema.videoScenes.id, scene.id));
       })
@@ -940,7 +943,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
       mediaPath: mediaPaths[i].path,
       mediaType: mediaPaths[i].type,
       text: scene.text.split("\n").join(" "),
-      duration: scene.duration ?? Math.round((musicScript.sections[i]?.durationMs ?? 8000) / 1000),
+      duration: actualDurationsSec[i] ?? scene.duration ?? 5,
       wordTimestamps: [],
     }));
 

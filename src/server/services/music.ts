@@ -143,18 +143,41 @@ export async function generateSong(
   };
 }
 
+async function getAudioDurationMs(filePath: string): Promise<number> {
+  const { stdout } = await execAsync(
+    `ffprobe -v error -show_entries format=duration -of csv=p=0 "${filePath}"`
+  );
+  return Math.round(parseFloat(stdout.trim()) * 1000);
+}
+
+export interface SplitResult {
+  audioPaths: string[];
+  actualDurationsMs: number[];
+}
+
 export async function splitSongIntoSections(
   songPath: string,
   sections: MusicSection[],
   outputDir: string
-): Promise<string[]> {
+): Promise<SplitResult> {
+  const actualSongMs = await getAudioDurationMs(songPath);
+  const requestedTotalMs = sections.reduce((sum, s) => sum + s.durationMs, 0);
+  const scale = requestedTotalMs > 0 ? actualSongMs / requestedTotalMs : 1;
+
+  console.log(`[suno] Song actual: ${(actualSongMs / 1000).toFixed(1)}s, requested: ${(requestedTotalMs / 1000).toFixed(1)}s, scale: ${scale.toFixed(2)}`);
+
   const audioPaths: string[] = [];
+  const actualDurationsMs: number[] = [];
   let offsetMs = 0;
 
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i];
+    const scaledDurationMs = Math.round(section.durationMs * scale);
+    const isLast = i === sections.length - 1;
+    const durationMs = isLast ? actualSongMs - offsetMs : scaledDurationMs;
+
     const startSec = offsetMs / 1000;
-    const durationSec = section.durationMs / 1000;
+    const durationSec = durationMs / 1000;
     const outputPath = path.join(outputDir, `section_audio_${i}.mp3`);
 
     await execAsync(
@@ -162,9 +185,10 @@ export async function splitSongIntoSections(
     );
 
     audioPaths.push(outputPath);
-    offsetMs += section.durationMs;
-    console.log(`[suno] Split section ${i} (${section.sectionName}): ${startSec}s → ${startSec + durationSec}s`);
+    actualDurationsMs.push(durationMs);
+    offsetMs += durationMs;
+    console.log(`[suno] Split section ${i} (${section.sectionName}): ${startSec.toFixed(1)}s → ${(startSec + durationSec).toFixed(1)}s (${durationSec.toFixed(1)}s)`);
   }
 
-  return audioPaths;
+  return { audioPaths, actualDurationsMs };
 }
