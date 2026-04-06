@@ -15,17 +15,20 @@ export async function GET() {
 
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
-    return NextResponse.json([]);
+    console.warn("[voices] ELEVENLABS_API_KEY is not set");
+    return NextResponse.json({ error: "API key not configured" }, { status: 500 });
   }
 
   try {
     const res = await fetch("https://api.elevenlabs.io/v1/voices", {
       headers: { "xi-api-key": apiKey },
-      next: { revalidate: 3600 },
+      cache: "no-store",
     });
 
     if (!res.ok) {
-      return NextResponse.json([]);
+      const errText = await res.text().catch(() => "");
+      console.error(`[voices] ElevenLabs API error: ${res.status} ${errText}`);
+      return NextResponse.json({ error: `ElevenLabs API error: ${res.status}` }, { status: 502 });
     }
 
     const data = await res.json();
@@ -43,7 +46,8 @@ export async function GET() {
       }));
 
     return NextResponse.json(voices);
-  } catch {
-    return NextResponse.json([]);
+  } catch (err) {
+    console.error("[voices] Failed to fetch voices:", err);
+    return NextResponse.json({ error: "Failed to fetch voices" }, { status: 500 });
   }
 }

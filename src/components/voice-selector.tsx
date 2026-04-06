@@ -23,16 +23,32 @@ export function VoiceSelector({ value, onChange }: VoiceSelectorProps) {
   const [loading, setLoading] = useState(true);
   const [playingId, setPlayingId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "male" | "female">("all");
+  const [useCustom, setUseCustom] = useState(false);
+  const [customId, setCustomId] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/voices")
-      .then((r) => r.json())
-      .then((data) => {
-        setVoices(data);
+      .then(async (r) => {
+        const data = await r.json();
+        if (!r.ok) {
+          setError(data.error || "Failed to load voices");
+          setLoading(false);
+          return;
+        }
+        if (Array.isArray(data)) {
+          setVoices(data);
+        } else {
+          setError(data.error || "Unexpected response");
+        }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch(() => {
+        setError("Network error loading voices");
+        setLoading(false);
+      });
   }, []);
 
   function handlePlay(voice: Voice) {
@@ -76,16 +92,73 @@ export function VoiceSelector({ value, onChange }: VoiceSelectorProps) {
     );
   }
 
-  if (voices.length === 0) {
+  if (error || voices.length === 0) {
     return (
       <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-        <p className="text-sm text-gray-500">No voices available. Check your ElevenLabs API key.</p>
+        <p className="text-sm text-gray-500">
+          {error || "No voices available. Check your ElevenLabs API key."}
+        </p>
       </div>
     );
   }
 
   return (
     <div>
+      {/* Mode toggle */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex gap-1 bg-white/5 rounded-lg p-1 w-fit">
+          <button
+            type="button"
+            onClick={() => { setUseCustom(false); if (customId) { setCustomId(""); } }}
+            className={`px-3 py-1 text-xs rounded-md transition-all ${
+              !useCustom ? "bg-violet-600 text-white" : "text-gray-400 hover:text-white"
+            }`}
+          >
+            Browse Voices
+          </button>
+          <button
+            type="button"
+            onClick={() => setUseCustom(true)}
+            className={`px-3 py-1 text-xs rounded-md transition-all ${
+              useCustom ? "bg-violet-600 text-white" : "text-gray-400 hover:text-white"
+            }`}
+          >
+            Custom Voice ID
+          </button>
+        </div>
+      </div>
+
+      {useCustom ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+          <label className="block text-xs text-gray-400 mb-1.5">
+            Paste your ElevenLabs Voice ID
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={customId}
+              onChange={(e) => setCustomId(e.target.value)}
+              placeholder="e.g. 21m00Tcm4TlvDq8ikWAM"
+              className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none font-mono"
+            />
+            <button
+              type="button"
+              onClick={() => { if (customId.trim()) onChange(customId.trim()); }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                customId.trim() && value === customId.trim()
+                  ? "bg-violet-600 text-white"
+                  : "bg-white/10 text-gray-300 hover:bg-white/20"
+              }`}
+            >
+              {value === customId.trim() && customId.trim() ? "Selected" : "Use"}
+            </button>
+          </div>
+          <p className="text-[10px] text-gray-500 mt-2">
+            Find your voice ID in ElevenLabs → Voices → click a voice → copy the ID from the URL or settings.
+          </p>
+        </div>
+      ) : (
+        <>
       {/* Filter tabs */}
       <div className="flex gap-1 mb-3 bg-white/5 rounded-lg p-1 w-fit">
         {(["all", "male", "female"] as const).map((f) => (
@@ -181,6 +254,8 @@ export function VoiceSelector({ value, onChange }: VoiceSelectorProps) {
         <p className="text-sm text-gray-500 text-center py-4">
           No {filter} voices found
         </p>
+      )}
+        </>
       )}
     </div>
   );
