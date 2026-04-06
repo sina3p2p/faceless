@@ -6,7 +6,7 @@ fal.config({
   credentials: process.env.FAL_KEY || "",
 });
 
-const I2V_MODEL = "fal-ai/kling-video/v2.1/standard/image-to-video";
+const I2V_MODEL = "fal-ai/kling-video/v2.5-turbo/pro/image-to-video";
 const T2V_MODEL = "fal-ai/wan-25-preview/text-to-video";
 
 interface VideoResult {
