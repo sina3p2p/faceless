@@ -18,7 +18,7 @@ export async function generateText(
   userPrompt: string,
   options: LLMOptions = {}
 ): Promise<string> {
-  const { maxTokens = 2048, temperature = 0.7, jsonMode = false, model } = options;
+  const { maxTokens, temperature = 0.7, jsonMode = false, model } = options;
   const primaryModel = model || LLM.defaultModel;
 
   const requestBody: OpenAI.ChatCompletionCreateParamsNonStreaming = {
@@ -27,7 +27,7 @@ export async function generateText(
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
-    max_tokens: maxTokens,
+    ...(maxTokens && { max_tokens: maxTokens }),
     temperature,
     ...(jsonMode && { response_format: { type: "json_object" } }),
   };
@@ -171,7 +171,6 @@ SCENE CONTINUITY MODE (CRITICAL — follow these rules):
     : `Create a ${niche} viral video script. Visual style: ${style}. Pick a topic that will make people STOP scrolling and watch till the end. Think: "I need to know what happens next."`;
 
   const result = await generateText(systemPrompt, userPrompt, {
-    maxTokens: 4000,
     temperature: 0.85,
     jsonMode: true,
     model,
@@ -290,7 +289,6 @@ KIDS MUSIC RULES:
     : `Create a viral ${niche}-themed song. Visual style: ${style}. Pick a topic that resonates emotionally and makes the listener want to replay it.`;
 
   const result = await generateText(systemPrompt, userPrompt, {
-    maxTokens: 4000,
     temperature: 0.85,
     jsonMode: true,
     model,
