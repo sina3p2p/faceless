@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES, LLM_MODELS, DEFAULT_LLM_MODEL } from "@/lib/constants";
+import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES, LLM_MODELS, DEFAULT_LLM_MODEL, IMAGE_MODELS, DEFAULT_IMAGE_MODEL } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
 
 export default function NewSeriesPage() {
@@ -19,6 +19,7 @@ export default function NewSeriesPage() {
     captionStyle: CAPTION_STYLES[0].id as string,
     videoType: VIDEO_TYPES[0].id as string,
     llmModel: DEFAULT_LLM_MODEL as string,
+    imageModel: DEFAULT_IMAGE_MODEL as string,
     defaultVoiceId: "",
     topicIdeas: "",
   });
@@ -42,6 +43,7 @@ export default function NewSeriesPage() {
         captionStyle: form.captionStyle,
         videoType: form.videoType,
         llmModel: form.llmModel,
+        imageModel: form.imageModel,
         defaultVoiceId: form.defaultVoiceId || undefined,
         topicIdeas,
       }),
@@ -125,6 +127,29 @@ export default function NewSeriesPage() {
                         </span>
                       )}
                     </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Image Generation Model
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {IMAGE_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setForm({ ...form, imageModel: m.id })}
+                    className={`rounded-xl border p-3 text-left transition-all ${
+                      form.imageModel === m.id
+                        ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                        : "border-white/10 bg-white/5 hover:border-white/20"
+                    }`}
+                  >
+                    <p className="font-medium text-white text-sm">{m.label}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
                   </button>
                 ))}

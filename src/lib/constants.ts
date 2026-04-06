@@ -71,7 +71,15 @@ export const AI_VIDEO = {
   get falKey() { return env("FAL_KEY"); },
   i2vModel: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video" as string,
   t2vModel: "fal-ai/wan-25-preview/text-to-video" as string,
+  fluxImageModel: "fal-ai/flux-pro/v1.1" as string,
 } as const;
+
+export const IMAGE_MODELS = [
+  { id: "dall-e-3", label: "DALL-E 3", description: "Good quality, ~$0.04/image (OpenAI)" },
+  { id: "flux-pro", label: "Flux Pro 1.1", description: "Best for 3D/claymation styles, ~$0.04/image (fal.ai)" },
+] as const;
+
+export const DEFAULT_IMAGE_MODEL = "dall-e-3";
 
 // ── Storage (S3 / R2) ──
 
@@ -141,6 +149,7 @@ export const NICHES = [
   { id: "anime-stories", label: "Anime Stories", description: "Anime-inspired narratives" },
   { id: "motivation", label: "Motivation", description: "Motivational stories and quotes" },
   { id: "kids", label: "Kids", description: "Fun educational stories for children" },
+  { id: "news", label: "News & Geopolitics", description: "Current events, world politics, and breaking news" },
 ] as const;
 
 export const ART_STYLES = [
@@ -150,6 +159,8 @@ export const ART_STYLES = [
   { id: "dark", label: "Dark & Moody" },
   { id: "minimal", label: "Minimal" },
   { id: "cartoon", label: "Cartoon" },
+  { id: "claymation", label: "Claymation 3D" },
+  { id: "pixar", label: "Pixar / 3D Render" },
 ] as const;
 
 export const CAPTION_STYLES = [

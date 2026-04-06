@@ -8,11 +8,12 @@ import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE } from "@/lib/constants";
-import { generateVideoScript } from "@/server/services/llm";
+import { generateVideoScript, VideoScript } from "@/server/services/llm";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
   getMediaForScene,
   generateImage,
+  generateFluxImage,
   resetUsedMedia,
   type MediaAsset,
 } from "@/server/services/media";
@@ -90,7 +91,7 @@ async function generateTTSParallel(
 
 async function fetchFacelessMediaParallel(
   script: Awaited<ReturnType<typeof generateVideoScript>>,
-  seriesRecord: { niche: string; style: string },
+  seriesRecord: { niche: string; style: string; imageModel?: string | null },
   workDir: string,
   concurrency = 3
 ): Promise<{ path: string; type: "video" | "image" }[]> {
@@ -112,7 +113,8 @@ async function fetchFacelessMediaParallel(
 
         let asset: MediaAsset;
         try {
-          asset = await getMediaForScene(searchQuery, imagePrompt, true);
+          const imgModel = seriesRecord.imageModel || "dall-e-3";
+          asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel);
         } catch (err) {
           console.warn(
             `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Trying fallback.`
@@ -146,13 +148,33 @@ async function fetchFacelessMediaParallel(
   return mediaPaths;
 }
 
+async function generateSceneImage(
+  imagePrompt: string,
+  imageModel: string,
+  sceneIndex: number
+): Promise<MediaAsset> {
+  if (imageModel === "flux-pro") {
+    console.log(`Scene ${sceneIndex}: Generating Flux Pro image...`);
+    const fluxImage = await generateFluxImage(imagePrompt);
+    if (fluxImage) return fluxImage;
+    console.warn(`Scene ${sceneIndex}: Flux failed, falling back to DALL-E`);
+  }
+
+  console.log(`Scene ${sceneIndex}: Generating DALL-E image...`);
+  const dalleImage = await generateImage(imagePrompt);
+  if (dalleImage) return dalleImage;
+
+  throw new Error(`Could not generate image for scene ${sceneIndex}. Check API keys.`);
+}
+
 async function fetchAIVideoMediaParallel(
   script: Awaited<ReturnType<typeof generateVideoScript>>,
-  seriesRecord: { niche: string; style: string },
+  seriesRecord: { niche: string; style: string; imageModel?: string | null },
   workDir: string,
   concurrency = 2
 ): Promise<{ path: string; type: "video" | "image" }[]> {
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
+  const imageModel = seriesRecord.imageModel || "dall-e-3";
 
   const chunks: number[][] = [];
   for (let i = 0; i < script.scenes.length; i += concurrency) {
@@ -168,16 +190,10 @@ async function fetchAIVideoMediaParallel(
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
         const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
 
-        console.log(`Scene ${i}: Generating DALL-E image...`);
-        const dalleImage = await generateImage(imagePrompt);
-        if (!dalleImage) {
-          throw new Error(
-            `Could not generate DALL-E image for scene ${i}. Check OpenAI API key.`
-          );
-        }
+        const generatedImage = await generateSceneImage(imagePrompt, imageModel, i);
 
         const imagePath = path.join(workDir, `ai_img_${i}.jpg`);
-        await downloadFile(dalleImage.url, imagePath);
+        await downloadFile(generatedImage.url, imagePath);
 
         console.log(`Scene ${i}: Uploading image to fal.ai...`);
         const falImageUrl = await uploadImageForFal(imagePath);
@@ -189,7 +205,7 @@ async function fetchAIVideoMediaParallel(
         const videoPath = path.join(workDir, `media_${i}.mp4`);
         await downloadAIVideo(videoResult.videoUrl, videoPath);
 
-        console.log(`Scene ${i}: AI video clip ready`);
+        console.log(`Scene ${i}: AI video clip ready (image: ${imageModel})`);
         mediaPaths[i] = { path: videoPath, type: "video" };
       })
     );
@@ -318,7 +334,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
           duration: s.duration ?? 5,
         })),
       };
-      return fetchFacelessMediaParallel(fakeScript as any, seriesRecord, workDir);
+      return fetchFacelessMediaParallel(fakeScript as VideoScript, seriesRecord, workDir);
     })();
 
     const [ttsResult, mediaPaths] = await Promise.all([ttsPromise, mediaPromise]);

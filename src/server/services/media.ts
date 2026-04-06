@@ -1,13 +1,16 @@
 import OpenAI from "openai";
-import { MEDIA } from "@/lib/constants";
+import { fal } from "@fal-ai/client";
+import { MEDIA, AI_VIDEO } from "@/lib/constants";
 
 const PEXELS_API_KEY = MEDIA.pexelsApiKey;
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
+fal.config({ credentials: AI_VIDEO.falKey });
+
 export interface MediaAsset {
   url: string;
   type: "video" | "image";
-  source: "pexels" | "openai";
+  source: "pexels" | "openai" | "flux";
   width: number;
   height: number;
 }
@@ -124,13 +127,59 @@ export async function generateImage(
   }
 }
 
+export async function generateFluxImage(
+  prompt: string
+): Promise<MediaAsset | null> {
+  try {
+    const result = await fal.subscribe(AI_VIDEO.fluxImageModel, {
+      input: {
+        prompt: `${prompt}. Vertical 9:16 composition, highly detailed, no text or watermarks.`,
+        image_size: { width: 768, height: 1344 },
+        num_images: 1,
+        output_format: "jpeg",
+        guidance_scale: 3.5,
+        num_inference_steps: 28,
+        safety_tolerance: "5",
+      },
+      logs: true,
+    });
+
+    const data = result.data as { images?: Array<{ url: string; width: number; height: number }> };
+    const image = data?.images?.[0];
+    if (!image?.url) return null;
+
+    return {
+      url: image.url,
+      type: "image",
+      source: "flux",
+      width: image.width || 768,
+      height: image.height || 1344,
+    };
+  } catch (err) {
+    console.warn(`Flux image generation failed: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
+}
+
+async function generateAnyImage(
+  prompt: string,
+  imageModel = "dall-e-3"
+): Promise<MediaAsset | null> {
+  if (imageModel === "flux-pro") {
+    const flux = await generateFluxImage(prompt);
+    if (flux) return flux;
+  }
+  return generateImage(prompt);
+}
+
 export async function getMediaForScene(
   searchQuery: string,
   imagePrompt: string,
-  preferAiImage = false
+  preferAiImage = false,
+  imageModel = "dall-e-3"
 ): Promise<MediaAsset> {
   if (preferAiImage) {
-    const generatedImage = await generateImage(imagePrompt);
+    const generatedImage = await generateAnyImage(imagePrompt, imageModel);
     if (generatedImage) return generatedImage;
   }
 
@@ -149,7 +198,7 @@ export async function getMediaForScene(
     if (fallbackImage) return fallbackImage;
   }
 
-  const generatedImage = await generateImage(imagePrompt);
+  const generatedImage = await generateAnyImage(imagePrompt, imageModel);
   if (generatedImage) return generatedImage;
 
   throw new Error(
