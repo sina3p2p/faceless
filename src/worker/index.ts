@@ -3,13 +3,13 @@ import IORedis from "ioredis";
 import { renderVideoJob, rerenderVideoJob, generateScriptJob, renderFromScenesJob } from "./renderJob";
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
+import { REDIS, WORKER } from "@/lib/constants";
 
 process.env.SERVICE_NAME = "faceless-worker";
 
-const connection = new IORedis(
-  process.env.REDIS_URL ?? "redis://localhost:6379",
-  { maxRetriesPerRequest: null }
-);
+const connection = new IORedis(REDIS.url, {
+  maxRetriesPerRequest: null,
+});
 
 const worker = new Worker(
   RENDER_QUEUE_NAME,
@@ -32,8 +32,8 @@ const worker = new Worker(
   },
   {
     connection,
-    concurrency: 2,
-    limiter: { max: 4, duration: 60_000 },
+    concurrency: WORKER.concurrency,
+    limiter: { max: WORKER.limiterMax, duration: WORKER.limiterDuration },
   }
 );
 

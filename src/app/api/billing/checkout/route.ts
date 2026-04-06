@@ -4,6 +4,7 @@ import { subscriptions } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { getStripe } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
+import { APP } from "@/lib/constants";
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser();
@@ -47,8 +48,8 @@ export async function POST(req: NextRequest) {
     mode: "subscription",
     payment_method_types: ["card"],
     line_items: [{ price: priceId, quantity: 1 }],
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?checkout=success`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?checkout=cancelled`,
+    success_url: `${APP.url}/dashboard?checkout=success`,
+    cancel_url: `${APP.url}/dashboard?checkout=cancelled`,
     metadata: { userId: user.id },
   });
 

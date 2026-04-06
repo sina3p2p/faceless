@@ -10,6 +10,7 @@ const createSeriesSchema = z.object({
   niche: z.string().min(1),
   style: z.string().default("cinematic"),
   defaultVoiceId: z.string().optional(),
+  llmModel: z.string().default("anthropic/claude-opus-4.6"),
   captionStyle: z.string().default("default"),
   videoType: z.enum(["faceless", "ai_video"]).default("faceless"),
   topicIdeas: z.array(z.string()).default([]),

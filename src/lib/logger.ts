@@ -1,3 +1,5 @@
+import { APP } from "@/lib/constants";
+
 type LogLevel = "debug" | "info" | "warn" | "error";
 
 interface LogEntry {
@@ -8,7 +10,7 @@ interface LogEntry {
   [key: string]: unknown;
 }
 
-const SERVICE = process.env.SERVICE_NAME || "faceless";
+const SERVICE = APP.serviceName;
 
 function createEntry(
   level: LogLevel,
@@ -37,7 +39,7 @@ function write(entry: LogEntry) {
 
 export const logger = {
   debug(message: string, data?: Record<string, unknown>) {
-    if (process.env.NODE_ENV === "development") {
+    if (APP.isDevelopment) {
       write(createEntry("debug", message, data));
     }
   },

@@ -6,23 +6,24 @@ import GitHubProvider from "next-auth/providers/github";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
+import { AUTH } from "@/lib/constants";
 
 export const authOptions: NextAuthOptions = {
   adapter: DrizzleAdapter(db) as NextAuthOptions["adapter"],
   providers: [
-    ...(process.env.GOOGLE_CLIENT_ID
+    ...(AUTH.google.clientId
       ? [
           GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+            clientId: AUTH.google.clientId,
+            clientSecret: AUTH.google.clientSecret,
           }),
         ]
       : []),
-    ...(process.env.GITHUB_CLIENT_ID
+    ...(AUTH.github.clientId
       ? [
           GitHubProvider({
-            clientId: process.env.GITHUB_CLIENT_ID,
-            clientSecret: process.env.GITHUB_CLIENT_SECRET || "",
+            clientId: AUTH.github.clientId,
+            clientSecret: AUTH.github.clientSecret,
           }),
         ]
       : []),

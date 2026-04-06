@@ -1,6 +1,4 @@
-const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY || "";
-const DEFAULT_VOICE_ID =
-  process.env.ELEVENLABS_DEFAULT_VOICE_ID || "21m00Tcm4TlvDq8ikWAM";
+import { TTS } from "@/lib/constants";
 
 interface TTSOptions {
   voiceId?: string;
@@ -26,10 +24,10 @@ export async function generateSpeech(
   options: TTSOptions = {}
 ): Promise<TTSResult> {
   const {
-    voiceId = DEFAULT_VOICE_ID,
-    stability = 0.4,
-    similarityBoost = 0.8,
-    style = 0.3,
+    voiceId = TTS.defaultVoiceId,
+    stability = TTS.defaultStability,
+    similarityBoost = TTS.defaultSimilarityBoost,
+    style = TTS.defaultStyle,
   } = options;
 
   const response = await fetch(
@@ -37,12 +35,12 @@ export async function generateSpeech(
     {
       method: "POST",
       headers: {
-        "xi-api-key": ELEVENLABS_API_KEY,
+        "xi-api-key": TTS.apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         text,
-        model_id: "eleven_multilingual_v2",
+        model_id: TTS.model,
         voice_settings: {
           stability,
           similarity_boost: similarityBoost,

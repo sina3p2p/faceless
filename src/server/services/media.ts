@@ -1,7 +1,8 @@
 import OpenAI from "openai";
+import { MEDIA } from "@/lib/constants";
 
-const PEXELS_API_KEY = process.env.PEXELS_API_KEY || "";
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "" });
+const PEXELS_API_KEY = MEDIA.pexelsApiKey;
+const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
 export interface MediaAsset {
   url: string;

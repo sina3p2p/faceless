@@ -102,6 +102,7 @@ export const series = pgTable("series", {
   niche: text("niche").notNull(),
   style: text("style").default("cinematic").notNull(),
   defaultVoiceId: text("default_voice_id"),
+  llmModel: text("llm_model").default("anthropic/claude-opus-4.6"),
   captionStyle: text("caption_style").default("default").notNull(),
   videoType: text("video_type").default("faceless").notNull(),
   topicIdeas: json("topic_ideas").$type<string[]>().default([]).notNull(),

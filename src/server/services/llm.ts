@@ -1,19 +1,16 @@
 import OpenAI from "openai";
+import { LLM } from "@/lib/constants";
 
 const openrouter = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY || "",
+  apiKey: LLM.apiKey,
 });
-
-const PRIMARY_MODEL =
-  process.env.OPENROUTER_PRIMARY_MODEL || "openai/gpt-4.1";
-const FALLBACK_MODEL =
-  process.env.OPENROUTER_FALLBACK_MODEL || "anthropic/claude-sonnet-4-20250514";
 
 interface LLMOptions {
   maxTokens?: number;
   temperature?: number;
   jsonMode?: boolean;
+  model?: string;
 }
 
 export async function generateText(
@@ -21,10 +18,11 @@ export async function generateText(
   userPrompt: string,
   options: LLMOptions = {}
 ): Promise<string> {
-  const { maxTokens = 2048, temperature = 0.7, jsonMode = false } = options;
+  const { maxTokens = 2048, temperature = 0.7, jsonMode = false, model } = options;
+  const primaryModel = model || LLM.defaultModel;
 
   const requestBody: OpenAI.ChatCompletionCreateParamsNonStreaming = {
-    model: PRIMARY_MODEL,
+    model: primaryModel,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -39,12 +37,12 @@ export async function generateText(
     return response.choices[0]?.message?.content ?? "";
   } catch (error) {
     console.warn(
-      `Primary model (${PRIMARY_MODEL}) failed, falling back to ${FALLBACK_MODEL}`,
+      `Primary model (${primaryModel}) failed, falling back to ${LLM.fallbackModel}`,
       error
     );
     const fallbackResponse = await openrouter.chat.completions.create({
       ...requestBody,
-      model: FALLBACK_MODEL,
+      model: LLM.fallbackModel,
     });
     return fallbackResponse.choices[0]?.message?.content ?? "";
   }
@@ -68,7 +66,8 @@ export async function generateVideoScript(
   niche: string,
   style: string,
   topicIdea?: string,
-  targetDuration = 45
+  targetDuration = 45,
+  model?: string
 ): Promise<VideoScript> {
   const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
 
@@ -79,9 +78,9 @@ Your output must be valid JSON matching this exact schema:
   "scenes": [
     {
       "text": "string - narration text for this scene. Must be punchy, conversational, and create micro-cliffhangers between scenes. 1-3 sentences max.",
-      "visualDescription": "string - what the viewer sees",
-      "searchQuery": "string - 2-4 specific words for stock footage search",
-      "imagePrompt": "string - AI image generation prompt: describe the exact scene, subject, setting, mood, camera angle, lighting. Must match the narration perfectly. Art style: ${style}.",
+      "visualDescription": "string - a rich, detailed description of the visual action happening on screen. Describe specific movements, gestures, camera motion, and environment changes. This is used to generate AI video clips so it must describe MOTION and ACTION, not a static image.",
+      "searchQuery": "string - 2-4 specific words for stock footage search (backup if AI generation fails)",
+      "imagePrompt": "string - A highly detailed prompt for AI video generation. This prompt will first generate a still image, then that image will be animated into a video clip. Write it as a single detailed paragraph covering ALL of these elements:\n1. SUBJECT: Who/what is the main focus? Describe their appearance, clothing, expression, pose in detail.\n2. ACTION/MOTION: What movement or action should happen? (camera slowly zooming in, character walking, wind blowing, water flowing, particles floating). Be specific about the motion direction and speed.\n3. ENVIRONMENT: Where is the scene set? Describe the background, surroundings, objects in the scene.\n4. LIGHTING: Describe the light source, shadows, color temperature (golden hour, moonlight, neon glow, dramatic rim lighting, soft diffused light).\n5. CAMERA: Specify camera angle (low angle, bird's eye, eye level, Dutch angle) and movement (slow push in, orbiting, static, tracking shot).\n6. MOOD/ATMOSPHERE: Fog, rain, dust particles, lens flare, smoke, bokeh, volumetric light rays.\n7. STYLE: ${style} style. Must feel cinematic and high-production.\nThe prompt must match the narration PERFECTLY. Every visual must reinforce what the narrator is saying.",
       "duration": number
     }
   ],
@@ -113,9 +112,20 @@ CRITICAL RULES:
 - Write like you're telling a secret to a friend, not giving a lecture
 - Every single sentence must either reveal new info or build tension
 - searchQuery must be HYPER-SPECIFIC (e.g. "abandoned underground bunker" not "dark place")
-- imagePrompt must paint a CINEMATIC scene that perfectly matches the narration. Include: main subject, environment, lighting (dramatic/moody/golden hour), camera angle (close-up/wide/aerial), atmosphere (fog/rain/dust particles). Style: ${style}.
 - Total duration should be ${targetDuration} seconds
 - Aim for 5-7 scenes
+
+IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
+- Each imagePrompt must be 50-100 words minimum. SHORT/LAZY prompts = ugly videos.
+- NEVER write vague prompts like "a mysterious scene" or "something dramatic happens". Be EXTREMELY specific.
+- Describe ONE clear subject doing ONE clear action in ONE clear environment. Do NOT cram multiple unrelated things.
+- Always include the art style: ${style}.
+- For people: describe age, ethnicity, clothing, facial expression, body language, hair.
+- For places: describe architecture, textures, weather, time of day, vegetation, materials.
+- For objects: describe size, material, color, condition, position relative to camera.
+- Include motion cues: "camera slowly pushes in", "wind gently moves the curtains", "smoke rises from the ground", "waves crash against rocks".
+- EACH scene's imagePrompt must be visually DIFFERENT from the others. Vary camera angles, color palettes, and compositions across scenes.
+- Think like a cinematographer — every frame should be visually stunning enough to pause and admire.
 ${niche === "kids" ? `
 KIDS CONTENT RULES (this overrides tone guidelines above):
 - Target age: 4-10 years old
@@ -134,9 +144,10 @@ KIDS CONTENT RULES (this overrides tone guidelines above):
     : `Create a ${niche} viral video script. Visual style: ${style}. Pick a topic that will make people STOP scrolling and watch till the end. Think: "I need to know what happens next."`;
 
   const result = await generateText(systemPrompt, userPrompt, {
-    maxTokens: 3000,
+    maxTokens: 4000,
     temperature: 0.85,
     jsonMode: true,
+    model,
   });
 
   return JSON.parse(result) as VideoScript;

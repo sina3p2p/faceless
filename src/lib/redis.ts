@@ -1,11 +1,12 @@
 import IORedis from "ioredis";
+import { REDIS, APP } from "@/lib/constants";
 
 const globalForRedis = globalThis as unknown as { redis: IORedis };
 
 export const redis =
   globalForRedis.redis ??
-  new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+  new IORedis(REDIS.url, {
     maxRetriesPerRequest: null,
   });
 
-if (process.env.NODE_ENV !== "production") globalForRedis.redis = redis;
+if (!APP.isProduction) globalForRedis.redis = redis;

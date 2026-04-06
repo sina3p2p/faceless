@@ -1,13 +1,14 @@
 import { fal } from "@fal-ai/client";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { AI_VIDEO } from "@/lib/constants";
 
 fal.config({
-  credentials: process.env.FAL_KEY || "",
+  credentials: AI_VIDEO.falKey,
 });
 
-const I2V_MODEL = "fal-ai/kling-video/v2.5-turbo/pro/image-to-video";
-const T2V_MODEL = "fal-ai/wan-25-preview/text-to-video";
+const I2V_MODEL = AI_VIDEO.i2vModel;
+const T2V_MODEL = AI_VIDEO.t2vModel;
 
 interface VideoResult {
   videoUrl: string;

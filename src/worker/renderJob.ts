@@ -7,6 +7,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
+import { DATABASE } from "@/lib/constants";
 import { generateVideoScript } from "@/server/services/llm";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
@@ -29,7 +30,7 @@ import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { recordUsage } from "@/lib/usage";
 import type { RenderJobData } from "@/lib/queue";
 
-const client = postgres(process.env.DATABASE_URL!);
+const client = postgres(DATABASE.url);
 const db = drizzle(client, { schema });
 
 async function updateJobStep(
@@ -220,7 +221,9 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
     const script = await generateVideoScript(
       seriesRecord.niche,
       seriesRecord.style,
-      topicIdea
+      topicIdea,
+      45,
+      seriesRecord.llmModel || undefined
     );
 
     await db
@@ -435,7 +438,9 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     const script = await generateVideoScript(
       seriesRecord.niche,
       seriesRecord.style,
-      topicIdea
+      topicIdea,
+      45,
+      seriesRecord.llmModel || undefined
     );
 
     await db

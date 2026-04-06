@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthUser, unauthorized } from "@/lib/api-utils";
+import { TTS } from "@/lib/constants";
 
 interface ElevenLabsVoice {
   voice_id: string;
@@ -13,7 +14,7 @@ export async function GET() {
   const user = await getAuthUser();
   if (!user) return unauthorized();
 
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+  const apiKey = TTS.apiKey;
   if (!apiKey) {
     console.warn("[voices] ELEVENLABS_API_KEY is not set");
     return NextResponse.json({ error: "API key not configured" }, { status: 500 });

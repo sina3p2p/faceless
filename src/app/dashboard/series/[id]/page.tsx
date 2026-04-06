@@ -23,6 +23,8 @@ interface SeriesDetail {
   niche: string;
   style: string;
   captionStyle: string;
+  videoType: string;
+  defaultVoiceId: string | null;
   topicIdeas: string[];
   videoProjects: Video[];
 }
@@ -112,12 +114,20 @@ export default function SeriesDetailPage() {
           <h1 className="text-2xl font-bold">{series.name}</h1>
           <p className="text-gray-400 mt-1">
             {series.niche} &middot; {series.style} &middot;{" "}
-            {series.captionStyle} captions
+            {series.captionStyle} captions &middot;{" "}
+            {series.videoType === "ai_video" ? "AI Video" : "Faceless"}
           </p>
         </div>
         <div className="flex items-center gap-3">
           <Button variant="danger" size="sm" loading={deleting} onClick={handleDelete}>
             Delete
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/dashboard/series/${id}/edit`)}
+          >
+            Edit Series
           </Button>
           <Button loading={generating} onClick={handleGenerate}>
             Generate Video

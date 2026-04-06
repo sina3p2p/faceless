@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -9,31 +9,63 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES, LLM_MODELS, DEFAULT_LLM_MODEL } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
 
-export default function NewSeriesPage() {
+interface SeriesData {
+  id: string;
+  name: string;
+  niche: string;
+  style: string;
+  captionStyle: string;
+  videoType: string;
+  llmModel: string | null;
+  defaultVoiceId: string | null;
+  topicIdeas: string[];
+}
+
+export default function EditSeriesPage() {
+  const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     name: "",
-    niche: NICHES[0].id as string,
-    style: ART_STYLES[0].id as string,
-    captionStyle: CAPTION_STYLES[0].id as string,
-    videoType: VIDEO_TYPES[0].id as string,
+    niche: "",
+    style: "",
+    captionStyle: "",
+    videoType: "",
     llmModel: DEFAULT_LLM_MODEL as string,
     defaultVoiceId: "",
     topicIdeas: "",
   });
 
+  useEffect(() => {
+    fetch(`/api/series/${id}`)
+      .then((r) => r.json())
+      .then((data: SeriesData) => {
+        setForm({
+          name: data.name,
+          niche: data.niche,
+          style: data.style,
+          captionStyle: data.captionStyle,
+          videoType: data.videoType || "faceless",
+          llmModel: data.llmModel || DEFAULT_LLM_MODEL,
+          defaultVoiceId: data.defaultVoiceId || "",
+          topicIdeas: (data.topicIdeas || []).join("\n"),
+        });
+        setLoading(false);
+      });
+  }, [id]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
 
     const topicIdeas = form.topicIdeas
       .split("\n")
       .map((t) => t.trim())
       .filter(Boolean);
 
-    const res = await fetch("/api/series", {
-      method: "POST",
+    const res = await fetch(`/api/series/${id}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: form.name,
@@ -42,25 +74,32 @@ export default function NewSeriesPage() {
         captionStyle: form.captionStyle,
         videoType: form.videoType,
         llmModel: form.llmModel,
-        defaultVoiceId: form.defaultVoiceId || undefined,
+        defaultVoiceId: form.defaultVoiceId || null,
         topicIdeas,
       }),
     });
 
     if (res.ok) {
-      const series = await res.json();
-      router.push(`/dashboard/series/${series.id}`);
+      router.push(`/dashboard/series/${id}`);
     } else {
-      setLoading(false);
+      setSaving(false);
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="animate-spin w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full" />
+      </div>
+    );
   }
 
   return (
     <div className="max-w-2xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold">Create New Series</h1>
+        <h1 className="text-2xl font-bold">Edit Series</h1>
         <p className="text-gray-400 mt-1">
-          Set up a new content series. You can generate videos from it anytime.
+          Update your series settings. Changes apply to new videos only.
         </p>
       </div>
 
@@ -205,8 +244,8 @@ export default function NewSeriesPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" loading={loading}>
-            Create Series
+          <Button type="submit" loading={saving}>
+            Save Changes
           </Button>
         </div>
       </form>

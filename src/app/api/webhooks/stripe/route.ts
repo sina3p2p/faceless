@@ -4,10 +4,11 @@ import { db } from "@/server/db";
 import { subscriptions, users } from "@/server/db/schema";
 import { getStripe } from "@/lib/stripe";
 import { eq } from "drizzle-orm";
+import { STRIPE as STRIPE_CONFIG } from "@/lib/constants";
 
 const PRICE_TO_PLAN: Record<string, "STARTER" | "PRO"> = {
-  [process.env.STRIPE_PRICE_ID_STARTER || ""]: "STARTER",
-  [process.env.STRIPE_PRICE_ID_PRO || ""]: "PRO",
+  [STRIPE_CONFIG.priceIdStarter]: "STARTER",
+  [STRIPE_CONFIG.priceIdPro]: "PRO",
 };
 
 export async function POST(req: NextRequest) {
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     event = stripe.webhooks.constructEvent(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET || ""
+      STRIPE_CONFIG.webhookSecret
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
