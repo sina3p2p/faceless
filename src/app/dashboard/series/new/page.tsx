@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES } from "@/lib/constants";
+import { VoiceSelector } from "@/components/voice-selector";
 
 export default function NewSeriesPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function NewSeriesPage() {
     style: ART_STYLES[0].id as string,
     captionStyle: CAPTION_STYLES[0].id as string,
     videoType: VIDEO_TYPES[0].id as string,
+    defaultVoiceId: "",
     topicIdeas: "",
   });
 
@@ -38,6 +40,7 @@ export default function NewSeriesPage() {
         style: form.style,
         captionStyle: form.captionStyle,
         videoType: form.videoType,
+        defaultVoiceId: form.defaultVoiceId || undefined,
         topicIdeas,
       }),
     });
@@ -127,6 +130,21 @@ export default function NewSeriesPage() {
                 label: `${c.label} — ${c.description}`,
               }))}
             />
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Voice
+              </label>
+              <VoiceSelector
+                value={form.defaultVoiceId}
+                onChange={(voiceId) =>
+                  setForm({ ...form, defaultVoiceId: voiceId })
+                }
+              />
+              <p className="text-xs text-gray-500 mt-1.5">
+                Click the play button to preview. Leave unselected to use the default voice.
+              </p>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">

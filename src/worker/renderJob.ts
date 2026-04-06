@@ -182,7 +182,7 @@ async function fetchAIVideoMediaParallel(
         const falImageUrl = await uploadImageForFal(imagePath);
 
         console.log(`Scene ${i}: Generating AI video clip...`);
-        const clipDuration: "5" | "10" = scene.duration > 6 ? "10" : "5";
+        const clipDuration: "5" | "10" = scene.duration >= 10 ? "10" : "5";
         const videoResult = await getAIVideoForScene(falImageUrl, videoPrompt, clipDuration);
 
         const videoPath = path.join(workDir, `media_${i}.mp4`);
@@ -400,7 +400,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
       .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
     throw error;
   } finally {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
   }
 }
 
@@ -557,7 +557,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
     throw error;
   } finally {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
   }
 }
 
@@ -636,6 +636,6 @@ export async function rerenderVideoJob(job: Job<RenderJobData>) {
     await updateVideoStatus(videoProjectId, "FAILED");
     throw error;
   } finally {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
   }
 }
