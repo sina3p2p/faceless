@@ -4,7 +4,7 @@ import { videoProjects, videoScenes, series } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
 import { generateImage, generateFluxImage, generateNanoBananaImage } from "@/server/services/media";
-import { uploadFile } from "@/lib/storage";
+import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -23,7 +23,7 @@ export async function POST(
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoId),
     with: {
-      series: { columns: { userId: true, imageModel: true, style: true } },
+      series: { columns: { userId: true, imageModel: true, style: true, characterImages: true } },
     },
   });
 
@@ -42,11 +42,22 @@ export async function POST(
   const prompt = promptOverride || scene.imagePrompt || scene.text;
   const imageModel = video.series.imageModel || "dall-e-3";
 
+  const rawChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
+  let charRefs: Array<{ url: string; description: string }> | undefined;
+  if (rawChars.length > 0) {
+    charRefs = await Promise.all(
+      rawChars.map(async (c) => ({
+        url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
+        description: c.description,
+      }))
+    );
+  }
+
   let imageUrl: string | null = null;
 
   try {
     if (imageModel === "nano-banana-2") {
-      const result = await generateNanoBananaImage(prompt);
+      const result = await generateNanoBananaImage(prompt, charRefs);
       imageUrl = result?.url ?? null;
     } else if (imageModel === "flux-pro") {
       const result = await generateFluxImage(prompt);

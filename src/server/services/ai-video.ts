@@ -20,12 +20,18 @@ interface VideoResult {
   durationSeconds: number;
 }
 
+export interface CharacterRef {
+  url: string;
+  description: string;
+}
+
 export async function generateVideoFromImage(
   imageUrl: string,
   prompt: string,
   duration: "5" | "10" = "5",
   videoModelKey?: string,
-  endImageUrl?: string
+  endImageUrl?: string,
+  characterRefs?: CharacterRef[]
 ): Promise<VideoResult> {
   const modelId = resolveI2VModelId(videoModelKey);
 
@@ -34,13 +40,18 @@ export async function generateVideoFromImage(
     duration,
   };
 
-  // Kling v3 uses start_image_url + end_image_url
   if (modelId.includes("kling-video/v3") || modelId.includes("kling-video/o3")) {
     input.start_image_url = imageUrl;
     if (endImageUrl) input.end_image_url = endImageUrl;
     input.generate_audio = false;
+
+    if (characterRefs && characterRefs.length > 0) {
+      input.elements = characterRefs.map((c) => ({
+        type: "subject",
+        frontal_image_url: c.url,
+      }));
+    }
   } else if (modelId.includes("kling-video")) {
-    // Older Kling models use image_url + tail_image_url
     input.image_url = imageUrl;
     if (endImageUrl) input.tail_image_url = endImageUrl;
   } else {
@@ -108,12 +119,14 @@ export async function getAIVideoForScene(
   prompt: string,
   duration: "5" | "10" = "5",
   videoModelKey?: string,
-  endImageUrl?: string
+  endImageUrl?: string,
+  characterRefs?: CharacterRef[]
 ): Promise<VideoResult> {
   try {
     const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
-    console.log(`[ai-video] Trying image-to-video (${modelLabel})${endImageUrl ? " with end frame" : ""} for: "${prompt.slice(0, 60)}..."`);
-    return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey, endImageUrl);
+    const charCount = characterRefs?.length || 0;
+    console.log(`[ai-video] Trying image-to-video (${modelLabel})${endImageUrl ? " with end frame" : ""}${charCount ? ` with ${charCount} character ref(s)` : ""} for: "${prompt.slice(0, 60)}..."`);
+    return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey, endImageUrl, characterRefs);
   } catch (err) {
     console.warn(
       `[ai-video] Image-to-video failed: ${err instanceof Error ? err.message : err}. Falling back to text-to-video.`

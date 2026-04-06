@@ -12,6 +12,7 @@ import { VoiceSelector } from "@/components/voice-selector";
 export default function NewSeriesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [pendingCharacters, setPendingCharacters] = useState<Array<{ file: File; preview: string; description: string }>>([]);
   const [form, setForm] = useState({
     name: "",
     niche: NICHES[0].id as string,
@@ -54,8 +55,27 @@ export default function NewSeriesPage() {
     });
 
     if (res.ok) {
-      const series = await res.json();
-      router.push(`/dashboard/series/${series.id}`);
+      const newSeries = await res.json();
+
+      for (const char of pendingCharacters) {
+        const fd = new FormData();
+        fd.append("file", char.file);
+        const uploadRes = await fetch(`/api/series/${newSeries.id}/character-image`, {
+          method: "POST",
+          body: fd,
+        });
+        if (uploadRes.ok && char.description) {
+          const uploadData = await uploadRes.json();
+          const idx = (uploadData.characterImages as Array<unknown>).length - 1;
+          await fetch(`/api/series/${newSeries.id}/character-image`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ index: idx, description: char.description }),
+          });
+        }
+      }
+
+      router.push(`/dashboard/series/${newSeries.id}`);
     } else {
       setLoading(false);
     }
@@ -282,6 +302,73 @@ export default function NewSeriesPage() {
               <p className="text-xs text-gray-500 mt-1">
                 Leave empty to let AI pick topics automatically.
               </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Characters (optional)
+              </label>
+              <p className="text-xs text-gray-500 mb-3">
+                Upload clear frontal images of your characters. All videos in this series will maintain their appearance. Add a description or let AI generate one. Works best with Nano Banana 2 + Kling v3.
+              </p>
+
+              <div className="space-y-4">
+                {pendingCharacters.map((char, idx) => (
+                  <div key={idx} className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+                    <div className="relative shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={char.preview} alt={`Character ${idx + 1}`} className="w-24 h-24 rounded-lg border border-white/10 object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          URL.revokeObjectURL(char.preview);
+                          setPendingCharacters((prev) => prev.filter((_, i) => i !== idx));
+                        }}
+                        className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] hover:bg-red-400"
+                      >
+                        &times;
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <textarea
+                        className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 focus:outline-none transition-colors resize-none h-[72px]"
+                        placeholder="Describe this character (e.g., 'A young woman with red curly hair...')"
+                        value={char.description}
+                        onChange={(e) => {
+                          setPendingCharacters((prev) =>
+                            prev.map((c, i) => i === idx ? { ...c, description: e.target.value } : c)
+                          );
+                        }}
+                      />
+                      <p className="text-[10px] text-gray-600 mt-1">
+                        AI description is available after creating the series (in edit page).
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <label className="flex items-center justify-center w-full h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/50 cursor-pointer transition-colors bg-white/5 mt-3">
+                <div className="text-center">
+                  <p className="text-sm text-gray-400">+ Add Character</p>
+                  <p className="text-xs text-gray-600 mt-0.5">JPG, PNG, WebP up to 10MB</p>
+                </div>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPendingCharacters((prev) => [
+                        ...prev,
+                        { file, preview: URL.createObjectURL(file), description: "" },
+                      ]);
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
             </div>
           </CardContent>
         </Card>

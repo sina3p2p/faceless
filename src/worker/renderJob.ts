@@ -59,6 +59,23 @@ async function updateVideoStatus(
     .where(eq(schema.videoProjects.id, videoProjectId));
 }
 
+interface CharacterRef {
+  url: string;
+  description: string;
+}
+
+async function resolveCharacterRefs(
+  characterImages: Array<{ url: string; description: string }> | null | undefined
+): Promise<CharacterRef[]> {
+  if (!characterImages || characterImages.length === 0) return [];
+  return Promise.all(
+    characterImages.map(async (c) => ({
+      url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
+      description: c.description,
+    }))
+  );
+}
+
 async function generateTTSParallel(
   sceneTexts: string[],
   voiceId: string | undefined,
@@ -120,7 +137,7 @@ async function reusePreApprovedImages(
 
 async function fetchFacelessMediaParallel(
   script: ScriptInput,
-  seriesRecord: { niche: string; style: string; imageModel?: string | null },
+  seriesRecord: { niche: string; style: string; imageModel?: string | null; characterRefs?: CharacterRef[] },
   workDir: string,
   concurrency = 3,
   preApproved: PreApproved = new Map()
@@ -149,7 +166,8 @@ async function fetchFacelessMediaParallel(
         let asset: MediaAsset;
         try {
           const imgModel = seriesRecord.imageModel || "dall-e-3";
-          asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel);
+          const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
+          asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel, refs);
         } catch (err) {
           console.warn(
             `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Trying fallback.`
@@ -186,11 +204,12 @@ async function fetchFacelessMediaParallel(
 async function generateSceneImage(
   imagePrompt: string,
   imageModel: string,
-  sceneIndex: number
+  sceneIndex: number,
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset> {
   if (imageModel === "nano-banana-2") {
-    console.log(`Scene ${sceneIndex}: Generating Nano Banana 2 image...`);
-    const nbImage = await generateNanoBananaImage(imagePrompt);
+    console.log(`Scene ${sceneIndex}: Generating Nano Banana 2 image${characterRefs?.length ? ` with ${characterRefs.length} character ref(s)` : ""}...`);
+    const nbImage = await generateNanoBananaImage(imagePrompt, characterRefs);
     if (nbImage) return nbImage;
     console.warn(`Scene ${sceneIndex}: Nano Banana 2 failed, falling back to DALL-E`);
   } else if (imageModel === "flux-pro") {
@@ -209,7 +228,7 @@ async function generateSceneImage(
 
 async function fetchAIVideoMediaParallel(
   script: ScriptInput,
-  seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null; sceneContinuity?: number },
+  seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null; sceneContinuity?: number; characterRefs?: CharacterRef[] },
   workDir: string,
   concurrency = 2,
   preApproved: PreApproved = new Map()
@@ -217,6 +236,7 @@ async function fetchAIVideoMediaParallel(
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
   const imageModel = seriesRecord.imageModel || "dall-e-3";
   const continuity = !!seriesRecord.sceneContinuity;
+  const charRefs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
 
   // Phase 1: Generate/collect all scene images first (needed for continuity pairs)
   const sceneImagePaths: string[] = new Array(script.scenes.length);
@@ -241,7 +261,7 @@ async function fetchAIVideoMediaParallel(
             console.log(`Scene ${i}: Using pre-approved image`);
           }
         } else {
-          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i);
+          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, charRefs);
           await downloadFile(generatedImage.url, imagePath);
         }
 
@@ -282,8 +302,8 @@ async function fetchAIVideoMediaParallel(
           ? falImageUrls[i + 1]
           : undefined;
 
-        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"})${endImageUrl ? " → scene " + (i + 1) : ""}...`);
-        const videoResult = await getAIVideoForScene(startImageUrl, videoPrompt, clipDuration, videoModelKey, endImageUrl);
+        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"})${endImageUrl ? " → scene " + (i + 1) : ""}${charRefs ? ` +${charRefs.length}chars` : ""}...`);
+        const videoResult = await getAIVideoForScene(startImageUrl, videoPrompt, clipDuration, videoModelKey, endImageUrl, charRefs);
 
         const videoPath = path.join(workDir, `media_${i}.mp4`);
         await downloadAIVideo(videoResult.videoUrl, videoPath);
@@ -373,10 +393,13 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
   resetUsedMedia();
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
+    const seriesRecordRaw = await db.query.series.findFirst({
       where: eq(schema.series.id, seriesId),
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!seriesRecordRaw) throw new Error(`Series not found: ${seriesId}`);
+
+    const characterRefs = await resolveCharacterRefs(seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null);
+    const seriesRecord = { ...seriesRecordRaw, characterRefs };
 
     const videoType = seriesRecord.videoType || "faceless";
 
@@ -522,11 +545,14 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
   resetUsedMedia();
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
+    const seriesRecordRaw = await db.query.series.findFirst({
       where: eq(schema.series.id, seriesId),
     });
 
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!seriesRecordRaw) throw new Error(`Series not found: ${seriesId}`);
+
+    const characterRefs = await resolveCharacterRefs(seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null);
+    const seriesRecord = { ...seriesRecordRaw, characterRefs };
 
     const videoType = seriesRecord.videoType || "faceless";
     console.log(`Render job starting: type=${videoType}, series=${seriesId}`);
@@ -831,10 +857,13 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
   resetUsedMedia();
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
+    const seriesRecordRaw = await db.query.series.findFirst({
       where: eq(schema.series.id, seriesId),
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!seriesRecordRaw) throw new Error(`Series not found: ${seriesId}`);
+
+    const characterRefs = await resolveCharacterRefs(seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null);
+    const seriesRecord = { ...seriesRecordRaw, characterRefs };
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),

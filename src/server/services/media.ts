@@ -161,21 +161,44 @@ export async function generateFluxImage(
   }
 }
 
+export interface CharacterRef {
+  url: string;
+  description: string;
+}
+
 export async function generateNanoBananaImage(
-  prompt: string
+  prompt: string,
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset | null> {
+  const hasRefs = characterRefs && characterRefs.length > 0;
+
   try {
-    const result = await fal.subscribe(AI_VIDEO.nanoBananaModel, {
-      input: {
-        prompt: `${prompt}. Vertical 9:16 composition, highly detailed, cinematic lighting, no text or watermarks.`,
-        aspect_ratio: "9:16",
-        output_format: "jpeg",
-        resolution: "1K",
-        num_images: 1,
-        safety_tolerance: "5",
-      },
+    const modelId = hasRefs
+      ? `${AI_VIDEO.nanoBananaModel}/edit`
+      : AI_VIDEO.nanoBananaModel;
+
+    const charContext = hasRefs
+      ? ` Characters in scene: ${characterRefs.map((c, i) => `[Character ${i + 1}: ${c.description || "reference image"}]`).join(", ")}. Keep all characters consistent with their reference images.`
+      : "";
+
+    const input: Record<string, unknown> = {
+      prompt: `${prompt}.${charContext} Vertical 9:16 composition, highly detailed, cinematic lighting, no text or watermarks.`,
+      aspect_ratio: "9:16",
+      output_format: "jpeg",
+      resolution: "1K",
+      num_images: 1,
+      safety_tolerance: "5",
+    };
+
+    if (hasRefs) {
+      input.image_urls = characterRefs.map((c) => c.url);
+    }
+
+    const result = await fal.subscribe(modelId, {
+      input,
       logs: true,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     const data = result.data as { images?: Array<{ url: string; width?: number; height?: number }> };
     const image = data?.images?.[0];
@@ -196,10 +219,11 @@ export async function generateNanoBananaImage(
 
 async function generateAnyImage(
   prompt: string,
-  imageModel = "dall-e-3"
+  imageModel = "dall-e-3",
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset | null> {
   if (imageModel === "nano-banana-2") {
-    const nb = await generateNanoBananaImage(prompt);
+    const nb = await generateNanoBananaImage(prompt, characterRefs);
     if (nb) return nb;
   }
   if (imageModel === "flux-pro") {
@@ -213,10 +237,11 @@ export async function getMediaForScene(
   searchQuery: string,
   imagePrompt: string,
   preferAiImage = false,
-  imageModel = "dall-e-3"
+  imageModel = "dall-e-3",
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset> {
   if (preferAiImage) {
-    const generatedImage = await generateAnyImage(imagePrompt, imageModel);
+    const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs);
     if (generatedImage) return generatedImage;
   }
 
@@ -235,7 +260,7 @@ export async function getMediaForScene(
     if (fallbackImage) return fallbackImage;
   }
 
-  const generatedImage = await generateAnyImage(imagePrompt, imageModel);
+  const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs);
   if (generatedImage) return generatedImage;
 
   throw new Error(

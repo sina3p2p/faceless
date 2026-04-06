@@ -205,7 +205,7 @@ export async function generateMusicScript(
   targetDuration = 60,
   model?: string
 ): Promise<MusicScript> {
-  const systemPrompt = `You are an elite songwriter AND music video director. You create songs that go viral on TikTok and YouTube Shorts, and pair them with cinematic visuals.
+  const systemPrompt = `You are an elite songwriter AND music video director. You create songs that go viral on TikTok and YouTube Shorts, and pair them with cinematic visuals that are PERFECTLY synchronized with the music.
 
 Your output must be valid JSON matching this exact schema:
 {
@@ -217,8 +217,8 @@ Your output must be valid JSON matching this exact schema:
       "sectionName": "string - e.g. 'Intro', 'Verse 1', 'Chorus', 'Verse 2', 'Bridge', 'Outro'",
       "lyrics": ["line 1", "line 2", "..."],
       "durationMs": number (section duration in milliseconds, between 5000 and 30000),
-      "imagePrompt": "string - highly detailed visual prompt for this section (50-100 words). Describe the scene that plays during this part of the song. Include subject, environment, lighting, camera angle, mood, and motion cues. Style: ${style}.",
-      "visualDescription": "string - brief description of visual action for video generation",
+      "imagePrompt": "string - EXTREMELY detailed visual prompt. The more detail the better — be as descriptive as possible. This generates the key frame image for this section's video clip.",
+      "visualDescription": "string - detailed motion/action description. Be as thorough as possible — describe every movement, camera motion, and environmental animation. This tells the AI video model what to animate.",
       "positiveStyles": ["string - musical elements to include, e.g. 'electric guitar', 'driving drums', 'female vocals'"],
       "negativeStyles": ["string - musical elements to avoid, e.g. 'saxophone', 'country twang'"]
     }
@@ -235,19 +235,54 @@ SONGWRITING RULES:
 7. positiveStyles should describe instruments, tempo, and vocal characteristics that match the genre.
 8. negativeStyles should list elements that would clash with the desired sound.
 
-VISUAL RULES (same quality standard as music videos):
-- Each section's imagePrompt must be 50-100 words, cinematically detailed.
-- Visuals must match the MOOD of the music in that section.
-- Verse visuals: storytelling, character close-ups, narrative scenes.
-- Chorus visuals: dynamic, energetic, wide shots, dramatic lighting.
-- Bridge/Outro: emotional climax, beautiful landscapes, slow-motion moments.
-- Art style: ${style}. Every frame should look like a professional music video.
+VISUAL-MUSIC SYNC RULES (CRITICAL — this is what makes or breaks the video):
+
+The visuals must feel like they were CHOREOGRAPHED to the music. Think like a real music video director.
+
+1. MATCH ENERGY TO SECTION TYPE:
+   - Intro: Establishing shot, slow reveal, atmospheric. Camera slowly pushing in or pulling back. Mysterious, anticipation-building.
+   - Verse: Storytelling scenes, medium shots of the subject, narrative progression. Moderate pace camera moves. The visual should ILLUSTRATE what the lyrics describe.
+   - Pre-Chorus: Building tension — camera gets closer, lighting intensifies, motion speeds up slightly.
+   - Chorus: MAXIMUM energy. Wide dynamic shots, dramatic lighting shifts, fast camera moves, vibrant colors. The visual peak must match the musical peak.
+   - Bridge: Contrast — something different. A new location, perspective shift, emotional turning point. Often slower, more intimate.
+   - Outro: Resolution. Wide pullback shot, sunset/sunrise, the subject walking away, fading light. Closure.
+
+2. LYRIC-VISUAL LITERALISM:
+   - If lyrics mention "fire" → show flames, warm orange lighting, glowing embers
+   - If lyrics mention "rain" → wet surfaces, water droplets, gray moody sky
+   - If lyrics mention "night" → dark setting, moonlight, city lights, neon glow
+   - If lyrics mention "flying/soaring" → aerial perspective, clouds, birds, open sky
+   - EVERY section's visuals must directly reference the lyrics being sung in that section. Do NOT generate generic pretty scenes.
+
+3. imagePrompt DETAIL REQUIREMENTS (be as detailed as possible, no word limit):
+   - SUBJECT: Who/what is the main focus? Describe appearance, clothing, expression, pose, body language in detail.
+   - ENVIRONMENT: Where is the scene? Describe the setting, architecture, nature, weather, time of day, props.
+   - LIGHTING: Describe light source, shadows, color temperature, atmosphere (golden hour, neon glow, moonlight, dramatic rim lighting, soft diffused studio light).
+   - CAMERA: Specify angle (low angle hero shot, bird's eye, eye level, Dutch angle) and framing (close-up, medium shot, wide establishing).
+   - MOOD: Atmospheric elements — fog, rain, lens flare, dust particles, bokeh, smoke, volumetric rays.
+   - COLOR PALETTE: Specify dominant colors that match the emotional tone (warm oranges for passion, cool blues for melancholy, vibrant neons for energy).
+   - STYLE: ${style}. Must feel premium and cinematic.
+
+4. visualDescription MOTION REQUIREMENTS (be as detailed as possible, no word limit):
+   - Describe the specific MOVEMENT and ACTION for the AI video generator.
+   - Include camera motion: "camera slowly orbits", "dramatic push-in", "tracking shot following the subject", "crane shot rising upward".
+   - Include subject motion: "character turns to face camera", "wind blows through hair", "walks forward through fog", "hands reach toward the sky".
+   - Include environmental motion: "clouds drifting", "rain falling", "fire flickering", "leaves swirling in wind", "neon signs flickering".
+   - Match motion SPEED to music tempo: slow songs = slow deliberate moves, upbeat songs = dynamic fast cuts.
+
+5. VISUAL CONTINUITY ACROSS SECTIONS:
+   - Maintain a CONSISTENT main character/subject across all sections.
+   - Use a coherent color palette throughout (warm tones, cool tones, or a planned color journey).
+   - The visual story should have a clear arc: setup → development → climax → resolution.
+   - Verse 1 and Verse 2 should show progression (e.g. same character, different situation or later in time).
+   - Both Chorus sections should share similar visual energy and color palette but from different angles or compositions.
 ${niche === "kids" ? `
 KIDS MUSIC RULES:
 - Write fun, educational, catchy songs for ages 4-10.
 - Simple words, lots of repetition, energetic and joyful.
-- Visuals must be bright, colorful, and age-appropriate.
+- Visuals must be bright, colorful, and age-appropriate. Never dark or scary.
 - Genre should be upbeat pop or playful children's music.
+- Characters should be friendly animals, cartoon kids, or colorful fantasy creatures.
 ` : ""}`;
 
   const userPrompt = topicIdea
