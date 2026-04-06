@@ -48,7 +48,7 @@ export default function SeriesDetailPage() {
   useEffect(() => {
     if (!series) return;
     const hasActive = series.videoProjects.some(
-      (v) => !["COMPLETED", "FAILED"].includes(v.status)
+      (v) => !["COMPLETED", "FAILED", "REVIEW"].includes(v.status)
     );
     if (!hasActive) return;
     const interval = setInterval(loadSeries, 3000);
@@ -89,6 +89,7 @@ export default function SeriesDetailPage() {
     switch (status) {
       case "COMPLETED": return "success" as const;
       case "FAILED": return "danger" as const;
+      case "REVIEW": return "default" as const;
       case "RENDERING":
       case "GENERATING_SCRIPT":
       case "GENERATING_ASSETS": return "warning" as const;
@@ -191,6 +192,18 @@ export default function SeriesDetailPage() {
                           />
                         </div>
                       )}
+                    {video.status === "REVIEW" && (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          router.push(`/dashboard/videos/${video.id}/review`);
+                        }}
+                      >
+                        Review Script
+                      </Button>
+                    )}
                     {video.status === "FAILED" && (
                       <Button
                         size="sm"

@@ -54,7 +54,7 @@ export default function VideoDetailPage() {
 
   useEffect(() => {
     if (!video) return;
-    if (["COMPLETED", "FAILED"].includes(video.status)) return;
+    if (["COMPLETED", "FAILED", "REVIEW"].includes(video.status)) return;
     const interval = setInterval(loadVideo, 3000);
     return () => clearInterval(interval);
   }, [video, loadVideo]);
@@ -93,6 +93,7 @@ export default function VideoDetailPage() {
     switch (status) {
       case "COMPLETED": return "success" as const;
       case "FAILED": return "danger" as const;
+      case "REVIEW": return "default" as const;
       case "RENDERING":
       case "GENERATING_SCRIPT":
       case "GENERATING_ASSETS": return "warning" as const;
@@ -126,8 +127,22 @@ export default function VideoDetailPage() {
         </Badge>
       </div>
 
+      {/* Review prompt */}
+      {video.status === "REVIEW" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">
+              Your script is ready! Review and edit the scenes before generating the video.
+            </p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review &amp; Edit Script
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Progress */}
-      {job && !["COMPLETED", "FAILED"].includes(video.status) && (
+      {job && !["COMPLETED", "FAILED", "REVIEW"].includes(video.status) && (
         <Card className="mb-8">
           <CardContent className="py-6">
             <div className="flex items-center justify-between mb-3">

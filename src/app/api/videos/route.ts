@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { series, videoProjects, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
-import { enqueueRenderJob } from "@/lib/queue";
+import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
-  await enqueueRenderJob({
+  await renderQueue.add("generate-script", {
     videoProjectId: videoProject.id,
     seriesId: seriesRecord.id,
     userId: user.id,
