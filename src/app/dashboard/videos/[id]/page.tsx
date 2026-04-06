@@ -13,6 +13,8 @@ interface Scene {
   text: string;
   duration: number | null;
   assetType: string | null;
+  assetUrl: string | null;
+  audioUrl: string | null;
 }
 
 interface VideoDetail {
@@ -228,9 +230,29 @@ export default function VideoDetailPage() {
                   <div className="flex-1">
                     <p className="text-gray-300 text-sm">{scene.text}</p>
                     <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                      {scene.duration && <span>{scene.duration}s</span>}
+                      {scene.duration && <span className="font-mono">{scene.duration}s</span>}
                       {scene.assetType && (
                         <Badge variant="default">{scene.assetType}</Badge>
+                      )}
+                      {scene.assetUrl && (
+                        <a
+                          href={`/api/media/${scene.assetUrl}`}
+                          download={`scene_${scene.sceneOrder + 1}.${scene.assetType === "video" ? "mp4" : "jpg"}`}
+                          className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          {scene.assetType === "video" ? "Video" : "Image"}
+                        </a>
+                      )}
+                      {scene.audioUrl && (
+                        <a
+                          href={`/api/media/${scene.audioUrl}`}
+                          download={`scene_${scene.sceneOrder + 1}_audio.mp3`}
+                          className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
+                        >
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          Audio
+                        </a>
                       )}
                     </div>
                   </div>
