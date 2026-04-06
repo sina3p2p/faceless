@@ -189,6 +189,7 @@ export const ART_STYLES = [
 ] as const;
 
 export const CAPTION_STYLES = [
+  { id: "none", label: "None", description: "No captions / subtitles" },
   { id: "default", label: "Default", description: "Clean white text with shadow" },
   { id: "bold", label: "Bold Pop", description: "Large bold text with color highlights" },
   { id: "typewriter", label: "Typewriter", description: "Word-by-word reveal effect" },

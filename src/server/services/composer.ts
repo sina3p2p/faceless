@@ -297,31 +297,36 @@ export async function composeVideo(
       );
     }
 
-    const styleConfig = getCaptionStyle(captionStyle);
-    const assContent = generateAssSubtitles(scenes, styleConfig, sceneDurations);
-    const assPath = path.join(workDir, "captions.ass");
-    await fs.writeFile(assPath, assContent);
+    let videoForBgMusic = rawConcat;
 
-    const withCaptions = path.join(workDir, "with_captions.mp4");
-    const assPathEscaped = assPath.replace(/'/g, "'\\''").replace(/:/g, "\\:");
-    await execAsync(
-      `ffmpeg -y -i "${rawConcat}" ` +
-        `-vf "ass='${assPathEscaped}'" ` +
-        `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-        `-c:a copy "${withCaptions}"`
-    );
+    if (captionStyle !== "none") {
+      const styleConfig = getCaptionStyle(captionStyle);
+      const assContent = generateAssSubtitles(scenes, styleConfig, sceneDurations);
+      const assPath = path.join(workDir, "captions.ass");
+      await fs.writeFile(assPath, assContent);
+
+      const withCaptions = path.join(workDir, "with_captions.mp4");
+      const assPathEscaped = assPath.replace(/'/g, "'\\''").replace(/:/g, "\\:");
+      await execAsync(
+        `ffmpeg -y -i "${rawConcat}" ` +
+          `-vf "ass='${assPathEscaped}'" ` +
+          `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
+          `-c:a copy "${withCaptions}"`
+      );
+      videoForBgMusic = withCaptions;
+    }
 
     if (backgroundMusicPath) {
       const finalOutput = path.join(workDir, "final.mp4");
       await execAsync(
-        `ffmpeg -y -i "${withCaptions}" -i "${backgroundMusicPath}" ` +
+        `ffmpeg -y -i "${videoForBgMusic}" -i "${backgroundMusicPath}" ` +
           `-filter_complex "[1:a]volume=0.10[bg];[0:a][bg]amix=inputs=2:duration=first[outa]" ` +
           `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${finalOutput}"`
       );
       return finalOutput;
     }
 
-    return withCaptions;
+    return videoForBgMusic;
   } catch (error) {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     throw error;
