@@ -180,3 +180,87 @@ SCENE CONTINUITY MODE (CRITICAL — follow these rules):
   const cleaned = result.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
   return JSON.parse(cleaned) as VideoScript;
 }
+
+export interface MusicSection {
+  sectionName: string;
+  lyrics: string[];
+  durationMs: number;
+  imagePrompt: string;
+  visualDescription: string;
+  positiveStyles: string[];
+  negativeStyles: string[];
+}
+
+export interface MusicScript {
+  title: string;
+  genre: string;
+  totalDuration: number;
+  sections: MusicSection[];
+}
+
+export async function generateMusicScript(
+  niche: string,
+  style: string,
+  topicIdea?: string,
+  targetDuration = 60,
+  model?: string
+): Promise<MusicScript> {
+  const systemPrompt = `You are an elite songwriter AND music video director. You create songs that go viral on TikTok and YouTube Shorts, and pair them with cinematic visuals.
+
+Your output must be valid JSON matching this exact schema:
+{
+  "title": "string - catchy song title",
+  "genre": "string - music genre/style description for the AI music generator (e.g. 'pop, upbeat, catchy', 'lo-fi hip hop, chill, dreamy', 'epic cinematic orchestral')",
+  "totalDuration": number (total seconds),
+  "sections": [
+    {
+      "sectionName": "string - e.g. 'Intro', 'Verse 1', 'Chorus', 'Verse 2', 'Bridge', 'Outro'",
+      "lyrics": ["line 1", "line 2", "..."],
+      "durationMs": number (section duration in milliseconds, between 5000 and 30000),
+      "imagePrompt": "string - highly detailed visual prompt for this section (50-100 words). Describe the scene that plays during this part of the song. Include subject, environment, lighting, camera angle, mood, and motion cues. Style: ${style}.",
+      "visualDescription": "string - brief description of visual action for video generation",
+      "positiveStyles": ["string - musical elements to include, e.g. 'electric guitar', 'driving drums', 'female vocals'"],
+      "negativeStyles": ["string - musical elements to avoid, e.g. 'saxophone', 'country twang'"]
+    }
+  ]
+}
+
+SONGWRITING RULES:
+1. Write lyrics that are CATCHY, MEMORABLE, and SINGABLE. Use rhyme, repetition, and strong hooks.
+2. The chorus should be the most memorable part — repeat it 2-3 times.
+3. Keep lyrics SHORT per line (5-10 words). Each line must be at most 200 characters.
+4. Match the genre to the niche: ${niche}
+5. Total song duration should be approximately ${targetDuration} seconds.
+6. Aim for 5-7 sections: Intro + 2 Verses + 2 Choruses + Bridge/Outro.
+7. positiveStyles should describe instruments, tempo, and vocal characteristics that match the genre.
+8. negativeStyles should list elements that would clash with the desired sound.
+
+VISUAL RULES (same quality standard as music videos):
+- Each section's imagePrompt must be 50-100 words, cinematically detailed.
+- Visuals must match the MOOD of the music in that section.
+- Verse visuals: storytelling, character close-ups, narrative scenes.
+- Chorus visuals: dynamic, energetic, wide shots, dramatic lighting.
+- Bridge/Outro: emotional climax, beautiful landscapes, slow-motion moments.
+- Art style: ${style}. Every frame should look like a professional music video.
+${niche === "kids" ? `
+KIDS MUSIC RULES:
+- Write fun, educational, catchy songs for ages 4-10.
+- Simple words, lots of repetition, energetic and joyful.
+- Visuals must be bright, colorful, and age-appropriate.
+- Genre should be upbeat pop or playful children's music.
+` : ""}`;
+
+  const userPrompt = topicIdea
+    ? `Create a viral ${niche}-themed song about: ${topicIdea}. Visual style: ${style}. The song should be irresistibly catchy.`
+    : `Create a viral ${niche}-themed song. Visual style: ${style}. Pick a topic that resonates emotionally and makes the listener want to replay it.`;
+
+  const result = await generateText(systemPrompt, userPrompt, {
+    maxTokens: 4000,
+    temperature: 0.85,
+    jsonMode: true,
+    model,
+  });
+
+  const cleaned = result.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
+  return JSON.parse(cleaned) as MusicScript;
+}

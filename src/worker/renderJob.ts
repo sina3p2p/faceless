@@ -8,7 +8,8 @@ import postgres from "postgres";
 import { eq } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE } from "@/lib/constants";
-import { generateVideoScript } from "@/server/services/llm";
+import { generateVideoScript, generateMusicScript, type MusicScript } from "@/server/services/llm";
+import { generateSong, splitSongIntoSections } from "@/server/services/music";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
   getMediaForScene,
@@ -748,6 +749,236 @@ export async function rerenderVideoJob(job: Job<RenderJobData>) {
       error instanceof Error ? error.message : "Unknown error";
     console.error(`Re-render failed for ${videoProjectId}:`, errorMessage);
     await updateVideoStatus(videoProjectId, "FAILED");
+    throw error;
+  } finally {
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
+  }
+}
+
+export async function generateMusicScriptJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    console.log(`Music script generation starting for series=${seriesId}`);
+    await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
+    await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
+    await job.updateProgress(10);
+
+    const topicIdeas = seriesRecord.topicIdeas as string[];
+    const topicIdea =
+      topicIdeas.length > 0
+        ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
+        : undefined;
+
+    const musicScript = await generateMusicScript(
+      seriesRecord.niche,
+      seriesRecord.style,
+      topicIdea,
+      60,
+      seriesRecord.llmModel || undefined
+    );
+
+    await db
+      .update(schema.videoProjects)
+      .set({
+        title: musicScript.title,
+        script: JSON.stringify(musicScript),
+        duration: musicScript.totalDuration,
+      })
+      .where(eq(schema.videoProjects.id, videoProjectId));
+
+    for (let i = 0; i < musicScript.sections.length; i++) {
+      const section = musicScript.sections[i];
+      await db.insert(schema.videoScenes).values({
+        videoProjectId,
+        sceneOrder: i,
+        text: section.lyrics.join("\n"),
+        imagePrompt: section.imagePrompt,
+        visualDescription: section.visualDescription,
+        searchQuery: section.sectionName,
+        duration: Math.round(section.durationMs / 1000),
+      });
+    }
+
+    await updateVideoStatus(videoProjectId, "REVIEW");
+    await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
+    await job.updateProgress(100);
+
+    console.log(`Music script ready for review: ${musicScript.title} (${musicScript.sections.length} sections)`);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`Music script generation failed for ${videoProjectId}:`, errorMessage);
+    await updateVideoStatus(videoProjectId, "FAILED");
+    await db
+      .update(schema.renderJobs)
+      .set({ status: "FAILED", error: errorMessage })
+      .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
+    throw error;
+  }
+}
+
+export async function renderMusicVideoJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId, userId } = job.data;
+  const workDir = path.join(os.tmpdir(), `faceless-music-${uuid()}`);
+  await fs.mkdir(workDir, { recursive: true });
+
+  resetUsedMedia();
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    const existingScenes = await db.query.videoScenes.findMany({
+      where: eq(schema.videoScenes.videoProjectId, videoProjectId),
+      orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
+    });
+
+    if (existingScenes.length === 0) throw new Error("No scenes to render");
+
+    const scriptJson = (await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      columns: { script: true },
+    }))?.script;
+
+    const musicScript: MusicScript | null = scriptJson ? JSON.parse(scriptJson) : null;
+    if (!musicScript) throw new Error("No music script found");
+
+    console.log(`Music video render starting: ${existingScenes.length} sections`);
+
+    await updateVideoStatus(videoProjectId, "GENERATING_ASSETS");
+    await updateJobStep(videoProjectId, "TTS", "ACTIVE", 10);
+    await job.updateProgress(10);
+
+    const sectionsForMusic = musicScript.sections.map((s, i) => ({
+      ...s,
+      lyrics: existingScenes[i] ? existingScenes[i].text.split("\n") : s.lyrics,
+      durationMs: (existingScenes[i]?.duration ?? Math.round(s.durationMs / 1000)) * 1000,
+    }));
+
+    const songResult = await generateSong(
+      musicScript.title,
+      musicScript.genre,
+      sectionsForMusic
+    );
+
+    const songPath = path.join(workDir, "full_song.mp3");
+    await downloadFile(songResult.audioUrl, songPath);
+
+    console.log("Full song generated and downloaded");
+    await job.updateProgress(30);
+
+    const sectionAudioPaths = await splitSongIntoSections(
+      songPath,
+      sectionsForMusic,
+      workDir
+    );
+
+    await job.updateProgress(35);
+
+    await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 40);
+
+    const preApproved = await reusePreApprovedImages(existingScenes, workDir);
+
+    const sceneScript = {
+      scenes: existingScenes.map((s, i) => ({
+        text: s.text,
+        visualDescription: s.visualDescription || musicScript.sections[i]?.visualDescription || s.text,
+        searchQuery: s.searchQuery || musicScript.sections[i]?.sectionName || "cinematic",
+        imagePrompt: s.imagePrompt || musicScript.sections[i]?.imagePrompt || s.text,
+        duration: s.duration ?? Math.round((musicScript.sections[i]?.durationMs ?? 8000) / 1000),
+      })),
+    };
+
+    let mediaPaths: { path: string; type: "video" | "image" }[];
+    if (seriesRecord.videoModel && seriesRecord.videoModel !== "none") {
+      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preApproved);
+    } else {
+      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preApproved);
+    }
+
+    await job.updateProgress(65);
+
+    await Promise.all(
+      existingScenes.map(async (scene, i) => {
+        const audioBuffer = await fs.readFile(sectionAudioPaths[i]);
+        const audioKey = `scenes/${videoProjectId}/audio_${i}.mp3`;
+        await uploadFile(audioKey, audioBuffer, "audio/mpeg");
+
+        const mediaBuffer = await fs.readFile(mediaPaths[i].path);
+        const mediaExt = mediaPaths[i].type === "video" ? "mp4" : "jpg";
+        const mediaMime = mediaPaths[i].type === "video" ? "video/mp4" : "image/jpeg";
+        const mediaKey = `scenes/${videoProjectId}/media_${i}.${mediaExt}`;
+        await uploadFile(mediaKey, mediaBuffer, mediaMime);
+
+        await db
+          .update(schema.videoScenes)
+          .set({
+            audioUrl: audioKey,
+            assetUrl: mediaKey,
+            assetType: mediaPaths[i].type,
+            duration: existingScenes[i].duration,
+          })
+          .where(eq(schema.videoScenes.id, scene.id));
+      })
+    );
+
+    await job.updateProgress(70);
+
+    await updateVideoStatus(videoProjectId, "RENDERING");
+    await updateJobStep(videoProjectId, "COMPOSE", "ACTIVE", 75);
+
+    const composerScenes: ComposerScene[] = existingScenes.map((scene, i) => ({
+      audioPath: sectionAudioPaths[i],
+      mediaPath: mediaPaths[i].path,
+      mediaType: mediaPaths[i].type,
+      text: scene.text.split("\n").join(" "),
+      duration: scene.duration ?? Math.round((musicScript.sections[i]?.durationMs ?? 8000) / 1000),
+      wordTimestamps: [],
+    }));
+
+    const outputPath = await composeVideo({
+      scenes: composerScenes,
+      captionStyle: seriesRecord.captionStyle,
+      sceneContinuity: !!seriesRecord.sceneContinuity,
+    });
+
+    await job.updateProgress(90);
+
+    const outputBuffer = await fs.readFile(outputPath);
+    const s3Key = `videos/${userId}/${videoProjectId}/output.mp4`;
+    await uploadFile(s3Key, outputBuffer, "video/mp4");
+
+    const totalDuration = composerScenes.reduce((s, sc) => s + sc.duration, 0);
+    await db
+      .update(schema.videoProjects)
+      .set({ duration: Math.round(totalDuration) })
+      .where(eq(schema.videoProjects.id, videoProjectId));
+
+    await updateVideoStatus(videoProjectId, "COMPLETED", { outputUrl: s3Key });
+    await updateJobStep(videoProjectId, "DONE", "COMPLETED", 100);
+    await job.updateProgress(100);
+
+    await recordUsage(userId, "video_generated", 1, {
+      videoProjectId,
+      duration: totalDuration,
+    });
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    console.error(`Music video render failed for ${videoProjectId}:`, errorMessage);
+    await updateVideoStatus(videoProjectId, "FAILED");
+    await db
+      .update(schema.renderJobs)
+      .set({ status: "FAILED", error: errorMessage })
+      .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
     throw error;
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });

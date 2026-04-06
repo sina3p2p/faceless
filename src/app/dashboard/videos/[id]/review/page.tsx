@@ -28,6 +28,7 @@ interface Scene {
   text: string;
   imagePrompt: string | null;
   visualDescription: string | null;
+  searchQuery: string | null;
   duration: number;
   assetUrl: string | null;
 }
@@ -50,6 +51,7 @@ function SortableSceneCard({
   onUpdate,
   onEditPrompt,
   generatingImage,
+  isMusicVideo,
 }: {
   scene: Scene;
   index: number;
@@ -59,6 +61,7 @@ function SortableSceneCard({
   onUpdate: (updates: { text?: string; duration?: number }) => void;
   onEditPrompt: () => void;
   generatingImage: boolean;
+  isMusicVideo?: boolean;
 }) {
   const {
     attributes,
@@ -132,9 +135,11 @@ function SortableSceneCard({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {/* Narration text */}
+          {/* Narration / Lyrics text */}
           <div className="mb-2">
-            <span className="text-[10px] uppercase tracking-wider text-gray-600 font-medium">Narration</span>
+            <span className="text-[10px] uppercase tracking-wider text-gray-600 font-medium">
+              {isMusicVideo ? scene.searchQuery || "Lyrics" : "Narration"}
+            </span>
             {editing ? (
               <textarea
                 value={text}
@@ -476,10 +481,12 @@ export default function ReviewPage() {
         </Button>
 
         <h1 className="text-2xl font-bold mb-2">
-          {video?.title ?? "Review Script"}
+          {video?.title ?? (video?.series?.videoType === "music_video" ? "Review Song" : "Review Script")}
         </h1>
         <p className="text-gray-400 text-sm">
-          Review your script, then generate preview images to approve before creating the video.
+          {video?.series?.videoType === "music_video"
+            ? "Review your song lyrics and sections, then generate preview images before creating the music video."
+            : "Review your script, then generate preview images to approve before creating the video."}
         </p>
       </div>
 
@@ -561,6 +568,7 @@ export default function ReviewPage() {
                 onUpdate={(updates) => handleUpdateScene(scene.id, updates)}
                 onEditPrompt={() => setEditingScene(scene)}
                 generatingImage={generatingSceneIds.has(scene.id)}
+                isMusicVideo={video?.series?.videoType === "music_video"}
               />
             ))}
           </div>

@@ -75,6 +75,14 @@ export const AI_VIDEO = {
   nanoBananaModel: "fal-ai/nano-banana-2",
 } as const;
 
+// ── Music (Suno) ──
+
+export const MUSIC = {
+  get sunoApiKey() { return env("SUNO_API_KEY"); },
+  sunoBaseUrl: "https://api.sunoapi.org",
+  sunoModel: "V5" as const,
+} as const;
+
 export const VIDEO_MODELS = [
   { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "fal-ai/kling-video/v3/standard/image-to-video", description: "#2 ranked globally, great value (~$0.42/5s)" },
   { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "fal-ai/kling-video/v3/pro/image-to-video", description: "Top-tier cinematic quality (~$0.50/5s)" },
@@ -190,4 +198,5 @@ export const CAPTION_STYLES = [
 export const VIDEO_TYPES = [
   { id: "faceless", label: "Faceless", description: "Stock footage and AI images with voiceover" },
   { id: "ai_video", label: "AI Video", description: "AI-generated animated video clips per scene (higher cost)" },
+  { id: "music_video", label: "Music Video", description: "AI-generated song with vocals + cinematic visuals (~$3-4/video)" },
 ] as const;
