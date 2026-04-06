@@ -150,5 +150,6 @@ KIDS CONTENT RULES (this overrides tone guidelines above):
     model,
   });
 
-  return JSON.parse(result) as VideoScript;
+  const cleaned = result.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
+  return JSON.parse(cleaned) as VideoScript;
 }
