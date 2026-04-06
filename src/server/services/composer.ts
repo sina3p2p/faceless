@@ -23,6 +23,7 @@ export interface ComposerOptions {
   captionStyle: string;
   backgroundMusicPath?: string;
   outputFormat?: string;
+  sceneContinuity?: boolean;
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {
@@ -206,7 +207,7 @@ function formatAssTime(seconds: number): string {
 export async function composeVideo(
   options: ComposerOptions
 ): Promise<string> {
-  const { scenes, captionStyle, backgroundMusicPath } = options;
+  const { scenes, captionStyle, backgroundMusicPath, sceneContinuity } = options;
   const workDir = path.join(os.tmpdir(), `faceless-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
   const W = VIDEO_DEFAULTS.width;
@@ -226,6 +227,7 @@ export async function composeVideo(
       sceneDurations.push(duration);
 
       const fadeOutStart = Math.max(0, duration - 0.4);
+      const fadeFilter = sceneContinuity ? "" : `,fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`;
 
       if (scene.mediaType === "video") {
         const videoDuration = await getMediaDuration(scene.mediaPath);
@@ -239,8 +241,7 @@ export async function composeVideo(
           `crop=${W}:${H}`,
           `setsar=1`,
           `fps=${FPS}`,
-          `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`,
-        ].join(",");
+        ].join(",") + fadeFilter;
 
         await execAsync(
           `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
@@ -265,8 +266,7 @@ export async function composeVideo(
           `crop=${W * 2}:${H * 2}`,
           `setsar=1`,
           `zoompan=z='${effect.zoom}':x='${effect.x}':y='${effect.y}':d=${totalFrames}:s=${W}x${H}:fps=${FPS}`,
-          `fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`,
-        ].join(",");
+        ].join(",") + fadeFilter;
 
         await execAsync(
           `ffmpeg -y -loop 1 -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +

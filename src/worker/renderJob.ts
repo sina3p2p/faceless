@@ -475,6 +475,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
     const outputPath = await composeVideo({
       scenes: composerScenes,
       captionStyle: seriesRecord.captionStyle,
+      sceneContinuity: !!seriesRecord.sceneContinuity,
     });
 
     await job.updateProgress(90);
@@ -640,6 +641,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     const outputPath = await composeVideo({
       scenes: composerScenes,
       captionStyle: seriesRecord.captionStyle,
+      sceneContinuity: !!seriesRecord.sceneContinuity,
     });
 
     await job.updateProgress(90);
@@ -724,6 +726,7 @@ export async function rerenderVideoJob(job: Job<RenderJobData>) {
     const outputPath = await composeVideo({
       scenes: composerScenes,
       captionStyle: seriesRecord.captionStyle,
+      sceneContinuity: !!seriesRecord.sceneContinuity,
     });
 
     await job.updateProgress(85);
