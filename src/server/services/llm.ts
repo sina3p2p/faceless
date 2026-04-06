@@ -115,7 +115,19 @@ CRITICAL RULES:
 - searchQuery must be HYPER-SPECIFIC (e.g. "abandoned underground bunker" not "dark place")
 - imagePrompt must paint a CINEMATIC scene that perfectly matches the narration. Include: main subject, environment, lighting (dramatic/moody/golden hour), camera angle (close-up/wide/aerial), atmosphere (fog/rain/dust particles). Style: ${style}.
 - Total duration should be ${targetDuration} seconds
-- Aim for 5-7 scenes`;
+- Aim for 5-7 scenes
+${niche === "kids" ? `
+KIDS CONTENT RULES (this overrides tone guidelines above):
+- Target age: 4-10 years old
+- Use simple, cheerful language a child can understand
+- NO scary, violent, dark, or mature content whatsoever
+- Make it FUN and EDUCATIONAL — teach something cool (animals, space, dinosaurs, nature, science experiments, fun facts)
+- Use excitement and wonder instead of tension ("Guess what?!", "How cool is THAT?!")
+- Narration should sound like a friendly, enthusiastic teacher or storyteller
+- imagePrompt should be colorful, bright, cartoonish or playful — never dark or moody
+- searchQuery should target kid-friendly footage (colorful animals, space, nature, cartoons)
+- CTA should be fun: "Which one was YOUR favorite?" or "Can you guess what happens next?"
+` : ""}`;
 
   const userPrompt = topicIdea
     ? `Create a ${niche} viral video script about: ${topicIdea}. Visual style: ${style}. Make it impossible to scroll past.`

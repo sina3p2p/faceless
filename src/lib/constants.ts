@@ -18,6 +18,7 @@ export const NICHES = [
   { id: "mythology", label: "Mythology", description: "Myths and legends from around the world" },
   { id: "anime-stories", label: "Anime Stories", description: "Anime-inspired narratives" },
   { id: "motivation", label: "Motivation", description: "Motivational stories and quotes" },
+  { id: "kids", label: "Kids", description: "Fun educational stories for children" },
 ] as const;
 
 export const ART_STYLES = [
@@ -26,6 +27,7 @@ export const ART_STYLES = [
   { id: "watercolor", label: "Watercolor" },
   { id: "dark", label: "Dark & Moody" },
   { id: "minimal", label: "Minimal" },
+  { id: "cartoon", label: "Cartoon" },
 ] as const;
 
 export const CAPTION_STYLES = [
