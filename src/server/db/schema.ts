@@ -22,6 +22,7 @@ export const videoStatusEnum = pgEnum("video_status", [
   "RENDERING",
   "COMPLETED",
   "FAILED",
+  "CANCELLED",
 ]);
 
 export const renderStepEnum = pgEnum("render_step", [

@@ -36,6 +36,7 @@ export default function SeriesDetailPage() {
   const [generating, setGenerating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const loadSeries = useCallback(() => {
     fetch(`/api/series/${id}`)
@@ -50,7 +51,7 @@ export default function SeriesDetailPage() {
   useEffect(() => {
     if (!series) return;
     const hasActive = series.videoProjects.some(
-      (v) => !["COMPLETED", "FAILED", "REVIEW"].includes(v.status)
+      (v) => !["COMPLETED", "FAILED", "REVIEW", "CANCELLED"].includes(v.status)
     );
     if (!hasActive) return;
     const interval = setInterval(loadSeries, 3000);
@@ -80,6 +81,16 @@ export default function SeriesDetailPage() {
     setRetryingId(null);
   }
 
+  async function handleCancel(videoId: string) {
+    if (!confirm("Cancel this video generation? This cannot be undone.")) return;
+    setCancellingId(videoId);
+    const res = await fetch(`/api/videos/${videoId}/cancel`, { method: "POST" });
+    if (res.ok) {
+      loadSeries();
+    }
+    setCancellingId(null);
+  }
+
   async function handleDelete() {
     if (!confirm("Delete this series and all its videos?")) return;
     setDeleting(true);
@@ -91,6 +102,7 @@ export default function SeriesDetailPage() {
     switch (status) {
       case "COMPLETED": return "success" as const;
       case "FAILED": return "danger" as const;
+      case "CANCELLED": return "danger" as const;
       case "REVIEW": return "default" as const;
       case "RENDERING":
       case "GENERATING_SCRIPT":
@@ -191,7 +203,7 @@ export default function SeriesDetailPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     {video.renderJobs[0] &&
-                      !["COMPLETED", "FAILED"].includes(video.status) && (
+                      !["COMPLETED", "FAILED", "CANCELLED"].includes(video.status) && (
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-500">
                             {video.renderJobs[0].step}
@@ -200,6 +212,18 @@ export default function SeriesDetailPage() {
                             value={video.renderJobs[0].progress}
                             className="w-24"
                           />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            loading={cancellingId === video.id}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleCancel(video.id);
+                            }}
+                            className="text-gray-400 hover:text-red-400"
+                          >
+                            Cancel
+                          </Button>
                         </div>
                       )}
                     {video.status === "REVIEW" && (
@@ -214,7 +238,7 @@ export default function SeriesDetailPage() {
                         Review Script
                       </Button>
                     )}
-                    {video.status === "FAILED" && (
+                    {(video.status === "FAILED" || video.status === "CANCELLED") && (
                       <Button
                         size="sm"
                         variant="outline"
