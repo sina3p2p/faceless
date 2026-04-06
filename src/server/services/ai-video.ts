@@ -1,14 +1,19 @@
 import { fal } from "@fal-ai/client";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { AI_VIDEO } from "@/lib/constants";
+import { AI_VIDEO, VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
 
 fal.config({
   credentials: AI_VIDEO.falKey,
 });
 
-const I2V_MODEL = AI_VIDEO.i2vModel;
 const T2V_MODEL = AI_VIDEO.t2vModel;
+
+function resolveI2VModelId(videoModelKey?: string): string {
+  const key = videoModelKey || DEFAULT_VIDEO_MODEL;
+  const entry = VIDEO_MODELS.find((m) => m.id === key);
+  return entry?.modelId ?? AI_VIDEO.defaultI2vModel;
+}
 
 interface VideoResult {
   videoUrl: string;
@@ -18,27 +23,39 @@ interface VideoResult {
 export async function generateVideoFromImage(
   imageUrl: string,
   prompt: string,
-  duration: "5" | "10" = "5"
+  duration: "5" | "10" = "5",
+  videoModelKey?: string
 ): Promise<VideoResult> {
-  const result = await fal.subscribe(I2V_MODEL, {
-    input: {
-      prompt,
-      image_url: imageUrl,
-      duration,
-    },
+  const modelId = resolveI2VModelId(videoModelKey);
+
+  const input: Record<string, unknown> = {
+    prompt,
+    image_url: imageUrl,
+    duration,
+  };
+
+  // Hailuo uses start_frame_url instead of image_url
+  if (modelId.includes("minimax") || modelId.includes("hailuo")) {
+    delete input.image_url;
+    input.image_url = imageUrl;
+  }
+
+  const result = await fal.subscribe(modelId, {
+    input,
     logs: true,
-    onQueueUpdate: (update) => {
+    onQueueUpdate: (update: { status: string; logs?: Array<{ message: string }> }) => {
       if (update.status === "IN_PROGRESS" && update.logs) {
         for (const log of update.logs) {
           console.log(`[fal i2v] ${log.message}`);
         }
       }
     },
-  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  } as any);
 
   const data = result.data as { video?: { url: string } };
   if (!data?.video?.url) {
-    throw new Error("fal.ai image-to-video returned no video URL");
+    throw new Error(`fal.ai image-to-video (${modelId}) returned no video URL`);
   }
 
   return {
@@ -82,11 +99,13 @@ export async function generateVideoFromText(
 export async function getAIVideoForScene(
   imageUrl: string,
   prompt: string,
-  duration: "5" | "10" = "5"
+  duration: "5" | "10" = "5",
+  videoModelKey?: string
 ): Promise<VideoResult> {
   try {
-    console.log(`[ai-video] Trying image-to-video for: "${prompt.slice(0, 60)}..."`);
-    return await generateVideoFromImage(imageUrl, prompt, duration);
+    const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
+    console.log(`[ai-video] Trying image-to-video (${modelLabel}) for: "${prompt.slice(0, 60)}..."`);
+    return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey);
   } catch (err) {
     console.warn(
       `[ai-video] Image-to-video failed: ${err instanceof Error ? err.message : err}. Falling back to text-to-video.`

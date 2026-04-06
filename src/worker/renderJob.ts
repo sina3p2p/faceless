@@ -208,7 +208,7 @@ async function generateSceneImage(
 
 async function fetchAIVideoMediaParallel(
   script: ScriptInput,
-  seriesRecord: { niche: string; style: string; imageModel?: string | null },
+  seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null },
   workDir: string,
   concurrency = 2,
   preApproved: PreApproved = new Map()
@@ -246,9 +246,10 @@ async function fetchAIVideoMediaParallel(
         console.log(`Scene ${i}: Uploading image to fal.ai...`);
         const falImageUrl = await uploadImageForFal(imagePath);
 
-        console.log(`Scene ${i}: Generating AI video clip...`);
+        const videoModelKey = seriesRecord.videoModel || undefined;
+        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"})...`);
         const clipDuration: "5" | "10" = scene.duration >= 10 ? "10" : "5";
-        const videoResult = await getAIVideoForScene(falImageUrl, videoPrompt, clipDuration);
+        const videoResult = await getAIVideoForScene(falImageUrl, videoPrompt, clipDuration, videoModelKey);
 
         const videoPath = path.join(workDir, `media_${i}.mp4`);
         await downloadAIVideo(videoResult.videoUrl, videoPath);

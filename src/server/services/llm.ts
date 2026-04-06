@@ -126,6 +126,23 @@ IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
 - Include motion cues: "camera slowly pushes in", "wind gently moves the curtains", "smoke rises from the ground", "waves crash against rocks".
 - EACH scene's imagePrompt must be visually DIFFERENT from the others. Vary camera angles, color palettes, and compositions across scenes.
 - Think like a cinematographer — every frame should be visually stunning enough to pause and admire.
+${["claymation", "gothic-clay"].includes(style) ? `
+CLAYMATION STYLE RULES (CRITICAL — follow these for every imagePrompt):
+- Every subject, object, and environment MUST look like it is handcrafted from clay, plasticine, or polymer clay
+- Describe visible clay textures: fingerprint marks, smooth rounded edges, slightly imperfect surfaces, soft matte finish
+- Environments must look like miniature handmade diorama sets with clay props and sculpted backdrops
+- Characters should have exaggerated proportions: slightly oversized heads, rounded features, stubby fingers, visible seam lines
+- Lighting should mimic a stop-motion studio: soft diffused overhead lighting, subtle shadows, warm color temperature
+- Include material callouts in every prompt: "sculpted from colorful plasticine", "clay figure with visible texture", "handcrafted miniature set piece"
+- Props and objects should look molded: "clay smartphone", "plasticine coffee cup", "sculpted clay castle walls"
+- Backgrounds: handmade painted backdrops, cardboard and clay scenery, miniature buildings and trees made of clay
+- ALWAYS start or end imagePrompt with: "Claymation stop-motion style, everything made of sculpted clay and plasticine"` : ""}${style === "gothic-clay" ? `
+GOTHIC CLAY VARIANT (apply ON TOP of claymation rules):
+- Dark moody atmosphere — gothic arches, stone castle walls made of gray and purple clay, candelabras with clay flames, stained glass, cobwebs
+- Color palette: deep purples, dark greens, charcoal grays, midnight blues, with pops of color on the main character
+- Characters wear dramatic clothing: fur coats, velvet capes, dark dresses, sunglasses — all sculpted from clay
+- Environment is always a gothic setting: clay castles, cathedrals, haunted mansions, dark forests — all as miniature clay dioramas
+- Mood: mysterious, elegant, slightly eerie but stylish — think Tim Burton meets Wallace and Gromit` : ""}
 ${niche === "kids" ? `
 KIDS CONTENT RULES (this overrides tone guidelines above):
 - Target age: 4-10 years old

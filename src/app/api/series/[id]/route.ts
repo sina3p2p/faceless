@@ -13,6 +13,7 @@ const updateSeriesSchema = z.object({
   videoType: z.enum(["faceless", "ai_video"]).optional(),
   llmModel: z.string().optional(),
   imageModel: z.string().optional(),
+  videoModel: z.string().optional(),
   defaultVoiceId: z.string().nullable().optional(),
   topicIdeas: z.array(z.string()).optional(),
 });

@@ -12,6 +12,7 @@ const createSeriesSchema = z.object({
   defaultVoiceId: z.string().optional(),
   llmModel: z.string().default("anthropic/claude-opus-4.6"),
   imageModel: z.string().default("dall-e-3"),
+  videoModel: z.string().default("kling-3-standard"),
   captionStyle: z.string().default("default"),
   videoType: z.enum(["faceless", "ai_video"]).default("faceless"),
   topicIdeas: z.array(z.string()).default([]),

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES, LLM_MODELS, DEFAULT_LLM_MODEL, IMAGE_MODELS, DEFAULT_IMAGE_MODEL } from "@/lib/constants";
+import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES, LLM_MODELS, DEFAULT_LLM_MODEL, IMAGE_MODELS, DEFAULT_IMAGE_MODEL, VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
 
 interface SeriesData {
@@ -18,6 +18,7 @@ interface SeriesData {
   videoType: string;
   llmModel: string | null;
   imageModel: string | null;
+  videoModel: string | null;
   defaultVoiceId: string | null;
   topicIdeas: string[];
 }
@@ -35,6 +36,7 @@ export default function EditSeriesPage() {
     videoType: "",
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
+    videoModel: DEFAULT_VIDEO_MODEL as string,
     defaultVoiceId: "",
     topicIdeas: "",
   });
@@ -51,6 +53,7 @@ export default function EditSeriesPage() {
           videoType: data.videoType || "faceless",
           llmModel: data.llmModel || DEFAULT_LLM_MODEL,
           imageModel: data.imageModel || DEFAULT_IMAGE_MODEL,
+          videoModel: data.videoModel || DEFAULT_VIDEO_MODEL,
           defaultVoiceId: data.defaultVoiceId || "",
           topicIdeas: (data.topicIdeas || []).join("\n"),
         });
@@ -78,6 +81,7 @@ export default function EditSeriesPage() {
         videoType: form.videoType,
         llmModel: form.llmModel,
         imageModel: form.imageModel,
+        videoModel: form.videoModel,
         defaultVoiceId: form.defaultVoiceId || null,
         topicIdeas,
       }),
@@ -196,6 +200,38 @@ export default function EditSeriesPage() {
                 ))}
               </div>
             </div>
+
+            {form.videoType === "ai_video" && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Video Generation Model
+                </label>
+                <div className="space-y-2">
+                  {VIDEO_MODELS.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, videoModel: m.id })}
+                      className={`w-full rounded-xl border p-3 text-left transition-all ${
+                        form.videoModel === m.id
+                          ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                          : "border-white/10 bg-white/5 hover:border-white/20"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-white text-sm">{m.label}</p>
+                        {m.id === DEFAULT_VIDEO_MODEL && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">
+                            RECOMMENDED
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <Select
               label="Niche"

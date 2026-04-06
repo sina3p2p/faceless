@@ -69,11 +69,25 @@ export const MEDIA = {
 
 export const AI_VIDEO = {
   get falKey() { return env("FAL_KEY"); },
-  i2vModel: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+  defaultI2vModel: "fal-ai/kling-video/v3/standard/image-to-video",
   t2vModel: "fal-ai/wan-25-preview/text-to-video",
   fluxImageModel: "fal-ai/flux-pro/v1.1",
   nanoBananaModel: "fal-ai/nano-banana-2",
 } as const;
+
+export const VIDEO_MODELS = [
+  { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "fal-ai/kling-video/v3/standard/image-to-video", description: "#2 ranked globally, great value (~$0.42/5s)" },
+  { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "fal-ai/kling-video/v3/pro/image-to-video", description: "Top-tier cinematic quality (~$0.50/5s)" },
+  { id: "kling-o3", label: "Kling O3", modelId: "fal-ai/kling-video/o3/standard/image-to-video", description: "Best 3D spatial awareness (~$0.50/5s)" },
+  { id: "hailuo-02-standard", label: "Hailuo 02 Standard", modelId: "fal-ai/minimax/hailuo-02/standard/image-to-video", description: "Natural motion, budget-friendly (~$0.27/5s)" },
+  { id: "hailuo-02-pro", label: "Hailuo 02 Pro", modelId: "fal-ai/minimax/hailuo-02/pro/image-to-video", description: "1080p, great prompt following (~$0.48/5s)" },
+  { id: "pixverse-v6", label: "PixVerse V6", modelId: "fal-ai/pixverse/v6/image-to-video", description: "Lifelike physics (~$0.45/5s)" },
+  { id: "kling-25-turbo", label: "Kling 2.5 Turbo Pro", modelId: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video", description: "Fast & cheap legacy model (~$0.35/5s)" },
+  { id: "ltx-2-pro", label: "LTX 2.0 Pro", modelId: "fal-ai/ltx-2/image-to-video", description: "Best bang-for-buck (~$0.30/5s)" },
+  { id: "wan-25", label: "Wan 2.5", modelId: "fal-ai/wan-25-preview/image-to-video", description: "Cheapest option (~$0.25/5s)" },
+] as const;
+
+export const DEFAULT_VIDEO_MODEL = "kling-3-standard";
 
 export const IMAGE_MODELS = [
   { id: "dall-e-3", label: "DALL-E 3", description: "Good quality, ~$0.04/image (OpenAI)" },
@@ -162,6 +176,7 @@ export const ART_STYLES = [
   { id: "minimal", label: "Minimal" },
   { id: "cartoon", label: "Cartoon" },
   { id: "claymation", label: "Claymation 3D" },
+  { id: "gothic-clay", label: "Gothic Clay" },
   { id: "pixar", label: "Pixar / 3D Render" },
 ] as const;
 
