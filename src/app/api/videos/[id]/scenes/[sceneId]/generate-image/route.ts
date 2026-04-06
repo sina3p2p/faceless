@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes, series } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
-import { generateImage, generateFluxImage } from "@/server/services/media";
+import { generateImage, generateFluxImage, generateNanoBananaImage } from "@/server/services/media";
 import { uploadFile } from "@/lib/storage";
 import { z } from "zod";
 
@@ -45,7 +45,10 @@ export async function POST(
   let imageUrl: string | null = null;
 
   try {
-    if (imageModel === "flux-pro") {
+    if (imageModel === "nano-banana-2") {
+      const result = await generateNanoBananaImage(prompt);
+      imageUrl = result?.url ?? null;
+    } else if (imageModel === "flux-pro") {
       const result = await generateFluxImage(prompt);
       imageUrl = result?.url ?? null;
     }

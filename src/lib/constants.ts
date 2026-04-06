@@ -69,14 +69,16 @@ export const MEDIA = {
 
 export const AI_VIDEO = {
   get falKey() { return env("FAL_KEY"); },
-  i2vModel: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video" as string,
-  t2vModel: "fal-ai/wan-25-preview/text-to-video" as string,
-  fluxImageModel: "fal-ai/flux-pro/v1.1" as string,
+  i2vModel: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+  t2vModel: "fal-ai/wan-25-preview/text-to-video",
+  fluxImageModel: "fal-ai/flux-pro/v1.1",
+  nanoBananaModel: "fal-ai/nano-banana-2",
 } as const;
 
 export const IMAGE_MODELS = [
   { id: "dall-e-3", label: "DALL-E 3", description: "Good quality, ~$0.04/image (OpenAI)" },
-  { id: "flux-pro", label: "Flux Pro 1.1", description: "Best for 3D/claymation styles, ~$0.04/image (fal.ai)" },
+  { id: "flux-pro", label: "Flux Pro 1.1", description: "Best for 3D/claymation styles, ~$0.04/image (Flux)" },
+  { id: "nano-banana-2", label: "Nano Banana 2", description: "Best quality & speed, ~$0.08/image (Google)" },
 ] as const;
 
 export const DEFAULT_IMAGE_MODEL = "dall-e-3";

@@ -14,6 +14,7 @@ import {
   getMediaForScene,
   generateImage,
   generateFluxImage,
+  generateNanoBananaImage,
   resetUsedMedia,
   type MediaAsset,
 } from "@/server/services/media";
@@ -186,7 +187,12 @@ async function generateSceneImage(
   imageModel: string,
   sceneIndex: number
 ): Promise<MediaAsset> {
-  if (imageModel === "flux-pro") {
+  if (imageModel === "nano-banana-2") {
+    console.log(`Scene ${sceneIndex}: Generating Nano Banana 2 image...`);
+    const nbImage = await generateNanoBananaImage(imagePrompt);
+    if (nbImage) return nbImage;
+    console.warn(`Scene ${sceneIndex}: Nano Banana 2 failed, falling back to DALL-E`);
+  } else if (imageModel === "flux-pro") {
     console.log(`Scene ${sceneIndex}: Generating Flux Pro image...`);
     const fluxImage = await generateFluxImage(imagePrompt);
     if (fluxImage) return fluxImage;

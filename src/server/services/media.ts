@@ -137,12 +137,12 @@ export async function generateFluxImage(
         image_size: { width: 768, height: 1344 },
         num_images: 1,
         output_format: "jpeg",
-        guidance_scale: 3.5,
         num_inference_steps: 28,
-        safety_tolerance: "5",
+        safety_tolerance: "5" as const,
       },
       logs: true,
-    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
 
     const data = result.data as { images?: Array<{ url: string; width: number; height: number }> };
     const image = data?.images?.[0];
@@ -161,10 +161,47 @@ export async function generateFluxImage(
   }
 }
 
+export async function generateNanoBananaImage(
+  prompt: string
+): Promise<MediaAsset | null> {
+  try {
+    const result = await fal.subscribe(AI_VIDEO.nanoBananaModel, {
+      input: {
+        prompt: `${prompt}. Vertical 9:16 composition, highly detailed, cinematic lighting, no text or watermarks.`,
+        aspect_ratio: "9:16",
+        output_format: "jpeg",
+        resolution: "1K",
+        num_images: 1,
+        safety_tolerance: "5",
+      },
+      logs: true,
+    });
+
+    const data = result.data as { images?: Array<{ url: string; width?: number; height?: number }> };
+    const image = data?.images?.[0];
+    if (!image?.url) return null;
+
+    return {
+      url: image.url,
+      type: "image",
+      source: "flux",
+      width: image.width || 768,
+      height: image.height || 1344,
+    };
+  } catch (err) {
+    console.warn(`Nano Banana 2 image generation failed: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
+}
+
 async function generateAnyImage(
   prompt: string,
   imageModel = "dall-e-3"
 ): Promise<MediaAsset | null> {
+  if (imageModel === "nano-banana-2") {
+    const nb = await generateNanoBananaImage(prompt);
+    if (nb) return nb;
+  }
   if (imageModel === "flux-pro") {
     const flux = await generateFluxImage(prompt);
     if (flux) return flux;
