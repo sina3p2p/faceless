@@ -67,7 +67,8 @@ export async function generateVideoScript(
   style: string,
   topicIdea?: string,
   targetDuration = 45,
-  model?: string
+  model?: string,
+  sceneContinuity = false
 ): Promise<VideoScript> {
   const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
 
@@ -154,6 +155,15 @@ KIDS CONTENT RULES (this overrides tone guidelines above):
 - imagePrompt should be colorful, bright, cartoonish or playful — never dark or moody
 - searchQuery should target kid-friendly footage (colorful animals, space, nature, cartoons)
 - CTA should be fun: "Which one was YOUR favorite?" or "Can you guess what happens next?"
+` : ""}${sceneContinuity ? `
+SCENE CONTINUITY MODE (CRITICAL — follow these rules):
+- Video clips will be generated using IMAGE PAIRS: each clip transitions from scene N's image to scene N+1's image.
+- This means each scene's imagePrompt must create a visually COMPATIBLE image with its neighbors. Avoid extreme visual jumps between consecutive scenes (e.g. don't go from underwater to outer space).
+- Maintain a CONSISTENT main subject/character across all scenes. If the first scene shows a character, keep that same character visible in subsequent scenes.
+- You MUST add one EXTRA FINAL scene at the end (the "ending scene"). This scene serves as the visual closing frame of the video.
+- The ending scene should be a visually striking conclusion: the main subject in a final pose, a wide establishing shot, or a stylized CTA composition (e.g. "camera pulls back to reveal a beautiful panoramic view", or "the character turns to the camera with a knowing smile").
+- The ending scene's narration should contain the CTA.
+- Total scenes should be 6-8 (including the ending scene).
 ` : ""}`;
 
   const userPrompt = topicIdea

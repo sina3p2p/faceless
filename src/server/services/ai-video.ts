@@ -24,19 +24,26 @@ export async function generateVideoFromImage(
   imageUrl: string,
   prompt: string,
   duration: "5" | "10" = "5",
-  videoModelKey?: string
+  videoModelKey?: string,
+  endImageUrl?: string
 ): Promise<VideoResult> {
   const modelId = resolveI2VModelId(videoModelKey);
 
   const input: Record<string, unknown> = {
     prompt,
-    image_url: imageUrl,
     duration,
   };
 
-  // Hailuo uses start_frame_url instead of image_url
-  if (modelId.includes("minimax") || modelId.includes("hailuo")) {
-    delete input.image_url;
+  // Kling v3 uses start_image_url + end_image_url
+  if (modelId.includes("kling-video/v3") || modelId.includes("kling-video/o3")) {
+    input.start_image_url = imageUrl;
+    if (endImageUrl) input.end_image_url = endImageUrl;
+    input.generate_audio = false;
+  } else if (modelId.includes("kling-video")) {
+    // Older Kling models use image_url + tail_image_url
+    input.image_url = imageUrl;
+    if (endImageUrl) input.tail_image_url = endImageUrl;
+  } else {
     input.image_url = imageUrl;
   }
 
@@ -100,12 +107,13 @@ export async function getAIVideoForScene(
   imageUrl: string,
   prompt: string,
   duration: "5" | "10" = "5",
-  videoModelKey?: string
+  videoModelKey?: string,
+  endImageUrl?: string
 ): Promise<VideoResult> {
   try {
     const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
-    console.log(`[ai-video] Trying image-to-video (${modelLabel}) for: "${prompt.slice(0, 60)}..."`);
-    return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey);
+    console.log(`[ai-video] Trying image-to-video (${modelLabel})${endImageUrl ? " with end frame" : ""} for: "${prompt.slice(0, 60)}..."`);
+    return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey, endImageUrl);
   } catch (err) {
     console.warn(
       `[ai-video] Image-to-video failed: ${err instanceof Error ? err.message : err}. Falling back to text-to-video.`

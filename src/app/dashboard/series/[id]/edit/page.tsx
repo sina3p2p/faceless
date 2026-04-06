@@ -19,6 +19,7 @@ interface SeriesData {
   llmModel: string | null;
   imageModel: string | null;
   videoModel: string | null;
+  sceneContinuity: number;
   defaultVoiceId: string | null;
   topicIdeas: string[];
 }
@@ -37,6 +38,7 @@ export default function EditSeriesPage() {
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
+    sceneContinuity: false,
     defaultVoiceId: "",
     topicIdeas: "",
   });
@@ -54,6 +56,7 @@ export default function EditSeriesPage() {
           llmModel: data.llmModel || DEFAULT_LLM_MODEL,
           imageModel: data.imageModel || DEFAULT_IMAGE_MODEL,
           videoModel: data.videoModel || DEFAULT_VIDEO_MODEL,
+          sceneContinuity: !!data.sceneContinuity,
           defaultVoiceId: data.defaultVoiceId || "",
           topicIdeas: (data.topicIdeas || []).join("\n"),
         });
@@ -82,6 +85,7 @@ export default function EditSeriesPage() {
         llmModel: form.llmModel,
         imageModel: form.imageModel,
         videoModel: form.videoModel,
+        sceneContinuity: form.sceneContinuity,
         defaultVoiceId: form.defaultVoiceId || null,
         topicIdeas,
       }),
@@ -229,6 +233,34 @@ export default function EditSeriesPage() {
                       <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {form.videoType === "ai_video" && (
+              <div
+                onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
+                className={`rounded-xl border p-4 cursor-pointer transition-all ${
+                  form.sceneContinuity
+                    ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                    : "border-white/10 bg-white/5 hover:border-white/20"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-white">Scene Continuity</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Each video clip smoothly transitions from one scene image to the next,
+                      creating seamless visual flow. An ending scene is auto-generated.
+                    </p>
+                  </div>
+                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${
+                    form.sceneContinuity ? "bg-violet-500" : "bg-white/10"
+                  }`}>
+                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      form.sceneContinuity ? "translate-x-5" : "translate-x-0"
+                    }`} />
+                  </div>
                 </div>
               </div>
             )}

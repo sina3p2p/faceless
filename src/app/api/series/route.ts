@@ -13,6 +13,7 @@ const createSeriesSchema = z.object({
   llmModel: z.string().default("anthropic/claude-opus-4.6"),
   imageModel: z.string().default("dall-e-3"),
   videoModel: z.string().default("kling-3-standard"),
+  sceneContinuity: z.boolean().default(false),
   captionStyle: z.string().default("default"),
   videoType: z.enum(["faceless", "ai_video"]).default("faceless"),
   topicIdeas: z.array(z.string()).default([]),
@@ -56,10 +57,12 @@ export async function POST(req: NextRequest) {
     return badRequest(parsed.error.message);
   }
 
+  const { sceneContinuity, ...rest } = parsed.data;
   const [newSeries] = await db
     .insert(series)
     .values({
-      ...parsed.data,
+      ...rest,
+      sceneContinuity: sceneContinuity ? 1 : 0,
       userId: user.id,
     })
     .returning();

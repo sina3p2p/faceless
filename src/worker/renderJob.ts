@@ -208,48 +208,81 @@ async function generateSceneImage(
 
 async function fetchAIVideoMediaParallel(
   script: ScriptInput,
-  seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null },
+  seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null; sceneContinuity?: number },
   workDir: string,
   concurrency = 2,
   preApproved: PreApproved = new Map()
 ): Promise<{ path: string; type: "video" | "image" }[]> {
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
   const imageModel = seriesRecord.imageModel || "dall-e-3";
+  const continuity = !!seriesRecord.sceneContinuity;
 
-  const chunks: number[][] = [];
+  // Phase 1: Generate/collect all scene images first (needed for continuity pairs)
+  const sceneImagePaths: string[] = new Array(script.scenes.length);
+  const imgChunks: number[][] = [];
   for (let i = 0; i < script.scenes.length; i += concurrency) {
-    chunks.push(
+    imgChunks.push(
       Array.from({ length: Math.min(concurrency, script.scenes.length - i) }, (_, j) => i + j)
     );
   }
 
-  for (const chunk of chunks) {
+  for (const chunk of imgChunks) {
     await Promise.all(
       chunk.map(async (i) => {
         const scene = script.scenes[i];
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
-        const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
-
         const imagePath = path.join(workDir, `ai_img_${i}.jpg`);
 
         if (preApproved.has(i)) {
           const approved = preApproved.get(i)!;
           if (approved.type === "image") {
             await fs.copyFile(approved.path, imagePath);
-            console.log(`Scene ${i}: Using pre-approved image for I2V`);
+            console.log(`Scene ${i}: Using pre-approved image`);
           }
         } else {
           const generatedImage = await generateSceneImage(imagePrompt, imageModel, i);
           await downloadFile(generatedImage.url, imagePath);
         }
 
-        console.log(`Scene ${i}: Uploading image to fal.ai...`);
-        const falImageUrl = await uploadImageForFal(imagePath);
+        sceneImagePaths[i] = imagePath;
+      })
+    );
+  }
 
+  // Phase 2: Upload all images to fal.ai
+  const falImageUrls: string[] = new Array(script.scenes.length);
+  for (const chunk of imgChunks) {
+    await Promise.all(
+      chunk.map(async (i) => {
+        console.log(`Scene ${i}: Uploading image to fal.ai...`);
+        falImageUrls[i] = await uploadImageForFal(sceneImagePaths[i]);
+      })
+    );
+  }
+
+  // Phase 3: Generate video clips (with end-frame pairs when continuity is on)
+  const vidChunks: number[][] = [];
+  for (let i = 0; i < script.scenes.length; i += concurrency) {
+    vidChunks.push(
+      Array.from({ length: Math.min(concurrency, script.scenes.length - i) }, (_, j) => i + j)
+    );
+  }
+
+  for (const chunk of vidChunks) {
+    await Promise.all(
+      chunk.map(async (i) => {
+        const scene = script.scenes[i];
+        const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
         const videoModelKey = seriesRecord.videoModel || undefined;
-        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"})...`);
         const clipDuration: "5" | "10" = scene.duration >= 10 ? "10" : "5";
-        const videoResult = await getAIVideoForScene(falImageUrl, videoPrompt, clipDuration, videoModelKey);
+
+        const startImageUrl = falImageUrls[i];
+        const endImageUrl = continuity && i < script.scenes.length - 1
+          ? falImageUrls[i + 1]
+          : undefined;
+
+        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"})${endImageUrl ? " → scene " + (i + 1) : ""}...`);
+        const videoResult = await getAIVideoForScene(startImageUrl, videoPrompt, clipDuration, videoModelKey, endImageUrl);
 
         const videoPath = path.join(workDir, `media_${i}.mp4`);
         await downloadAIVideo(videoResult.videoUrl, videoPath);
@@ -288,7 +321,8 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
       seriesRecord.style,
       topicIdea,
       45,
-      seriesRecord.llmModel || undefined
+      seriesRecord.llmModel || undefined,
+      !!seriesRecord.sceneContinuity
     );
 
     await db
@@ -511,7 +545,8 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       seriesRecord.style,
       topicIdea,
       45,
-      seriesRecord.llmModel || undefined
+      seriesRecord.llmModel || undefined,
+      !!seriesRecord.sceneContinuity
     );
 
     await db

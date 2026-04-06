@@ -107,6 +107,7 @@ export const series = pgTable("series", {
   imageModel: text("image_model").default("dall-e-3"),
   videoModel: text("video_model").default("kling-3-standard"),
   captionStyle: text("caption_style").default("default").notNull(),
+  sceneContinuity: integer("scene_continuity").default(0).notNull(),
   videoType: text("video_type").default("faceless").notNull(),
   topicIdeas: json("topic_ideas").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),

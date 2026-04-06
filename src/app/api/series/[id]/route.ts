@@ -14,6 +14,7 @@ const updateSeriesSchema = z.object({
   llmModel: z.string().optional(),
   imageModel: z.string().optional(),
   videoModel: z.string().optional(),
+  sceneContinuity: z.boolean().optional(),
   defaultVoiceId: z.string().nullable().optional(),
   topicIdeas: z.array(z.string()).optional(),
 });
@@ -67,7 +68,9 @@ export async function PATCH(
   const parsed = updateSeriesSchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
-  const updates = parsed.data;
+  const { sceneContinuity, ...restUpdates } = parsed.data;
+  const updates: Record<string, unknown> = { ...restUpdates };
+  if (sceneContinuity !== undefined) updates.sceneContinuity = sceneContinuity ? 1 : 0;
   if (Object.keys(updates).length === 0) return badRequest("No fields to update");
 
   const [updated] = await db
