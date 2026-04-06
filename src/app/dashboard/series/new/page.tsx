@@ -285,6 +285,11 @@ export default function NewSeriesPage() {
               />
               <p className="text-xs text-gray-500 mt-1.5">
                 Click the play button to preview. Leave unselected to use the default voice.
+                Browse more voices on the{" "}
+                <a href="https://elevenlabs.io/voice-library" target="_blank" rel="noopener noreferrer" className="text-violet-400 hover:text-violet-300 underline">
+                  ElevenLabs Voice Library
+                </a>{" "}
+                and copy the Voice ID to use with &quot;Custom Voice ID&quot;.
               </p>
             </div>
 
