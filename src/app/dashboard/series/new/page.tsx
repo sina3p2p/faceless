@@ -13,6 +13,7 @@ export default function NewSeriesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [pendingCharacters, setPendingCharacters] = useState<Array<{ file: File; preview: string; description: string }>>([]);
+  const [describingIdx, setDescribingIdx] = useState<number | null>(null);
   const [form, setForm] = useState({
     name: "",
     niche: NICHES[0].id as string,
@@ -340,9 +341,42 @@ export default function NewSeriesPage() {
                           );
                         }}
                       />
-                      <p className="text-[10px] text-gray-600 mt-1">
-                        AI description is available after creating the series (in edit page).
-                      </p>
+                      <button
+                        type="button"
+                        disabled={describingIdx === idx}
+                        onClick={async () => {
+                          setDescribingIdx(idx);
+                          try {
+                            const fd = new FormData();
+                            fd.append("file", char.file);
+                            const res = await fetch("/api/describe-character", {
+                              method: "POST",
+                              body: fd,
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              setPendingCharacters((prev) =>
+                                prev.map((c, i) => i === idx ? { ...c, description: data.description } : c)
+                              );
+                            }
+                          } finally {
+                            setDescribingIdx(null);
+                          }
+                        }}
+                        className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-colors disabled:opacity-50"
+                      >
+                        {describingIdx === idx ? (
+                          <>
+                            <span className="w-3 h-3 border border-violet-300 border-t-transparent rounded-full animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                            AI Describe
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
                 ))}
