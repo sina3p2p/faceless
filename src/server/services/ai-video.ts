@@ -126,17 +126,10 @@ export async function getAIVideoForScene(
   endImageUrl?: string,
   characterRefs?: CharacterRef[]
 ): Promise<VideoResult> {
-  try {
-    const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
-    const charCount = characterRefs?.length || 0;
-    console.log(`[ai-video] Trying image-to-video (${modelLabel})${endImageUrl ? " with end frame" : ""}${charCount ? ` with ${charCount} character ref(s)` : ""} for: "${prompt.slice(0, 60)}..."`);
-    return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey, endImageUrl, characterRefs);
-  } catch (err) {
-    console.warn(
-      `[ai-video] Image-to-video failed: ${err instanceof Error ? err.message : err}. Falling back to text-to-video.`
-    );
-    return await generateVideoFromText(prompt, duration);
-  }
+  const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
+  const charCount = characterRefs?.length || 0;
+  console.log(`[ai-video] Trying image-to-video (${modelLabel})${endImageUrl ? " with end frame" : ""}${charCount ? ` with ${charCount} character ref(s)` : ""} for: "${prompt.slice(0, 60)}..."`);
+  return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey, endImageUrl, characterRefs);
 }
 
 export async function downloadAIVideo(

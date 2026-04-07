@@ -223,12 +223,10 @@ async function generateAnyImage(
   characterRefs?: CharacterRef[]
 ): Promise<MediaAsset | null> {
   if (imageModel === "nano-banana-2") {
-    const nb = await generateNanoBananaImage(prompt, characterRefs);
-    if (nb) return nb;
+    return generateNanoBananaImage(prompt, characterRefs);
   }
   if (imageModel === "flux-pro") {
-    const flux = await generateFluxImage(prompt);
-    if (flux) return flux;
+    return generateFluxImage(prompt);
   }
   return generateImage(prompt);
 }

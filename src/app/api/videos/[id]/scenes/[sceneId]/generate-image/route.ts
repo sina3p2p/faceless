@@ -62,15 +62,16 @@ export async function POST(
     } else if (imageModel === "flux-pro") {
       const result = await generateFluxImage(prompt);
       imageUrl = result?.url ?? null;
-    }
-
-    if (!imageUrl) {
+    } else {
       const result = await generateImage(prompt);
       imageUrl = result?.url ?? null;
     }
 
     if (!imageUrl) {
-      return NextResponse.json({ error: "Image generation failed" }, { status: 500 });
+      return NextResponse.json(
+        { error: `${imageModel} failed to generate the image. You can try again or switch to a different model.`, failedModel: imageModel },
+        { status: 422 }
+      );
     }
 
     const imageResponse = await fetch(imageUrl);

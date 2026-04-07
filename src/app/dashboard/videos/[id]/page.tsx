@@ -55,6 +55,7 @@ export default function VideoDetailPage() {
   const [thumbUrl, setThumbUrl] = useState<string | null>(null);
   const [generatingThumb, setGeneratingThumb] = useState(false);
   const [showThumbPanel, setShowThumbPanel] = useState(false);
+  const [thumbError, setThumbError] = useState<string | null>(null);
 
   const loadVideo = useCallback(() => {
     fetch(`/api/videos/${id}`)
@@ -321,6 +322,15 @@ export default function VideoDetailPage() {
                   </div>
                 )}
 
+                {thumbError && (
+                  <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3">
+                    <p className="text-sm text-red-400">{thumbError}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      You can try again with the same model or pick a different one above.
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Button
                     variant="primary"
@@ -329,6 +339,7 @@ export default function VideoDetailPage() {
                     disabled={false}
                     onClick={async () => {
                       setGeneratingThumb(true);
+                      setThumbError(null);
                       try {
                         const res = await fetch(`/api/videos/${id}/thumbnail`, {
                           method: "POST",
@@ -338,7 +349,11 @@ export default function VideoDetailPage() {
                         if (res.ok) {
                           const data = await res.json();
                           setThumbUrl(data.url);
+                          setThumbError(null);
                           setShowThumbPanel(false);
+                        } else {
+                          const data = await res.json().catch(() => ({}));
+                          setThumbError(data.error || "Thumbnail generation failed");
                         }
                       } finally {
                         setGeneratingThumb(false);
