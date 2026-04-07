@@ -124,6 +124,7 @@ export const videoProjects = pgTable("video_projects", {
   duration: integer("duration"),
   config: json("config"),
   outputUrl: text("output_url"),
+  thumbnailUrl: text("thumbnail_url"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

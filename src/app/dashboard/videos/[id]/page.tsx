@@ -24,6 +24,7 @@ interface VideoDetail {
   script: string | null;
   duration: number | null;
   outputUrl: string | null;
+  thumbnailUrl: string | null;
   createdAt: string;
   scenes: Scene[];
   renderJobs: Array<{
@@ -36,6 +37,12 @@ interface VideoDetail {
   series: { name: string; niche: string };
 }
 
+const THUMB_MODELS = [
+  { id: "dall-e-3", label: "DALL-E 3" },
+  { id: "flux-pro", label: "Flux Pro" },
+  { id: "nano-banana-2", label: "Nano Banana 2" },
+] as const;
+
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -43,11 +50,22 @@ export default function VideoDetailPage() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [thumbPrompt, setThumbPrompt] = useState("");
+  const [thumbModel, setThumbModel] = useState<string>("dall-e-3");
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
+  const [generatingThumb, setGeneratingThumb] = useState(false);
+  const [showThumbPanel, setShowThumbPanel] = useState(false);
 
   const loadVideo = useCallback(() => {
     fetch(`/api/videos/${id}`)
       .then((r) => r.json())
-      .then(setVideo);
+      .then((data: VideoDetail) => {
+        setVideo(data);
+        if (data.thumbnailUrl && !thumbUrl) {
+          setThumbUrl(`/api/media/${data.thumbnailUrl}`);
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -205,6 +223,146 @@ export default function VideoDetailPage() {
                 Edit Video
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Thumbnail Generator */}
+      {video.status === "COMPLETED" && (
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold">Thumbnail</h2>
+              {!showThumbPanel && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowThumbPanel(true)}
+                >
+                  {thumbUrl ? "Regenerate" : "Generate Thumbnail"}
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {thumbUrl && !showThumbPanel && (
+              <div className="space-y-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={thumbUrl}
+                  alt="Thumbnail"
+                  className="w-full max-w-md rounded-xl border border-white/10"
+                />
+                <div className="flex gap-2">
+                  <a
+                    href={thumbUrl}
+                    download={`thumbnail_${id}.jpg`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                    Download
+                  </a>
+                  <button
+                    onClick={() => setShowThumbPanel(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-400 text-xs font-medium hover:bg-white/10 transition-colors"
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showThumbPanel && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Thumbnail Prompt
+                  </label>
+                  <textarea
+                    value={thumbPrompt}
+                    onChange={(e) => setThumbPrompt(e.target.value)}
+                    rows={3}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white resize-y focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+                    placeholder="Leave empty for AI-generated prompt based on your video title and content, or type a custom prompt..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                    Image Model
+                  </label>
+                  <div className="flex gap-2">
+                    {THUMB_MODELS.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setThumbModel(m.id)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          thumbModel === m.id
+                            ? "bg-violet-600 text-white"
+                            : "bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10"
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {thumbUrl && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1.5">Current thumbnail:</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={thumbUrl}
+                      alt="Current thumbnail"
+                      className="w-full max-w-xs rounded-lg border border-white/10"
+                    />
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    loading={generatingThumb}
+                    disabled={false}
+                    onClick={async () => {
+                      setGeneratingThumb(true);
+                      try {
+                        const res = await fetch(`/api/videos/${id}/thumbnail`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ prompt: thumbPrompt.trim() || undefined, imageModel: thumbModel }),
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setThumbUrl(data.url);
+                          setShowThumbPanel(false);
+                        }
+                      } finally {
+                        setGeneratingThumb(false);
+                      }
+                    }}
+                  >
+                    Generate Thumbnail
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowThumbPanel(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {!thumbUrl && !showThumbPanel && (
+              <p className="text-sm text-gray-500">
+                No thumbnail yet. Click &quot;Generate Thumbnail&quot; to create one.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

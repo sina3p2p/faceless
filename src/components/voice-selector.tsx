@@ -26,6 +26,7 @@ export function VoiceSelector({ value, onChange }: VoiceSelectorProps) {
   const [useCustom, setUseCustom] = useState(false);
   const [customId, setCustomId] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const initializedRef = useRef(false);
 
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +41,14 @@ export function VoiceSelector({ value, onChange }: VoiceSelectorProps) {
         }
         if (Array.isArray(data)) {
           setVoices(data);
+          if (!initializedRef.current && value) {
+            const isKnownVoice = data.some((v: Voice) => v.id === value);
+            if (!isKnownVoice) {
+              setUseCustom(true);
+              setCustomId(value);
+            }
+            initializedRef.current = true;
+          }
         } else {
           setError(data.error || "Unexpected response");
         }
@@ -49,6 +58,7 @@ export function VoiceSelector({ value, onChange }: VoiceSelectorProps) {
         setError("Network error loading voices");
         setLoading(false);
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handlePlay(voice: Voice) {
