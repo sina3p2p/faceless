@@ -9,7 +9,7 @@ import { eq, and, ne, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE } from "@/lib/constants";
 import { generateVideoScript, generateMusicScript, type MusicScript } from "@/server/services/llm";
-import { generateSong, splitSongIntoSections } from "@/server/services/music";
+import { generateSong, splitSongIntoSections, transcribeSong, alignLyricsToTranscription, splitSongAligned } from "@/server/services/music";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
   getMediaForScene,
@@ -288,7 +288,7 @@ async function fetchAIVideoMediaParallel(
         const scene = script.scenes[i];
         const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
         const videoModelKey = seriesRecord.videoModel || undefined;
-        const clipDuration: "5" | "10" = scene.duration >= 10 ? "10" : "5";
+        const clipDuration: "5" | "10" = scene.duration >= 7 ? "10" : "5";
 
         const startImageUrl = falImageUrls[i];
         const endImageUrl = continuity && i < script.scenes.length - 1
@@ -912,14 +912,34 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
     await downloadFile(songResult.audioUrl, songPath);
 
     console.log("Full song generated and downloaded");
+    await job.updateProgress(25);
+
+    // Whisper transcription for lyrics alignment
+    let alignedSections;
+    try {
+      const whisperWords = await transcribeSong(songResult.audioUrl);
+      const totalDurationMs = Math.round(songResult.duration * 1000);
+      alignedSections = alignLyricsToTranscription(sectionsForMusic, whisperWords, totalDurationMs);
+      console.log(`[music] Whisper alignment successful: ${alignedSections.length} sections aligned`);
+    } catch (err) {
+      console.warn(`[music] Whisper alignment failed, falling back to proportional split: ${err instanceof Error ? err.message : err}`);
+      alignedSections = null;
+    }
+
     await job.updateProgress(30);
 
-    const splitResult = await splitSongIntoSections(
-      songPath,
-      sectionsForMusic,
-      workDir
-    );
-    const { audioPaths: sectionAudioPaths, actualDurationsMs } = splitResult;
+    let sectionAudioPaths: string[];
+    let actualDurationsMs: number[];
+
+    if (alignedSections) {
+      const splitResult = await splitSongAligned(songPath, alignedSections, workDir);
+      sectionAudioPaths = splitResult.audioPaths;
+      actualDurationsMs = splitResult.actualDurationsMs;
+    } else {
+      const splitResult = await splitSongIntoSections(songPath, sectionsForMusic, workDir);
+      sectionAudioPaths = splitResult.audioPaths;
+      actualDurationsMs = splitResult.actualDurationsMs;
+    }
 
     const actualDurationsSec = actualDurationsMs.map((ms) => Math.round(ms / 1000));
 
@@ -960,6 +980,8 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
         const mediaKey = `scenes/${videoProjectId}/media_${i}.${mediaExt}`;
         await uploadFile(mediaKey, mediaBuffer, mediaMime);
 
+        const sectionWordTimestamps = alignedSections?.[i]?.wordTimestamps || [];
+
         await db
           .update(schema.videoScenes)
           .set({
@@ -967,6 +989,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
             assetUrl: mediaKey,
             assetType: mediaPaths[i].type,
             duration: actualDurationsSec[i] ?? existingScenes[i].duration,
+            captionData: sectionWordTimestamps.length > 0 ? sectionWordTimestamps : null,
             modelUsed: seriesRecord.imageModel || "dall-e-3",
           })
           .where(eq(schema.videoScenes.id, scene.id));
@@ -984,7 +1007,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
       mediaType: mediaPaths[i].type,
       text: scene.text.split("\n").join(" "),
       duration: actualDurationsSec[i] ?? scene.duration ?? 5,
-      wordTimestamps: [],
+      wordTimestamps: alignedSections?.[i]?.wordTimestamps || [],
     }));
 
     const outputPath = await composeVideo({
