@@ -87,21 +87,26 @@ export async function POST(
     let imageUrl: string | null = null;
 
     if (mode === "edit" && imageModel === "nano-banana-2" && scene.assetUrl) {
-      // Edit mode: current image + scene refs + char refs -> Nano Banana 2 /edit
       const currentImageUrl = scene.assetUrl.startsWith("http")
         ? scene.assetUrl
         : await getSignedDownloadUrl(scene.assetUrl);
 
+      const refDescriptions = sceneRefs.length > 0
+        ? ` Use the other reference image(s) ONLY for character appearance, clothing, and facial features — do NOT copy their background, composition, or layout.`
+        : "";
+
+      const editPrompt = `Edit the first reference image: ${cleanedPrompt}.${refDescriptions} Keep the original scene's background, composition, camera angle, and overall layout. Only modify what was explicitly requested.`;
+
       const allRefs: CharacterRef[] = [
-        { url: currentImageUrl, description: "current scene image to edit" },
-        ...sceneRefs,
+        { url: currentImageUrl, description: "main image to edit — preserve this scene" },
+        ...sceneRefs.map((r) => ({ ...r, description: `character reference only: ${r.description}` })),
         ...charRefs,
       ];
 
-      const result = await generateNanoBananaImage(cleanedPrompt, allRefs);
+      const result = await generateNanoBananaImage(editPrompt, allRefs);
       imageUrl = result?.url ?? null;
     } else if (imageModel === "nano-banana-2") {
-      // Regenerate mode with scene refs merged into char refs
+      // Regenerate mode: fresh image, only scene refs + char refs (no current image)
       const allRefs = [...sceneRefs, ...charRefs];
       const result = await generateNanoBananaImage(cleanedPrompt, allRefs.length > 0 ? allRefs : undefined);
       imageUrl = result?.url ?? null;

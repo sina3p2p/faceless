@@ -179,7 +179,7 @@ function SortableSceneCard({
             <div className="mt-2 relative group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={scene.assetUrl}
+                src={`/api/media/${scene.assetUrl}`}
                 alt={`Scene ${index + 1}`}
                 className="w-full max-w-[200px] rounded-lg border border-white/10"
               />
@@ -390,14 +390,18 @@ function PromptEditModal({
   imageModel,
   onClose,
   onSubmit,
+  onUndo,
   regenerating,
+  undoing,
 }: {
   scene: Scene;
   scenes: Scene[];
   imageModel: string;
   onClose: () => void;
   onSubmit: (prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[]) => void;
+  onUndo: (() => void) | null;
   regenerating: boolean;
+  undoing: boolean;
 }) {
   const canEdit = scene.assetUrl && imageModel === "nano-banana-2";
   const [mode, setMode] = useState<"regenerate" | "edit">("regenerate");
@@ -431,13 +435,26 @@ function PromptEditModal({
           </h3>
 
           {scene.assetUrl && (
-            <div className="mb-4">
+            <div className="mb-4 relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`/api/media/${scene.assetUrl}`}
                 alt="Current preview"
                 className="w-full rounded-lg border border-white/10"
               />
+              {onUndo && (
+                <button
+                  onClick={onUndo}
+                  disabled={undoing}
+                  className="absolute top-2 left-2 px-2.5 py-1.5 rounded-lg bg-black/70 backdrop-blur text-white text-xs font-medium hover:bg-violet-600 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1 4 1 10 7 10" />
+                    <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                  </svg>
+                  {undoing ? "Undoing..." : "Undo"}
+                </button>
+              )}
             </div>
           )}
 
@@ -532,7 +549,9 @@ export default function ReviewPage() {
   const [rendering, setRendering] = useState(false);
   const [video, setVideo] = useState<VideoDetail | null>(null);
   const [editingScene, setEditingScene] = useState<Scene | null>(null);
+  const [previousAssetUrl, setPreviousAssetUrl] = useState<string | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  const [undoing, setUndoing] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
 
@@ -654,12 +673,39 @@ export default function ReviewPage() {
     setGeneratingAll(false);
   }
 
+  useEffect(() => {
+    if (editingScene) {
+      const fresh = scenes.find((s) => s.id === editingScene.id);
+      if (fresh && fresh.assetUrl !== editingScene.assetUrl) {
+        setEditingScene({ ...fresh });
+      }
+    }
+  }, [scenes, editingScene]);
+
   async function handleGenerateImage(prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[]) {
     if (!editingScene) return;
+    setPreviousAssetUrl(editingScene.assetUrl);
     setRegenerating(true);
     await generateImageForScene(editingScene.id, prompt, mode, referenceSceneIds);
     setRegenerating(false);
-    setEditingScene(null);
+  }
+
+  async function handleUndo() {
+    if (!editingScene || !previousAssetUrl) return;
+    setUndoing(true);
+    try {
+      await fetch(`/api/videos/${id}/scenes/${editingScene.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetUrl: previousAssetUrl }),
+      });
+      await loadData();
+      const reverted = scenes.find((s) => s.id === editingScene.id);
+      setEditingScene(reverted ? { ...reverted, assetUrl: previousAssetUrl } : null);
+      setPreviousAssetUrl(null);
+    } finally {
+      setUndoing(false);
+    }
   }
 
   async function handleStartRendering() {
@@ -829,9 +875,11 @@ export default function ReviewPage() {
           scene={editingScene}
           scenes={scenes}
           imageModel={video?.series?.imageModel || "dall-e-3"}
-          onClose={() => setEditingScene(null)}
+          onClose={() => { setEditingScene(null); setPreviousAssetUrl(null); }}
           onSubmit={handleGenerateImage}
+          onUndo={previousAssetUrl ? handleUndo : null}
           regenerating={regenerating}
+          undoing={undoing}
         />
       )}
     </div>
