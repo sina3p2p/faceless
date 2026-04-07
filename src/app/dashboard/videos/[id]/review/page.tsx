@@ -287,7 +287,7 @@ function SceneRefTextarea({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const [dropdownPos, setDropdownPos] = useState({ bottom: 0, left: 0 });
   const [atIndex, setAtIndex] = useState(-1);
 
   const availableScenes = scenes.filter(
@@ -307,8 +307,7 @@ function SceneRefTextarea({
       if (/^(scene\d*)?$/i.test(afterAt)) {
         setAtIndex(lastAt);
         setShowDropdown(true);
-        const rect = e.target.getBoundingClientRect();
-        setDropdownPos({ top: rect.height + 4, left: 0 });
+        setDropdownPos({ bottom: 0, left: 0 });
         return;
       }
     }
@@ -346,8 +345,7 @@ function SceneRefTextarea({
       />
       {showDropdown && availableScenes.length > 0 && (
         <div
-          className="absolute z-50 w-full bg-gray-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden"
-          style={{ top: dropdownPos.top }}
+          className="absolute z-[100] w-full bg-gray-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden bottom-full mb-1"
         >
           <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-white/5">
             Reference a scene
