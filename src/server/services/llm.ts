@@ -32,20 +32,8 @@ export async function generateText(
     ...(jsonMode && { response_format: { type: "json_object" } }),
   };
 
-  try {
-    const response = await openrouter.chat.completions.create(requestBody);
-    return response.choices[0]?.message?.content ?? "";
-  } catch (error) {
-    console.warn(
-      `Primary model (${primaryModel}) failed, falling back to ${LLM.fallbackModel}`,
-      error
-    );
-    const fallbackResponse = await openrouter.chat.completions.create({
-      ...requestBody,
-      model: LLM.fallbackModel,
-    });
-    return fallbackResponse.choices[0]?.message?.content ?? "";
-  }
+  const response = await openrouter.chat.completions.create(requestBody);
+  return response.choices[0]?.message?.content ?? "";
 }
 
 export interface VideoScript {

@@ -163,27 +163,9 @@ async function fetchFacelessMediaParallel(
         const searchQuery = scene.searchQuery || scene.visualDescription;
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
 
-        let asset: MediaAsset;
-        try {
-          const imgModel = seriesRecord.imageModel || "dall-e-3";
-          const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
-          asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel, refs);
-        } catch (err) {
-          console.warn(
-            `Failed to get media for scene ${i}: ${err instanceof Error ? err.message : err}. Trying fallback.`
-          );
-          try {
-            asset = await getMediaForScene(
-              seriesRecord.niche,
-              `A dramatic cinematic scene related to ${seriesRecord.niche}, ${seriesRecord.style} art style, moody lighting, photorealistic, no text`,
-              false
-            );
-          } catch {
-            throw new Error(
-              `Could not find any media for scene ${i}. Check Pexels API key and OpenAI API key.`
-            );
-          }
-        }
+        const imgModel = seriesRecord.imageModel || "dall-e-3";
+        const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
+        const asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel, refs);
 
         const ext = asset.type === "video" ? "mp4" : "jpg";
         const mediaPath = path.join(workDir, `media_${i}.${ext}`);
@@ -207,23 +189,21 @@ async function generateSceneImage(
   sceneIndex: number,
   characterRefs?: CharacterRef[]
 ): Promise<MediaAsset> {
+  console.log(`Scene ${sceneIndex}: Generating image with ${imageModel}${characterRefs?.length ? ` with ${characterRefs.length} character ref(s)` : ""}...`);
+
+  let result: MediaAsset | null = null;
   if (imageModel === "nano-banana-2") {
-    console.log(`Scene ${sceneIndex}: Generating Nano Banana 2 image${characterRefs?.length ? ` with ${characterRefs.length} character ref(s)` : ""}...`);
-    const nbImage = await generateNanoBananaImage(imagePrompt, characterRefs);
-    if (nbImage) return nbImage;
-    console.warn(`Scene ${sceneIndex}: Nano Banana 2 failed, falling back to DALL-E`);
+    result = await generateNanoBananaImage(imagePrompt, characterRefs);
   } else if (imageModel === "flux-pro") {
-    console.log(`Scene ${sceneIndex}: Generating Flux Pro image...`);
-    const fluxImage = await generateFluxImage(imagePrompt);
-    if (fluxImage) return fluxImage;
-    console.warn(`Scene ${sceneIndex}: Flux failed, falling back to DALL-E`);
+    result = await generateFluxImage(imagePrompt);
+  } else {
+    result = await generateImage(imagePrompt);
   }
 
-  console.log(`Scene ${sceneIndex}: Generating DALL-E image...`);
-  const dalleImage = await generateImage(imagePrompt);
-  if (dalleImage) return dalleImage;
-
-  throw new Error(`Could not generate image for scene ${sceneIndex}. Check API keys.`);
+  if (!result) {
+    throw new Error(`${imageModel} failed to generate image for scene ${sceneIndex}. The job will fail — you can retry or switch to a different model in series settings.`);
+  }
+  return result;
 }
 
 async function fetchAIVideoMediaParallel(
