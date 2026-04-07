@@ -179,7 +179,7 @@ function SortableSceneCard({
             <div className="mt-2 relative group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`/api/media/${scene.assetUrl}`}
+                src={scene.assetUrl}
                 alt={`Scene ${index + 1}`}
                 className="w-full max-w-[200px] rounded-lg border border-white/10"
               />
@@ -211,7 +211,7 @@ function SortableSceneCard({
             )}
             {scene.assetUrl && (
               <a
-                href={`/api/media/${scene.assetUrl}`}
+                href={scene.assetUrl}
                 download={`scene_${index + 1}.${scene.assetType === "video" ? "mp4" : "jpg"}`}
                 onClick={(e) => e.stopPropagation()}
                 className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
@@ -222,7 +222,7 @@ function SortableSceneCard({
             )}
             {scene.audioUrl && (
               <a
-                href={`/api/media/${scene.audioUrl}`}
+                href={scene.audioUrl}
                 download={`scene_${index + 1}_audio.mp3`}
                 onClick={(e) => e.stopPropagation()}
                 className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
@@ -365,7 +365,7 @@ function SceneRefTextarea({
                   {s.assetUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`/api/media/${s.assetUrl}`}
+                      src={s.assetUrl}
                       alt=""
                       className="w-8 h-8 rounded object-cover shrink-0 border border-white/10"
                     />
@@ -438,7 +438,7 @@ function PromptEditModal({
             <div className="mb-4 relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`/api/media/${scene.assetUrl}`}
+                src={scene.assetUrl}
                 alt="Current preview"
                 className="w-full rounded-lg border border-white/10"
               />
