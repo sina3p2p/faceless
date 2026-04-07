@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, series } from "@/server/db/schema";
+import { videoProjects, videoScenes } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { eq, and } from "drizzle-orm";
-import { generateImage, generateFluxImage, generateNanoBananaImage } from "@/server/services/media";
+import { eq, and, inArray } from "drizzle-orm";
+import { generateImage, generateFluxImage, generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod";
 
 const bodySchema = z.object({
   imagePrompt: z.string().min(1).optional(),
+  mode: z.enum(["regenerate", "edit"]).default("regenerate"),
+  referenceSceneIds: z.array(z.string()).optional(),
 });
 
 export async function POST(
@@ -37,33 +39,77 @@ export async function POST(
 
   const body = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(body);
-  const promptOverride = parsed.success ? parsed.data.imagePrompt : undefined;
+  if (!parsed.success) return badRequest(parsed.error.message);
 
-  const prompt = promptOverride || scene.imagePrompt || scene.text;
+  const { mode, referenceSceneIds } = parsed.data;
+  const promptOverride = parsed.data.imagePrompt;
+
+  const cleanedPrompt = (promptOverride || scene.imagePrompt || scene.text)
+    .replace(/@scene\d+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
   const imageModel = video.series.imageModel || "dall-e-3";
 
+  // Resolve series-level character images
   const rawChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
-  let charRefs: Array<{ url: string; description: string }> | undefined;
+  const charRefs: CharacterRef[] = [];
   if (rawChars.length > 0) {
-    charRefs = await Promise.all(
-      rawChars.map(async (c) => ({
+    for (const c of rawChars) {
+      charRefs.push({
         url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
         description: c.description,
-      }))
-    );
+      });
+    }
   }
 
-  let imageUrl: string | null = null;
+  // Resolve @sceneN reference images
+  const sceneRefs: CharacterRef[] = [];
+  if (referenceSceneIds && referenceSceneIds.length > 0 && imageModel === "nano-banana-2") {
+    const refScenes = await db.query.videoScenes.findMany({
+      where: and(
+        eq(videoScenes.videoProjectId, videoId),
+        inArray(videoScenes.id, referenceSceneIds)
+      ),
+      columns: { id: true, assetUrl: true, text: true },
+    });
+
+    for (const rs of refScenes) {
+      if (!rs.assetUrl) continue;
+      const url = rs.assetUrl.startsWith("http")
+        ? rs.assetUrl
+        : await getSignedDownloadUrl(rs.assetUrl);
+      sceneRefs.push({ url, description: rs.text?.slice(0, 100) || "reference scene" });
+    }
+  }
 
   try {
-    if (imageModel === "nano-banana-2") {
-      const result = await generateNanoBananaImage(prompt, charRefs);
+    let imageUrl: string | null = null;
+
+    if (mode === "edit" && imageModel === "nano-banana-2" && scene.assetUrl) {
+      // Edit mode: current image + scene refs + char refs -> Nano Banana 2 /edit
+      const currentImageUrl = scene.assetUrl.startsWith("http")
+        ? scene.assetUrl
+        : await getSignedDownloadUrl(scene.assetUrl);
+
+      const allRefs: CharacterRef[] = [
+        { url: currentImageUrl, description: "current scene image to edit" },
+        ...sceneRefs,
+        ...charRefs,
+      ];
+
+      const result = await generateNanoBananaImage(cleanedPrompt, allRefs);
+      imageUrl = result?.url ?? null;
+    } else if (imageModel === "nano-banana-2") {
+      // Regenerate mode with scene refs merged into char refs
+      const allRefs = [...sceneRefs, ...charRefs];
+      const result = await generateNanoBananaImage(cleanedPrompt, allRefs.length > 0 ? allRefs : undefined);
       imageUrl = result?.url ?? null;
     } else if (imageModel === "flux-pro") {
-      const result = await generateFluxImage(prompt);
+      const result = await generateFluxImage(cleanedPrompt);
       imageUrl = result?.url ?? null;
     } else {
-      const result = await generateImage(prompt);
+      const result = await generateImage(cleanedPrompt);
       imageUrl = result?.url ?? null;
     }
 
@@ -78,15 +124,15 @@ export async function POST(
     if (!imageResponse.ok) throw new Error("Failed to download generated image");
     const buffer = Buffer.from(await imageResponse.arrayBuffer());
 
-    const key = `scenes/${videoId}/preview_${sceneId}.jpg`;
+    const key = `scenes/${videoId}/preview_${sceneId}_${Date.now()}.jpg`;
     await uploadFile(key, buffer, "image/jpeg");
 
     const updates: Record<string, unknown> = {
       assetUrl: key,
       assetType: "image",
     };
-    if (promptOverride) {
-      updates.imagePrompt = promptOverride;
+    if (mode === "regenerate" && promptOverride) {
+      updates.imagePrompt = promptOverride.replace(/@scene\d+/gi, "").trim();
     }
 
     await db
@@ -94,7 +140,7 @@ export async function POST(
       .set(updates)
       .where(and(eq(videoScenes.id, sceneId), eq(videoScenes.videoProjectId, videoId)));
 
-    return NextResponse.json({ assetUrl: key, imageModel });
+    return NextResponse.json({ assetUrl: key, imageModel, mode });
   } catch (err) {
     console.error(`Image generation failed for scene ${sceneId}:`, err);
     return NextResponse.json(

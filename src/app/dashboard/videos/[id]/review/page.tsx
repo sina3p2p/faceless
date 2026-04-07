@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -270,51 +270,238 @@ function SortableSceneCard({
   );
 }
 
+function SceneRefTextarea({
+  value,
+  onChange,
+  scenes,
+  currentSceneId,
+  rows,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  scenes: Scene[];
+  currentSceneId: string;
+  rows: number;
+  placeholder: string;
+}) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const [atIndex, setAtIndex] = useState(-1);
+
+  const availableScenes = scenes.filter(
+    (s) => s.id !== currentSceneId && s.assetUrl
+  );
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const val = e.target.value;
+    onChange(val);
+
+    const pos = e.target.selectionStart;
+    const textBefore = val.slice(0, pos);
+    const lastAt = textBefore.lastIndexOf("@");
+
+    if (lastAt !== -1) {
+      const afterAt = textBefore.slice(lastAt + 1);
+      if (/^(scene\d*)?$/i.test(afterAt)) {
+        setAtIndex(lastAt);
+        setShowDropdown(true);
+        const rect = e.target.getBoundingClientRect();
+        setDropdownPos({ top: rect.height + 4, left: 0 });
+        return;
+      }
+    }
+    setShowDropdown(false);
+  }
+
+  function insertRef(sceneIndex: number) {
+    const tag = `@scene${sceneIndex + 1}`;
+    const before = value.slice(0, atIndex);
+    const pos = textareaRef.current?.selectionStart ?? value.length;
+    const textAfterAt = value.slice(atIndex, pos);
+    const afterCursor = value.slice(atIndex + textAfterAt.length);
+    const newValue = before + tag + " " + afterCursor;
+    onChange(newValue);
+    setShowDropdown(false);
+
+    requestAnimationFrame(() => {
+      const cursor = before.length + tag.length + 1;
+      textareaRef.current?.setSelectionRange(cursor, cursor);
+      textareaRef.current?.focus();
+    });
+  }
+
+  return (
+    <div className="relative">
+      <textarea
+        ref={textareaRef}
+        value={value}
+        onChange={handleChange}
+        onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+        onKeyDown={(e) => { if (e.key === "Escape") setShowDropdown(false); }}
+        rows={rows}
+        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white resize-y focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+        placeholder={placeholder}
+      />
+      {showDropdown && availableScenes.length > 0 && (
+        <div
+          className="absolute z-50 w-full bg-gray-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden"
+          style={{ top: dropdownPos.top }}
+        >
+          <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-white/5">
+            Reference a scene
+          </div>
+          <div className="max-h-48 overflow-y-auto">
+            {availableScenes.map((s) => {
+              const idx = scenes.indexOf(s);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onMouseDown={(e) => { e.preventDefault(); insertRef(idx); }}
+                  className="w-full flex items-center gap-3 px-3 py-2 hover:bg-violet-500/10 text-left transition-colors"
+                >
+                  {s.assetUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/media/${s.assetUrl}`}
+                      alt=""
+                      className="w-8 h-8 rounded object-cover shrink-0 border border-white/10"
+                    />
+                  )}
+                  <div className="min-w-0">
+                    <span className="text-xs font-medium text-violet-400">@scene{idx + 1}</span>
+                    <p className="text-xs text-gray-400 truncate">{s.text.slice(0, 60)}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PromptEditModal({
   scene,
+  scenes,
+  imageModel,
   onClose,
-  onRegenerate,
+  onSubmit,
   regenerating,
 }: {
   scene: Scene;
+  scenes: Scene[];
+  imageModel: string;
   onClose: () => void;
-  onRegenerate: (prompt: string) => void;
+  onSubmit: (prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[]) => void;
   regenerating: boolean;
 }) {
-  const [prompt, setPrompt] = useState(scene.imagePrompt || scene.text);
+  const canEdit = scene.assetUrl && imageModel === "nano-banana-2";
+  const [mode, setMode] = useState<"regenerate" | "edit">("regenerate");
+  const [regenPrompt, setRegenPrompt] = useState(scene.imagePrompt || scene.text);
+  const [editInstruction, setEditInstruction] = useState("");
+
+  function parseSceneRefs(text: string): string[] {
+    const matches = text.matchAll(/@scene(\d+)/gi);
+    const ids: string[] = [];
+    for (const m of matches) {
+      const idx = parseInt(m[1], 10) - 1;
+      if (idx >= 0 && idx < scenes.length && scenes[idx].assetUrl) {
+        ids.push(scenes[idx].id);
+      }
+    }
+    return [...new Set(ids)];
+  }
+
+  function handleSubmit() {
+    const prompt = mode === "edit" ? editInstruction : regenPrompt;
+    const refs = parseSceneRefs(prompt);
+    onSubmit(prompt, mode, refs);
+  }
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="p-6">
-          <h3 className="text-lg font-semibold text-white mb-1">Edit Image Prompt</h3>
-          <p className="text-sm text-gray-400 mb-4">
-            Modify the prompt and regenerate the image until you&apos;re happy with it.
-          </p>
+          <h3 className="text-lg font-semibold text-white mb-4">
+            {mode === "edit" ? "Edit Image" : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
+          </h3>
 
           {scene.assetUrl && (
             <div className="mb-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={scene.assetUrl}
+                src={`/api/media/${scene.assetUrl}`}
                 alt="Current preview"
                 className="w-full rounded-lg border border-white/10"
               />
             </div>
           )}
 
-          <label className="block text-sm font-medium text-gray-300 mb-1.5">Image Prompt</label>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            rows={6}
-            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white resize-y focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
-            placeholder="Describe the image you want to generate..."
-          />
+          {/* Tabs */}
+          {canEdit && (
+            <div className="flex gap-1 mb-4 p-1 bg-white/5 rounded-lg">
+              <button
+                onClick={() => setMode("regenerate")}
+                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  mode === "regenerate"
+                    ? "bg-violet-600 text-white"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                Regenerate
+              </button>
+              <button
+                onClick={() => setMode("edit")}
+                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  mode === "edit"
+                    ? "bg-violet-600 text-white"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                Edit Image
+              </button>
+            </div>
+          )}
 
-          <div className="flex items-center justify-between mt-2 mb-4">
-            <span className="text-xs text-gray-600">{prompt.length} characters</span>
-          </div>
+          {mode === "regenerate" ? (
+            <>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Image Prompt</label>
+              <SceneRefTextarea
+                value={regenPrompt}
+                onChange={setRegenPrompt}
+                scenes={scenes}
+                currentSceneId={scene.id}
+                rows={6}
+                placeholder="Describe the image you want to generate..."
+              />
+              <div className="flex items-center justify-between mt-2 mb-4">
+                <span className="text-xs text-gray-600">{regenPrompt.length} chars</span>
+                {imageModel === "nano-banana-2" && (
+                  <span className="text-xs text-gray-600">Type @ to reference another scene</span>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">Edit Instruction</label>
+              <SceneRefTextarea
+                value={editInstruction}
+                onChange={setEditInstruction}
+                scenes={scenes}
+                currentSceneId={scene.id}
+                rows={3}
+                placeholder='e.g. "change the hair color to look like @scene1" or "add dramatic fog"'
+              />
+              <div className="flex items-center justify-between mt-2 mb-4">
+                <span className="text-xs text-gray-600">{editInstruction.length} chars</span>
+                <span className="text-xs text-gray-600">Type @ to reference another scene</span>
+              </div>
+            </>
+          )}
 
           <div className="flex gap-3">
             <Button variant="ghost" onClick={onClose} className="flex-1">
@@ -323,10 +510,11 @@ function PromptEditModal({
             <Button
               variant="primary"
               loading={regenerating}
-              onClick={() => onRegenerate(prompt)}
+              onClick={handleSubmit}
+              disabled={mode === "edit" && !editInstruction.trim()}
               className="flex-1"
             >
-              {scene.assetUrl ? "Regenerate Image" : "Generate Image"}
+              {mode === "edit" ? "Edit Image" : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
             </Button>
           </div>
         </div>
@@ -425,11 +613,17 @@ export default function ReviewPage() {
     fetch(`/api/videos/${id}/scenes/${sceneId}`, { method: "DELETE" });
   }
 
-  async function generateImageForScene(sceneId: string, promptOverride?: string) {
+  async function generateImageForScene(
+    sceneId: string,
+    promptOverride?: string,
+    mode: "regenerate" | "edit" = "regenerate",
+    referenceSceneIds?: string[]
+  ) {
     setGeneratingSceneIds((prev) => new Set(prev).add(sceneId));
     try {
-      const body: Record<string, string> = {};
+      const body: Record<string, unknown> = { mode };
       if (promptOverride) body.imagePrompt = promptOverride;
+      if (referenceSceneIds && referenceSceneIds.length > 0) body.referenceSceneIds = referenceSceneIds;
 
       const res = await fetch(`/api/videos/${id}/scenes/${sceneId}/generate-image`, {
         method: "POST",
@@ -460,10 +654,10 @@ export default function ReviewPage() {
     setGeneratingAll(false);
   }
 
-  async function handleRegenerate(prompt: string) {
+  async function handleGenerateImage(prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[]) {
     if (!editingScene) return;
     setRegenerating(true);
-    await generateImageForScene(editingScene.id, prompt);
+    await generateImageForScene(editingScene.id, prompt, mode, referenceSceneIds);
     setRegenerating(false);
     setEditingScene(null);
   }
@@ -633,8 +827,10 @@ export default function ReviewPage() {
       {editingScene && (
         <PromptEditModal
           scene={editingScene}
+          scenes={scenes}
+          imageModel={video?.series?.imageModel || "dall-e-3"}
           onClose={() => setEditingScene(null)}
-          onRegenerate={handleRegenerate}
+          onSubmit={handleGenerateImage}
           regenerating={regenerating}
         />
       )}
