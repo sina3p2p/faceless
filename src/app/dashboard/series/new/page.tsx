@@ -213,7 +213,7 @@ export default function NewSeriesPage() {
               </div>
             )}
 
-            {form.videoType === "ai_video" && (
+            {(form.videoType === "ai_video" || form.videoType === "music_video") && (
               <div
                 onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
                 className={`rounded-xl border p-4 cursor-pointer transition-all ${
