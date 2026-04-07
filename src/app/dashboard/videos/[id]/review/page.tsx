@@ -401,14 +401,8 @@ function MaskCanvas({
     img.onload = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      const container = containerRef.current;
-      const displayW = container?.clientWidth || 400;
-      const scale = displayW / img.naturalWidth;
-      const displayH = img.naturalHeight * scale;
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
-      canvas.style.width = `${displayW}px`;
-      canvas.style.height = `${displayH}px`;
       setImgDimensions({ w: img.naturalWidth, h: img.naturalHeight });
     };
     img.src = imageUrl;
@@ -532,7 +526,7 @@ function MaskCanvas({
         />
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 cursor-crosshair touch-none"
+          className="absolute inset-0 w-full h-full cursor-crosshair touch-none"
           onMouseDown={startDraw}
           onMouseMove={moveDraw}
           onMouseUp={endDraw}
@@ -593,7 +587,7 @@ function PromptEditModal({
   undoing: boolean;
 }) {
   const [selectedModel, setSelectedModel] = useState(imageModel);
-  const canEdit = scene.assetUrl && selectedModel === "nano-banana-2";
+  const canEdit = !!scene.assetUrl;
   const canInpaint = !!scene.assetUrl;
   const [mode, setMode] = useState<"regenerate" | "edit" | "inpaint">("regenerate");
   const [regenPrompt, setRegenPrompt] = useState(scene.imagePrompt || scene.text);
@@ -613,10 +607,26 @@ function PromptEditModal({
     return [...new Set(ids)];
   }
 
+  function createFullWhiteMaskDataUrl(): string {
+    const c = document.createElement("canvas");
+    c.width = 1024;
+    c.height = 1792;
+    const ctx = c.getContext("2d")!;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, c.width, c.height);
+    return c.toDataURL("image/png");
+  }
+
   function handleSubmit() {
     const modelOverride = selectedModel !== imageModel ? selectedModel : undefined;
     if (mode === "inpaint") {
       onSubmit(inpaintPrompt, "inpaint", [], maskDataUrl || undefined, modelOverride);
+      return;
+    }
+    if (mode === "edit" && selectedModel !== "nano-banana-2") {
+      const whiteMask = createFullWhiteMaskDataUrl();
+      const editPrompt = `${editInstruction}. Keep the original scene's composition and layout. Only modify what was explicitly requested.`;
+      onSubmit(editPrompt, "inpaint", [], whiteMask, modelOverride);
       return;
     }
     const prompt = mode === "edit" ? editInstruction : regenPrompt;
@@ -711,7 +721,7 @@ function PromptEditModal({
                     type="button"
                     onClick={() => {
                       setSelectedModel(m.id);
-                      if (mode === "edit" && m.id !== "nano-banana-2") setMode("regenerate");
+                      if (mode === "edit" && !scene.assetUrl) setMode("regenerate");
                     }}
                     className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                       selectedModel === m.id
@@ -744,7 +754,7 @@ function PromptEditModal({
               />
               <div className="flex items-center justify-between mt-2 mb-4">
                 <span className="text-xs text-gray-600">{regenPrompt.length} chars</span>
-                {imageModel === "nano-banana-2" && (
+                {selectedModel === "nano-banana-2" && (
                   <span className="text-xs text-gray-600">Type @ to reference another scene</span>
                 )}
               </div>
