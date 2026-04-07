@@ -1,15 +1,19 @@
 import { Job } from "bullmq";
+import { exec } from "child_process";
+import { promisify } from "util";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import { v4 as uuid } from "uuid";
+
+const execAsync = promisify(exec);
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and, ne, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE } from "@/lib/constants";
 import { generateVideoScript, generateMusicScript, type MusicScript } from "@/server/services/llm";
-import { generateSong, splitSongIntoSections, transcribeSong, alignLyricsToTranscription, splitSongAligned } from "@/server/services/music";
+import { generateSong, transcribeSong, alignLyricsToTranscription, type AlignedSection } from "@/server/services/music";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
   getMediaForScene,
@@ -288,7 +292,9 @@ async function fetchAIVideoMediaParallel(
         const scene = script.scenes[i];
         const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
         const videoModelKey = seriesRecord.videoModel || undefined;
-        const clipDuration: "5" | "10" = scene.duration >= 7 ? "10" : "5";
+        // Use 10s clip only when section > 10s (avoids >2x slow-motion)
+        // For sections 5-10s, a 5s clip with mild slow-down looks natural
+        const clipDuration: "5" | "10" = scene.duration > 10 ? "10" : "5";
 
         const startImageUrl = falImageUrls[i];
         const endImageUrl = continuity && i < script.scenes.length - 1
@@ -422,33 +428,48 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
 
     const sceneTexts = existingScenes.map((s) => s.text);
 
-    const ttsPromise = generateTTSParallel(
+    // Generate TTS first so we know exact audio durations for video clip decisions
+    const ttsResult = await generateTTSParallel(
       sceneTexts,
       seriesRecord.defaultVoiceId ?? undefined,
       workDir
     );
-
-    const mediaPromise = (async () => {
-      const sceneScript = {
-        scenes: existingScenes.map((s, i) => ({
-          text: s.text,
-          visualDescription: s.visualDescription || script?.scenes?.[i]?.visualDescription || s.text,
-          searchQuery: s.searchQuery || script?.scenes?.[i]?.searchQuery || s.text.split(" ").slice(0, 4).join(" "),
-          imagePrompt: s.imagePrompt || script?.scenes?.[i]?.imagePrompt || s.text,
-          duration: s.duration ?? 5,
-        })),
-      };
-
-      const preApproved = await reusePreApprovedImages(existingScenes, workDir);
-
-      if (videoType === "ai_video") {
-        return fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preApproved);
-      }
-      return fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preApproved);
-    })();
-
-    const [ttsResult, mediaPaths] = await Promise.all([ttsPromise, mediaPromise]);
     const { audioPaths, ttsResults } = ttsResult;
+
+    // Measure actual TTS audio durations
+    const ttsDurations = await Promise.all(
+      audioPaths.map(async (audioPath) => {
+        try {
+          const { stdout } = await execAsync(
+            `ffprobe -v error -show_entries format=duration -of csv=p=0 "${audioPath}"`
+          );
+          return Math.ceil(parseFloat(stdout.trim()));
+        } catch {
+          return 5;
+        }
+      })
+    );
+
+    console.log(`[render] TTS durations: ${ttsDurations.map((d, i) => `S${i}=${d}s`).join(", ")}`);
+
+    const sceneScript = {
+      scenes: existingScenes.map((s, i) => ({
+        text: s.text,
+        visualDescription: s.visualDescription || script?.scenes?.[i]?.visualDescription || s.text,
+        searchQuery: s.searchQuery || script?.scenes?.[i]?.searchQuery || s.text.split(" ").slice(0, 4).join(" "),
+        imagePrompt: s.imagePrompt || script?.scenes?.[i]?.imagePrompt || s.text,
+        duration: ttsDurations[i] ?? s.duration ?? 5,
+      })),
+    };
+
+    const preApproved = await reusePreApprovedImages(existingScenes, workDir);
+
+    let mediaPaths: { path: string; type: "video" | "image" }[];
+    if (videoType === "ai_video") {
+      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preApproved);
+    } else {
+      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preApproved);
+    }
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 60);
     await job.updateProgress(60);
@@ -466,11 +487,11 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
         await uploadFile(mediaKey, mediaBuffer, mediaMime);
 
         const sceneUpdates: Record<string, unknown> = {
-            audioUrl: audioKey,
-            assetUrl: mediaKey,
-            assetType: mediaPaths[i].type,
-            captionData: ttsResults[i].wordTimestamps,
-            duration: existingScenes[i].duration,
+          audioUrl: audioKey,
+          assetUrl: mediaKey,
+          assetType: mediaPaths[i].type,
+          captionData: ttsResults[i].wordTimestamps,
+          duration: ttsDurations[i] ?? existingScenes[i].duration,
         };
         if (!existingScenes[i].modelUsed) {
           sceneUpdates.modelUsed = seriesRecord.imageModel || "dall-e-3";
@@ -914,34 +935,31 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
     console.log("Full song generated and downloaded");
     await job.updateProgress(25);
 
-    // Whisper transcription for lyrics alignment
-    let alignedSections;
+    // Whisper transcription for lyrics alignment (timestamps only, no audio splitting)
+    let alignedSections: AlignedSection[] | null = null;
     try {
       const whisperWords = await transcribeSong(songResult.audioUrl);
       const totalDurationMs = Math.round(songResult.duration * 1000);
       alignedSections = alignLyricsToTranscription(sectionsForMusic, whisperWords, totalDurationMs);
       console.log(`[music] Whisper alignment successful: ${alignedSections.length} sections aligned`);
     } catch (err) {
-      console.warn(`[music] Whisper alignment failed, falling back to proportional split: ${err instanceof Error ? err.message : err}`);
-      alignedSections = null;
+      console.warn(`[music] Whisper alignment failed, falling back to proportional durations: ${err instanceof Error ? err.message : err}`);
     }
 
     await job.updateProgress(30);
 
-    let sectionAudioPaths: string[];
-    let actualDurationsMs: number[];
+    // Compute section durations from Whisper or proportional fallback
+    const totalSongDurationMs = Math.round(songResult.duration * 1000);
+    const actualDurationsSec: number[] = alignedSections
+      ? alignedSections.map((s) => Math.round((s.endMs - s.startMs) / 1000))
+      : (() => {
+          const requestedTotal = sectionsForMusic.reduce((sum, s) => sum + s.durationMs, 0);
+          const scale = requestedTotal > 0 ? totalSongDurationMs / requestedTotal : 1;
+          return sectionsForMusic.map((s) => Math.round((s.durationMs * scale) / 1000));
+        })();
 
-    if (alignedSections) {
-      const splitResult = await splitSongAligned(songPath, alignedSections, workDir);
-      sectionAudioPaths = splitResult.audioPaths;
-      actualDurationsMs = splitResult.actualDurationsMs;
-    } else {
-      const splitResult = await splitSongIntoSections(songPath, sectionsForMusic, workDir);
-      sectionAudioPaths = splitResult.audioPaths;
-      actualDurationsMs = splitResult.actualDurationsMs;
-    }
-
-    const actualDurationsSec = actualDurationsMs.map((ms) => Math.round(ms / 1000));
+    const estimatedCost = actualDurationsSec.reduce((sum, dur) => sum + (dur > 10 ? 0.84 : 0.42), 0);
+    console.log(`[music] Section durations (from ${alignedSections ? "Whisper" : "proportional"}): ${actualDurationsSec.map((d, i) => `S${i}=${d}s${d > 10 ? "→10s" : "→5s"}`).join(", ")} | est. video cost: $${estimatedCost.toFixed(2)}`);
 
     await job.updateProgress(35);
 
@@ -968,12 +986,13 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
 
     await job.updateProgress(65);
 
+    // Upload full song as the audio asset, and media per scene
+    const songBuffer = await fs.readFile(songPath);
+    const songKey = `scenes/${videoProjectId}/full_song.mp3`;
+    await uploadFile(songKey, songBuffer, "audio/mpeg");
+
     await Promise.all(
       existingScenes.map(async (scene, i) => {
-        const audioBuffer = await fs.readFile(sectionAudioPaths[i]);
-        const audioKey = `scenes/${videoProjectId}/audio_${i}.mp3`;
-        await uploadFile(audioKey, audioBuffer, "audio/mpeg");
-
         const mediaBuffer = await fs.readFile(mediaPaths[i].path);
         const mediaExt = mediaPaths[i].type === "video" ? "mp4" : "jpg";
         const mediaMime = mediaPaths[i].type === "video" ? "video/mp4" : "image/jpeg";
@@ -985,7 +1004,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
         await db
           .update(schema.videoScenes)
           .set({
-            audioUrl: audioKey,
+            audioUrl: songKey,
             assetUrl: mediaKey,
             assetType: mediaPaths[i].type,
             duration: actualDurationsSec[i] ?? existingScenes[i].duration,
@@ -1002,7 +1021,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "COMPOSE", "ACTIVE", 75);
 
     const composerScenes: ComposerScene[] = existingScenes.map((scene, i) => ({
-      audioPath: sectionAudioPaths[i],
+      audioPath: songPath,
       mediaPath: mediaPaths[i].path,
       mediaType: mediaPaths[i].type,
       text: scene.text.split("\n").join(" "),
@@ -1013,6 +1032,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
     const outputPath = await composeVideo({
       scenes: composerScenes,
       captionStyle: seriesRecord.captionStyle,
+      globalAudioPath: songPath,
       sceneContinuity: !!seriesRecord.sceneContinuity,
     });
 

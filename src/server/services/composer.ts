@@ -22,6 +22,7 @@ export interface ComposerOptions {
   scenes: ComposerScene[];
   captionStyle: string;
   backgroundMusicPath?: string;
+  globalAudioPath?: string;
   outputFormat?: string;
   sceneContinuity?: boolean;
 }
@@ -207,12 +208,13 @@ function formatAssTime(seconds: number): string {
 export async function composeVideo(
   options: ComposerOptions
 ): Promise<string> {
-  const { scenes, captionStyle, backgroundMusicPath, sceneContinuity } = options;
+  const { scenes, captionStyle, backgroundMusicPath, globalAudioPath, sceneContinuity } = options;
   const workDir = path.join(os.tmpdir(), `faceless-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
   const W = VIDEO_DEFAULTS.width;
   const H = VIDEO_DEFAULTS.height;
   const FPS = VIDEO_DEFAULTS.fps;
+  const useGlobalAudio = !!globalAudioPath;
 
   try {
     const scenePaths: string[] = [];
@@ -222,8 +224,9 @@ export async function composeVideo(
       const scene = scenes[i];
       const sceneOutput = path.join(workDir, `scene_${i}.mp4`);
 
-      const audioDuration = await getAudioDuration(scene.audioPath);
-      const duration = Math.max(audioDuration + 0.5, 2);
+      const duration = useGlobalAudio
+        ? Math.max(scene.duration, 1)
+        : Math.max(await getAudioDuration(scene.audioPath) + 0.5, 2);
       sceneDurations.push(duration);
 
       const fadeOutStart = Math.max(0, duration - 0.4);
@@ -243,14 +246,23 @@ export async function composeVideo(
           `fps=${FPS}`,
         ].join(",") + fadeFilter;
 
-        await execAsync(
-          `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
-            `-filter_complex "[0:v]${videoFilters}[outv];[1:a]aresample=44100[outa]" ` +
-            `-map "[outv]" -map "[outa]" ` +
-            `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-            `-c:a aac -b:a 192k -ar 44100 ` +
-            `-t ${duration} "${sceneOutput}"`
-        );
+        if (useGlobalAudio) {
+          await execAsync(
+            `ffmpeg -y -i "${scene.mediaPath}" ` +
+              `-vf "${videoFilters}" -an ` +
+              `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
+              `-t ${duration} "${sceneOutput}"`
+          );
+        } else {
+          await execAsync(
+            `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
+              `-filter_complex "[0:v]${videoFilters}[outv];[1:a]aresample=44100[outa]" ` +
+              `-map "[outv]" -map "[outa]" ` +
+              `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
+              `-c:a aac -b:a 192k -ar 44100 ` +
+              `-t ${duration} "${sceneOutput}"`
+          );
+        }
       } else {
         const totalFrames = Math.ceil(duration * FPS);
         const effects = [
@@ -268,14 +280,23 @@ export async function composeVideo(
           `zoompan=z='${effect.zoom}':x='${effect.x}':y='${effect.y}':d=${totalFrames}:s=${W}x${H}:fps=${FPS}`,
         ].join(",") + fadeFilter;
 
-        await execAsync(
-          `ffmpeg -y -loop 1 -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
-            `-filter_complex "[0:v]${imageFilter}[outv];[1:a]aresample=44100[outa]" ` +
-            `-map "[outv]" -map "[outa]" ` +
-            `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-            `-c:a aac -b:a 192k -ar 44100 ` +
-            `-t ${duration} "${sceneOutput}"`
-        );
+        if (useGlobalAudio) {
+          await execAsync(
+            `ffmpeg -y -loop 1 -i "${scene.mediaPath}" ` +
+              `-vf "${imageFilter}" -an ` +
+              `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
+              `-t ${duration} "${sceneOutput}"`
+          );
+        } else {
+          await execAsync(
+            `ffmpeg -y -loop 1 -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
+              `-filter_complex "[0:v]${imageFilter}[outv];[1:a]aresample=44100[outa]" ` +
+              `-map "[outv]" -map "[outa]" ` +
+              `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
+              `-c:a aac -b:a 192k -ar 44100 ` +
+              `-t ${duration} "${sceneOutput}"`
+          );
+        }
       }
 
       scenePaths.push(sceneOutput);
@@ -293,11 +314,12 @@ export async function composeVideo(
       await execAsync(
         `ffmpeg -y -f concat -safe 0 -i "${concatList}" ` +
           `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-          `-c:a aac -b:a 192k "${rawConcat}"`
+          (useGlobalAudio ? `-an ` : `-c:a aac -b:a 192k `) +
+          `"${rawConcat}"`
       );
     }
 
-    let videoForBgMusic = rawConcat;
+    let currentVideo = rawConcat;
 
     if (captionStyle !== "none") {
       const styleConfig = getCaptionStyle(captionStyle);
@@ -311,22 +333,33 @@ export async function composeVideo(
         `ffmpeg -y -i "${rawConcat}" ` +
           `-vf "ass='${assPathEscaped}'" ` +
           `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-          `-c:a copy "${withCaptions}"`
+          (useGlobalAudio ? `-an ` : `-c:a copy `) +
+          `"${withCaptions}"`
       );
-      videoForBgMusic = withCaptions;
+      currentVideo = withCaptions;
+    }
+
+    if (globalAudioPath) {
+      const withAudio = path.join(workDir, "with_global_audio.mp4");
+      await execAsync(
+        `ffmpeg -y -i "${currentVideo}" -i "${globalAudioPath}" ` +
+          `-map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -ar 44100 ` +
+          `-shortest "${withAudio}"`
+      );
+      currentVideo = withAudio;
     }
 
     if (backgroundMusicPath) {
       const finalOutput = path.join(workDir, "final.mp4");
       await execAsync(
-        `ffmpeg -y -i "${videoForBgMusic}" -i "${backgroundMusicPath}" ` +
+        `ffmpeg -y -i "${currentVideo}" -i "${backgroundMusicPath}" ` +
           `-filter_complex "[1:a]volume=0.10[bg];[0:a][bg]amix=inputs=2:duration=first[outa]" ` +
           `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${finalOutput}"`
       );
       return finalOutput;
     }
 
-    return videoForBgMusic;
+    return currentVideo;
   } catch (error) {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
     throw error;
