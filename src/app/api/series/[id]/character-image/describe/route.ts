@@ -5,7 +5,7 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { eq, and } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { generateText } from "ai";
-import { getOpenRouterClient } from "@/server/services/llm";
+import { openrouter } from "@/server/services/llm";
 import { z } from "zod/v4";
 
 const VISION_MODEL = "openai/gpt-4.1";
@@ -51,7 +51,7 @@ export async function POST(
 
   try {
     const { text } = await generateText({
-      model: getOpenRouterClient().chat(VISION_MODEL),
+      model: openrouter.chat(VISION_MODEL),
       system: SYSTEM_PROMPT,
       messages: [
         {

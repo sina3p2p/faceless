@@ -3,18 +3,9 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 
-let _openrouter: ReturnType<typeof createOpenRouter> | null = null;
-
-export function getOpenRouterClient() {
-  if (!_openrouter) {
-    _openrouter = createOpenRouter({ apiKey: LLM.apiKey });
-  }
-  return _openrouter;
-}
-
-function openrouter() {
-  return getOpenRouterClient();
-}
+export const openrouter = createOpenRouter({
+  apiKey: LLM.apiKey,
+});
 
 // ── Zod Schemas ──
 
@@ -103,7 +94,7 @@ LANGUAGE RULE (CRITICAL):
   messages.push({ role: "user", content: userMessage });
 
   const { object } = await generateObject({
-    model: openrouter().chat(primaryModel),
+    model: openrouter.chat(primaryModel),
     schema: videoScriptSchema,
     system: systemPrompt,
     messages,
@@ -153,7 +144,7 @@ LANGUAGE RULE (CRITICAL):
   messages.push({ role: "user", content: userMessage });
 
   const { object } = await generateObject({
-    model: openrouter().chat(primaryModel),
+    model: openrouter.chat(primaryModel),
     schema: musicScriptSchema,
     system: systemPrompt,
     messages,
@@ -174,7 +165,7 @@ export async function generateText(
   const primaryModel = model || LLM.defaultModel;
 
   const { text } = await aiGenerateText({
-    model: openrouter().chat(primaryModel),
+    model: openrouter.chat(primaryModel),
     system: systemPrompt,
     prompt: userPrompt,
     temperature,
@@ -299,7 +290,7 @@ SCENE CONTINUITY MODE (CRITICAL — follow these rules):
     : `Create a ${niche} viral video script. Visual style: ${style}. Pick a topic that will make people STOP scrolling and watch till the end. Think: "I need to know what happens next."${seriesContext}`;
 
   const { object } = await generateObject({
-    model: openrouter().chat(primaryModel),
+    model: openrouter.chat(primaryModel),
     schema: videoScriptSchema,
     system: systemPrompt,
     prompt: userPrompt,
@@ -406,7 +397,7 @@ KIDS MUSIC RULES:
     : `Create a viral ${niche}-themed song. Visual style: ${style}. Pick a topic that resonates emotionally and makes the listener want to replay it.${seriesContext}`;
 
   const { object } = await generateObject({
-    model: openrouter().chat(primaryModel),
+    model: openrouter.chat(primaryModel),
     schema: musicScriptSchema,
     system: systemPrompt,
     prompt: userPrompt,

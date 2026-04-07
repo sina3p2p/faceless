@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { generateText } from "ai";
-import { getOpenRouterClient } from "@/server/services/llm";
+import { openrouter } from "@/server/services/llm";
 
 const VISION_MODEL = "openai/gpt-4.1";
 const SYSTEM_PROMPT = `You are a character description specialist for AI image/video generation. 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const { text } = await generateText({
-      model: getOpenRouterClient().chat(VISION_MODEL),
+      model: openrouter.chat(VISION_MODEL),
       system: SYSTEM_PROMPT,
       messages: [
         {
