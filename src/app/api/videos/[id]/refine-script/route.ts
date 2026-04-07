@@ -31,7 +31,7 @@ export async function POST(
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, id),
     with: {
-      series: { columns: { userId: true, llmModel: true, videoType: true } },
+      series: { columns: { userId: true, llmModel: true, videoType: true, language: true } },
       scenes: { orderBy: asc(videoScenes.sceneOrder) },
     },
   });
@@ -69,7 +69,8 @@ export async function POST(
         currentScript,
         message,
         chatHistory as ChatMessage[],
-        video.series.llmModel || undefined
+        video.series.llmModel || undefined,
+        video.series.language || "en"
       );
 
       return NextResponse.json({
@@ -113,7 +114,8 @@ export async function POST(
         currentScript,
         message,
         chatHistory as ChatMessage[],
-        video.series.llmModel || undefined
+        video.series.llmModel || undefined,
+        video.series.language || "en"
       );
 
       return NextResponse.json({

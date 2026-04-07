@@ -339,7 +339,8 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
       45,
       seriesRecord.llmModel || undefined,
       !!seriesRecord.sceneContinuity,
-      previousTopics
+      previousTopics,
+      seriesRecord.language || "en"
     );
 
     await db
@@ -577,7 +578,8 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       45,
       seriesRecord.llmModel || undefined,
       !!seriesRecord.sceneContinuity,
-      previousTopics
+      previousTopics,
+      seriesRecord.language || "en"
     );
 
     await db
@@ -813,7 +815,8 @@ export async function generateMusicScriptJob(job: Job<RenderJobData>) {
       topicIdea,
       60,
       seriesRecord.llmModel || undefined,
-      previousTopics
+      previousTopics,
+      seriesRecord.language || "en"
     );
 
     await db

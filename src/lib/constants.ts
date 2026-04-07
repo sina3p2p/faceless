@@ -196,6 +196,35 @@ export const CAPTION_STYLES = [
   { id: "neon", label: "Neon Glow", description: "Glowing neon-style captions" },
 ] as const;
 
+export const LANGUAGES = [
+  { id: "en", label: "English", name: "English" },
+  { id: "es", label: "Spanish (Español)", name: "Spanish" },
+  { id: "fr", label: "French (Français)", name: "French" },
+  { id: "de", label: "German (Deutsch)", name: "German" },
+  { id: "pt", label: "Portuguese (Português)", name: "Portuguese" },
+  { id: "it", label: "Italian (Italiano)", name: "Italian" },
+  { id: "nl", label: "Dutch (Nederlands)", name: "Dutch" },
+  { id: "ru", label: "Russian (Русский)", name: "Russian" },
+  { id: "ja", label: "Japanese (日本語)", name: "Japanese" },
+  { id: "ko", label: "Korean (한국어)", name: "Korean" },
+  { id: "zh", label: "Chinese (中文)", name: "Chinese" },
+  { id: "ar", label: "Arabic (العربية)", name: "Arabic" },
+  { id: "fa", label: "Persian (فارسی)", name: "Persian" },
+  { id: "tr", label: "Turkish (Türkçe)", name: "Turkish" },
+  { id: "hi", label: "Hindi (हिन्दी)", name: "Hindi" },
+  { id: "id", label: "Indonesian (Bahasa)", name: "Indonesian" },
+  { id: "pl", label: "Polish (Polski)", name: "Polish" },
+  { id: "sv", label: "Swedish (Svenska)", name: "Swedish" },
+  { id: "th", label: "Thai (ไทย)", name: "Thai" },
+  { id: "vi", label: "Vietnamese (Tiếng Việt)", name: "Vietnamese" },
+] as const;
+
+export const DEFAULT_LANGUAGE = "en";
+
+export function getLanguageName(code: string): string {
+  return LANGUAGES.find((l) => l.id === code)?.name ?? code;
+}
+
 export const VIDEO_TYPES = [
   { id: "faceless", label: "Faceless", description: "Stock footage and AI images with voiceover" },
   { id: "ai_video", label: "AI Video", description: "AI-generated animated video clips per scene (higher cost)" },

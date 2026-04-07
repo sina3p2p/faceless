@@ -10,6 +10,7 @@ const updateSeriesSchema = z.object({
   niche: z.string().min(1).optional(),
   style: z.string().optional(),
   captionStyle: z.string().optional(),
+  language: z.string().optional(),
   videoType: z.enum(["faceless", "ai_video", "music_video"]).optional(),
   llmModel: z.string().optional(),
   imageModel: z.string().optional(),

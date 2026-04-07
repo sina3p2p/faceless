@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES, LLM_MODELS, DEFAULT_LLM_MODEL, IMAGE_MODELS, DEFAULT_IMAGE_MODEL, VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
+import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES, LLM_MODELS, DEFAULT_LLM_MODEL, IMAGE_MODELS, DEFAULT_IMAGE_MODEL, VIDEO_MODELS, DEFAULT_VIDEO_MODEL, LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
 
 interface CharacterImage {
@@ -24,6 +24,7 @@ interface SeriesData {
   llmModel: string | null;
   imageModel: string | null;
   videoModel: string | null;
+  language: string | null;
   sceneContinuity: number;
   characterImages: CharacterImage[] | null;
   defaultVoiceId: string | null;
@@ -47,6 +48,7 @@ export default function EditSeriesPage() {
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
+    language: DEFAULT_LANGUAGE as string,
     sceneContinuity: false,
     defaultVoiceId: "",
     topicIdeas: "",
@@ -65,6 +67,7 @@ export default function EditSeriesPage() {
           llmModel: data.llmModel || DEFAULT_LLM_MODEL,
           imageModel: data.imageModel || DEFAULT_IMAGE_MODEL,
           videoModel: data.videoModel || DEFAULT_VIDEO_MODEL,
+          language: data.language || DEFAULT_LANGUAGE,
           sceneContinuity: !!data.sceneContinuity,
           defaultVoiceId: data.defaultVoiceId || "",
           topicIdeas: (data.topicIdeas || []).join("\n"),
@@ -95,6 +98,7 @@ export default function EditSeriesPage() {
         llmModel: form.llmModel,
         imageModel: form.imageModel,
         videoModel: form.videoModel,
+        language: form.language,
         sceneContinuity: form.sceneContinuity,
         defaultVoiceId: form.defaultVoiceId || null,
         topicIdeas,
@@ -282,6 +286,16 @@ export default function EditSeriesPage() {
               options={NICHES.map((n) => ({
                 value: n.id,
                 label: `${n.label} — ${n.description}`,
+              }))}
+            />
+
+            <Select
+              label="Script Language"
+              value={form.language}
+              onChange={(e) => setForm({ ...form, language: e.target.value })}
+              options={LANGUAGES.map((l) => ({
+                value: l.id,
+                label: l.label,
               }))}
             />
 

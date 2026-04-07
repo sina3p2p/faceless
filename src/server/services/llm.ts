@@ -1,7 +1,7 @@
 import { generateObject, generateText as aiGenerateText } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
-import { LLM } from "@/lib/constants";
+import { LLM, getLanguageName } from "@/lib/constants";
 
 export const openrouter = createOpenRouter({
   apiKey: LLM.apiKey,
@@ -58,9 +58,11 @@ export async function refineVideoScript(
   currentScript: VideoScript,
   userMessage: string,
   chatHistory: ChatMessage[] = [],
-  model?: string
+  model?: string,
+  language = "en"
 ): Promise<VideoScript> {
   const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
 
   const systemPrompt = `You are a collaborative video script editor. The user has a video script and wants to improve it through conversation.
 
@@ -75,7 +77,13 @@ RULES:
 - Keep all imagePrompts detailed (50-100+ words) — never shorten them
 - Maintain the same JSON structure
 - If the user's request is vague, make your best creative judgment
-- You can add, remove, reorder, or merge scenes if the user asks`;
+- You can add, remove, reorder, or merge scenes if the user asks
+- ONE ACTION PER SCENE: Each scene must show exactly ONE clear action. If a scene has multiple actions (e.g. "brush teeth, wash face, comb hair"), split them into separate scenes. AI video models cannot handle multiple actions in one clip.
+
+LANGUAGE RULE (CRITICAL):
+- The user may write their instructions in ANY language, but the script output (title, hook, narration text, CTA) MUST ALWAYS be written in ${langName}.
+- imagePrompt, visualDescription, and searchQuery should remain in English for best AI model compatibility.
+- Never switch the script language based on the user's input language. Always output narration in ${langName}.`;
 
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
 
@@ -100,9 +108,11 @@ export async function refineMusicScript(
   currentScript: MusicScript,
   userMessage: string,
   chatHistory: ChatMessage[] = [],
-  model?: string
+  model?: string,
+  language = "en"
 ): Promise<MusicScript> {
   const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
 
   const systemPrompt = `You are a collaborative music video script editor. The user has a music script and wants to improve it through conversation.
 
@@ -117,7 +127,13 @@ RULES:
 - Keep all imagePrompts and visualDescriptions as detailed as possible
 - Maintain the same JSON structure
 - Lyrics must remain singable — short lines, good rhythm
-- If the user's request is vague, make your best creative judgment`;
+- If the user's request is vague, make your best creative judgment
+- ONE ACTION PER SECTION: Each section's visuals must show exactly ONE clear action. If lyrics pack multiple actions, pick the single most impactful moment for the imagePrompt/visualDescription. Split into more sections if needed.
+
+LANGUAGE RULE (CRITICAL):
+- The user may write their instructions in ANY language, but the script output (title, lyrics, sectionName) MUST ALWAYS be written in ${langName}.
+- imagePrompt, visualDescription, and genre should remain in English for best AI model compatibility.
+- Never switch the script language based on the user's input language. Always output lyrics and titles in ${langName}.`;
 
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
 
@@ -168,11 +184,18 @@ export async function generateVideoScript(
   targetDuration = 45,
   model?: string,
   sceneContinuity = false,
-  previousTopics: string[] = []
+  previousTopics: string[] = [],
+  language = "en"
 ): Promise<VideoScript> {
   const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
 
   const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
+
+OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
+- ALL text content (title, hook, scene narration/text, CTA) MUST be written in ${langName}.
+- imagePrompt, visualDescription, and searchQuery MUST remain in English for best AI model compatibility.
+- This rule overrides everything else. Even if the topic or niche name is in a different language, the output narration must be in ${langName}.
 
 VIRAL SCRIPT FORMULA (follow this exactly):
 
@@ -200,6 +223,13 @@ CRITICAL RULES:
 - searchQuery must be HYPER-SPECIFIC (e.g. "abandoned underground bunker" not "dark place")
 - Total duration should be ${targetDuration} seconds
 - Aim for 5-7 scenes
+
+ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
+- Each scene must show exactly ONE clear action or moment. NEVER pack multiple actions into one scene.
+- BAD: "Brush teeth, wash face, and comb hair" — this is 3 separate actions crammed together. The video model will fail or produce garbage.
+- GOOD: Scene 1 = "Brush teeth with a big smile", Scene 2 = "Splash water on face", Scene 3 = "Comb hair in the mirror"
+- If the story needs multiple actions, SPLIT them into separate scenes. More scenes with single actions is ALWAYS better than fewer scenes with multiple actions.
+- The visualDescription and imagePrompt must also describe only ONE moment/pose/action, never a sequence.
 
 IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
 - Each imagePrompt must be 50-100 words minimum. SHORT/LAZY prompts = ugly videos.
@@ -278,11 +308,18 @@ export async function generateMusicScript(
   topicIdea?: string,
   targetDuration = 60,
   model?: string,
-  previousTopics: string[] = []
+  previousTopics: string[] = [],
+  language = "en"
 ): Promise<MusicScript> {
   const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
 
   const systemPrompt = `You are an elite songwriter AND music video director. You create songs that go viral on TikTok and YouTube Shorts, and pair them with cinematic visuals that are PERFECTLY synchronized with the music.
+
+OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
+- ALL lyrics, song title, and sectionName MUST be written in ${langName}.
+- imagePrompt, visualDescription, genre, positiveStyles, and negativeStyles MUST remain in English for best AI model compatibility.
+- This rule overrides everything else. Even if the niche or topic is in another language, lyrics and titles must be in ${langName}.
 
 SONGWRITING RULES:
 1. Write lyrics that are CATCHY, MEMORABLE, and SINGABLE. Use rhyme, repetition, and strong hooks.
@@ -328,6 +365,13 @@ The visuals must feel like they were CHOREOGRAPHED to the music. Think like a re
    - Include subject motion: "character turns to face camera", "wind blows through hair", "walks forward through fog", "hands reach toward the sky".
    - Include environmental motion: "clouds drifting", "rain falling", "fire flickering", "leaves swirling in wind", "neon signs flickering".
    - Match motion SPEED to music tempo: slow songs = slow deliberate moves, upbeat songs = dynamic fast cuts.
+
+   ONE ACTION PER SECTION (CRITICAL — AI video models CANNOT handle multiple actions):
+   - Each section's imagePrompt and visualDescription must show exactly ONE clear action or moment. NEVER pack multiple actions into one section.
+   - BAD: "Brush teeth, wash face, comb hair" — 3 actions crammed together. The video model will produce garbage.
+   - GOOD: One section = "Brush teeth with a big grin in front of the bathroom mirror". Next section = "Splash water on face, droplets flying".
+   - If lyrics describe a sequence of actions, the imagePrompt/visualDescription should capture only the MOST IMPORTANT single moment from that section.
+   - Split dense lyrics across more sections if needed rather than overloading one section's visuals.
 
 5. VISUAL CONTINUITY ACROSS SECTIONS:
    - Maintain a CONSISTENT main character/subject across all sections.
