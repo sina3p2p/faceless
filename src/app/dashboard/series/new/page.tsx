@@ -23,7 +23,7 @@ export default function NewSeriesPage() {
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
-    sceneContinuity: false,
+    sceneContinuity: true,
     defaultVoiceId: "",
     topicIdeas: "",
   });
