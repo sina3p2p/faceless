@@ -5,7 +5,7 @@ import * as os from "os";
 import { v4 as uuid } from "uuid";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq } from "drizzle-orm";
+import { eq, and, ne, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE } from "@/lib/constants";
 import { generateVideoScript, generateMusicScript, type MusicScript } from "@/server/services/llm";
@@ -35,6 +35,19 @@ import type { RenderJobData } from "@/lib/queue";
 
 const client = postgres(DATABASE.url);
 const db = drizzle(client, { schema });
+
+async function getPreviousTopics(seriesId: string, currentVideoId: string): Promise<string[]> {
+  const prev = await db.query.videoProjects.findMany({
+    where: and(
+      eq(schema.videoProjects.seriesId, seriesId),
+      ne(schema.videoProjects.id, currentVideoId)
+    ),
+    columns: { title: true },
+    orderBy: desc(schema.videoProjects.createdAt),
+    limit: 50,
+  });
+  return prev.map((v) => v.title).filter((t): t is string => !!t);
+}
 
 async function updateJobStep(
   videoProjectId: string,
@@ -317,13 +330,16 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
         ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
         : undefined;
 
+    const previousTopics = await getPreviousTopics(seriesId, videoProjectId);
+
     const script = await generateVideoScript(
       seriesRecord.niche,
       seriesRecord.style,
       topicIdea,
       45,
       seriesRecord.llmModel || undefined,
-      !!seriesRecord.sceneContinuity
+      !!seriesRecord.sceneContinuity,
+      previousTopics
     );
 
     await db
@@ -552,13 +568,16 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
         ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
         : undefined;
 
+    const previousTopics = await getPreviousTopics(seriesId, videoProjectId);
+
     const script = await generateVideoScript(
       seriesRecord.niche,
       seriesRecord.style,
       topicIdea,
       45,
       seriesRecord.llmModel || undefined,
-      !!seriesRecord.sceneContinuity
+      !!seriesRecord.sceneContinuity,
+      previousTopics
     );
 
     await db
@@ -786,12 +805,15 @@ export async function generateMusicScriptJob(job: Job<RenderJobData>) {
         ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
         : undefined;
 
+    const previousTopics = await getPreviousTopics(seriesId, videoProjectId);
+
     const musicScript = await generateMusicScript(
       seriesRecord.niche,
       seriesRecord.style,
       topicIdea,
       60,
-      seriesRecord.llmModel || undefined
+      seriesRecord.llmModel || undefined,
+      previousTopics
     );
 
     await db

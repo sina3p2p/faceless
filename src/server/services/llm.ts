@@ -76,7 +76,8 @@ export async function generateVideoScript(
   topicIdea?: string,
   targetDuration = 45,
   model?: string,
-  sceneContinuity = false
+  sceneContinuity = false,
+  previousTopics: string[] = []
 ): Promise<VideoScript> {
   const primaryModel = model || LLM.defaultModel;
 
@@ -159,9 +160,13 @@ SCENE CONTINUITY MODE (CRITICAL — follow these rules):
 - Total scenes should be 6-8 (including the ending scene).
 ` : ""}`;
 
+  const seriesContext = previousTopics.length > 0
+    ? `\n\nSERIES CONTINUITY — Think of this as a Netflix-style series. Here are the previous episodes (most recent first):\n${previousTopics.map((t, i) => `  Episode ${previousTopics.length - i}: "${t}"`).join("\n")}\n\nYour job is to create the NEXT episode. Rules:\n- Build on the world/theme established by previous episodes — viewers should feel this belongs in the same series\n- Reference or connect to earlier episodes when it makes sense (e.g. "remember when we talked about X? Well..."), but the video MUST stand on its own\n- NEVER repeat the same topic, story, or script as a previous episode\n- Explore a fresh angle, a deeper layer, a sequel, a related mystery, or the "other side of the story"\n- If the series has a recurring character/narrator persona, maintain it\n- Escalate — each episode should feel like the stakes or intrigue are building`
+    : "";
+
   const userPrompt = topicIdea
-    ? `Create a ${niche} viral video script about: ${topicIdea}. Visual style: ${style}. Make it impossible to scroll past.`
-    : `Create a ${niche} viral video script. Visual style: ${style}. Pick a topic that will make people STOP scrolling and watch till the end. Think: "I need to know what happens next."`;
+    ? `Create a ${niche} viral video script about: ${topicIdea}. Visual style: ${style}. Make it impossible to scroll past.${seriesContext}`
+    : `Create a ${niche} viral video script. Visual style: ${style}. Pick a topic that will make people STOP scrolling and watch till the end. Think: "I need to know what happens next."${seriesContext}`;
 
   const { object } = await generateObject({
     model: openrouter.chat(primaryModel),
@@ -181,7 +186,8 @@ export async function generateMusicScript(
   style: string,
   topicIdea?: string,
   targetDuration = 60,
-  model?: string
+  model?: string,
+  previousTopics: string[] = []
 ): Promise<MusicScript> {
   const primaryModel = model || LLM.defaultModel;
 
@@ -247,9 +253,13 @@ KIDS MUSIC RULES:
 - Characters should be friendly animals, cartoon kids, or colorful fantasy creatures.
 ` : ""}`;
 
+  const seriesContext = previousTopics.length > 0
+    ? `\n\nALBUM CONTINUITY — Think of this as a music album/series. Here are the previous tracks (most recent first):\n${previousTopics.map((t, i) => `  Track ${previousTopics.length - i}: "${t}"`).join("\n")}\n\nYour job is to create the NEXT track. Rules:\n- It should feel like it belongs in the same album — maintain a cohesive mood, genre, and artistic identity\n- NEVER repeat the same topic, lyrics, or melody concept as a previous track\n- Explore a new emotion, story, or perspective that complements what came before\n- If earlier tracks established a narrative arc or recurring motifs, build on them\n- Each track should bring something fresh while feeling connected to the whole`
+    : "";
+
   const userPrompt = topicIdea
-    ? `Create a viral ${niche}-themed song about: ${topicIdea}. Visual style: ${style}. The song should be irresistibly catchy.`
-    : `Create a viral ${niche}-themed song. Visual style: ${style}. Pick a topic that resonates emotionally and makes the listener want to replay it.`;
+    ? `Create a viral ${niche}-themed song about: ${topicIdea}. Visual style: ${style}. The song should be irresistibly catchy.${seriesContext}`
+    : `Create a viral ${niche}-themed song. Visual style: ${style}. Pick a topic that resonates emotionally and makes the listener want to replay it.${seriesContext}`;
 
   const { object } = await generateObject({
     model: openrouter.chat(primaryModel),
