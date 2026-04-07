@@ -4,14 +4,17 @@ import { series } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
-import { LLM } from "@/lib/constants";
-import OpenAI from "openai";
+import { generateText } from "ai";
+import { openrouter } from "@/server/services/llm";
 import { z } from "zod/v4";
 
-const openrouter = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: LLM.apiKey,
-});
+const VISION_MODEL = "openai/gpt-4.1";
+const SYSTEM_PROMPT = `You are a character description specialist for AI image/video generation. 
+Describe the character in the image in detail so AI models can recreate them consistently.
+Include: gender, approximate age, ethnicity/skin tone, hair (color, style, length), eye color, 
+facial features, body build, clothing, accessories, and any distinctive features.
+Keep it concise but thorough (2-4 sentences). Write in plain descriptive language, no conversational text.
+Example: "A young East Asian woman in her late 20s with long straight black hair and dark brown eyes. She has a slender build, light skin, and delicate facial features with high cheekbones. She wears a burgundy leather jacket over a white t-shirt."`;
 
 const bodySchema = z.object({
   index: z.number().int().min(0),
@@ -47,37 +50,23 @@ export async function POST(
     : await getSignedDownloadUrl(charImage.url);
 
   try {
-    const response = await openrouter.chat.completions.create({
-      model: "openai/gpt-4.1",
+    const { text } = await generateText({
+      model: openrouter.chat(VISION_MODEL),
+      system: SYSTEM_PROMPT,
       messages: [
-        {
-          role: "system",
-          content: `You are a character description specialist for AI image/video generation. 
-Describe the character in the image in detail so AI models can recreate them consistently.
-Include: gender, approximate age, ethnicity/skin tone, hair (color, style, length), eye color, 
-facial features, body build, clothing, accessories, and any distinctive features.
-Keep it concise but thorough (2-4 sentences). Write in plain descriptive language, no conversational text.
-Example: "A young East Asian woman in her late 20s with long straight black hair and dark brown eyes. She has a slender build, light skin, and delicate facial features with high cheekbones. She wears a burgundy leather jacket over a white t-shirt."`,
-        },
         {
           role: "user",
           content: [
-            {
-              type: "image_url",
-              image_url: { url: imageUrl },
-            },
-            {
-              type: "text",
-              text: "Describe this character in detail for AI image generation consistency.",
-            },
+            { type: "image", image: new URL(imageUrl) },
+            { type: "text", text: "Describe this character in detail for AI image generation consistency." },
           ],
         },
       ],
-      max_tokens: 300,
+      maxOutputTokens: 300,
       temperature: 0.3,
     });
 
-    const description = response.choices[0]?.message?.content?.trim() || "";
+    const description = text.trim();
 
     const updatedImages = [...images];
     updatedImages[parsed.data.index] = { ...updatedImages[parsed.data.index], description };

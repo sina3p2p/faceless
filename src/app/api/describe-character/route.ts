@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
-import { LLM } from "@/lib/constants";
-import OpenAI from "openai";
+import { generateText } from "ai";
+import { openrouter } from "@/server/services/llm";
 
-const openrouter = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: LLM.apiKey,
-});
+const VISION_MODEL = "openai/gpt-4.1";
+const SYSTEM_PROMPT = `You are a character description specialist for AI image/video generation. 
+Describe the character in the image in detail so AI models can recreate them consistently.
+Include: gender, approximate age, ethnicity/skin tone, hair (color, style, length), eye color, 
+facial features, body build, clothing, accessories, and any distinctive features.
+Keep it concise but thorough (2-4 sentences). Write in plain descriptive language, no conversational text.
+Example: "A young East Asian woman in her late 20s with long straight black hair and dark brown eyes. She has a slender build, light skin, and delicate facial features with high cheekbones. She wears a burgundy leather jacket over a white t-shirt."`;
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser();
@@ -27,32 +30,23 @@ export async function POST(req: NextRequest) {
   const dataUrl = `data:${file.type};base64,${base64}`;
 
   try {
-    const response = await openrouter.chat.completions.create({
-      model: "openai/gpt-4.1",
+    const { text } = await generateText({
+      model: openrouter.chat(VISION_MODEL),
+      system: SYSTEM_PROMPT,
       messages: [
-        {
-          role: "system",
-          content: `You are a character description specialist for AI image/video generation. 
-Describe the character in the image in detail so AI models can recreate them consistently.
-Include: gender, approximate age, ethnicity/skin tone, hair (color, style, length), eye color, 
-facial features, body build, clothing, accessories, and any distinctive features.
-Keep it concise but thorough (2-4 sentences). Write in plain descriptive language, no conversational text.
-Example: "A young East Asian woman in her late 20s with long straight black hair and dark brown eyes. She has a slender build, light skin, and delicate facial features with high cheekbones. She wears a burgundy leather jacket over a white t-shirt."`,
-        },
         {
           role: "user",
           content: [
-            { type: "image_url", image_url: { url: dataUrl } },
+            { type: "image", image: new URL(dataUrl) },
             { type: "text", text: "Describe this character in detail for AI image generation consistency." },
           ],
         },
       ],
-      max_tokens: 300,
+      maxOutputTokens: 300,
       temperature: 0.3,
     });
 
-    const description = response.choices[0]?.message?.content?.trim() || "";
-    return NextResponse.json({ description });
+    return NextResponse.json({ description: text.trim() });
   } catch (err) {
     console.error("AI describe failed:", err);
     return NextResponse.json(

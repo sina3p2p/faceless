@@ -1,54 +1,74 @@
-import OpenAI from "openai";
+import { generateObject, generateText as aiGenerateText } from "ai";
+import { createOpenRouter } from "@openrouter/ai-sdk-provider";
+import { z } from "zod";
 import { LLM } from "@/lib/constants";
 
-const openrouter = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
+export const openrouter = createOpenRouter({
   apiKey: LLM.apiKey,
 });
 
-interface LLMOptions {
-  maxTokens?: number;
-  temperature?: number;
-  jsonMode?: boolean;
-  model?: string;
-}
+// ── Zod Schemas ──
+
+const videoSceneSchema = z.object({
+  text: z.string().describe("Narration text for this scene. Punchy, conversational, micro-cliffhangers. 1-3 sentences max."),
+  visualDescription: z.string().describe("Rich detailed description of visual action on screen — movements, gestures, camera motion, environment changes. Must describe MOTION and ACTION, not a static image."),
+  searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
+  imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT (appearance, clothing, expression), ACTION/MOTION, ENVIRONMENT, LIGHTING, CAMERA angle/movement, MOOD/ATMOSPHERE, and STYLE. Single detailed paragraph."),
+  duration: z.number().describe("Duration of this scene in seconds"),
+});
+
+const videoScriptSchema = z.object({
+  title: z.string().describe("SEO-optimized title with emotional trigger words"),
+  hook: z.string().describe("Opening 1-2 sentences that create instant curiosity gap (spoken in first 3 seconds)"),
+  scenes: z.array(videoSceneSchema),
+  cta: z.string().describe("Call to action that makes viewers comment, like, or follow"),
+  totalDuration: z.number().describe("Total video duration in seconds"),
+});
+
+export type VideoScript = z.infer<typeof videoScriptSchema>;
+
+const musicSectionSchema = z.object({
+  sectionName: z.string().describe("Section type, e.g. 'Intro', 'Verse 1', 'Chorus', 'Bridge', 'Outro'"),
+  lyrics: z.array(z.string()).describe("Song lyrics for this section, one line per array element"),
+  durationMs: z.number().describe("Section duration in milliseconds (5000-30000)"),
+  imagePrompt: z.string().describe("Extremely detailed visual prompt for the key frame image of this section's video clip — be as descriptive as possible"),
+  visualDescription: z.string().describe("Detailed motion/action description for the AI video model — camera motion, subject motion, environmental animation"),
+  positiveStyles: z.array(z.string()).describe("Musical elements to include, e.g. 'electric guitar', 'driving drums', 'female vocals'"),
+  negativeStyles: z.array(z.string()).describe("Musical elements to avoid, e.g. 'saxophone', 'country twang'"),
+});
+
+const musicScriptSchema = z.object({
+  title: z.string().describe("Catchy song title"),
+  genre: z.string().describe("Music genre/style for the AI music generator, e.g. 'pop, upbeat, catchy'"),
+  totalDuration: z.number().describe("Total song duration in seconds"),
+  sections: z.array(musicSectionSchema),
+});
+
+export type MusicSection = z.infer<typeof musicSectionSchema>;
+export type MusicScript = z.infer<typeof musicScriptSchema>;
+
+// ── Generic text generation (for non-structured calls) ──
 
 export async function generateText(
   systemPrompt: string,
   userPrompt: string,
-  options: LLMOptions = {}
+  options: { maxOutputTokens?: number; temperature?: number; model?: string } = {}
 ): Promise<string> {
-  const { maxTokens, temperature = 0.7, jsonMode = false, model } = options;
+  const { maxOutputTokens, temperature = 0.7, model } = options;
   const primaryModel = model || LLM.defaultModel;
 
-  const requestBody: OpenAI.ChatCompletionCreateParamsNonStreaming = {
-    model: primaryModel,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-    ...(maxTokens && { max_tokens: maxTokens }),
+  const { text } = await aiGenerateText({
+    model: openrouter.chat(primaryModel),
+    system: systemPrompt,
+    prompt: userPrompt,
     temperature,
-    ...(jsonMode && { response_format: { type: "json_object" } }),
-  };
+    ...(maxOutputTokens && { maxOutputTokens }),
+  });
 
-  const response = await openrouter.chat.completions.create(requestBody);
-  return response.choices[0]?.message?.content ?? "";
+  return text;
 }
 
-export interface VideoScript {
-  title: string;
-  hook: string;
-  scenes: Array<{
-    text: string;
-    visualDescription: string;
-    searchQuery: string;
-    imagePrompt: string;
-    duration: number;
-  }>;
-  cta: string;
-  totalDuration: number;
-}
+// ── Video Script Generation ──
 
 export async function generateVideoScript(
   niche: string,
@@ -58,24 +78,9 @@ export async function generateVideoScript(
   model?: string,
   sceneContinuity = false
 ): Promise<VideoScript> {
-  const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
+  const primaryModel = model || LLM.defaultModel;
 
-Your output must be valid JSON matching this exact schema:
-{
-  "title": "string - SEO-optimized title with emotional trigger words",
-  "hook": "string - the opening 1-2 sentences that create an instant curiosity gap (spoken in first 3 seconds)",
-  "scenes": [
-    {
-      "text": "string - narration text for this scene. Must be punchy, conversational, and create micro-cliffhangers between scenes. 1-3 sentences max.",
-      "visualDescription": "string - a rich, detailed description of the visual action happening on screen. Describe specific movements, gestures, camera motion, and environment changes. This is used to generate AI video clips so it must describe MOTION and ACTION, not a static image.",
-      "searchQuery": "string - 2-4 specific words for stock footage search (backup if AI generation fails)",
-      "imagePrompt": "string - A highly detailed prompt for AI video generation. This prompt will first generate a still image, then that image will be animated into a video clip. Write it as a single detailed paragraph covering ALL of these elements:\n1. SUBJECT: Who/what is the main focus? Describe their appearance, clothing, expression, pose in detail.\n2. ACTION/MOTION: What movement or action should happen? (camera slowly zooming in, character walking, wind blowing, water flowing, particles floating). Be specific about the motion direction and speed.\n3. ENVIRONMENT: Where is the scene set? Describe the background, surroundings, objects in the scene.\n4. LIGHTING: Describe the light source, shadows, color temperature (golden hour, moonlight, neon glow, dramatic rim lighting, soft diffused light).\n5. CAMERA: Specify camera angle (low angle, bird's eye, eye level, Dutch angle) and movement (slow push in, orbiting, static, tracking shot).\n6. MOOD/ATMOSPHERE: Fog, rain, dust particles, lens flare, smoke, bokeh, volumetric light rays.\n7. STYLE: ${style} style. Must feel cinematic and high-production.\nThe prompt must match the narration PERFECTLY. Every visual must reinforce what the narrator is saying.",
-      "duration": number
-    }
-  ],
-  "cta": "string - call to action",
-  "totalDuration": number
-}
+  const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
 
 VIRAL SCRIPT FORMULA (follow this exactly):
 
@@ -158,32 +163,18 @@ SCENE CONTINUITY MODE (CRITICAL — follow these rules):
     ? `Create a ${niche} viral video script about: ${topicIdea}. Visual style: ${style}. Make it impossible to scroll past.`
     : `Create a ${niche} viral video script. Visual style: ${style}. Pick a topic that will make people STOP scrolling and watch till the end. Think: "I need to know what happens next."`;
 
-  const result = await generateText(systemPrompt, userPrompt, {
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: videoScriptSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
     temperature: 0.85,
-    jsonMode: true,
-    model,
   });
 
-  const cleaned = result.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
-  return JSON.parse(cleaned) as VideoScript;
+  return object;
 }
 
-export interface MusicSection {
-  sectionName: string;
-  lyrics: string[];
-  durationMs: number;
-  imagePrompt: string;
-  visualDescription: string;
-  positiveStyles: string[];
-  negativeStyles: string[];
-}
-
-export interface MusicScript {
-  title: string;
-  genre: string;
-  totalDuration: number;
-  sections: MusicSection[];
-}
+// ── Music Script Generation ──
 
 export async function generateMusicScript(
   niche: string,
@@ -192,25 +183,9 @@ export async function generateMusicScript(
   targetDuration = 60,
   model?: string
 ): Promise<MusicScript> {
-  const systemPrompt = `You are an elite songwriter AND music video director. You create songs that go viral on TikTok and YouTube Shorts, and pair them with cinematic visuals that are PERFECTLY synchronized with the music.
+  const primaryModel = model || LLM.defaultModel;
 
-Your output must be valid JSON matching this exact schema:
-{
-  "title": "string - catchy song title",
-  "genre": "string - music genre/style description for the AI music generator (e.g. 'pop, upbeat, catchy', 'lo-fi hip hop, chill, dreamy', 'epic cinematic orchestral')",
-  "totalDuration": number (total seconds),
-  "sections": [
-    {
-      "sectionName": "string - e.g. 'Intro', 'Verse 1', 'Chorus', 'Verse 2', 'Bridge', 'Outro'",
-      "lyrics": ["line 1", "line 2", "..."],
-      "durationMs": number (section duration in milliseconds, between 5000 and 30000),
-      "imagePrompt": "string - EXTREMELY detailed visual prompt. The more detail the better — be as descriptive as possible. This generates the key frame image for this section's video clip.",
-      "visualDescription": "string - detailed motion/action description. Be as thorough as possible — describe every movement, camera motion, and environmental animation. This tells the AI video model what to animate.",
-      "positiveStyles": ["string - musical elements to include, e.g. 'electric guitar', 'driving drums', 'female vocals'"],
-      "negativeStyles": ["string - musical elements to avoid, e.g. 'saxophone', 'country twang'"]
-    }
-  ]
-}
+  const systemPrompt = `You are an elite songwriter AND music video director. You create songs that go viral on TikTok and YouTube Shorts, and pair them with cinematic visuals that are PERFECTLY synchronized with the music.
 
 SONGWRITING RULES:
 1. Write lyrics that are CATCHY, MEMORABLE, and SINGABLE. Use rhyme, repetition, and strong hooks.
@@ -276,12 +251,13 @@ KIDS MUSIC RULES:
     ? `Create a viral ${niche}-themed song about: ${topicIdea}. Visual style: ${style}. The song should be irresistibly catchy.`
     : `Create a viral ${niche}-themed song. Visual style: ${style}. Pick a topic that resonates emotionally and makes the listener want to replay it.`;
 
-  const result = await generateText(systemPrompt, userPrompt, {
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: musicScriptSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
     temperature: 0.85,
-    jsonMode: true,
-    model,
   });
 
-  const cleaned = result.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
-  return JSON.parse(cleaned) as MusicScript;
+  return object;
 }
