@@ -47,6 +47,97 @@ const musicScriptSchema = z.object({
 export type MusicSection = z.infer<typeof musicSectionSchema>;
 export type MusicScript = z.infer<typeof musicScriptSchema>;
 
+// ── Script Refinement (chat-based) ──
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function refineVideoScript(
+  currentScript: VideoScript,
+  userMessage: string,
+  chatHistory: ChatMessage[] = [],
+  model?: string
+): Promise<VideoScript> {
+  const primaryModel = model || LLM.defaultModel;
+
+  const systemPrompt = `You are a collaborative video script editor. The user has a video script and wants to improve it through conversation.
+
+CURRENT SCRIPT:
+${JSON.stringify(currentScript, null, 2)}
+
+RULES:
+- Apply the user's requested changes to the script and return the COMPLETE modified script
+- Only change what the user asks for — preserve everything else exactly as-is
+- If the user asks to change a specific scene, only modify that scene
+- If the user asks for tone/style changes, apply them across all scenes
+- Keep all imagePrompts detailed (50-100+ words) — never shorten them
+- Maintain the same JSON structure
+- If the user's request is vague, make your best creative judgment
+- You can add, remove, reorder, or merge scenes if the user asks`;
+
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+  for (const msg of chatHistory) {
+    messages.push({ role: msg.role, content: msg.content });
+  }
+
+  messages.push({ role: "user", content: userMessage });
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: videoScriptSchema,
+    system: systemPrompt,
+    messages,
+    temperature: 0.7,
+  });
+
+  return object;
+}
+
+export async function refineMusicScript(
+  currentScript: MusicScript,
+  userMessage: string,
+  chatHistory: ChatMessage[] = [],
+  model?: string
+): Promise<MusicScript> {
+  const primaryModel = model || LLM.defaultModel;
+
+  const systemPrompt = `You are a collaborative music video script editor. The user has a music script and wants to improve it through conversation.
+
+CURRENT SCRIPT:
+${JSON.stringify(currentScript, null, 2)}
+
+RULES:
+- Apply the user's requested changes to the script and return the COMPLETE modified script
+- Only change what the user asks for — preserve everything else exactly as-is
+- If the user asks to change a specific section, only modify that section
+- If the user asks for tone/style/genre changes, apply them appropriately
+- Keep all imagePrompts and visualDescriptions as detailed as possible
+- Maintain the same JSON structure
+- Lyrics must remain singable — short lines, good rhythm
+- If the user's request is vague, make your best creative judgment`;
+
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+
+  for (const msg of chatHistory) {
+    messages.push({ role: msg.role, content: msg.content });
+  }
+
+  messages.push({ role: "user", content: userMessage });
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: musicScriptSchema,
+    system: systemPrompt,
+    messages,
+    temperature: 0.7,
+  });
+
+  return object;
+}
+
 // ── Generic text generation (for non-structured calls) ──
 
 export async function generateText(
