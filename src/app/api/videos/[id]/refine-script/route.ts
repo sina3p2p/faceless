@@ -84,7 +84,7 @@ export async function POST(
           duration: s.durationMs / 1000,
         })),
         title: refined.title,
-        summary: buildSummary(video.scenes, refined.sections.map((s, i) => ({
+        changes: buildChanges(video.scenes, refined.sections.map((s) => ({
           text: s.lyrics.join("\n"),
           imagePrompt: s.imagePrompt,
           visualDescription: s.visualDescription,
@@ -129,7 +129,7 @@ export async function POST(
           duration: s.duration,
         })),
         title: refined.title,
-        summary: buildSummary(video.scenes, refined.scenes),
+        changes: buildChanges(video.scenes, refined.scenes),
       });
     }
   } catch (err) {
@@ -148,30 +148,55 @@ interface SceneLike {
   duration?: number | null;
 }
 
-function buildSummary(oldScenes: SceneLike[], newScenes: SceneLike[]): string {
-  const changes: string[] = [];
+interface SceneChange {
+  scene: number;
+  type: "modified" | "added" | "removed";
+  fields: Array<{
+    field: string;
+    old?: string;
+    new?: string;
+  }>;
+}
 
-  if (oldScenes.length !== newScenes.length) {
-    changes.push(`Scene count: ${oldScenes.length} → ${newScenes.length}`);
-  }
-
+function buildChanges(oldScenes: SceneLike[], newScenes: SceneLike[]): SceneChange[] {
+  const changes: SceneChange[] = [];
   const maxLen = Math.max(oldScenes.length, newScenes.length);
+
   for (let i = 0; i < maxLen; i++) {
     const oldS = oldScenes[i];
     const newS = newScenes[i];
-    if (!oldS) {
-      changes.push(`Scene ${i + 1}: added`);
-    } else if (!newS) {
-      changes.push(`Scene ${i + 1}: removed`);
-    } else {
-      const diffs: string[] = [];
-      if (oldS.text !== newS.text) diffs.push("narration");
-      if ((oldS.imagePrompt || "") !== (newS.imagePrompt || "")) diffs.push("image prompt");
-      if ((oldS.visualDescription || "") !== (newS.visualDescription || "")) diffs.push("visual description");
-      if ((oldS.duration ?? 0) !== (newS.duration ?? 0)) diffs.push("duration");
-      if (diffs.length > 0) changes.push(`Scene ${i + 1}: ${diffs.join(", ")} changed`);
+
+    if (!oldS && newS) {
+      changes.push({
+        scene: i + 1,
+        type: "added",
+        fields: [{ field: "narration", new: newS.text }],
+      });
+    } else if (oldS && !newS) {
+      changes.push({
+        scene: i + 1,
+        type: "removed",
+        fields: [{ field: "narration", old: oldS.text }],
+      });
+    } else if (oldS && newS) {
+      const fields: SceneChange["fields"] = [];
+      if (oldS.text !== newS.text) {
+        fields.push({ field: "narration", old: oldS.text, new: newS.text });
+      }
+      if ((oldS.imagePrompt || "") !== (newS.imagePrompt || "")) {
+        fields.push({ field: "image prompt", old: oldS.imagePrompt || "", new: newS.imagePrompt || "" });
+      }
+      if ((oldS.visualDescription || "") !== (newS.visualDescription || "")) {
+        fields.push({ field: "visual description", old: oldS.visualDescription || "", new: newS.visualDescription || "" });
+      }
+      if ((oldS.duration ?? 0) !== (newS.duration ?? 0)) {
+        fields.push({ field: "duration", old: `${oldS.duration ?? 0}s`, new: `${newS.duration ?? 0}s` });
+      }
+      if (fields.length > 0) {
+        changes.push({ scene: i + 1, type: "modified", fields });
+      }
     }
   }
 
-  return changes.length > 0 ? changes.join("\n") : "No changes detected";
+  return changes;
 }

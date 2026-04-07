@@ -829,6 +829,59 @@ interface RefinedScene {
   duration: number;
 }
 
+interface FieldChange {
+  field: string;
+  old?: string;
+  new?: string;
+}
+
+interface SceneChange {
+  scene: number;
+  type: "modified" | "added" | "removed";
+  fields: FieldChange[];
+}
+
+function DiffBlock({ change }: { change: SceneChange }) {
+  const [expanded, setExpanded] = useState(true);
+  const label =
+    change.type === "added" ? "Added" :
+    change.type === "removed" ? "Removed" : `${change.fields.length} change${change.fields.length > 1 ? "s" : ""}`;
+  const color =
+    change.type === "added" ? "text-green-400" :
+    change.type === "removed" ? "text-red-400" : "text-violet-300";
+
+  return (
+    <div className="rounded-lg border border-white/10 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between px-3 py-1.5 bg-white/5 hover:bg-white/10 transition-colors"
+      >
+        <span className="text-xs font-medium text-white">Scene {change.scene}</span>
+        <span className={`text-[10px] font-medium ${color}`}>{label}</span>
+      </button>
+      {expanded && (
+        <div className="px-3 py-2 space-y-2">
+          {change.fields.map((f, i) => (
+            <div key={i}>
+              <span className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">{f.field}</span>
+              {f.old && (
+                <div className="mt-0.5 rounded bg-red-500/10 border border-red-500/20 px-2 py-1">
+                  <p className="text-xs text-red-300/80 line-through break-words">{f.old.length > 150 ? f.old.slice(0, 150) + "…" : f.old}</p>
+                </div>
+              )}
+              {f.new && (
+                <div className="mt-0.5 rounded bg-green-500/10 border border-green-500/20 px-2 py-1">
+                  <p className="text-xs text-green-300 break-words">{f.new.length > 150 ? f.new.slice(0, 150) + "…" : f.new}</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ScriptChatPanel({
   videoId,
   scenes,
@@ -846,10 +899,9 @@ function ScriptChatPanel({
   const [pendingResult, setPendingResult] = useState<{
     scenes: RefinedScene[];
     title: string;
-    summary: string;
+    changes: SceneChange[];
   } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -883,12 +935,18 @@ function ScriptChatPanel({
       }
 
       const data = await res.json();
+      const changes: SceneChange[] = data.changes || [];
+      const changedCount = changes.length;
+      const briefSummary = changedCount === 0
+        ? "No changes detected."
+        : `${changedCount} scene${changedCount > 1 ? "s" : ""} modified:`;
+
       setPendingResult({
         scenes: data.scenes,
         title: data.title,
-        summary: data.summary,
+        changes,
       });
-      setMessages([...newMessages, { role: "assistant", content: data.summary }]);
+      setMessages([...newMessages, { role: "assistant", content: briefSummary }]);
     } catch {
       setMessages([...newMessages, { role: "assistant", content: "Error: Network request failed" }]);
     } finally {
@@ -904,7 +962,7 @@ function ScriptChatPanel({
   }
 
   return (
-    <div className="fixed bottom-4 right-4 w-[420px] max-h-[70vh] bg-gray-900 border border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden">
+    <div className="fixed bottom-4 right-4 w-[440px] max-h-[75vh] bg-gray-900 border border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-2">
@@ -959,19 +1017,23 @@ function ScriptChatPanel({
           </div>
         )}
 
-        {pendingResult && (
-          <div className="bg-violet-500/10 border border-violet-500/30 rounded-xl p-3">
-            <p className="text-xs font-medium text-violet-300 mb-2">Ready to apply changes</p>
+        {pendingResult && pendingResult.changes.length > 0 && (
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              {pendingResult.changes.map((ch, i) => (
+                <DiffBlock key={i} change={ch} />
+              ))}
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={handleApply}
-                className="flex-1 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-500 transition-colors"
+                className="flex-1 px-3 py-2 rounded-lg bg-green-600 text-white text-xs font-semibold hover:bg-green-500 transition-colors"
               >
-                Apply Changes
+                Apply {pendingResult.changes.length} Change{pendingResult.changes.length > 1 ? "s" : ""}
               </button>
               <button
                 onClick={() => setPendingResult(null)}
-                className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-gray-400 text-xs font-medium hover:text-white transition-colors"
+                className="px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-gray-400 text-xs font-medium hover:text-white transition-colors"
               >
                 Dismiss
               </button>
@@ -986,7 +1048,6 @@ function ScriptChatPanel({
       <div className="border-t border-white/10 p-3 shrink-0">
         <div className="flex gap-2">
           <textarea
-            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
