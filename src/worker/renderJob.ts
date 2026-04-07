@@ -448,15 +448,19 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
         const mediaKey = `scenes/${videoProjectId}/media_${i}.${mediaExt}`;
         await uploadFile(mediaKey, mediaBuffer, mediaMime);
 
-        await db
-          .update(schema.videoScenes)
-          .set({
+        const sceneUpdates: Record<string, unknown> = {
             audioUrl: audioKey,
             assetUrl: mediaKey,
             assetType: mediaPaths[i].type,
             captionData: ttsResults[i].wordTimestamps,
             duration: existingScenes[i].duration,
-          })
+        };
+        if (!existingScenes[i].modelUsed) {
+          sceneUpdates.modelUsed = seriesRecord.imageModel || "dall-e-3";
+        }
+        await db
+          .update(schema.videoScenes)
+          .set(sceneUpdates)
           .where(eq(schema.videoScenes.id, existingScenes[i].id));
       })
     );
@@ -624,6 +628,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
             assetUrl: mediaKey,
             assetType: mediaPaths[i].type,
             captionData: ttsResults[i].wordTimestamps,
+            modelUsed: seriesRecord.imageModel || "dall-e-3",
           })
           .where(eq(schema.videoScenes.id, sceneIds[i]));
       })
@@ -937,6 +942,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
             assetUrl: mediaKey,
             assetType: mediaPaths[i].type,
             duration: actualDurationsSec[i] ?? existingScenes[i].duration,
+            modelUsed: seriesRecord.imageModel || "dall-e-3",
           })
           .where(eq(schema.videoScenes.id, scene.id));
       })

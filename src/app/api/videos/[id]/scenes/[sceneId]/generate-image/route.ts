@@ -3,14 +3,16 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, inArray } from "drizzle-orm";
-import { generateImage, generateFluxImage, generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
+import { generateImage, generateFluxImage, generateNanoBananaImage, inpaintImage, type CharacterRef } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod";
 
 const bodySchema = z.object({
   imagePrompt: z.string().min(1).optional(),
-  mode: z.enum(["regenerate", "edit"]).default("regenerate"),
+  mode: z.enum(["regenerate", "edit", "inpaint"]).default("regenerate"),
   referenceSceneIds: z.array(z.string()).optional(),
+  maskDataUrl: z.string().optional(),
+  imageModel: z.enum(["dall-e-3", "flux-pro", "nano-banana-2"]).optional(),
 });
 
 export async function POST(
@@ -41,7 +43,7 @@ export async function POST(
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
-  const { mode, referenceSceneIds } = parsed.data;
+  const { mode, referenceSceneIds, maskDataUrl } = parsed.data;
   const promptOverride = parsed.data.imagePrompt;
 
   const cleanedPrompt = (promptOverride || scene.imagePrompt || scene.text)
@@ -49,7 +51,7 @@ export async function POST(
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  const imageModel = video.series.imageModel || "dall-e-3";
+  const imageModel = parsed.data.imageModel || video.series.imageModel || "dall-e-3";
 
   // Resolve series-level character images
   const rawChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
@@ -86,7 +88,21 @@ export async function POST(
   try {
     let imageUrl: string | null = null;
 
-    if (mode === "edit" && imageModel === "nano-banana-2" && scene.assetUrl) {
+    if (mode === "inpaint" && maskDataUrl && scene.assetUrl) {
+      const currentImageUrl = scene.assetUrl.startsWith("http")
+        ? scene.assetUrl
+        : await getSignedDownloadUrl(scene.assetUrl);
+
+      // Upload mask to S3 so fal.ai can access it
+      const maskBase64 = maskDataUrl.replace(/^data:image\/\w+;base64,/, "");
+      const maskBuffer = Buffer.from(maskBase64, "base64");
+      const maskKey = `scenes/${videoId}/mask_${sceneId}_${Date.now()}.png`;
+      await uploadFile(maskKey, maskBuffer, "image/png");
+      const maskPublicUrl = await getSignedDownloadUrl(maskKey);
+
+      const result = await inpaintImage(currentImageUrl, maskPublicUrl, cleanedPrompt);
+      imageUrl = result?.url ?? null;
+    } else if (mode === "edit" && imageModel === "nano-banana-2" && scene.assetUrl) {
       const currentImageUrl = scene.assetUrl.startsWith("http")
         ? scene.assetUrl
         : await getSignedDownloadUrl(scene.assetUrl);
@@ -132,9 +148,11 @@ export async function POST(
     const key = `scenes/${videoId}/preview_${sceneId}_${Date.now()}.jpg`;
     await uploadFile(key, buffer, "image/jpeg");
 
+    const modelUsed = mode === "inpaint" ? "flux-pro-fill" : imageModel;
     const updates: Record<string, unknown> = {
       assetUrl: key,
       assetType: "image",
+      modelUsed,
     };
     if (mode === "regenerate" && promptOverride) {
       updates.imagePrompt = promptOverride.replace(/@scene\d+/gi, "").trim();

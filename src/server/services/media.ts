@@ -161,6 +161,42 @@ export async function generateFluxImage(
   }
 }
 
+export async function inpaintImage(
+  imageUrl: string,
+  maskUrl: string,
+  prompt: string
+): Promise<MediaAsset | null> {
+  try {
+    const result = await fal.subscribe("fal-ai/flux-pro/v1/fill", {
+      input: {
+        prompt,
+        image_url: imageUrl,
+        mask_url: maskUrl,
+        num_images: 1,
+        output_format: "jpeg",
+        safety_tolerance: "5",
+      },
+      logs: true,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+
+    const data = result.data as { images?: Array<{ url: string; width: number; height: number }> };
+    const image = data?.images?.[0];
+    if (!image?.url) return null;
+
+    return {
+      url: image.url,
+      type: "image",
+      source: "flux",
+      width: image.width || 768,
+      height: image.height || 1344,
+    };
+  } catch (err) {
+    console.error(`Flux inpainting failed: ${err instanceof Error ? err.message : err}`);
+    throw new Error(`Inpainting failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+  }
+}
+
 export interface CharacterRef {
   url: string;
   description: string;

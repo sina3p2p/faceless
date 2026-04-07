@@ -21,6 +21,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { IMAGE_MODELS } from "@/lib/constants";
 
 interface Scene {
   id: string;
@@ -287,7 +288,6 @@ function SceneRefTextarea({
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showDropdown, setShowDropdown] = useState(false);
-  const [dropdownPos, setDropdownPos] = useState({ bottom: 0, left: 0 });
   const [atIndex, setAtIndex] = useState(-1);
 
   const availableScenes = scenes.filter(
@@ -307,7 +307,6 @@ function SceneRefTextarea({
       if (/^(scene\d*)?$/i.test(afterAt)) {
         setAtIndex(lastAt);
         setShowDropdown(true);
-        setDropdownPos({ bottom: 0, left: 0 });
         return;
       }
     }
@@ -345,7 +344,7 @@ function SceneRefTextarea({
       />
       {showDropdown && availableScenes.length > 0 && (
         <div
-          className="absolute z-[100] w-full bg-gray-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden bottom-full mb-1"
+          className="absolute z-100 w-full bg-gray-800 border border-white/10 rounded-xl shadow-2xl overflow-hidden bottom-full mb-1"
         >
           <div className="px-3 py-2 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-white/5">
             Reference a scene
@@ -382,6 +381,198 @@ function SceneRefTextarea({
   );
 }
 
+function MaskCanvas({
+  imageUrl,
+  onMaskReady,
+}: {
+  imageUrl: string;
+  onMaskReady: (dataUrl: string | null) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [brushSize, setBrushSize] = useState(30);
+  const [strokes, setStrokes] = useState<ImageData[]>([]);
+  const [imgDimensions, setImgDimensions] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const container = containerRef.current;
+      const displayW = container?.clientWidth || 400;
+      const scale = displayW / img.naturalWidth;
+      const displayH = img.naturalHeight * scale;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.style.width = `${displayW}px`;
+      canvas.style.height = `${displayH}px`;
+      setImgDimensions({ w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.src = imageUrl;
+  }, [imageUrl]);
+
+  function getPos(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  }
+
+  function saveSnapshot() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    setStrokes((prev) => [...prev, ctx.getImageData(0, 0, canvas.width, canvas.height)]);
+  }
+
+  function drawAt(x: number, y: number) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(168, 85, 247, 0.5)";
+    ctx.beginPath();
+    const scaledBrush = brushSize * (canvas.width / (containerRef.current?.clientWidth || canvas.width));
+    ctx.arc(x, y, scaledBrush / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function startDraw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    e.preventDefault();
+    saveSnapshot();
+    setDrawing(true);
+    const { x, y } = getPos(e);
+    drawAt(x, y);
+  }
+
+  function moveDraw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    if (!drawing) return;
+    e.preventDefault();
+    const { x, y } = getPos(e);
+    drawAt(x, y);
+  }
+
+  function endDraw() {
+    if (!drawing) return;
+    setDrawing(false);
+    exportMask();
+  }
+
+  function undoStroke() {
+    const canvas = canvasRef.current;
+    if (!canvas || strokes.length === 0) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const last = strokes[strokes.length - 1];
+    ctx.putImageData(last, 0, 0);
+    setStrokes((prev) => prev.slice(0, -1));
+    exportMask();
+  }
+
+  function clearCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setStrokes([]);
+    onMaskReady(null);
+  }
+
+  function exportMask() {
+    const canvas = canvasRef.current;
+    if (!canvas || imgDimensions.w === 0) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const maskCanvas = document.createElement("canvas");
+    maskCanvas.width = canvas.width;
+    maskCanvas.height = canvas.height;
+    const maskCtx = maskCanvas.getContext("2d");
+    if (!maskCtx) return;
+
+    maskCtx.fillStyle = "#000000";
+    maskCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+
+    const sourceData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const maskData = maskCtx.getImageData(0, 0, maskCanvas.width, maskCanvas.height);
+
+    for (let i = 3; i < sourceData.data.length; i += 4) {
+      if (sourceData.data[i] > 0) {
+        maskData.data[i - 3] = 255;
+        maskData.data[i - 2] = 255;
+        maskData.data[i - 1] = 255;
+      }
+    }
+    maskCtx.putImageData(maskData, 0, 0);
+    onMaskReady(maskCanvas.toDataURL("image/png"));
+  }
+
+  return (
+    <div>
+      <div ref={containerRef} className="relative rounded-lg overflow-hidden border border-white/10 mb-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt="Scene to inpaint"
+          className="w-full block"
+          draggable={false}
+        />
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 cursor-crosshair touch-none"
+          onMouseDown={startDraw}
+          onMouseMove={moveDraw}
+          onMouseUp={endDraw}
+          onMouseLeave={endDraw}
+          onTouchStart={startDraw}
+          onTouchMove={moveDraw}
+          onTouchEnd={endDraw}
+        />
+      </div>
+      <div className="flex items-center gap-3 mb-3">
+        <label className="text-xs text-gray-400 shrink-0">Brush</label>
+        <input
+          type="range"
+          min={5}
+          max={80}
+          value={brushSize}
+          onChange={(e) => setBrushSize(Number(e.target.value))}
+          className="flex-1 accent-violet-500 h-1"
+        />
+        <span className="text-xs text-gray-500 w-6 text-right">{brushSize}</span>
+        <button
+          type="button"
+          onClick={undoStroke}
+          disabled={strokes.length === 0}
+          className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 disabled:opacity-30 transition-colors"
+        >
+          Undo
+        </button>
+        <button
+          type="button"
+          onClick={clearCanvas}
+          className="px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 transition-colors"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function PromptEditModal({
   scene,
   scenes,
@@ -396,15 +587,19 @@ function PromptEditModal({
   scenes: Scene[];
   imageModel: string;
   onClose: () => void;
-  onSubmit: (prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[]) => void;
+  onSubmit: (prompt: string, mode: "regenerate" | "edit" | "inpaint", referenceSceneIds: string[], maskDataUrl?: string, modelOverride?: string) => void;
   onUndo: (() => void) | null;
   regenerating: boolean;
   undoing: boolean;
 }) {
-  const canEdit = scene.assetUrl && imageModel === "nano-banana-2";
-  const [mode, setMode] = useState<"regenerate" | "edit">("regenerate");
+  const [selectedModel, setSelectedModel] = useState(imageModel);
+  const canEdit = scene.assetUrl && selectedModel === "nano-banana-2";
+  const canInpaint = !!scene.assetUrl;
+  const [mode, setMode] = useState<"regenerate" | "edit" | "inpaint">("regenerate");
   const [regenPrompt, setRegenPrompt] = useState(scene.imagePrompt || scene.text);
   const [editInstruction, setEditInstruction] = useState("");
+  const [inpaintPrompt, setInpaintPrompt] = useState("");
+  const [maskDataUrl, setMaskDataUrl] = useState<string | null>(null);
 
   function parseSceneRefs(text: string): string[] {
     const matches = text.matchAll(/@scene(\d+)/gi);
@@ -419,9 +614,14 @@ function PromptEditModal({
   }
 
   function handleSubmit() {
+    const modelOverride = selectedModel !== imageModel ? selectedModel : undefined;
+    if (mode === "inpaint") {
+      onSubmit(inpaintPrompt, "inpaint", [], maskDataUrl || undefined, modelOverride);
+      return;
+    }
     const prompt = mode === "edit" ? editInstruction : regenPrompt;
     const refs = parseSceneRefs(prompt);
-    onSubmit(prompt, mode, refs);
+    onSubmit(prompt, mode, refs, undefined, modelOverride);
   }
 
   return (
@@ -429,10 +629,10 @@ function PromptEditModal({
       <div className="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="p-6">
           <h3 className="text-lg font-semibold text-white mb-4">
-            {mode === "edit" ? "Edit Image" : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
+            {mode === "inpaint" ? "Inpaint Area" : mode === "edit" ? "Edit Image" : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
           </h3>
 
-          {scene.assetUrl && (
+          {scene.assetUrl && mode !== "inpaint" && (
             <div className="mb-4 relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -456,8 +656,12 @@ function PromptEditModal({
             </div>
           )}
 
+          {mode === "inpaint" && scene.assetUrl && (
+            <MaskCanvas imageUrl={scene.assetUrl} onMaskReady={setMaskDataUrl} />
+          )}
+
           {/* Tabs */}
-          {canEdit && (
+          {(canEdit || canInpaint) && (
             <div className="flex gap-1 mb-4 p-1 bg-white/5 rounded-lg">
               <button
                 onClick={() => setMode("regenerate")}
@@ -469,20 +673,65 @@ function PromptEditModal({
               >
                 Regenerate
               </button>
-              <button
-                onClick={() => setMode("edit")}
-                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  mode === "edit"
-                    ? "bg-violet-600 text-white"
-                    : "text-gray-400 hover:text-white"
-                }`}
-              >
-                Edit Image
-              </button>
+              {canEdit && (
+                <button
+                  onClick={() => setMode("edit")}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    mode === "edit"
+                      ? "bg-violet-600 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Edit
+                </button>
+              )}
+              {canInpaint && (
+                <button
+                  onClick={() => setMode("inpaint")}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                    mode === "inpaint"
+                      ? "bg-violet-600 text-white"
+                      : "text-gray-400 hover:text-white"
+                  }`}
+                >
+                  Inpaint
+                </button>
+              )}
             </div>
           )}
 
-          {mode === "regenerate" ? (
+          {/* Model selector */}
+          {mode !== "inpaint" && (
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-400 mb-1.5">Image Model</label>
+              <div className="flex gap-1.5 flex-wrap">
+                {IMAGE_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedModel(m.id);
+                      if (mode === "edit" && m.id !== "nano-banana-2") setMode("regenerate");
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      selectedModel === m.id
+                        ? "bg-violet-600 text-white"
+                        : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              {selectedModel !== imageModel && (
+                <p className="text-[10px] text-amber-400/80 mt-1">
+                  Overriding series default ({IMAGE_MODELS.find((m) => m.id === imageModel)?.label || imageModel})
+                </p>
+              )}
+            </div>
+          )}
+
+          {mode === "regenerate" && (
             <>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Image Prompt</label>
               <SceneRefTextarea
@@ -500,7 +749,9 @@ function PromptEditModal({
                 )}
               </div>
             </>
-          ) : (
+          )}
+
+          {mode === "edit" && (
             <>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Edit Instruction</label>
               <SceneRefTextarea
@@ -518,6 +769,25 @@ function PromptEditModal({
             </>
           )}
 
+          {mode === "inpaint" && (
+            <>
+              <p className="text-xs text-gray-400 mb-2">
+                Paint over the area you want to change, then describe what should replace it.
+              </p>
+              <label className="block text-sm font-medium text-gray-300 mb-1.5">What to fill in</label>
+              <textarea
+                value={inpaintPrompt}
+                onChange={(e) => setInpaintPrompt(e.target.value)}
+                rows={2}
+                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white resize-y focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+                placeholder='e.g. "a golden crown" or "blue sky with clouds"'
+              />
+              <div className="mt-2 mb-4">
+                <span className="text-xs text-gray-600">{inpaintPrompt.length} chars</span>
+              </div>
+            </>
+          )}
+
           <div className="flex gap-3">
             <Button variant="ghost" onClick={onClose} className="flex-1">
               Cancel
@@ -526,10 +796,17 @@ function PromptEditModal({
               variant="primary"
               loading={regenerating}
               onClick={handleSubmit}
-              disabled={mode === "edit" && !editInstruction.trim()}
+              disabled={
+                (mode === "edit" && !editInstruction.trim()) ||
+                (mode === "inpaint" && (!maskDataUrl || !inpaintPrompt.trim()))
+              }
               className="flex-1"
             >
-              {mode === "edit" ? "Edit Image" : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
+              {mode === "inpaint"
+                ? "Inpaint"
+                : mode === "edit"
+                  ? "Edit Image"
+                  : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
             </Button>
           </div>
         </div>
@@ -633,14 +910,18 @@ export default function ReviewPage() {
   async function generateImageForScene(
     sceneId: string,
     promptOverride?: string,
-    mode: "regenerate" | "edit" = "regenerate",
-    referenceSceneIds?: string[]
+    mode: "regenerate" | "edit" | "inpaint" = "regenerate",
+    referenceSceneIds?: string[],
+    maskDataUrl?: string,
+    modelOverride?: string
   ) {
     setGeneratingSceneIds((prev) => new Set(prev).add(sceneId));
     try {
       const body: Record<string, unknown> = { mode };
       if (promptOverride) body.imagePrompt = promptOverride;
       if (referenceSceneIds && referenceSceneIds.length > 0) body.referenceSceneIds = referenceSceneIds;
+      if (maskDataUrl) body.maskDataUrl = maskDataUrl;
+      if (modelOverride) body.imageModel = modelOverride;
 
       const res = await fetch(`/api/videos/${id}/scenes/${sceneId}/generate-image`, {
         method: "POST",
@@ -680,11 +961,11 @@ export default function ReviewPage() {
     }
   }, [scenes, editingScene]);
 
-  async function handleGenerateImage(prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[]) {
+  async function handleGenerateImage(prompt: string, mode: "regenerate" | "edit" | "inpaint", referenceSceneIds: string[], maskDataUrl?: string, modelOverride?: string) {
     if (!editingScene) return;
     setPreviousAssetUrl(editingScene.assetUrl);
     setRegenerating(true);
-    await generateImageForScene(editingScene.id, prompt, mode, referenceSceneIds);
+    await generateImageForScene(editingScene.id, prompt, mode, referenceSceneIds, maskDataUrl, modelOverride);
     setRegenerating(false);
   }
 
