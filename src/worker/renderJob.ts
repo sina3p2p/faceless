@@ -151,27 +151,44 @@ type PreApproved = Map<number, { path: string; type: "video" | "image"; url: str
 
 type ScriptInput = Pick<Awaited<ReturnType<typeof generateVideoScript>>, "scenes">;
 
-async function reusePreApprovedImages(
-  scenes: Array<{ assetUrl?: string | null; assetType?: string | null }>,
+async function reusePreApprovedAssets(
+  scenes: Array<{ imageUrl?: string | null; videoUrl?: string | null; assetUrl?: string | null; assetType?: string | null }>,
   workDir: string
-): Promise<PreApproved> {
-  const result: PreApproved = new Map();
+): Promise<{ images: PreApproved; videos: PreApproved }> {
+  const images: PreApproved = new Map();
+  const videos: PreApproved = new Map();
   await Promise.all(
     scenes.map(async (scene, i) => {
-      if (!scene.assetUrl) return;
-      try {
-        const signedUrl = await getSignedDownloadUrl(scene.assetUrl);
-        const ext = scene.assetType === "video" ? "mp4" : "jpg";
-        const localPath = path.join(workDir, `media_${i}.${ext}`);
-        await downloadFile(signedUrl, localPath);
-        result.set(i, { path: localPath, type: (scene.assetType as "video" | "image") || "image", url: signedUrl });
-        console.log(`Scene ${i}: Reusing pre-approved ${scene.assetType || "image"}`);
-      } catch (err) {
-        console.warn(`Scene ${i}: Could not reuse pre-approved asset, will regenerate:`, err);
+      // Reuse existing video clip if available
+      const videoKey = scene.videoUrl;
+      if (videoKey) {
+        try {
+          const signedUrl = await getSignedDownloadUrl(videoKey);
+          const localPath = path.join(workDir, `media_${i}.mp4`);
+          await downloadFile(signedUrl, localPath);
+          videos.set(i, { path: localPath, type: "video", url: signedUrl });
+          console.log(`Scene ${i}: Reusing existing video clip`);
+        } catch (err) {
+          console.warn(`Scene ${i}: Could not reuse video, will regenerate:`, err);
+        }
+      }
+
+      // Reuse existing image (needed as input for video generation even if video is missing)
+      const imageKey = scene.imageUrl || (scene.assetType !== "video" ? scene.assetUrl : null);
+      if (imageKey) {
+        try {
+          const signedUrl = await getSignedDownloadUrl(imageKey);
+          const localPath = path.join(workDir, `img_${i}.jpg`);
+          await downloadFile(signedUrl, localPath);
+          images.set(i, { path: localPath, type: "image", url: signedUrl });
+          if (!videoKey) console.log(`Scene ${i}: Reusing existing image`);
+        } catch (err) {
+          console.warn(`Scene ${i}: Could not reuse image, will regenerate:`, err);
+        }
       }
     })
   );
-  return result;
+  return { images, videos };
 }
 
 async function fetchFacelessMediaParallel(
@@ -250,54 +267,72 @@ async function fetchAIVideoMediaParallel(
   seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null; sceneContinuity?: number; characterRefs?: CharacterRef[] },
   workDir: string,
   concurrency = 2,
-  preApproved: PreApproved = new Map()
+  preApprovedImages: PreApproved = new Map(),
+  preApprovedVideos: PreApproved = new Map()
 ): Promise<{ path: string; type: "video" | "image" }[]> {
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
   const imageModel = seriesRecord.imageModel || "dall-e-3";
   const continuity = !!seriesRecord.sceneContinuity;
   const charRefs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
 
-  // Phase 1: Generate/collect all scene images and keep their remote URLs
-  const sceneImagePaths: string[] = new Array(script.scenes.length);
+  // Scenes that already have video clips can be skipped entirely
+  const scenesNeedingVideo: number[] = [];
+  for (let i = 0; i < script.scenes.length; i++) {
+    if (preApprovedVideos.has(i)) {
+      mediaPaths[i] = preApprovedVideos.get(i)!;
+      console.log(`Scene ${i}: Skipping — already has video clip`);
+    } else {
+      scenesNeedingVideo.push(i);
+    }
+  }
+
+  if (scenesNeedingVideo.length === 0) {
+    console.log("[ai-video] All scenes already have video clips, skipping generation");
+    return mediaPaths;
+  }
+
+  console.log(`[ai-video] ${scenesNeedingVideo.length}/${script.scenes.length} scenes need video generation`);
+
+  // Phase 1: Generate/collect images for scenes that need video (+ neighbors for continuity)
   const sceneImageUrls: string[] = new Array(script.scenes.length);
+  const scenesNeedingImage = new Set<number>();
+  for (const i of scenesNeedingVideo) {
+    scenesNeedingImage.add(i);
+    if (continuity && i < script.scenes.length - 1) scenesNeedingImage.add(i + 1);
+  }
+
+  const imgList = Array.from(scenesNeedingImage).sort((a, b) => a - b);
   const imgChunks: number[][] = [];
-  for (let i = 0; i < script.scenes.length; i += concurrency) {
-    imgChunks.push(
-      Array.from({ length: Math.min(concurrency, script.scenes.length - i) }, (_, j) => i + j)
-    );
+  for (let j = 0; j < imgList.length; j += concurrency) {
+    imgChunks.push(imgList.slice(j, j + concurrency));
   }
 
   for (const chunk of imgChunks) {
     await Promise.all(
       chunk.map(async (i) => {
+        if (sceneImageUrls[i]) return;
         const scene = script.scenes[i];
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
         const imagePath = path.join(workDir, `ai_img_${i}.jpg`);
 
-        if (preApproved.has(i)) {
-          const approved = preApproved.get(i)!;
-          if (approved.type === "image") {
-            await fs.copyFile(approved.path, imagePath);
-            sceneImageUrls[i] = approved.url;
-            console.log(`Scene ${i}: Using pre-approved image`);
-          }
+        if (preApprovedImages.has(i)) {
+          const approved = preApprovedImages.get(i)!;
+          await fs.copyFile(approved.path, imagePath);
+          sceneImageUrls[i] = approved.url;
+          console.log(`Scene ${i}: Using existing image`);
         } else {
           const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, charRefs);
           sceneImageUrls[i] = generatedImage.url;
           await downloadFile(generatedImage.url, imagePath);
         }
-
-        sceneImagePaths[i] = imagePath;
       })
     );
   }
 
-  // Phase 2: Generate video clips (pass image URLs directly to fal.ai — no re-upload needed)
+  // Phase 2: Generate video clips only for scenes that need them
   const vidChunks: number[][] = [];
-  for (let i = 0; i < script.scenes.length; i += concurrency) {
-    vidChunks.push(
-      Array.from({ length: Math.min(concurrency, script.scenes.length - i) }, (_, j) => i + j)
-    );
+  for (let j = 0; j < scenesNeedingVideo.length; j += concurrency) {
+    vidChunks.push(scenesNeedingVideo.slice(j, j + concurrency));
   }
 
   for (const chunk of vidChunks) {
@@ -482,13 +517,13 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
       })),
     };
 
-    const preApproved = await reusePreApprovedImages(existingScenes, workDir);
+    const { images: preImages, videos: preVideos } = await reusePreApprovedAssets(existingScenes, workDir);
 
     let mediaPaths: { path: string; type: "video" | "image" }[];
     if (videoType === "ai_video") {
-      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preApproved);
+      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preImages, preVideos);
     } else {
-      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preApproved);
+      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preImages);
     }
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 60);
@@ -1178,7 +1213,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 40);
 
-    const preApproved = await reusePreApprovedImages(existingScenes, workDir);
+    const { images: preImages, videos: preVideos } = await reusePreApprovedAssets(existingScenes, workDir);
 
     const sceneScript = {
       scenes: existingScenes.map((s, i) => ({
@@ -1192,9 +1227,9 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
 
     let mediaPaths: { path: string; type: "video" | "image" }[];
     if (seriesRecord.videoModel && seriesRecord.videoModel !== "none") {
-      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preApproved);
+      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preImages, preVideos);
     } else {
-      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preApproved);
+      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preImages);
     }
 
     await job.updateProgress(65);
