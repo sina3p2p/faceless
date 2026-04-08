@@ -607,10 +607,10 @@ function PromptEditModal({
     return [...new Set(ids)];
   }
 
-  function createFullWhiteMaskDataUrl(): string {
+  function createFullWhiteMaskDataUrl(width: number, height: number): string {
     const c = document.createElement("canvas");
-    c.width = 1024;
-    c.height = 1792;
+    c.width = width;
+    c.height = height;
     const ctx = c.getContext("2d")!;
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, c.width, c.height);
@@ -624,9 +624,19 @@ function PromptEditModal({
       return;
     }
     if (mode === "edit" && selectedModel !== "nano-banana-2") {
-      const whiteMask = createFullWhiteMaskDataUrl();
-      const editPrompt = `${editInstruction}. Keep the original scene's composition and layout. Only modify what was explicitly requested.`;
-      onSubmit(editPrompt, "inpaint", [], whiteMask, modelOverride);
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const whiteMask = createFullWhiteMaskDataUrl(img.naturalWidth, img.naturalHeight);
+        const editPrompt = `${editInstruction}. Keep the original scene's composition and layout. Only modify what was explicitly requested.`;
+        onSubmit(editPrompt, "inpaint", [], whiteMask, modelOverride);
+      };
+      img.onerror = () => {
+        const whiteMask = createFullWhiteMaskDataUrl(1024, 1024);
+        const editPrompt = `${editInstruction}. Keep the original scene's composition and layout. Only modify what was explicitly requested.`;
+        onSubmit(editPrompt, "inpaint", [], whiteMask, modelOverride);
+      };
+      img.src = scene.assetUrl || "";
       return;
     }
     const prompt = mode === "edit" ? editInstruction : regenPrompt;

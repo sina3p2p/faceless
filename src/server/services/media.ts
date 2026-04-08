@@ -167,6 +167,8 @@ export async function inpaintImage(
   prompt: string
 ): Promise<MediaAsset | null> {
   try {
+    console.log(`[inpaint] Starting: image=${imageUrl.slice(0, 80)}... mask=${maskUrl.slice(0, 80)}... prompt="${prompt.slice(0, 100)}"`);
+
     const result = await fal.subscribe("fal-ai/flux-pro/v1/fill", {
       input: {
         prompt,
@@ -174,7 +176,7 @@ export async function inpaintImage(
         mask_url: maskUrl,
         num_images: 1,
         output_format: "jpeg",
-        safety_tolerance: "5",
+        safety_tolerance: 5,
       },
       logs: true,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -192,8 +194,10 @@ export async function inpaintImage(
       height: image.height || 1344,
     };
   } catch (err) {
-    console.error(`Flux inpainting failed: ${err instanceof Error ? err.message : err}`);
-    throw new Error(`Inpainting failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const detail = (err as any)?.body?.detail ?? (err as any)?.message ?? err;
+    console.error(`Flux inpainting failed:`, JSON.stringify(detail, null, 2));
+    throw new Error(`Inpainting failed: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
   }
 }
 
