@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, inArray } from "drizzle-orm";
-import { generateImage, generateKlingImage, generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
+import { generateImage, generateKlingImage, editKlingImage, generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod";
 
@@ -45,10 +45,14 @@ export async function POST(
   const { mode, referenceSceneIds } = parsed.data;
   const promptOverride = parsed.data.imagePrompt;
 
-  const cleanedPrompt = (promptOverride || scene.imagePrompt || scene.text)
+  const userInstruction = (promptOverride || "")
     .replace(/@scene\d+/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+
+  const cleanedPrompt = mode === "edit"
+    ? (scene.imagePrompt || scene.text) + (userInstruction ? `. ${userInstruction}` : "")
+    : (userInstruction || scene.imagePrompt || scene.text);
 
   const imageModel = parsed.data.imageModel || video.series.imageModel || "dall-e-3";
 
@@ -92,8 +96,8 @@ export async function POST(
         ? scene.assetUrl
         : await getSignedDownloadUrl(scene.assetUrl);
 
-      const editPrompt = `${cleanedPrompt}. Keep the original scene's composition and layout. Only modify what was explicitly requested.`;
-      const result = await generateKlingImage(editPrompt, currentImageUrl, charRefs.length > 0 ? charRefs : undefined);
+      const allRefs = [...sceneRefs, ...charRefs];
+      const result = await editKlingImage(cleanedPrompt, currentImageUrl, allRefs.length > 0 ? allRefs : undefined);
       imageUrl = result?.url ?? null;
     } else if (mode === "edit" && imageModel === "nano-banana-2" && scene.assetUrl) {
       const currentImageUrl = scene.assetUrl.startsWith("http")
