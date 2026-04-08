@@ -46,9 +46,10 @@ export default function DashboardPage() {
     switch (status) {
       case "COMPLETED": return "success";
       case "FAILED": return "danger";
-      case "RENDERING":
-      case "GENERATING_SCRIPT":
-      case "GENERATING_ASSETS": return "warning";
+      case "SCRIPT":
+      case "IMAGE_GENERATION":
+      case "VIDEO_GENERATION":
+      case "RENDERING": return "warning";
       default: return "default";
     }
   };

@@ -843,6 +843,7 @@ export default function ReviewPage() {
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
   const [chatOpen, setChatOpen] = useState(false);
+  const generatingAllRef = useRef(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -953,18 +954,63 @@ export default function ReviewPage() {
     }
   }
 
+  async function updateVideoStatus(status: string) {
+    await fetch(`/api/videos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setVideo((prev) => prev ? { ...prev, status } : prev);
+  }
+
   async function handleGenerateAllImages(regenerateExisting = false) {
     setGeneratingAll(true);
+    generatingAllRef.current = true;
+    if (video?.status === "REVIEW_SCRIPT" || video?.status === "IMAGE_REVIEW") {
+      await updateVideoStatus("IMAGE_GENERATION");
+    }
+
     const target = regenerateExisting
       ? scenes
       : scenes.filter((s) => !s.assetUrl);
 
-    await Promise.all(
-      target.map((s) => generateImageForScene(s.id))
-    );
+    for (const s of target) {
+      if (!generatingAllRef.current) break;
+      await generateImageForScene(s.id);
+    }
 
+    await updateVideoStatus("IMAGE_REVIEW");
+    generatingAllRef.current = false;
     setGeneratingAll(false);
   }
+
+  // Resume image generation if it was in progress when the user left the page
+  const resumedRef = useRef(false);
+  useEffect(() => {
+    if (loading || scenes.length === 0 || resumedRef.current || generatingAllRef.current) return;
+    if (video?.status !== "IMAGE_GENERATION") return;
+
+    const missing = scenes.filter((s) => !s.assetUrl);
+    if (missing.length === 0) {
+      updateVideoStatus("IMAGE_REVIEW");
+      return;
+    }
+
+    resumedRef.current = true;
+    setGeneratingAll(true);
+    generatingAllRef.current = true;
+
+    (async () => {
+      for (const s of missing) {
+        if (!generatingAllRef.current) break;
+        await generateImageForScene(s.id);
+      }
+      await updateVideoStatus("IMAGE_REVIEW");
+      generatingAllRef.current = false;
+      setGeneratingAll(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, scenes]);
 
   useEffect(() => {
     if (editingScene) {
@@ -1095,12 +1141,15 @@ export default function ReviewPage() {
               <span className="text-gray-500">Duration:</span>{" "}
               <span className="text-white font-medium font-mono">{totalDuration.toFixed(1)}s</span>
             </div>
-            {someImagesGenerated && (
-              <div>
+            {(someImagesGenerated || generatingAll) && (
+              <div className="flex items-center gap-1.5">
                 <span className="text-gray-500">Images:</span>{" "}
                 <span className="text-white font-medium">
                   {scenes.filter((s) => s.assetUrl).length}/{scenes.length}
                 </span>
+                {generatingAll && (
+                  <div className="animate-spin w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full ml-1" />
+                )}
               </div>
             )}
           </div>

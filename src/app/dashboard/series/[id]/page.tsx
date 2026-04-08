@@ -67,7 +67,7 @@ export default function SeriesDetailPage() {
   useEffect(() => {
     if (!series) return;
     const hasActive = series.videoProjects.some(
-      (v) => !["COMPLETED", "FAILED", "REVIEW", "CANCELLED"].includes(v.status)
+      (v) => !["COMPLETED", "FAILED", "REVIEW_SCRIPT", "IMAGE_REVIEW", "CANCELLED"].includes(v.status)
     );
     if (!hasActive) return;
     const interval = setInterval(loadSeries, 3000);
@@ -95,18 +95,21 @@ export default function SeriesDetailPage() {
     });
 
     if (res.ok) {
-      loadSeries();
+      const video = await res.json();
+      router.push(`/dashboard/videos/${video.id}`);
+    } else {
+      setGenerating(false);
     }
-    setGenerating(false);
   }
 
   async function handleRetry(videoId: string) {
     setRetryingId(videoId);
     const res = await fetch(`/api/videos/${videoId}/retry`, { method: "POST" });
     if (res.ok) {
-      loadSeries();
+      router.push(`/dashboard/videos/${videoId}`);
+    } else {
+      setRetryingId(null);
     }
-    setRetryingId(null);
   }
 
   async function handleCancel(videoId: string) {
@@ -129,12 +132,14 @@ export default function SeriesDetailPage() {
   const statusVariant = (status: string) => {
     switch (status) {
       case "COMPLETED": return "success" as const;
-      case "FAILED": return "danger" as const;
+      case "FAILED":
       case "CANCELLED": return "danger" as const;
-      case "REVIEW": return "default" as const;
-      case "RENDERING":
-      case "GENERATING_SCRIPT":
-      case "GENERATING_ASSETS": return "warning" as const;
+      case "REVIEW_SCRIPT":
+      case "IMAGE_REVIEW": return "default" as const;
+      case "SCRIPT":
+      case "IMAGE_GENERATION":
+      case "VIDEO_GENERATION":
+      case "RENDERING": return "warning" as const;
       default: return "default" as const;
     }
   };
@@ -287,7 +292,7 @@ export default function SeriesDetailPage() {
                           </Button>
                         </div>
                       )}
-                    {video.status === "REVIEW" && (
+                    {(video.status === "REVIEW_SCRIPT" || video.status === "IMAGE_REVIEW" || video.status === "IMAGE_GENERATION") && (
                       <Button
                         size="sm"
                         variant="primary"
@@ -296,7 +301,7 @@ export default function SeriesDetailPage() {
                           router.push(`/dashboard/videos/${video.id}/review`);
                         }}
                       >
-                        Review Script
+                        {video.status === "REVIEW_SCRIPT" ? "Review Script" : video.status === "IMAGE_GENERATION" ? "View Progress" : "Review Images"}
                       </Button>
                     )}
                     {(video.status === "FAILED" || video.status === "CANCELLED") && (

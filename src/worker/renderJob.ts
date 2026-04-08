@@ -380,7 +380,7 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
     const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 45;
 
     console.log(`Script generation starting for series=${seriesId}, targetDuration=${targetDuration}s`);
-    await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
+    await updateVideoStatus(videoProjectId, "SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
 
@@ -425,7 +425,7 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
       });
     }
 
-    await updateVideoStatus(videoProjectId, "REVIEW");
+    await updateVideoStatus(videoProjectId, "REVIEW_SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
     await job.updateProgress(100);
 
@@ -477,7 +477,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
 
     console.log(`Render from scenes starting: type=${videoType}, ${existingScenes.length} scenes`);
 
-    await updateVideoStatus(videoProjectId, "GENERATING_ASSETS");
+    await updateVideoStatus(videoProjectId, "VIDEO_GENERATION");
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 10);
     await job.updateProgress(10);
 
@@ -649,7 +649,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     console.log(`Render job starting: type=${videoType}, series=${seriesId}, targetDuration=${targetDuration}s`);
 
     // Step 1: Generate Script
-    await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
+    await updateVideoStatus(videoProjectId, "SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
 
@@ -697,7 +697,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     await job.updateProgress(25);
 
     // Step 2 + 3: Generate TTS and Media in parallel
-    await updateVideoStatus(videoProjectId, "GENERATING_ASSETS");
+    await updateVideoStatus(videoProjectId, "IMAGE_GENERATION");
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 30);
     await job.updateProgress(30);
 
@@ -755,6 +755,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     await job.updateProgress(73);
 
     // Step 4: Compose Video with word-synced captions
+    await updateVideoStatus(videoProjectId, "VIDEO_GENERATION");
     await updateVideoStatus(videoProjectId, "RENDERING");
     await updateJobStep(videoProjectId, "COMPOSE", "ACTIVE", 75);
     await job.updateProgress(75);
@@ -903,7 +904,7 @@ export async function generateMusicScriptJob(job: Job<RenderJobData>) {
     const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 60;
 
     console.log(`Music script generation starting for series=${seriesId}, targetDuration=${targetDuration}s`);
-    await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
+    await updateVideoStatus(videoProjectId, "SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
 
@@ -948,7 +949,7 @@ export async function generateMusicScriptJob(job: Job<RenderJobData>) {
       });
     }
 
-    await updateVideoStatus(videoProjectId, "REVIEW");
+    await updateVideoStatus(videoProjectId, "REVIEW_SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
     await job.updateProgress(100);
 
@@ -992,7 +993,7 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
     });
 
     console.log(`Standalone script generation starting: prompt="${prompt.slice(0, 80)}...", targetDuration=${targetDuration}s`);
-    await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
+    await updateVideoStatus(videoProjectId, "SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
 
@@ -1028,7 +1029,7 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
       });
     }
 
-    await updateVideoStatus(videoProjectId, "REVIEW");
+    await updateVideoStatus(videoProjectId, "REVIEW_SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
     await job.updateProgress(100);
 
@@ -1071,7 +1072,7 @@ export async function generateStandaloneMusicScriptJob(job: Job<RenderJobData>) 
     });
 
     console.log(`Standalone music script generation starting: prompt="${prompt.slice(0, 80)}...", targetDuration=${targetDuration}s`);
-    await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
+    await updateVideoStatus(videoProjectId, "SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
 
@@ -1107,7 +1108,7 @@ export async function generateStandaloneMusicScriptJob(job: Job<RenderJobData>) 
       });
     }
 
-    await updateVideoStatus(videoProjectId, "REVIEW");
+    await updateVideoStatus(videoProjectId, "REVIEW_SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
     await job.updateProgress(100);
 
@@ -1160,7 +1161,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
 
     console.log(`Music video render starting: ${existingScenes.length} sections, targetDuration=${targetDuration}s`);
 
-    await updateVideoStatus(videoProjectId, "GENERATING_ASSETS");
+    await updateVideoStatus(videoProjectId, "VIDEO_GENERATION");
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 10);
     await job.updateProgress(10);
 

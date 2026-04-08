@@ -120,7 +120,7 @@ export default function VideoDetailPage() {
 
   useEffect(() => {
     if (!video) return;
-    if (["COMPLETED", "FAILED", "REVIEW"].includes(video.status)) return;
+    if (["COMPLETED", "FAILED", "REVIEW_SCRIPT", "IMAGE_REVIEW"].includes(video.status)) return;
     const interval = setInterval(loadVideo, 3000);
     return () => clearInterval(interval);
   }, [video, loadVideo]);
@@ -218,10 +218,12 @@ export default function VideoDetailPage() {
     switch (status) {
       case "COMPLETED": return "success" as const;
       case "FAILED": return "danger" as const;
-      case "REVIEW": return "default" as const;
-      case "RENDERING":
-      case "GENERATING_SCRIPT":
-      case "GENERATING_ASSETS": return "warning" as const;
+      case "REVIEW_SCRIPT":
+      case "IMAGE_REVIEW": return "default" as const;
+      case "SCRIPT":
+      case "IMAGE_GENERATION":
+      case "VIDEO_GENERATION":
+      case "RENDERING": return "warning" as const;
       default: return "default" as const;
     }
   };
@@ -253,7 +255,7 @@ export default function VideoDetailPage() {
       </div>
 
       {/* Review prompt */}
-      {video.status === "REVIEW" && (
+      {video.status === "REVIEW_SCRIPT" && (
         <Card className="mb-8 border-violet-500/30">
           <CardContent className="py-6 text-center">
             <p className="text-gray-300 mb-4">
@@ -266,8 +268,36 @@ export default function VideoDetailPage() {
         </Card>
       )}
 
+      {/* Image review prompt */}
+      {video.status === "IMAGE_REVIEW" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">
+              Preview images are ready! Review, edit, and approve them before generating the video.
+            </p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review Images
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Image generation in progress */}
+      {video.status === "IMAGE_GENERATION" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">
+              Preview images are being generated. You can check progress on the review page.
+            </p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              View Progress
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Progress */}
-      {job && !["COMPLETED", "FAILED", "REVIEW"].includes(video.status) && (
+      {job && !["COMPLETED", "FAILED", "REVIEW_SCRIPT", "IMAGE_REVIEW", "IMAGE_GENERATION"].includes(video.status) && (
         <Card className="mb-8">
           <CardContent className="py-6">
             <div className="flex items-center justify-between mb-3">

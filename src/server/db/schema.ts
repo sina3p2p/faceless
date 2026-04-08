@@ -17,9 +17,11 @@ export const planTierEnum = pgEnum("plan_tier", ["FREE", "STARTER", "PRO"]);
 
 export const videoStatusEnum = pgEnum("video_status", [
   "PENDING",
-  "GENERATING_SCRIPT",
-  "REVIEW",
-  "GENERATING_ASSETS",
+  "SCRIPT",
+  "REVIEW_SCRIPT",
+  "IMAGE_GENERATION",
+  "IMAGE_REVIEW",
+  "VIDEO_GENERATION",
   "RENDERING",
   "COMPLETED",
   "FAILED",

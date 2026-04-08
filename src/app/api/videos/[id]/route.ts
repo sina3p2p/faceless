@@ -40,8 +40,15 @@ export async function GET(
   });
 }
 
+const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
+  REVIEW_SCRIPT: ["IMAGE_GENERATION"],
+  IMAGE_GENERATION: ["IMAGE_REVIEW"],
+  IMAGE_REVIEW: ["IMAGE_GENERATION", "VIDEO_GENERATION"],
+};
+
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
+  status: z.enum(["IMAGE_GENERATION", "IMAGE_REVIEW", "VIDEO_GENERATION"]).optional(),
 });
 
 export async function PATCH(
@@ -66,6 +73,13 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   if (parsed.data.title !== undefined) updates.title = parsed.data.title;
+  if (parsed.data.status !== undefined) {
+    const allowed = ALLOWED_STATUS_TRANSITIONS[video.status];
+    if (!allowed || !allowed.includes(parsed.data.status)) {
+      return badRequest(`Cannot transition from "${video.status}" to "${parsed.data.status}"`);
+    }
+    updates.status = parsed.data.status;
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ ok: true });

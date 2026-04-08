@@ -199,7 +199,7 @@ export async function generateNanoBananaImage(
       output_format: "jpeg",
       resolution: "1K",
       num_images: 1,
-      safety_tolerance: "5",
+      safety_tolerance: "6",
     };
 
     if (hasRefs) {

@@ -30,7 +30,7 @@ export async function POST(
 
   await db
     .update(videoProjects)
-    .set({ status: "GENERATING_ASSETS" })
+    .set({ status: "VIDEO_GENERATION" })
     .where(eq(videoProjects.id, id));
 
   await db
@@ -53,5 +53,5 @@ export async function POST(
     userId: user.id,
   });
 
-  return NextResponse.json({ success: true, status: "GENERATING_ASSETS" });
+  return NextResponse.json({ success: true, status: "VIDEO_GENERATION" });
 }
