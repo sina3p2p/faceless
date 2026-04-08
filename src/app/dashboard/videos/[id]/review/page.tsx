@@ -843,8 +843,6 @@ export default function ReviewPage() {
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
   const [chatOpen, setChatOpen] = useState(false);
-  const generatingAllRef = useRef(false);
-
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -965,52 +963,30 @@ export default function ReviewPage() {
 
   async function handleGenerateAllImages(regenerateExisting = false) {
     setGeneratingAll(true);
-    generatingAllRef.current = true;
-    if (video?.status === "REVIEW_SCRIPT" || video?.status === "IMAGE_REVIEW") {
-      await updateVideoStatus("IMAGE_GENERATION");
+    try {
+      await fetch(`/api/videos/${id}/generate-images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regenerateExisting }),
+      });
+      setVideo((prev) => prev ? { ...prev, status: "IMAGE_GENERATION" } : prev);
+    } catch {
+      setGeneratingAll(false);
     }
-
-    const target = regenerateExisting
-      ? scenes
-      : scenes.filter((s) => !s.assetUrl);
-
-    for (const s of target) {
-      if (!generatingAllRef.current) break;
-      await generateImageForScene(s.id);
-    }
-
-    await updateVideoStatus("IMAGE_REVIEW");
-    generatingAllRef.current = false;
-    setGeneratingAll(false);
   }
 
-  // Resume image generation if it was in progress when the user left the page
-  const resumedRef = useRef(false);
+  // Poll for image progress while the worker is generating images
   useEffect(() => {
-    if (loading || scenes.length === 0 || resumedRef.current || generatingAllRef.current) return;
-    if (video?.status !== "IMAGE_GENERATION") return;
+    const isGenerating = video?.status === "IMAGE_GENERATION";
+    setGeneratingAll(isGenerating ?? false);
+    if (!isGenerating) return;
 
-    const missing = scenes.filter((s) => !s.assetUrl);
-    if (missing.length === 0) {
-      updateVideoStatus("IMAGE_REVIEW");
-      return;
-    }
+    const interval = setInterval(async () => {
+      await loadData();
+    }, 3000);
 
-    resumedRef.current = true;
-    setGeneratingAll(true);
-    generatingAllRef.current = true;
-
-    (async () => {
-      for (const s of missing) {
-        if (!generatingAllRef.current) break;
-        await generateImageForScene(s.id);
-      }
-      await updateVideoStatus("IMAGE_REVIEW");
-      generatingAllRef.current = false;
-      setGeneratingAll(false);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, scenes]);
+    return () => clearInterval(interval);
+  }, [video?.status, loadData]);
 
   useEffect(() => {
     if (editingScene) {
