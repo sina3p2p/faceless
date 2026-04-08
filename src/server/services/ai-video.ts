@@ -9,10 +9,26 @@ fal.config({
 
 const T2V_MODEL = AI_VIDEO.t2vModel;
 
-function resolveI2VModelId(videoModelKey?: string): string {
+function resolveModel(videoModelKey?: string) {
   const key = videoModelKey || DEFAULT_VIDEO_MODEL;
   const entry = VIDEO_MODELS.find((m) => m.id === key);
-  return entry?.modelId ?? AI_VIDEO.defaultI2vModel;
+  return {
+    modelId: entry?.modelId ?? AI_VIDEO.defaultI2vModel,
+    durations: entry?.durations ?? [5, 10],
+  };
+}
+
+/**
+ * Pick the best API duration for the requested scene duration.
+ * If the model supports the exact value, use it.
+ * Otherwise pick the closest supported value that is >= requested (so the
+ * composer can trim rather than stretch). Falls back to the largest available.
+ */
+function pickBestDuration(requested: number, supported: readonly number[]): number {
+  if (supported.includes(requested)) return requested;
+  const candidates = supported.filter((d) => d >= requested);
+  if (candidates.length > 0) return Math.min(...candidates);
+  return Math.max(...supported);
 }
 
 interface VideoResult {
@@ -23,15 +39,16 @@ interface VideoResult {
 export async function generateVideoFromImage(
   imageUrl: string,
   prompt: string,
-  duration: "5" | "10" = "5",
+  desiredDuration: number = 5,
   videoModelKey?: string,
   endImageUrl?: string,
 ): Promise<VideoResult> {
-  const modelId = resolveI2VModelId(videoModelKey);
+  const { modelId, durations } = resolveModel(videoModelKey);
+  const apiDuration = pickBestDuration(desiredDuration, durations);
 
   const input: Record<string, unknown> = {
     prompt,
-    duration,
+    duration: String(apiDuration),
   };
 
   if (modelId.includes("kling-video/v3") || modelId.includes("kling-video/o3")) {
@@ -45,7 +62,7 @@ export async function generateVideoFromImage(
     input.image_url = imageUrl;
   }
 
-  console.log(`[ai-video] fal.subscribe(${modelId}) input:`, JSON.stringify(input));
+  console.log(`[ai-video] fal.subscribe(${modelId}) desired=${desiredDuration}s api=${apiDuration}s input:`, JSON.stringify(input));
 
   const result = await fal.subscribe(modelId, {
     input,
@@ -67,18 +84,19 @@ export async function generateVideoFromImage(
 
   return {
     videoUrl: data.video.url,
-    durationSeconds: parseInt(duration),
+    durationSeconds: apiDuration,
   };
 }
 
 export async function generateVideoFromText(
   prompt: string,
-  duration: "5" | "10" = "5"
+  duration: number = 5
 ): Promise<VideoResult> {
+  const apiDuration = [5, 10].includes(duration) ? duration : (duration > 7 ? 10 : 5);
   const result = await fal.subscribe(T2V_MODEL, {
     input: {
       prompt,
-      duration,
+      duration: String(apiDuration) as "5" | "10",
       aspect_ratio: "9:16" as const,
       resolution: "1080p" as const,
     },
@@ -99,20 +117,20 @@ export async function generateVideoFromText(
 
   return {
     videoUrl: data.video.url,
-    durationSeconds: parseInt(duration),
+    durationSeconds: apiDuration,
   };
 }
 
 export async function getAIVideoForScene(
   imageUrl: string,
   prompt: string,
-  duration: "5" | "10" = "5",
+  desiredDuration: number = 5,
   videoModelKey?: string,
   endImageUrl?: string,
 ): Promise<VideoResult> {
   const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
-  console.log(`[ai-video] Trying image-to-video (${modelLabel})${endImageUrl ? " with end frame" : ""} for: "${prompt.slice(0, 60)}..."`);
-  return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey, endImageUrl);
+  console.log(`[ai-video] Trying image-to-video (${modelLabel}) desired=${desiredDuration}s${endImageUrl ? " with end frame" : ""} for: "${prompt.slice(0, 60)}..."`);
+  return await generateVideoFromImage(imageUrl, prompt, desiredDuration, videoModelKey, endImageUrl);
 }
 
 export async function downloadAIVideo(

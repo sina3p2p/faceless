@@ -84,7 +84,7 @@ export default function VideoDetailPage() {
   const [regenScene, setRegenScene] = useState<Scene | null>(null);
   const [regenPrompt, setRegenPrompt] = useState("");
   const [regenModel, setRegenModel] = useState("");
-  const [regenDuration, setRegenDuration] = useState<"5" | "10">("5");
+  const [regenDuration, setRegenDuration] = useState<number>(5);
   const [regenerating, setRegenerating] = useState(false);
   const [regenError, setRegenError] = useState<string | null>(null);
 
@@ -595,7 +595,7 @@ export default function VideoDetailPage() {
                             setRegenScene(scene);
                             setRegenPrompt(scene.visualDescription || scene.text);
                             setRegenModel(video.series.videoModel || "");
-                            setRegenDuration("5");
+                            setRegenDuration(Math.max(3, Math.round(scene.duration || 5)));
                             setRegenError(null);
                           }}
                           className="text-xs text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
@@ -685,23 +685,22 @@ export default function VideoDetailPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Duration
+                  Duration: <span className="text-violet-400 font-mono">{regenDuration}s</span>
                 </label>
-                <div className="flex gap-2">
-                  {(["5", "10"] as const).map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => setRegenDuration(d)}
-                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                        regenDuration === d
-                          ? "bg-violet-600 text-white"
-                          : "bg-white/5 text-gray-400 hover:bg-white/10 border border-white/10"
-                      }`}
-                    >
-                      {d}s
-                    </button>
-                  ))}
+                <input
+                  type="range"
+                  min={3}
+                  max={15}
+                  step={1}
+                  value={regenDuration}
+                  onChange={(e) => setRegenDuration(Number(e.target.value))}
+                  className="w-full accent-violet-500"
+                />
+                <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+                  <span>3s</span>
+                  <span>5s</span>
+                  <span>10s</span>
+                  <span>15s</span>
                 </div>
               </div>
 

@@ -10,7 +10,7 @@ import { z } from "zod";
 const bodySchema = z.object({
   visualDescription: z.string().optional(),
   videoModel: z.string().optional(),
-  duration: z.enum(["5", "10"]).default("5"),
+  duration: z.number().min(3).max(15).default(5),
 });
 
 export async function POST(

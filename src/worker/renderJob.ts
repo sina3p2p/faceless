@@ -11,7 +11,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and, ne, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
-import { DATABASE } from "@/lib/constants";
+import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
 import { generateVideoScript, generateMusicScript, generateStandaloneScript, generateStandaloneMusicScript, type MusicScript } from "@/server/services/llm";
 import { generateSong, transcribeSong, alignLyricsToTranscription, type AlignedSection } from "@/server/services/music";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
@@ -56,6 +56,11 @@ async function insertSceneMedia(
     modelUsed: modelUsed ?? undefined,
     metadata: metadata ?? undefined,
   });
+}
+
+function getModelDurations(videoModel?: string | null): number[] | undefined {
+  const entry = VIDEO_MODELS.find((m) => m.id === (videoModel || DEFAULT_VIDEO_MODEL));
+  return entry?.durations as number[] | undefined;
 }
 
 async function getPreviousTopics(seriesId: string, currentVideoId: string): Promise<string[]> {
@@ -310,17 +315,15 @@ async function fetchAIVideoMediaParallel(
         const scene = script.scenes[i];
         const videoPrompt = `${scene.visualDescription}. Cinematic, ${seriesRecord.style} style, smooth camera motion, dramatic lighting.`;
         const videoModelKey = seriesRecord.videoModel || undefined;
-        // Use 10s clip only when section > 10s (avoids >2x slow-motion)
-        // For sections 5-10s, a 5s clip with mild slow-down looks natural
-        const clipDuration: "5" | "10" = scene.duration > 10 ? "10" : "5";
+        const desiredDuration = Math.max(3, Math.round(scene.duration));
 
         const startImageUrl = falImageUrls[i];
         const endImageUrl = continuity && i < script.scenes.length - 1
           ? falImageUrls[i + 1]
           : undefined;
 
-        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"})${endImageUrl ? " → scene " + (i + 1) : ""}...`);
-        const videoResult = await getAIVideoForScene(startImageUrl, videoPrompt, clipDuration, videoModelKey, endImageUrl);
+        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"}, desired=${desiredDuration}s)${endImageUrl ? " → scene " + (i + 1) : ""}...`);
+        const videoResult = await getAIVideoForScene(startImageUrl, videoPrompt, desiredDuration, videoModelKey, endImageUrl);
 
         const videoPath = path.join(workDir, `media_${i}.mp4`);
         await downloadAIVideo(videoResult.videoUrl, videoPath);
@@ -371,7 +374,8 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
       seriesRecord.llmModel || undefined,
       !!seriesRecord.sceneContinuity,
       previousTopics,
-      seriesRecord.language || "en"
+      seriesRecord.language || "en",
+      getModelDurations(seriesRecord.videoModel)
     );
 
     await db
@@ -639,7 +643,8 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       seriesRecord.llmModel || undefined,
       !!seriesRecord.sceneContinuity,
       previousTopics,
-      seriesRecord.language || "en"
+      seriesRecord.language || "en",
+      getModelDurations(seriesRecord.videoModel)
     );
 
     await db
@@ -891,7 +896,8 @@ export async function generateMusicScriptJob(job: Job<RenderJobData>) {
       targetDuration,
       seriesRecord.llmModel || undefined,
       previousTopics,
-      seriesRecord.language || "en"
+      seriesRecord.language || "en",
+      getModelDurations(seriesRecord.videoModel)
     );
 
     await db
@@ -971,7 +977,8 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
       targetDuration,
       seriesRecord.llmModel || undefined,
       !!seriesRecord.sceneContinuity,
-      seriesRecord.language || "en"
+      seriesRecord.language || "en",
+      getModelDurations(seriesRecord.videoModel)
     );
 
     await db
@@ -1048,7 +1055,8 @@ export async function generateStandaloneMusicScriptJob(job: Job<RenderJobData>) 
       characters,
       targetDuration,
       seriesRecord.llmModel || undefined,
-      seriesRecord.language || "en"
+      seriesRecord.language || "en",
+      getModelDurations(seriesRecord.videoModel)
     );
 
     await db
@@ -1172,8 +1180,8 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
           return sectionsForMusic.map((s) => Math.round((s.durationMs * scale) / 1000));
         })();
 
-    const estimatedCost = actualDurationsSec.reduce((sum, dur) => sum + (dur > 10 ? 0.84 : 0.42), 0);
-    console.log(`[music] Section durations (from ${alignedSections ? "Whisper" : "proportional"}): ${actualDurationsSec.map((d, i) => `S${i}=${d}s${d > 10 ? "→10s" : "→5s"}`).join(", ")} | est. video cost: $${estimatedCost.toFixed(2)}`);
+    const estimatedCost = actualDurationsSec.reduce((sum, dur) => sum + dur * 0.14, 0);
+    console.log(`[music] Section durations (from ${alignedSections ? "Whisper" : "proportional"}): ${actualDurationsSec.map((d, i) => `S${i}=${d}s`).join(", ")} | est. video cost: $${estimatedCost.toFixed(2)}`);
 
     await job.updateProgress(35);
 

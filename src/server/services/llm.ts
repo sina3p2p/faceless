@@ -175,6 +175,51 @@ export async function generateText(
   return text;
 }
 
+// ── Duration Instruction Helpers ──
+
+function buildDurationInstruction(targetDuration: number, durations?: number[]): string {
+  if (!durations || durations.length === 0) {
+    return `- Total duration should be ${targetDuration} seconds\n- Aim for 5-7 scenes`;
+  }
+  const min = Math.min(...durations);
+  const max = Math.max(...durations);
+  const isFlexible = durations.length > 2;
+  if (isFlexible) {
+    return [
+      `- Total duration should be ${targetDuration} seconds`,
+      `- Each scene duration MUST be a whole number between ${min} and ${max} seconds (inclusive)`,
+      `- You decide how many scenes to create — split the total time into scenes that each fit within ${min}-${max}s`,
+      `- Vary scene durations naturally: quick cuts (${min}-${min + 2}s) for action, longer holds (${max - 3}-${max}s) for emotional beats`,
+    ].join("\n");
+  }
+  const allowed = durations.join(" or ");
+  return [
+    `- Total duration should be ${targetDuration} seconds`,
+    `- Each scene duration MUST be exactly ${allowed} seconds — no other values`,
+    `- You decide how many scenes to create to fill the total duration using only ${allowed}s scenes`,
+  ].join("\n");
+}
+
+function buildMusicDurationInstruction(targetDuration: number, durations?: number[]): string {
+  if (!durations || durations.length === 0) {
+    if (targetDuration <= 30) return "Aim for 3-4 SHORT sections only (e.g. Intro + Verse + Chorus + Outro). Keep each section to 2-4 lines of lyrics MAX. Fewer sections = shorter song.";
+    if (targetDuration <= 45) return "Aim for 4-5 sections (e.g. Intro + Verse + Chorus + Verse + Outro). Keep lyrics concise — 2-4 lines per section.";
+    return "Aim for 5-7 sections: Intro + 2 Verses + 2 Choruses + Bridge/Outro.";
+  }
+  const min = Math.min(...durations);
+  const max = Math.max(...durations);
+  const isFlexible = durations.length > 2;
+  if (isFlexible) {
+    return [
+      `Each section's durationMs must produce a whole number of seconds between ${min} and ${max} (e.g. ${min * 1000}-${max * 1000}ms).`,
+      `You decide how many sections to create — split the ~${targetDuration}s total into sections that each fit within ${min}-${max}s.`,
+      `Vary section lengths: short bursts (${min}-${min + 2}s) for intros/outros, longer holds (${max - 3}-${max}s) for verses/choruses.`,
+    ].join(" ");
+  }
+  const allowed = durations.join(" or ");
+  return `Each section's durationMs MUST produce exactly ${allowed} seconds (i.e. ${durations.map(d => d * 1000).join(" or ")}ms). You decide how many sections to create to fill ~${targetDuration}s using only ${allowed}s sections.`;
+}
+
 // ── Video Script Generation ──
 
 export async function generateVideoScript(
@@ -185,7 +230,8 @@ export async function generateVideoScript(
   model?: string,
   sceneContinuity = false,
   previousTopics: string[] = [],
-  language = "en"
+  language = "en",
+  durations?: number[]
 ): Promise<VideoScript> {
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
@@ -221,8 +267,7 @@ CRITICAL RULES:
 - Write like you're telling a secret to a friend, not giving a lecture
 - Every single sentence must either reveal new info or build tension
 - searchQuery must be HYPER-SPECIFIC (e.g. "abandoned underground bunker" not "dark place")
-- Total duration should be ${targetDuration} seconds
-- Aim for 5-7 scenes
+${buildDurationInstruction(targetDuration, durations)}
 
 ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
 - Each scene must show exactly ONE clear action or moment. NEVER pack multiple actions into one scene.
@@ -309,7 +354,8 @@ export async function generateMusicScript(
   targetDuration = 60,
   model?: string,
   previousTopics: string[] = [],
-  language = "en"
+  language = "en",
+  durations?: number[]
 ): Promise<MusicScript> {
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
@@ -327,11 +373,7 @@ SONGWRITING RULES:
 3. Keep lyrics SHORT per line (5-10 words). Each line must be at most 200 characters.
 4. Match the genre to the niche: ${niche}
 5. Total song duration MUST be approximately ${targetDuration} seconds. This is CRITICAL for cost control.
-6. ${targetDuration <= 30
-    ? "Aim for 3-4 SHORT sections only (e.g. Intro + Verse + Chorus + Outro). Keep each section to 2-4 lines of lyrics MAX. Fewer sections = shorter song."
-    : targetDuration <= 45
-    ? "Aim for 4-5 sections (e.g. Intro + Verse + Chorus + Verse + Outro). Keep lyrics concise — 2-4 lines per section."
-    : "Aim for 5-7 sections: Intro + 2 Verses + 2 Choruses + Bridge/Outro."}
+6. ${buildMusicDurationInstruction(targetDuration, durations)}
 7. positiveStyles should describe instruments, tempo, and vocal characteristics that match the genre.
 8. negativeStyles should list elements that would clash with the desired sound.
 
@@ -438,7 +480,8 @@ export async function generateStandaloneScript(
   targetDuration = 45,
   model?: string,
   sceneContinuity = true,
-  language = "en"
+  language = "en",
+  durations?: number[]
 ): Promise<VideoScript> {
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
@@ -458,8 +501,7 @@ STORYTELLING RULES:
 
 CRITICAL RULES:
 - Each scene narration = 15-25 words. Short punchy sentences.
-- Total duration should be ${targetDuration} seconds
-- Aim for 5-7 scenes
+${buildDurationInstruction(targetDuration, durations)}
 - searchQuery must be HYPER-SPECIFIC
 
 ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
@@ -513,7 +555,8 @@ export async function generateStandaloneMusicScript(
   characters: StandaloneCharacter[] = [],
   targetDuration = 60,
   model?: string,
-  language = "en"
+  language = "en",
+  durations?: number[]
 ): Promise<MusicScript> {
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
@@ -529,11 +572,7 @@ SONGWRITING RULES:
 2. The chorus should be the most memorable part — repeat it 2-3 times.
 3. Keep lyrics SHORT per line (5-10 words). Each line must be at most 200 characters.
 4. Total song duration MUST be approximately ${targetDuration} seconds.
-5. ${targetDuration <= 30
-    ? "Aim for 3-4 SHORT sections only (Intro + Verse + Chorus + Outro). Keep each section to 2-4 lines MAX."
-    : targetDuration <= 45
-    ? "Aim for 4-5 sections (Intro + Verse + Chorus + Verse + Outro). Keep lyrics concise — 2-4 lines per section."
-    : "Aim for 5-7 sections: Intro + 2 Verses + 2 Choruses + Bridge/Outro."}
+5. ${buildMusicDurationInstruction(targetDuration, durations)}
 6. positiveStyles: instruments, tempo, vocal characteristics matching the genre.
 7. negativeStyles: elements that would clash with the desired sound.
 
