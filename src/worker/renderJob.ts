@@ -181,8 +181,7 @@ async function fetchFacelessMediaParallel(
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
 
         const imgModel = seriesRecord.imageModel || "dall-e-3";
-        const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
-        const asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel, refs);
+        const asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel);
 
         const ext = asset.type === "video" ? "mp4" : "jpg";
         const mediaPath = path.join(workDir, `media_${i}.${ext}`);
@@ -204,15 +203,14 @@ async function generateSceneImage(
   imagePrompt: string,
   imageModel: string,
   sceneIndex: number,
-  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset> {
-  console.log(`Scene ${sceneIndex}: Generating image with ${imageModel}${characterRefs?.length ? ` with ${characterRefs.length} character ref(s)` : ""}...`);
+  console.log(`Scene ${sceneIndex}: Generating image with ${imageModel}...`);
 
   let result: MediaAsset | null = null;
   if (imageModel === "nano-banana-2") {
-    result = await generateNanoBananaImage(imagePrompt, characterRefs);
+    result = await generateNanoBananaImage(imagePrompt);
   } else if (imageModel === "kling-image-v3") {
-    result = await generateKlingImage(imagePrompt, undefined, characterRefs);
+    result = await generateKlingImage(imagePrompt);
   } else {
     result = await generateImage(imagePrompt);
   }
@@ -258,7 +256,7 @@ async function fetchAIVideoMediaParallel(
             console.log(`Scene ${i}: Using pre-approved image`);
           }
         } else {
-          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, charRefs);
+          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i);
           await downloadFile(generatedImage.url, imagePath);
         }
 

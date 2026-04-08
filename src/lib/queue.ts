@@ -5,11 +5,7 @@ import { RENDER_QUEUE_NAME } from "./constants";
 export const renderQueue = new Queue(RENDER_QUEUE_NAME, {
   connection: redis,
   defaultJobOptions: {
-    attempts: 3,
-    backoff: {
-      type: "exponential",
-      delay: 5000,
-    },
+    attempts: 1,
     removeOnComplete: { count: 100 },
     removeOnFail: { count: 500 },
   },
