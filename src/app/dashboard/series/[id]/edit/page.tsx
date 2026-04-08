@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { NICHES, ART_STYLES, CAPTION_STYLES, DEFAULT_LLM_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_SIZE, LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
 import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector, VideoSizeSelector } from "@/components/model-selectors";
+import { GenerateCharacterModal } from "@/components/generate-character-modal";
 
 interface CharacterImage {
   url: string;
@@ -41,6 +42,7 @@ export default function EditSeriesPage() {
   const [characters, setCharacters] = useState<CharacterImage[]>([]);
   const [uploadingChar, setUploadingChar] = useState(false);
   const [describingIdx, setDescribingIdx] = useState<number | null>(null);
+  const [showCharGenModal, setShowCharGenModal] = useState(false);
   const [form, setForm] = useState({
     name: "",
     niche: "",
@@ -358,37 +360,50 @@ export default function EditSeriesPage() {
                 ))}
               </div>
 
-              <label className={`flex items-center justify-center w-full h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/50 cursor-pointer transition-colors bg-white/5 mt-3 ${uploadingChar ? "opacity-50 pointer-events-none" : ""}`}>
-                <div className="text-center">
-                  <p className="text-sm text-gray-400">{uploadingChar ? "Uploading..." : "+ Add Character"}</p>
-                  <p className="text-xs text-gray-600 mt-0.5">JPG, PNG, WebP up to 10MB</p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    setUploadingChar(true);
-                    try {
-                      const fd = new FormData();
-                      fd.append("file", file);
-                      const res = await fetch(`/api/series/${id}/character-image`, {
-                        method: "POST",
-                        body: fd,
-                      });
-                      if (res.ok) {
-                        const data = await res.json();
-                        setCharacters(data.characterImages);
+              <div className="flex gap-3 mt-3">
+                <label className={`flex-1 flex items-center justify-center h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/50 cursor-pointer transition-colors bg-white/5 ${uploadingChar ? "opacity-50 pointer-events-none" : ""}`}>
+                  <div className="text-center">
+                    <p className="text-sm text-gray-400">{uploadingChar ? "Uploading..." : "+ Upload Image"}</p>
+                    <p className="text-xs text-gray-600 mt-0.5">JPG, PNG, WebP</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploadingChar(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append("file", file);
+                        const res = await fetch(`/api/series/${id}/character-image`, {
+                          method: "POST",
+                          body: fd,
+                        });
+                        if (res.ok) {
+                          const data = await res.json();
+                          setCharacters(data.characterImages);
+                        }
+                      } finally {
+                        setUploadingChar(false);
+                        e.target.value = "";
                       }
-                    } finally {
-                      setUploadingChar(false);
-                      e.target.value = "";
-                    }
-                  }}
-                />
-              </label>
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCharGenModal(true)}
+                  className="flex-1 flex items-center justify-center h-20 rounded-xl border-2 border-dashed border-violet-500/30 hover:border-violet-500/50 bg-violet-500/5 hover:bg-violet-500/10 transition-colors"
+                >
+                  <div className="text-center">
+                    <p className="text-sm text-violet-400">+ AI Generate</p>
+                    <p className="text-xs text-violet-400/60 mt-0.5">Describe & create</p>
+                  </div>
+                </button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -406,6 +421,22 @@ export default function EditSeriesPage() {
           </Button>
         </div>
       </form>
+
+      <GenerateCharacterModal
+        open={showCharGenModal}
+        onClose={() => setShowCharGenModal(false)}
+        onCharacterGenerated={async (char) => {
+          const res = await fetch(`/api/series/${id}/character-image`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: char.url, description: char.description }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setCharacters(data.characterImages);
+          }
+        }}
+      />
     </div>
   );
 }

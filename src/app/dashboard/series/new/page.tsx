@@ -9,12 +9,14 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { NICHES, ART_STYLES, CAPTION_STYLES, DEFAULT_LLM_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_SIZE, LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
 import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector, VideoSizeSelector } from "@/components/model-selectors";
+import { GenerateCharacterModal } from "@/components/generate-character-modal";
 
 export default function NewSeriesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [pendingCharacters, setPendingCharacters] = useState<Array<{ file: File; preview: string; description: string }>>([]);
+  const [pendingCharacters, setPendingCharacters] = useState<Array<{ file: File | null; preview: string; description: string; generatedUrl?: string }>>([]);
   const [describingIdx, setDescribingIdx] = useState<number | null>(null);
+  const [showCharGenModal, setShowCharGenModal] = useState(false);
   const [form, setForm] = useState({
     name: "",
     niche: NICHES[0].id as string,
@@ -64,20 +66,28 @@ export default function NewSeriesPage() {
       const newSeries = await res.json();
 
       for (const char of pendingCharacters) {
-        const fd = new FormData();
-        fd.append("file", char.file);
-        const uploadRes = await fetch(`/api/series/${newSeries.id}/character-image`, {
-          method: "POST",
-          body: fd,
-        });
-        if (uploadRes.ok && char.description) {
-          const uploadData = await uploadRes.json();
-          const idx = (uploadData.characterImages as Array<unknown>).length - 1;
+        if (char.generatedUrl) {
           await fetch(`/api/series/${newSeries.id}/character-image`, {
-            method: "PATCH",
+            method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ index: idx, description: char.description }),
+            body: JSON.stringify({ url: char.generatedUrl, description: char.description }),
           });
+        } else if (char.file) {
+          const fd = new FormData();
+          fd.append("file", char.file);
+          const uploadRes = await fetch(`/api/series/${newSeries.id}/character-image`, {
+            method: "POST",
+            body: fd,
+          });
+          if (uploadRes.ok && char.description) {
+            const uploadData = await uploadRes.json();
+            const idx = (uploadData.characterImages as Array<unknown>).length - 1;
+            await fetch(`/api/series/${newSeries.id}/character-image`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ index: idx, description: char.description }),
+            });
+          }
         }
       }
 
@@ -264,68 +274,83 @@ export default function NewSeriesPage() {
                           );
                         }}
                       />
-                      <button
-                        type="button"
-                        disabled={describingIdx === idx}
-                        onClick={async () => {
-                          setDescribingIdx(idx);
-                          try {
-                            const fd = new FormData();
-                            fd.append("file", char.file);
-                            const res = await fetch("/api/describe-character", {
-                              method: "POST",
-                              body: fd,
-                            });
-                            if (res.ok) {
-                              const data = await res.json();
-                              setPendingCharacters((prev) =>
-                                prev.map((c, i) => i === idx ? { ...c, description: data.description } : c)
-                              );
+                      {char.file && (
+                        <button
+                          type="button"
+                          disabled={describingIdx === idx}
+                          onClick={async () => {
+                            setDescribingIdx(idx);
+                            try {
+                              const fd = new FormData();
+                              fd.append("file", char.file!);
+                              const res = await fetch("/api/describe-character", {
+                                method: "POST",
+                                body: fd,
+                              });
+                              if (res.ok) {
+                                const data = await res.json();
+                                setPendingCharacters((prev) =>
+                                  prev.map((c, i) => i === idx ? { ...c, description: data.description } : c)
+                                );
+                              }
+                            } finally {
+                              setDescribingIdx(null);
                             }
-                          } finally {
-                            setDescribingIdx(null);
-                          }
-                        }}
-                        className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-colors disabled:opacity-50"
-                      >
-                        {describingIdx === idx ? (
-                          <>
-                            <span className="w-3 h-3 border border-violet-300 border-t-transparent rounded-full animate-spin" />
-                            Analyzing...
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                            AI Describe
-                          </>
-                        )}
-                      </button>
+                          }}
+                          className="mt-1.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-colors disabled:opacity-50"
+                        >
+                          {describingIdx === idx ? (
+                            <>
+                              <span className="w-3 h-3 border border-violet-300 border-t-transparent rounded-full animate-spin" />
+                              Analyzing...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                              AI Describe
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <label className="flex items-center justify-center w-full h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/50 cursor-pointer transition-colors bg-white/5 mt-3">
-                <div className="text-center">
-                  <p className="text-sm text-gray-400">+ Add Character</p>
-                  <p className="text-xs text-gray-600 mt-0.5">JPG, PNG, WebP up to 10MB</p>
-                </div>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      setPendingCharacters((prev) => [
-                        ...prev,
-                        { file, preview: URL.createObjectURL(file), description: "" },
-                      ]);
-                    }
-                    e.target.value = "";
-                  }}
-                />
-              </label>
+              <div className="flex gap-3 mt-3">
+                <label className="flex-1 flex items-center justify-center h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/50 cursor-pointer transition-colors bg-white/5">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-400">+ Upload Image</p>
+                    <p className="text-xs text-gray-600 mt-0.5">JPG, PNG, WebP</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setPendingCharacters((prev) => [
+                          ...prev,
+                          { file, preview: URL.createObjectURL(file), description: "" },
+                        ]);
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCharGenModal(true)}
+                  className="flex-1 flex items-center justify-center h-20 rounded-xl border-2 border-dashed border-violet-500/30 hover:border-violet-500/50 bg-violet-500/5 hover:bg-violet-500/10 transition-colors"
+                >
+                  <div className="text-center">
+                    <p className="text-sm text-violet-400">+ AI Generate</p>
+                    <p className="text-xs text-violet-400/60 mt-0.5">Describe & create</p>
+                  </div>
+                </button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -343,6 +368,22 @@ export default function NewSeriesPage() {
           </Button>
         </div>
       </form>
+
+      <GenerateCharacterModal
+        open={showCharGenModal}
+        onClose={() => setShowCharGenModal(false)}
+        onCharacterGenerated={(char) => {
+          setPendingCharacters((prev) => [
+            ...prev,
+            {
+              file: null,
+              preview: char.previewUrl,
+              description: char.description,
+              generatedUrl: char.url,
+            },
+          ]);
+        }}
+      />
     </div>
   );
 }

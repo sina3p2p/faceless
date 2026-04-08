@@ -8,6 +8,11 @@ import { z } from "zod/v4";
 
 type CharacterImage = { url: string; description: string };
 
+const addGeneratedSchema = z.object({
+  url: z.string().min(1),
+  description: z.string().default(""),
+});
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,6 +28,23 @@ export async function POST(
   });
   if (!existing) return notFound("Series not found");
 
+  const contentType = req.headers.get("content-type") || "";
+  const currentImages = (existing.characterImages ?? []) as CharacterImage[];
+
+  if (contentType.includes("application/json")) {
+    const body = await req.json();
+    const parsed = addGeneratedSchema.safeParse(body);
+    if (!parsed.success) return badRequest(parsed.error.message);
+
+    const newImages = [...currentImages, { url: parsed.data.url, description: parsed.data.description }];
+    await db
+      .update(series)
+      .set({ characterImages: newImages, updatedAt: new Date() })
+      .where(eq(series.id, id));
+
+    return NextResponse.json({ characterImages: newImages });
+  }
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
 
@@ -37,7 +59,6 @@ export async function POST(
     return badRequest("File must be under 10MB");
   }
 
-  const currentImages = (existing.characterImages ?? []) as CharacterImage[];
   const index = currentImages.length;
 
   const buffer = Buffer.from(await file.arrayBuffer());
