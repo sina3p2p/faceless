@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+
+const DURATION_PRESETS = [
+  { label: "15s", value: 15, hint: "Quick test" },
+  { label: "30s", value: 30, hint: "Short" },
+  { label: "45s", value: 45, hint: "Standard" },
+  { label: "60s", value: 60, hint: "Standard+" },
+  { label: "90s", value: 90, hint: "Long" },
+  { label: "120s", value: 120, hint: "Extra long" },
+];
 
 interface Video {
   id: string;
@@ -37,6 +46,9 @@ export default function SeriesDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
+  const [targetDuration, setTargetDuration] = useState(45);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   const loadSeries = useCallback(() => {
     fetch(`/api/series/${id}`)
@@ -49,6 +61,10 @@ export default function SeriesDetailPage() {
   }, [loadSeries]);
 
   useEffect(() => {
+    if (series?.videoType === "music_video") setTargetDuration(60);
+  }, [series?.videoType]);
+
+  useEffect(() => {
     if (!series) return;
     const hasActive = series.videoProjects.some(
       (v) => !["COMPLETED", "FAILED", "REVIEW", "CANCELLED"].includes(v.status)
@@ -58,12 +74,24 @@ export default function SeriesDetailPage() {
     return () => clearInterval(interval);
   }, [series, loadSeries]);
 
+  useEffect(() => {
+    if (!showDurationPicker) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowDurationPicker(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showDurationPicker]);
+
   async function handleGenerate() {
     setGenerating(true);
+    setShowDurationPicker(false);
     const res = await fetch("/api/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seriesId: id }),
+      body: JSON.stringify({ seriesId: id, targetDuration }),
     });
 
     if (res.ok) {
@@ -141,9 +169,42 @@ export default function SeriesDetailPage() {
           >
             Edit Series
           </Button>
-          <Button loading={generating} onClick={handleGenerate}>
-            Generate Video
-          </Button>
+          <div className="relative" ref={pickerRef}>
+            <Button
+              loading={generating}
+              onClick={() => setShowDurationPicker(!showDurationPicker)}
+            >
+              Generate Video
+            </Button>
+            {showDurationPicker && (
+              <div className="absolute right-0 top-full mt-2 w-72 bg-gray-900 border border-white/10 rounded-xl shadow-2xl p-4 z-50">
+                <p className="text-sm font-medium text-gray-300 mb-3">Video Duration</p>
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  {DURATION_PRESETS.map((p) => (
+                    <button
+                      key={p.value}
+                      onClick={() => setTargetDuration(p.value)}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        targetDuration === p.value
+                          ? "bg-violet-600 text-white"
+                          : "bg-white/5 text-gray-400 hover:bg-white/10"
+                      }`}
+                    >
+                      <span className="block">{p.label}</span>
+                      <span className="block text-[10px] opacity-60">{p.hint}</span>
+                    </button>
+                  ))}
+                </div>
+                <Button
+                  className="w-full"
+                  loading={generating}
+                  onClick={handleGenerate}
+                >
+                  Generate {targetDuration}s Video
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

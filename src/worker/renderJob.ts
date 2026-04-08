@@ -325,7 +325,14 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
     });
     if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
 
-    console.log(`Script generation starting for series=${seriesId}`);
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      columns: { config: true },
+    });
+    const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;
+    const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 45;
+
+    console.log(`Script generation starting for series=${seriesId}, targetDuration=${targetDuration}s`);
     await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
@@ -342,7 +349,7 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
       seriesRecord.niche,
       seriesRecord.style,
       topicIdea,
-      45,
+      targetDuration,
       seriesRecord.llmModel || undefined,
       !!seriesRecord.sceneContinuity,
       previousTopics,
@@ -577,7 +584,15 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     const seriesRecord = { ...seriesRecordRaw, characterRefs };
 
     const videoType = seriesRecord.videoType || "faceless";
-    console.log(`Render job starting: type=${videoType}, series=${seriesId}`);
+
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      columns: { config: true },
+    });
+    const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;
+    const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 45;
+
+    console.log(`Render job starting: type=${videoType}, series=${seriesId}, targetDuration=${targetDuration}s`);
 
     // Step 1: Generate Script
     await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
@@ -596,7 +611,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       seriesRecord.niche,
       seriesRecord.style,
       topicIdea,
-      45,
+      targetDuration,
       seriesRecord.llmModel || undefined,
       !!seriesRecord.sceneContinuity,
       previousTopics,
@@ -817,7 +832,14 @@ export async function generateMusicScriptJob(job: Job<RenderJobData>) {
     });
     if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
 
-    console.log(`Music script generation starting for series=${seriesId}`);
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      columns: { config: true },
+    });
+    const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;
+    const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 60;
+
+    console.log(`Music script generation starting for series=${seriesId}, targetDuration=${targetDuration}s`);
     await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
@@ -834,7 +856,7 @@ export async function generateMusicScriptJob(job: Job<RenderJobData>) {
       seriesRecord.niche,
       seriesRecord.style,
       topicIdea,
-      60,
+      targetDuration,
       seriesRecord.llmModel || undefined,
       previousTopics,
       seriesRecord.language || "en"

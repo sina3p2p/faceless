@@ -9,6 +9,7 @@ import { z } from "zod/v4";
 
 const createVideoSchema = z.object({
   seriesId: z.string().min(1),
+  targetDuration: z.number().min(10).max(180).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -70,9 +71,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const config = parsed.data.targetDuration
+    ? { targetDuration: parsed.data.targetDuration }
+    : undefined;
+
   const [videoProject] = await db
     .insert(videoProjects)
-    .values({ seriesId: seriesRecord.id, status: "PENDING" })
+    .values({ seriesId: seriesRecord.id, status: "PENDING", config })
     .returning();
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
