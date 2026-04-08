@@ -20,18 +20,12 @@ interface VideoResult {
   durationSeconds: number;
 }
 
-export interface CharacterRef {
-  url: string;
-  description: string;
-}
-
 export async function generateVideoFromImage(
   imageUrl: string,
   prompt: string,
   duration: "5" | "10" = "5",
   videoModelKey?: string,
   endImageUrl?: string,
-  characterRefs?: CharacterRef[]
 ): Promise<VideoResult> {
   const modelId = resolveI2VModelId(videoModelKey);
 
@@ -44,17 +38,6 @@ export async function generateVideoFromImage(
     input.start_image_url = imageUrl;
     if (endImageUrl) input.end_image_url = endImageUrl;
     input.generate_audio = false;
-
-    if (characterRefs && characterRefs.length > 0) {
-      input.elements = characterRefs.map((c) => ({
-        frontal_image_url: c.url,
-      }));
-      const elementTags = characterRefs.map((c, i) => {
-        const label = c.description || `character ${i + 1}`;
-        return `@Element${i + 1} (${label})`;
-      }).join(", ");
-      input.prompt = `${prompt}. Featuring: ${elementTags}`;
-    }
   } else if (modelId.includes("kling-video")) {
     input.image_url = imageUrl;
     if (endImageUrl) input.tail_image_url = endImageUrl;
@@ -124,12 +107,10 @@ export async function getAIVideoForScene(
   duration: "5" | "10" = "5",
   videoModelKey?: string,
   endImageUrl?: string,
-  characterRefs?: CharacterRef[]
 ): Promise<VideoResult> {
   const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
-  const charCount = characterRefs?.length || 0;
-  console.log(`[ai-video] Trying image-to-video (${modelLabel})${endImageUrl ? " with end frame" : ""}${charCount ? ` with ${charCount} character ref(s)` : ""} for: "${prompt.slice(0, 60)}..."`);
-  return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey, endImageUrl, characterRefs);
+  console.log(`[ai-video] Trying image-to-video (${modelLabel})${endImageUrl ? " with end frame" : ""} for: "${prompt.slice(0, 60)}..."`);
+  return await generateVideoFromImage(imageUrl, prompt, duration, videoModelKey, endImageUrl);
 }
 
 export async function downloadAIVideo(

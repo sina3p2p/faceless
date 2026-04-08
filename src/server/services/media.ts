@@ -232,12 +232,13 @@ export async function generateNanoBananaImage(
 async function generateAnyImage(
   prompt: string,
   imageModel = "dall-e-3",
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset | null> {
   if (imageModel === "nano-banana-2") {
-    return generateNanoBananaImage(prompt);
+    return generateNanoBananaImage(prompt, characterRefs);
   }
   if (imageModel === "kling-image-v3") {
-    return generateKlingImage(prompt);
+    return generateKlingImage(prompt, undefined, characterRefs);
   }
   return generateImage(prompt);
 }
@@ -247,9 +248,10 @@ export async function getMediaForScene(
   imagePrompt: string,
   preferAiImage = false,
   imageModel = "dall-e-3",
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset> {
   if (preferAiImage) {
-    const generatedImage = await generateAnyImage(imagePrompt, imageModel);
+    const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs);
     if (generatedImage) return generatedImage;
   }
 
@@ -268,7 +270,7 @@ export async function getMediaForScene(
     if (fallbackImage) return fallbackImage;
   }
 
-  const generatedImage = await generateAnyImage(imagePrompt, imageModel);
+  const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs);
   if (generatedImage) return generatedImage;
 
   throw new Error(

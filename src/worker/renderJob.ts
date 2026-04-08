@@ -181,7 +181,8 @@ async function fetchFacelessMediaParallel(
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
 
         const imgModel = seriesRecord.imageModel || "dall-e-3";
-        const asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel);
+        const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
+        const asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel, refs);
 
         const ext = asset.type === "video" ? "mp4" : "jpg";
         const mediaPath = path.join(workDir, `media_${i}.${ext}`);
@@ -203,14 +204,15 @@ async function generateSceneImage(
   imagePrompt: string,
   imageModel: string,
   sceneIndex: number,
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset> {
-  console.log(`Scene ${sceneIndex}: Generating image with ${imageModel}...`);
+  console.log(`Scene ${sceneIndex}: Generating image with ${imageModel}${characterRefs?.length ? ` with ${characterRefs.length} character ref(s)` : ""}...`);
 
   let result: MediaAsset | null = null;
   if (imageModel === "nano-banana-2") {
-    result = await generateNanoBananaImage(imagePrompt);
+    result = await generateNanoBananaImage(imagePrompt, characterRefs);
   } else if (imageModel === "kling-image-v3") {
-    result = await generateKlingImage(imagePrompt);
+    result = await generateKlingImage(imagePrompt, undefined, characterRefs);
   } else {
     result = await generateImage(imagePrompt);
   }
@@ -256,7 +258,7 @@ async function fetchAIVideoMediaParallel(
             console.log(`Scene ${i}: Using pre-approved image`);
           }
         } else {
-          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i);
+          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, charRefs);
           await downloadFile(generatedImage.url, imagePath);
         }
 
@@ -299,8 +301,8 @@ async function fetchAIVideoMediaParallel(
           ? falImageUrls[i + 1]
           : undefined;
 
-        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"})${endImageUrl ? " → scene " + (i + 1) : ""}${charRefs ? ` +${charRefs.length}chars` : ""}...`);
-        const videoResult = await getAIVideoForScene(startImageUrl, videoPrompt, clipDuration, videoModelKey, endImageUrl, charRefs);
+        console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"})${endImageUrl ? " → scene " + (i + 1) : ""}...`);
+        const videoResult = await getAIVideoForScene(startImageUrl, videoPrompt, clipDuration, videoModelKey, endImageUrl);
 
         const videoPath = path.join(workDir, `media_${i}.mp4`);
         await downloadAIVideo(videoResult.videoUrl, videoPath);
