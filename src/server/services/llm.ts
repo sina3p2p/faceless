@@ -75,6 +75,7 @@ RULES:
 - If the user asks to change a specific scene, only modify that scene
 - If the user asks for tone/style changes, apply them across all scenes
 - Keep all imagePrompts detailed (50-100+ words) — never shorten them
+- NO COPYRIGHTED NAMES in imagePrompt or visualDescription — image models REJECT these. Describe the character's appearance instead (e.g. instead of "Cinderella" write "a young woman with golden blonde hair in a shimmering blue ball gown"). Narration text CAN use the real names.
 - Maintain the same JSON structure
 - If the user's request is vague, make your best creative judgment
 - You can add, remove, reorder, or merge scenes if the user asks
@@ -287,6 +288,7 @@ IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
 - Include motion cues: "camera slowly pushes in", "wind gently moves the curtains", "smoke rises from the ground", "waves crash against rocks".
 - EACH scene's imagePrompt must be visually DIFFERENT from the others. Vary camera angles, color palettes, and compositions across scenes.
 - Think like a cinematographer — every frame should be visually stunning enough to pause and admire.
+- NO COPYRIGHTED NAMES IN IMAGE PROMPTS (CRITICAL): NEVER use trademarked or copyrighted character names (e.g. "Cinderella", "Elsa", "Spider-Man", "Mickey Mouse") in imagePrompt or visualDescription. Image models will REJECT these. Instead, describe the character's appearance in detail. Example: instead of "Cinderella" write "a young woman with golden blonde hair in an updo, wearing a shimmering ice-blue ball gown with glass slippers". The narration text CAN use the real names — only imagePrompt and visualDescription must avoid them.
 ${["claymation", "gothic-clay"].includes(style) ? `
 CLAYMATION STYLE RULES (CRITICAL — follow these for every imagePrompt):
 - Every subject, object, and environment MUST look like it is handcrafted from clay, plasticine, or polymer clay
@@ -404,6 +406,7 @@ The visuals must feel like they were CHOREOGRAPHED to the music. Think like a re
    - MOOD: Atmospheric elements — fog, rain, lens flare, dust particles, bokeh, smoke, volumetric rays.
    - COLOR PALETTE: Specify dominant colors that match the emotional tone (warm oranges for passion, cool blues for melancholy, vibrant neons for energy).
    - STYLE: ${style}. Must feel premium and cinematic.
+   - NO COPYRIGHTED NAMES: NEVER use trademarked/copyrighted character names in imagePrompt or visualDescription — image models REJECT these. Describe the character's appearance instead. Song lyrics CAN use real names.
 
 4. visualDescription MOTION REQUIREMENTS (be as detailed as possible, no word limit):
    - Describe the specific MOVEMENT and ACTION for the AI video generator.
@@ -519,6 +522,7 @@ IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
 - For places: describe architecture, textures, weather, time of day, vegetation, materials.
 - Include motion cues: "camera slowly pushes in", "wind moves the curtains", etc.
 - EACH scene's imagePrompt must be visually DIFFERENT. Vary camera angles, color palettes, and compositions.
+- NO COPYRIGHTED NAMES IN IMAGE PROMPTS (CRITICAL): NEVER use trademarked/copyrighted character names (e.g. "Cinderella", "Elsa", "Spider-Man") in imagePrompt or visualDescription — image models REJECT these. Describe the character's appearance instead. Narration text CAN use real names.
 ${["claymation", "gothic-clay"].includes(style) ? `
 CLAYMATION STYLE RULES:
 - Every subject must look handcrafted from clay/plasticine with visible fingerprint marks, rounded edges, matte finish
@@ -587,6 +591,7 @@ VISUAL-MUSIC SYNC RULES:
 2. LYRIC-VISUAL LITERALISM: Every section's visuals must directly reference the lyrics being sung.
 
 3. imagePrompt DETAIL: Be as detailed as possible — subject, environment, lighting, camera angle, mood, color palette, style: ${style}.
+   - NO COPYRIGHTED NAMES: NEVER use trademarked/copyrighted character names in imagePrompt or visualDescription — image models REJECT these. Describe the character's appearance instead. Lyrics CAN use real names.
 
 4. visualDescription MOTION: Specific movement and action for the AI video generator with camera/subject/environmental motion.
 
