@@ -137,11 +137,11 @@ export async function generateKlingImage(
     const elements: any[] = [];
 
     if (referenceImageUrl) {
-      elements.push({ frontal_image_url: referenceImageUrl });
+      elements.push({ reference_image_urls: [referenceImageUrl] });
     }
     if (characterRefs && characterRefs.length > 0) {
       for (const ref of characterRefs) {
-        elements.push({ frontal_image_url: ref.url });
+        elements.push({ reference_image_urls: [ref.url] });
       }
     }
 
