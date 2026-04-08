@@ -71,7 +71,7 @@ export const AI_VIDEO = {
   get falKey() { return env("FAL_KEY"); },
   defaultI2vModel: "fal-ai/kling-video/v3/standard/image-to-video",
   t2vModel: "fal-ai/wan-25-preview/text-to-video",
-  fluxImageModel: "fal-ai/flux-pro/v1.1",
+  klingImageModel: "fal-ai/kling-image/v3/text-to-image",
   nanoBananaModel: "fal-ai/nano-banana-2",
 } as const;
 
@@ -99,8 +99,8 @@ export const DEFAULT_VIDEO_MODEL = "kling-3-standard";
 
 export const IMAGE_MODELS = [
   { id: "dall-e-3", label: "DALL-E 3", description: "Good quality, ~$0.04/image (OpenAI)" },
-  { id: "flux-pro", label: "Flux Pro 1.1", description: "Best for 3D/claymation styles, ~$0.04/image (Flux)" },
-  { id: "nano-banana-2", label: "Nano Banana 2", description: "Best quality & speed, ~$0.08/image (Google)" },
+  { id: "kling-image-v3", label: "Kling Image V3", description: "Excellent quality, character refs, ~$0.028/image" },
+  { id: "nano-banana-2", label: "Nano Banana 2", description: "High quality, multi-ref, ~$0.08/image" },
 ] as const;
 
 export const DEFAULT_IMAGE_MODEL = "dall-e-3";

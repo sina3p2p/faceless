@@ -18,7 +18,7 @@ import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
   getMediaForScene,
   generateImage,
-  generateFluxImage,
+  generateKlingImage,
   generateNanoBananaImage,
   resetUsedMedia,
   type MediaAsset,
@@ -211,8 +211,8 @@ async function generateSceneImage(
   let result: MediaAsset | null = null;
   if (imageModel === "nano-banana-2") {
     result = await generateNanoBananaImage(imagePrompt, characterRefs);
-  } else if (imageModel === "flux-pro") {
-    result = await generateFluxImage(imagePrompt);
+  } else if (imageModel === "kling-image-v3") {
+    result = await generateKlingImage(imagePrompt, undefined, characterRefs);
   } else {
     result = await generateImage(imagePrompt);
   }

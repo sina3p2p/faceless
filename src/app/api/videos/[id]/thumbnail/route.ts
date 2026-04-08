@@ -3,13 +3,13 @@ import { db } from "@/server/db";
 import { videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { generateImage, generateFluxImage, generateNanoBananaImage } from "@/server/services/media";
+import { generateImage, generateKlingImage, generateNanoBananaImage } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod/v4";
 
 const bodySchema = z.object({
   prompt: z.string().optional(),
-  imageModel: z.enum(["dall-e-3", "flux-pro", "nano-banana-2"]).default("dall-e-3"),
+  imageModel: z.enum(["dall-e-3", "kling-image-v3", "nano-banana-2"]).default("dall-e-3"),
 });
 
 export async function POST(
@@ -93,8 +93,8 @@ export async function POST(
     if (imageModel === "nano-banana-2") {
       const result = await generateNanoBananaImage(prompt, charRefs);
       imageUrl = result?.url ?? null;
-    } else if (imageModel === "flux-pro") {
-      const result = await generateFluxImage(prompt);
+    } else if (imageModel === "kling-image-v3") {
+      const result = await generateKlingImage(prompt);
       imageUrl = result?.url ?? null;
     } else {
       const result = await generateImage(prompt);

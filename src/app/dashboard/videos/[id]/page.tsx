@@ -39,7 +39,7 @@ interface VideoDetail {
 
 const THUMB_MODELS = [
   { id: "dall-e-3", label: "DALL-E 3" },
-  { id: "flux-pro", label: "Flux Pro" },
+  { id: "kling-image-v3", label: "Kling Image V3" },
   { id: "nano-banana-2", label: "Nano Banana 2" },
 ] as const;
 

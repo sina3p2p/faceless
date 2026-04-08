@@ -10,7 +10,7 @@ fal.config({ credentials: AI_VIDEO.falKey });
 export interface MediaAsset {
   url: string;
   type: "video" | "image";
-  source: "pexels" | "openai" | "flux";
+  source: "pexels" | "openai" | "kling" | "nano-banana";
   width: number;
   height: number;
 }
@@ -127,18 +127,35 @@ export async function generateImage(
   }
 }
 
-export async function generateFluxImage(
-  prompt: string
+export async function generateKlingImage(
+  prompt: string,
+  referenceImageUrl?: string,
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset | null> {
   try {
-    const result = await fal.subscribe(AI_VIDEO.fluxImageModel, {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const elements: any[] = [];
+
+    if (referenceImageUrl) {
+      elements.push({ frontal_image_url: referenceImageUrl });
+    }
+    if (characterRefs && characterRefs.length > 0) {
+      for (const ref of characterRefs) {
+        elements.push({ frontal_image_url: ref.url });
+      }
+    }
+
+    const elementRefs = elements.length > 0
+      ? ` ${elements.map((_, i) => `@Element${i + 1}`).join(" ")}`
+      : "";
+
+    const result = await fal.subscribe(AI_VIDEO.klingImageModel, {
       input: {
-        prompt: `${prompt}. Vertical 9:16 composition, highly detailed, no text or watermarks.`,
-        image_size: { width: 768, height: 1344 },
+        prompt: `${prompt}. Vertical 9:16 composition, highly detailed, no text or watermarks.${elementRefs}`,
+        ...(elements.length > 0 ? { elements } : {}),
+        aspect_ratio: "9:16",
         num_images: 1,
         output_format: "jpeg",
-        num_inference_steps: 28,
-        safety_tolerance: "5" as const,
       },
       logs: true,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -148,56 +165,10 @@ export async function generateFluxImage(
     const image = data?.images?.[0];
     if (!image?.url) return null;
 
-    return {
-      url: image.url,
-      type: "image",
-      source: "flux",
-      width: image.width || 768,
-      height: image.height || 1344,
-    };
+    return { url: image.url, type: "image", source: "kling", width: image.width || 768, height: image.height || 1344 };
   } catch (err) {
-    console.warn(`Flux image generation failed: ${err instanceof Error ? err.message : err}`);
+    console.warn(`Kling image generation failed: ${err instanceof Error ? err.message : err}`);
     return null;
-  }
-}
-
-export async function inpaintImage(
-  imageUrl: string,
-  maskUrl: string,
-  prompt: string
-): Promise<MediaAsset | null> {
-  try {
-    console.log(`[inpaint] Starting: image=${imageUrl.slice(0, 80)}... mask=${maskUrl.slice(0, 80)}... prompt="${prompt.slice(0, 100)}"`);
-
-    const result = await fal.subscribe("fal-ai/flux-pro/v1/fill", {
-      input: {
-        prompt,
-        image_url: imageUrl,
-        mask_url: maskUrl,
-        num_images: 1,
-        output_format: "jpeg",
-        safety_tolerance: 5,
-      },
-      logs: true,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
-
-    const data = result.data as { images?: Array<{ url: string; width: number; height: number }> };
-    const image = data?.images?.[0];
-    if (!image?.url) return null;
-
-    return {
-      url: image.url,
-      type: "image",
-      source: "flux",
-      width: image.width || 768,
-      height: image.height || 1344,
-    };
-  } catch (err) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const detail = (err as any)?.body?.detail ?? (err as any)?.message ?? err;
-    console.error(`Flux inpainting failed:`, JSON.stringify(detail, null, 2));
-    throw new Error(`Inpainting failed: ${typeof detail === "string" ? detail : JSON.stringify(detail)}`);
   }
 }
 
@@ -247,7 +218,7 @@ export async function generateNanoBananaImage(
     return {
       url: image.url,
       type: "image",
-      source: "flux",
+      source: "nano-banana",
       width: image.width || 768,
       height: image.height || 1344,
     };
@@ -265,8 +236,8 @@ async function generateAnyImage(
   if (imageModel === "nano-banana-2") {
     return generateNanoBananaImage(prompt, characterRefs);
   }
-  if (imageModel === "flux-pro") {
-    return generateFluxImage(prompt);
+  if (imageModel === "kling-image-v3") {
+    return generateKlingImage(prompt, undefined, characterRefs);
   }
   return generateImage(prompt);
 }
