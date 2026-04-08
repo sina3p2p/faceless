@@ -1,6 +1,9 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { renderVideoJob, rerenderVideoJob, generateScriptJob, renderFromScenesJob, generateMusicScriptJob, renderMusicVideoJob, generateStandaloneScriptJob, generateStandaloneMusicScriptJob, generateImagesJob, generateMusicLyricsJob, generateSongJob, generateMusicVisualsJob, generateDialogueScriptJob } from "./renderJob";
+import { generateScriptJob, generateMusicScriptJob, generateStandaloneScriptJob, generateStandaloneMusicScriptJob, generateDialogueScriptJob } from "./scriptJobs";
+import { generateMusicLyricsJob, generateSongJob, generateMusicVisualsJob } from "./musicJobs";
+import { generateImagesJob } from "./mediaJobs";
+import { renderVideoJob, rerenderVideoJob, renderFromScenesJob, renderMusicVideoJob } from "./renderJobs";
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { REDIS, WORKER } from "@/lib/constants";

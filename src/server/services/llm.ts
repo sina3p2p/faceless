@@ -306,7 +306,17 @@ ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple action
 - If the story needs multiple actions, SPLIT them into separate scenes. More scenes with single actions is ALWAYS better than fewer scenes with multiple actions.
 - The visualDescription and imagePrompt must also describe only ONE moment/pose/action, never a sequence.
 
-IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
+VISUAL DESCRIPTION — AI VIDEO MOTION PROMPT (CRITICAL — this drives REAL video clip generation):
+- The visualDescription field is sent directly to an AI image-to-video model to generate REAL video clips (NOT just images with zoom).
+- Each visualDescription must be 30-60 words describing CONTINUOUS MOTION:
+  - CAMERA MOTION: "camera slowly dollies forward", "smooth orbit around the subject", "crane shot rising upward", "tracking shot following the character", "slow push in on face"
+  - SUBJECT MOTION: "character turns head slowly", "hands reaching forward", "walking through the corridor", "wind blowing through hair"
+  - ENVIRONMENT MOTION: "clouds drifting across the sky", "rain falling", "leaves swirling in the wind", "fire flickering"
+- BAD visualDescription: "A man standing in a room" (STATIC — produces a boring frozen image, not video)
+- GOOD visualDescription: "Camera slowly pushes in on the man's face as his eyes widen with realization, shadows shifting across the dimly lit room, dust particles floating in a beam of light"
+- NEVER write static descriptions. Every visualDescription MUST contain at least one camera movement AND one subject/environment movement.
+
+IMAGE PROMPT QUALITY (drives the key frame image for each video clip):
 - Each imagePrompt must be 50-100 words minimum. SHORT/LAZY prompts = ugly videos.
 - NEVER write vague prompts like "a mysterious scene" or "something dramatic happens". Be EXTREMELY specific.
 - Describe ONE clear subject doing ONE clear action in ONE clear environment. Do NOT cram multiple unrelated things.
@@ -598,18 +608,23 @@ export async function generateMusicVisuals(
   sections: VisualSection[],
   style: string,
   model?: string,
-  language = "en"
+  language = "en",
+  supportedClipDurations?: number[]
 ): Promise<MusicVisuals> {
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
 
   const sectionsContext = sections.map((s, i) =>
-    `Section ${i + 1} — "${s.sectionName}" (${s.durationSec}s):\n  Lyrics: ${s.lyrics.join(" / ")}`
+    `Section ${i + 1} — "${s.sectionName}" (${s.durationSec}s clip):\n  Lyrics: ${s.lyrics.join(" / ")}`
   ).join("\n\n");
+
+  const clipDurNote = supportedClipDurations?.length
+    ? `\n\nVIDEO CLIP DURATIONS: The AI video model only supports clips of exactly ${supportedClipDurations.join(" or ")} seconds. Each section will be rendered as one video clip at its listed duration. Design the motion in your visualDescription to fill exactly that clip length — e.g. a ${Math.min(...supportedClipDurations)}s clip needs quick, punchy motion while a ${Math.max(...supportedClipDurations)}s clip can have slower, more cinematic movement.\nSections labeled "(part N/M)" are sub-clips of a longer original section — their visuals should PROGRESS the narrative (don't repeat the same shot). Part 1 = establish, Part 2 = develop, Part 3 = climax/resolve.`
+    : "";
 
   const systemPrompt = `You are an elite music video director. Given a song's sections (with lyrics and ACTUAL durations from the generated audio), create detailed visual prompts for each section.
 
-The song lyrics are in ${langName}, but ALL imagePrompt and visualDescription MUST be in English.
+The song lyrics are in ${langName}, but ALL imagePrompt and visualDescription MUST be in English.${clipDurNote}
 
 VISUAL-MUSIC SYNC RULES:
 1. MATCH ENERGY TO SECTION TYPE:
@@ -632,9 +647,11 @@ VISUAL-MUSIC SYNC RULES:
    - STYLE: ${style}
    - NO COPYRIGHTED CONTENT: NEVER use copyrighted character names OR iconic signature details in imagePrompt or visualDescription. Reimagine with original visuals.
 
-4. visualDescription MOTION:
-   - Camera motion, subject motion, environmental motion
-   - Match speed to music tempo
+4. visualDescription MOTION (CRITICAL — this drives REAL AI video clip generation):
+   - Each visualDescription is sent to an image-to-video model to produce an ACTUAL animated clip.
+   - Describe SPECIFIC camera motion (dolly, orbit, crane, tracking), subject motion, and environment motion.
+   - Match motion speed to the clip duration and music tempo.
+   - NEVER write static descriptions — every clip MUST have continuous motion.
 
 5. ONE ACTION PER SECTION: Each section = ONE clear visual moment.
 
@@ -710,7 +727,17 @@ ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple action
 - GOOD: Scene 1 = "She opens the door", Scene 2 = "She walks into the room", Scene 3 = "She sits down"
 - The visualDescription and imagePrompt must describe only ONE moment/pose/action.
 
-IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
+VISUAL DESCRIPTION — AI VIDEO MOTION PROMPT (CRITICAL — this drives REAL video clip generation):
+- The visualDescription field is sent directly to an AI image-to-video model to generate REAL video clips (NOT just images with zoom).
+- Each visualDescription must be 30-60 words describing CONTINUOUS MOTION:
+  - CAMERA MOTION: "camera slowly dollies forward", "smooth orbit around the character", "crane shot rising upward", "tracking shot following the subject", "slow push in on face"
+  - SUBJECT MOTION: "character turns head slowly to the left", "hands reaching forward", "walking through the corridor", "wind blowing through hair"
+  - ENVIRONMENT MOTION: "clouds drifting across the sky", "rain falling", "leaves swirling in the wind", "fire flickering"
+- BAD visualDescription: "A woman standing in a garden" (STATIC — this produces a boring frozen image, not a video)
+- GOOD visualDescription: "Camera slowly pushes in on the woman as she turns to face the viewer, wind gently moving her hair, flower petals drifting past in the warm afternoon light"
+- NEVER write static descriptions. Every visualDescription MUST contain at least one camera movement AND one subject/environment movement.
+
+IMAGE PROMPT QUALITY (drives the key frame image for each video clip):
 - Each imagePrompt must be 50-100 words minimum.
 - NEVER write vague prompts. Be EXTREMELY specific.
 - Describe ONE clear subject doing ONE clear action in ONE clear environment.
@@ -815,7 +842,7 @@ ${buildCharacterBlock(characters)}`;
 const dialogueSceneSchema = z.object({
   speaker: z.string().describe("Who is speaking: exact character name or 'Narrator'"),
   text: z.string().describe("What this character says, or narrator description"),
-  visualDescription: z.string().describe("Rich description of the visual — who is on screen, their expression, posture, environment"),
+  visualDescription: z.string().describe("MOTION PROMPT for the AI video generator (30-60 words). Describe the speaking character's gestures, head tilts, hand movements, lip sync, facial expression changes, and camera motion (slow push in, orbit, over-the-shoulder). Must describe CONTINUOUS MOTION, not a static pose."),
   imagePrompt: z.string().describe("Detailed prompt for AI image generation (50-100+ words). Show the speaking character clearly."),
   searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
   duration: z.number().describe("Duration of this scene in seconds"),
@@ -871,7 +898,15 @@ SCENE STRUCTURE:
 - Total conversation should feel like a natural exchange, not scripted Q&A.
 ${buildDurationInstruction(targetDuration, durations)}
 
-IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
+VISUAL DESCRIPTION — AI VIDEO MOTION PROMPT (CRITICAL — this drives REAL video clip generation):
+- The visualDescription is sent to an AI image-to-video model to generate REAL animated video clips.
+- Each visualDescription must be 30-60 words describing CONTINUOUS MOTION:
+  - Show the speaking character's gestures, head tilts, lip movements, hand gestures, expression changes.
+  - Include camera motion: "slow push in", "over-the-shoulder shot", "camera orbits to reveal the other character".
+- BAD: "Character A standing and talking" (STATIC)
+- GOOD: "Camera slowly pushes in on Character A's face as she leans forward, eyes narrowing with suspicion, gesturing emphatically with her right hand, warm lamplight flickering across her features"
+
+IMAGE PROMPT QUALITY (drives the key frame image for each video clip):
 - Each imagePrompt must be 50-100 words minimum.
 - Show the SPEAKING CHARACTER prominently — their face, expression, and body language.
 - Always include the art style: ${style}.
