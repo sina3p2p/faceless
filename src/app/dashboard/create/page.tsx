@@ -26,6 +26,7 @@ interface PendingCharacter {
   name: string;
   description: string;
   generatedUrl?: string;
+  voiceId?: string;
 }
 
 export default function CreateVideoPage() {
@@ -69,7 +70,7 @@ export default function CreateVideoPage() {
     setError("");
 
     try {
-      const characters: Array<{ imageUrl: string; name: string; description: string }> = [];
+      const characters: Array<{ imageUrl: string; name: string; description: string; voiceId?: string }> = [];
 
       for (const char of pendingCharacters) {
         if (char.generatedUrl) {
@@ -77,6 +78,7 @@ export default function CreateVideoPage() {
             imageUrl: char.generatedUrl,
             name: char.name,
             description: char.description,
+            voiceId: char.voiceId || undefined,
           });
         } else if (char.file) {
           const url = await uploadCharacterImage(char.file);
@@ -85,6 +87,7 @@ export default function CreateVideoPage() {
               imageUrl: url,
               name: char.name,
               description: char.description,
+              voiceId: char.voiceId || undefined,
             });
           }
         }
@@ -306,6 +309,19 @@ export default function CreateVideoPage() {
                           )}
                         </button>
                       )}
+                      <div className="mt-2">
+                        <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-medium mb-1">
+                          Voice
+                        </label>
+                        <VoiceSelector
+                          value={char.voiceId || ""}
+                          onChange={(voiceId) => {
+                            setPendingCharacters((prev) =>
+                              prev.map((c, i) => (i === idx ? { ...c, voiceId } : c))
+                            );
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -391,19 +407,30 @@ export default function CreateVideoPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Voice
+                  {form.videoType === "dialogue" ? "Narrator / Default Voice" : "Voice"}
                 </label>
                 <VoiceSelector
                   value={form.voiceId}
                   onChange={(voiceId) => setForm({ ...form, voiceId })}
                 />
                 <p className="text-xs text-gray-500 mt-1.5">
-                  Leave unselected to use the default voice.
+                  {form.videoType === "dialogue"
+                    ? "Used for Narrator lines and characters without an assigned voice."
+                    : "Leave unselected to use the default voice."}
                 </p>
               </div>
             </CardContent>
           )}
         </Card>
+
+        {form.videoType === "dialogue" && (() => {
+          const charsWithVoices = pendingCharacters.filter((c) => c.voiceId);
+          return charsWithVoices.length < 2 ? (
+            <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
+              Assign voices to at least 2 characters to use Dialogue mode.
+            </div>
+          ) : null;
+        })()}
 
         {error && (
           <div className="mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
@@ -419,7 +446,14 @@ export default function CreateVideoPage() {
           >
             Cancel
           </Button>
-          <Button type="submit" loading={loading} disabled={!form.prompt.trim()}>
+          <Button
+            type="submit"
+            loading={loading}
+            disabled={
+              !form.prompt.trim() ||
+              (form.videoType === "dialogue" && pendingCharacters.filter((c) => c.voiceId).length < 2)
+            }
+          >
             Generate Video
           </Button>
         </div>

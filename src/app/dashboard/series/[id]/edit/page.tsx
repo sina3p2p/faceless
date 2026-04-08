@@ -14,6 +14,7 @@ import { GenerateCharacterModal } from "@/components/generate-character-modal";
 interface CharacterImage {
   url: string;
   description: string;
+  voiceId?: string;
 }
 
 interface SeriesData {
@@ -355,6 +356,24 @@ export default function EditSeriesPage() {
                           </>
                         )}
                       </button>
+                      <div className="mt-2">
+                        <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-medium mb-1">
+                          Voice
+                        </label>
+                        <VoiceSelector
+                          value={char.voiceId || ""}
+                          onChange={async (voiceId) => {
+                            setCharacters((prev) =>
+                              prev.map((c, i) => i === idx ? { ...c, voiceId } : c)
+                            );
+                            await fetch(`/api/series/${id}/character-image`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ index: idx, voiceId }),
+                            });
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}

@@ -12,7 +12,7 @@ import postgres from "postgres";
 import { eq, and, ne, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL, getVideoSize } from "@/lib/constants";
-import { generateVideoScript, generateMusicScript, generateStandaloneScript, generateStandaloneMusicScript, generateMusicLyrics, generateStandaloneMusicLyrics, generateMusicVisuals, type MusicScript, type MusicLyrics } from "@/server/services/llm";
+import { generateVideoScript, generateMusicScript, generateStandaloneScript, generateStandaloneMusicScript, generateMusicLyrics, generateStandaloneMusicLyrics, generateMusicVisuals, generateDialogueScript, type MusicScript, type MusicLyrics } from "@/server/services/llm";
 import { generateSong, transcribeSong, alignLyricsToTranscription, type AlignedSection } from "@/server/services/music";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
@@ -120,7 +120,8 @@ async function generateTTSParallel(
   sceneTexts: string[],
   voiceId: string | undefined,
   workDir: string,
-  concurrency = 3
+  concurrency = 3,
+  perSceneVoiceIds?: (string | undefined)[]
 ): Promise<{ audioPaths: string[]; ttsResults: TTSResult[] }> {
   const audioPaths: string[] = new Array(sceneTexts.length);
   const ttsResults: TTSResult[] = new Array(sceneTexts.length);
@@ -135,12 +136,13 @@ async function generateTTSParallel(
   for (const chunk of chunks) {
     await Promise.all(
       chunk.map(async (i) => {
-        const result = await generateSpeech(sceneTexts[i], { voiceId });
+        const sceneVoice = perSceneVoiceIds?.[i] ?? voiceId;
+        const result = await generateSpeech(sceneTexts[i], { voiceId: sceneVoice });
         const audioPath = path.join(workDir, `audio_${i}.mp3`);
         await fs.writeFile(audioPath, result.audioBuffer);
         audioPaths[i] = audioPath;
         ttsResults[i] = result;
-        console.log(`Scene ${i}: TTS done, ${result.wordTimestamps.length} word timestamps`);
+        console.log(`Scene ${i}: TTS done (voice=${sceneVoice || "default"}), ${result.wordTimestamps.length} word timestamps`);
       })
     );
   }
@@ -569,11 +571,32 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
 
     const sceneTexts = existingScenes.map((s) => s.text);
 
-    // Generate TTS first so we know exact audio durations for video clip decisions
+    let perSceneVoiceIds: (string | undefined)[] | undefined;
+    if (videoType === "dialogue") {
+      const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string; voiceId?: string }>;
+      const voiceMap = new Map<string, string>();
+      for (const c of charImages) {
+        if (c.voiceId) {
+          const parts = c.description.split(":").map((s) => s.trim());
+          const name = parts.length >= 2 ? parts[0] : "";
+          if (name) voiceMap.set(name.toLowerCase(), c.voiceId);
+        }
+      }
+      perSceneVoiceIds = existingScenes.map((s) => {
+        if (!s.speaker || s.speaker.toLowerCase() === "narrator") {
+          return seriesRecord.defaultVoiceId ?? undefined;
+        }
+        return voiceMap.get(s.speaker.toLowerCase()) ?? seriesRecord.defaultVoiceId ?? undefined;
+      });
+      console.log(`[dialogue] Voice map: ${JSON.stringify(Object.fromEntries(voiceMap))}`);
+    }
+
     const ttsResult = await generateTTSParallel(
       sceneTexts,
       seriesRecord.defaultVoiceId ?? undefined,
-      workDir
+      workDir,
+      3,
+      perSceneVoiceIds
     );
     const { audioPaths, ttsResults } = ttsResult;
 
@@ -1136,6 +1159,86 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error(`Standalone script generation failed for ${videoProjectId}:`, errorMessage);
+    await updateVideoStatus(videoProjectId, "FAILED");
+    await db
+      .update(schema.renderJobs)
+      .set({ status: "FAILED", error: errorMessage })
+      .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
+    throw error;
+  }
+}
+
+export async function generateDialogueScriptJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      columns: { config: true },
+    });
+    const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;
+    const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 45;
+
+    const prompt = (seriesRecord.topicIdeas as string[])?.[0] || "";
+    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+    const characters = charImages.map((c) => {
+      const parts = c.description.split(":").map((s) => s.trim());
+      return parts.length >= 2
+        ? { name: parts[0], description: parts.slice(1).join(":").trim() }
+        : { name: "Character", description: c.description };
+    });
+
+    console.log(`Dialogue script generation starting: prompt="${prompt.slice(0, 80)}...", characters=${characters.length}, targetDuration=${targetDuration}s`);
+    await updateVideoStatus(videoProjectId, "SCRIPT");
+    await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
+    await job.updateProgress(10);
+
+    const script = await generateDialogueScript(
+      prompt,
+      seriesRecord.style,
+      characters,
+      targetDuration,
+      seriesRecord.llmModel || undefined,
+      !!seriesRecord.sceneContinuity,
+      seriesRecord.language || "en",
+      getModelDurations(seriesRecord.videoModel)
+    );
+
+    await db
+      .update(schema.videoProjects)
+      .set({
+        title: script.title,
+        script: JSON.stringify(script),
+        duration: script.totalDuration,
+      })
+      .where(eq(schema.videoProjects.id, videoProjectId));
+
+    for (let i = 0; i < script.scenes.length; i++) {
+      await db.insert(schema.videoScenes).values({
+        videoProjectId,
+        sceneOrder: i,
+        text: script.scenes[i].text,
+        imagePrompt: script.scenes[i].imagePrompt,
+        visualDescription: script.scenes[i].visualDescription,
+        searchQuery: script.scenes[i].searchQuery,
+        duration: script.scenes[i].duration,
+        speaker: script.scenes[i].speaker,
+      });
+    }
+
+    await updateVideoStatus(videoProjectId, "REVIEW_SCRIPT");
+    await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
+    await job.updateProgress(100);
+
+    console.log(`Dialogue script ready for review: ${script.title} (${script.scenes.length} scenes)`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`Dialogue script generation failed for ${videoProjectId}:`, errorMessage);
     await updateVideoStatus(videoProjectId, "FAILED");
     await db
       .update(schema.renderJobs)

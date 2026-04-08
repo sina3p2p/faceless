@@ -10,6 +10,7 @@ const updateSchema = z.object({
   imagePrompt: z.string().optional(),
   visualDescription: z.string().optional(),
   searchQuery: z.string().optional(),
+  speaker: z.string().optional(),
   duration: z.number().min(1).max(30).optional(),
   assetUrl: z.string().optional(),
 });
@@ -43,6 +44,7 @@ export async function PATCH(
   if (parsed.data.imagePrompt !== undefined) updates.imagePrompt = parsed.data.imagePrompt;
   if (parsed.data.visualDescription !== undefined) updates.visualDescription = parsed.data.visualDescription;
   if (parsed.data.searchQuery !== undefined) updates.searchQuery = parsed.data.searchQuery;
+  if (parsed.data.speaker !== undefined) updates.speaker = parsed.data.speaker;
   if (parsed.data.duration !== undefined) updates.duration = parsed.data.duration;
   if (parsed.data.assetUrl !== undefined) updates.assetUrl = parsed.data.assetUrl;
 

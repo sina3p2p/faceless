@@ -8,7 +8,7 @@ import { z } from "zod/v4";
 
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
-  videoType: z.enum(["faceless", "ai_video", "music_video"]).default("ai_video"),
+  videoType: z.enum(["faceless", "ai_video", "music_video", "dialogue"]).default("ai_video"),
   style: z.string().default("cinematic"),
   imageModel: z.string().default("dall-e-3"),
   videoModel: z.string().default("kling-3-standard"),
@@ -25,6 +25,7 @@ const standaloneSchema = z.object({
         imageUrl: z.string(),
         name: z.string(),
         description: z.string(),
+        voiceId: z.string().optional(),
       })
     )
     .optional(),
@@ -55,6 +56,7 @@ export async function POST(req: NextRequest) {
   const characterImages = (data.characters ?? []).map((c) => ({
     url: c.imageUrl,
     description: c.name ? `${c.name}: ${c.description}` : c.description,
+    ...(c.voiceId ? { voiceId: c.voiceId } : {}),
   }));
 
   const [internalSeries] = await db
@@ -92,7 +94,9 @@ export async function POST(req: NextRequest) {
 
   const jobName = data.videoType === "music_video"
     ? "generate-music-lyrics"
-    : "generate-standalone-script";
+    : data.videoType === "dialogue"
+      ? "generate-dialogue-script"
+      : "generate-standalone-script";
 
   await renderQueue.add(jobName, {
     videoProjectId: videoProject.id,

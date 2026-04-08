@@ -14,7 +14,7 @@ import { GenerateCharacterModal } from "@/components/generate-character-modal";
 export default function NewSeriesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [pendingCharacters, setPendingCharacters] = useState<Array<{ file: File | null; preview: string; description: string; generatedUrl?: string }>>([]);
+  const [pendingCharacters, setPendingCharacters] = useState<Array<{ file: File | null; preview: string; description: string; generatedUrl?: string; voiceId?: string }>>([]);
   const [describingIdx, setDescribingIdx] = useState<number | null>(null);
   const [showCharGenModal, setShowCharGenModal] = useState(false);
   const [form, setForm] = useState({
@@ -70,7 +70,7 @@ export default function NewSeriesPage() {
           await fetch(`/api/series/${newSeries.id}/character-image`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: char.generatedUrl, description: char.description }),
+            body: JSON.stringify({ url: char.generatedUrl, description: char.description, voiceId: char.voiceId || undefined }),
           });
         } else if (char.file) {
           const fd = new FormData();
@@ -79,14 +79,16 @@ export default function NewSeriesPage() {
             method: "POST",
             body: fd,
           });
-          if (uploadRes.ok && char.description) {
+          if (uploadRes.ok) {
             const uploadData = await uploadRes.json();
             const idx = (uploadData.characterImages as Array<unknown>).length - 1;
-            await fetch(`/api/series/${newSeries.id}/character-image`, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ index: idx, description: char.description }),
-            });
+            if (char.description || char.voiceId) {
+              await fetch(`/api/series/${newSeries.id}/character-image`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ index: idx, description: char.description, voiceId: char.voiceId || undefined }),
+              });
+            }
           }
         }
       }
@@ -312,6 +314,19 @@ export default function NewSeriesPage() {
                           )}
                         </button>
                       )}
+                      <div className="mt-2">
+                        <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-medium mb-1">
+                          Voice
+                        </label>
+                        <VoiceSelector
+                          value={char.voiceId || ""}
+                          onChange={(voiceId) => {
+                            setPendingCharacters((prev) =>
+                              prev.map((c, i) => i === idx ? { ...c, voiceId } : c)
+                            );
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -354,6 +369,15 @@ export default function NewSeriesPage() {
             </div>
           </CardContent>
         </Card>
+
+        {form.videoType === "dialogue" && (() => {
+          const charsWithVoices = pendingCharacters.filter((c) => c.voiceId);
+          return charsWithVoices.length < 2 ? (
+            <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
+              Assign voices to at least 2 characters to use Dialogue mode.
+            </div>
+          ) : null;
+        })()}
 
         <div className="flex justify-end gap-3 mt-6">
           <Button

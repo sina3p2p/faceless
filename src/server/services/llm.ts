@@ -809,3 +809,92 @@ ${buildCharacterBlock(characters)}`;
 
   return object;
 }
+
+// ── Dialogue Script Generation ──
+
+const dialogueSceneSchema = z.object({
+  speaker: z.string().describe("Who is speaking: exact character name or 'Narrator'"),
+  text: z.string().describe("What this character says, or narrator description"),
+  visualDescription: z.string().describe("Rich description of the visual — who is on screen, their expression, posture, environment"),
+  imagePrompt: z.string().describe("Detailed prompt for AI image generation (50-100+ words). Show the speaking character clearly."),
+  searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
+  duration: z.number().describe("Duration of this scene in seconds"),
+});
+
+const dialogueScriptSchema = z.object({
+  title: z.string().describe("Title for this dialogue video"),
+  hook: z.string().describe("Brief hook or setup for the conversation"),
+  scenes: z.array(dialogueSceneSchema),
+  cta: z.string().describe("Call to action at the end"),
+  totalDuration: z.number().describe("Total video duration in seconds"),
+});
+
+export type DialogueScript = z.infer<typeof dialogueScriptSchema>;
+
+export async function generateDialogueScript(
+  prompt: string,
+  style: string,
+  characters: StandaloneCharacter[],
+  targetDuration = 45,
+  model?: string,
+  sceneContinuity = false,
+  language = "en",
+  durations?: number[]
+): Promise<DialogueScript> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const charList = characters.map((c, i) => `  - ${c.name} (@Element${i + 1}): ${c.description}`).join("\n");
+
+  const systemPrompt = `You are an elite dialogue scriptwriter for short-form video. You create compelling conversations between characters for TikTok, YouTube Shorts, and Instagram Reels.
+
+OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
+- ALL text content (title, hook, dialogue text, CTA) MUST be written in ${langName}.
+- imagePrompt, visualDescription, and searchQuery MUST remain in English for best AI model compatibility.
+
+DIALOGUE RULES:
+1. Each scene is ONE character's spoken turn (or a Narrator line for scene-setting).
+2. The "speaker" field must be the EXACT character name from the list below, or "Narrator" for narration.
+3. Alternate between characters naturally. Don't have the same character speak twice in a row unless dramatically appropriate.
+4. Narrator lines should be used sparingly for scene-setting, transitions, or dramatic emphasis — NOT for every turn.
+5. Each character should have a distinct speaking style that reflects their personality.
+6. Build dramatic tension, humor, or emotional depth through the conversation.
+7. End with a satisfying or cliffhanger conclusion.
+
+CHARACTERS (CRITICAL — only these speakers are valid):
+${charList}
+
+SCENE STRUCTURE:
+- Start with a hook that pulls viewers in (a Narrator intro or a character's provocative opening line).
+- Build the conversation with escalating stakes, reveals, or comedy.
+- Each scene = one speaker's turn. Keep dialogue lines 10-25 words.
+- Total conversation should feel like a natural exchange, not scripted Q&A.
+${buildDurationInstruction(targetDuration, durations)}
+
+IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
+- Each imagePrompt must be 50-100 words minimum.
+- Show the SPEAKING CHARACTER prominently — their face, expression, and body language.
+- Always include the art style: ${style}.
+- For Narrator scenes, show the environment or both characters.
+- EACH scene's imagePrompt must be visually DIFFERENT. Vary camera angles, expressions, and compositions.
+- NO COPYRIGHTED CONTENT IN IMAGE PROMPTS: Reimagine characters with original visual details.
+${["claymation", "gothic-clay"].includes(style) ? `
+CLAYMATION STYLE RULES:
+- Every subject must look handcrafted from clay/plasticine
+- Include: "Claymation stop-motion style, everything made of sculpted clay and plasticine"` : ""}${sceneContinuity ? `
+SCENE CONTINUITY MODE:
+- Maintain consistent character appearances across all scenes.
+- Visual style and environment should feel cohesive.` : ""}`;
+
+  const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. Create an engaging dialogue between the characters that feels natural and compelling.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: dialogueScriptSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
+
+  return object;
+}

@@ -157,6 +157,7 @@ export const videoScenes = pgTable("video_scenes", {
   assetUrl: text("asset_url"),
   assetType: text("asset_type"),
   modelUsed: text("model_used"),
+  speaker: text("speaker"),
   duration: real("duration"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });

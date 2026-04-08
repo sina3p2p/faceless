@@ -84,7 +84,9 @@ export async function POST(req: NextRequest) {
 
   const jobName = seriesRecord.videoType === "music_video"
     ? "generate-music-lyrics"
-    : "generate-script";
+    : seriesRecord.videoType === "dialogue"
+      ? "generate-dialogue-script"
+      : "generate-script";
 
   await renderQueue.add(jobName, {
     videoProjectId: videoProject.id,

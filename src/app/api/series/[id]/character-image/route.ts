@@ -6,11 +6,12 @@ import { eq, and } from "drizzle-orm";
 import { uploadFile } from "@/lib/storage";
 import { z } from "zod/v4";
 
-type CharacterImage = { url: string; description: string };
+type CharacterImage = { url: string; description: string; voiceId?: string };
 
 const addGeneratedSchema = z.object({
   url: z.string().min(1),
   description: z.string().default(""),
+  voiceId: z.string().optional(),
 });
 
 export async function POST(
@@ -36,7 +37,9 @@ export async function POST(
     const parsed = addGeneratedSchema.safeParse(body);
     if (!parsed.success) return badRequest(parsed.error.message);
 
-    const newImages = [...currentImages, { url: parsed.data.url, description: parsed.data.description }];
+    const newEntry: CharacterImage = { url: parsed.data.url, description: parsed.data.description };
+    if (parsed.data.voiceId) newEntry.voiceId = parsed.data.voiceId;
+    const newImages = [...currentImages, newEntry];
     await db
       .update(series)
       .set({ characterImages: newImages, updatedAt: new Date() })
@@ -79,7 +82,8 @@ export async function POST(
 
 const updateDescSchema = z.object({
   index: z.number().int().min(0),
-  description: z.string(),
+  description: z.string().optional(),
+  voiceId: z.string().nullable().optional(),
 });
 
 export async function PATCH(
@@ -104,7 +108,10 @@ export async function PATCH(
   const images = [...((existing.characterImages ?? []) as CharacterImage[])];
   if (parsed.data.index >= images.length) return badRequest("Invalid index");
 
-  images[parsed.data.index] = { ...images[parsed.data.index], description: parsed.data.description };
+  const updates: Partial<CharacterImage> = {};
+  if (parsed.data.description !== undefined) updates.description = parsed.data.description;
+  if (parsed.data.voiceId !== undefined) updates.voiceId = parsed.data.voiceId ?? undefined;
+  images[parsed.data.index] = { ...images[parsed.data.index], ...updates };
 
   await db
     .update(series)

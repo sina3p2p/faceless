@@ -245,4 +245,5 @@ export const VIDEO_TYPES = [
   { id: "faceless", label: "Faceless", description: "Stock footage and AI images with voiceover" },
   { id: "ai_video", label: "AI Video", description: "AI-generated animated video clips per scene (higher cost)" },
   { id: "music_video", label: "Music Video", description: "AI-generated song with vocals + cinematic visuals (~$3-4/video)" },
+  { id: "dialogue", label: "Dialogue", description: "Conversational story between characters with different voices" },
 ] as const;

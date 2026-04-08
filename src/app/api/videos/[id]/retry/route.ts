@@ -39,7 +39,9 @@ export async function POST(
 
   const jobName = video.series.videoType === "music_video"
     ? "generate-music-lyrics"
-    : "generate-script";
+    : video.series.videoType === "dialogue"
+      ? "generate-dialogue-script"
+      : "generate-script";
 
   await renderQueue.add(jobName, {
     videoProjectId: id,

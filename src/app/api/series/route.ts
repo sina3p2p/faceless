@@ -17,7 +17,7 @@ const createSeriesSchema = z.object({
   sceneContinuity: z.boolean().default(false),
   captionStyle: z.string().default("default"),
   language: z.string().default("en"),
-  videoType: z.enum(["faceless", "ai_video", "music_video"]).default("faceless"),
+  videoType: z.enum(["faceless", "ai_video", "music_video", "dialogue"]).default("faceless"),
   topicIdeas: z.array(z.string()).default([]),
 });
 

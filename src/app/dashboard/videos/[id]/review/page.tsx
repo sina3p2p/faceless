@@ -30,6 +30,7 @@ interface Scene {
   imagePrompt: string | null;
   visualDescription: string | null;
   searchQuery: string | null;
+  speaker: string | null;
   duration: number;
   assetUrl: string | null;
   assetType: string | null;
@@ -55,16 +56,18 @@ function SortableSceneCard({
   onEditPrompt,
   generatingImage,
   isMusicVideo,
+  isDialogue,
 }: {
   scene: Scene;
   index: number;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: () => void;
-  onUpdate: (updates: { text?: string; duration?: number }) => void;
+  onUpdate: (updates: { text?: string; duration?: number; speaker?: string }) => void;
   onEditPrompt: () => void;
   generatingImage: boolean;
   isMusicVideo?: boolean;
+  isDialogue?: boolean;
 }) {
   const {
     attributes,
@@ -138,10 +141,23 @@ function SortableSceneCard({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
+          {/* Speaker badge for dialogue */}
+          {isDialogue && scene.speaker && (
+            <div className="mb-1.5">
+              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
+                scene.speaker.toLowerCase() === "narrator"
+                  ? "bg-gray-500/20 text-gray-400"
+                  : "bg-violet-500/20 text-violet-400"
+              }`}>
+                {scene.speaker}
+              </span>
+            </div>
+          )}
+
           {/* Narration / Lyrics text */}
           <div className="mb-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-600 font-medium">
-              {isMusicVideo ? scene.searchQuery || "Lyrics" : "Narration"}
+              {isMusicVideo ? scene.searchQuery || "Lyrics" : isDialogue ? "Dialogue" : "Narration"}
             </span>
             {editing ? (
               <textarea
@@ -901,7 +917,7 @@ export default function ReviewPage() {
 
   function handleUpdateScene(
     sceneId: string,
-    updates: { text?: string; duration?: number }
+    updates: { text?: string; duration?: number; speaker?: string }
   ) {
     setScenes((prev) =>
       prev.map((s) => (s.id === sceneId ? { ...s, ...updates } : s))
@@ -1242,6 +1258,7 @@ export default function ReviewPage() {
                 onEditPrompt={() => setEditingScene(scene)}
                 generatingImage={generatingSceneIds.has(scene.id)}
                 isMusicVideo={video?.series?.videoType === "music_video"}
+                isDialogue={video?.series?.videoType === "dialogue"}
               />
             ))}
           </div>
