@@ -26,7 +26,6 @@ import {
 import {
   getAIVideoForScene,
   downloadAIVideo,
-  uploadImageForFal,
 } from "@/server/services/ai-video";
 import {
   composeVideo,
@@ -148,7 +147,7 @@ async function generateTTSParallel(
   return { audioPaths, ttsResults };
 }
 
-type PreApproved = Map<number, { path: string; type: "video" | "image" }>;
+type PreApproved = Map<number, { path: string; type: "video" | "image"; url: string }>;
 
 type ScriptInput = Pick<Awaited<ReturnType<typeof generateVideoScript>>, "scenes">;
 
@@ -165,7 +164,7 @@ async function reusePreApprovedImages(
         const ext = scene.assetType === "video" ? "mp4" : "jpg";
         const localPath = path.join(workDir, `media_${i}.${ext}`);
         await downloadFile(signedUrl, localPath);
-        result.set(i, { path: localPath, type: (scene.assetType as "video" | "image") || "image" });
+        result.set(i, { path: localPath, type: (scene.assetType as "video" | "image") || "image", url: signedUrl });
         console.log(`Scene ${i}: Reusing pre-approved ${scene.assetType || "image"}`);
       } catch (err) {
         console.warn(`Scene ${i}: Could not reuse pre-approved asset, will regenerate:`, err);
@@ -258,8 +257,9 @@ async function fetchAIVideoMediaParallel(
   const continuity = !!seriesRecord.sceneContinuity;
   const charRefs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
 
-  // Phase 1: Generate/collect all scene images first (needed for continuity pairs)
+  // Phase 1: Generate/collect all scene images and keep their remote URLs
   const sceneImagePaths: string[] = new Array(script.scenes.length);
+  const sceneImageUrls: string[] = new Array(script.scenes.length);
   const imgChunks: number[][] = [];
   for (let i = 0; i < script.scenes.length; i += concurrency) {
     imgChunks.push(
@@ -278,10 +278,12 @@ async function fetchAIVideoMediaParallel(
           const approved = preApproved.get(i)!;
           if (approved.type === "image") {
             await fs.copyFile(approved.path, imagePath);
+            sceneImageUrls[i] = approved.url;
             console.log(`Scene ${i}: Using pre-approved image`);
           }
         } else {
           const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, charRefs);
+          sceneImageUrls[i] = generatedImage.url;
           await downloadFile(generatedImage.url, imagePath);
         }
 
@@ -290,18 +292,7 @@ async function fetchAIVideoMediaParallel(
     );
   }
 
-  // Phase 2: Upload all images to fal.ai
-  const falImageUrls: string[] = new Array(script.scenes.length);
-  for (const chunk of imgChunks) {
-    await Promise.all(
-      chunk.map(async (i) => {
-        console.log(`Scene ${i}: Uploading image to fal.ai...`);
-        falImageUrls[i] = await uploadImageForFal(sceneImagePaths[i]);
-      })
-    );
-  }
-
-  // Phase 3: Generate video clips (with end-frame pairs when continuity is on)
+  // Phase 2: Generate video clips (pass image URLs directly to fal.ai — no re-upload needed)
   const vidChunks: number[][] = [];
   for (let i = 0; i < script.scenes.length; i += concurrency) {
     vidChunks.push(
@@ -317,9 +308,9 @@ async function fetchAIVideoMediaParallel(
         const videoModelKey = seriesRecord.videoModel || undefined;
         const desiredDuration = Math.max(3, Math.round(scene.duration));
 
-        const startImageUrl = falImageUrls[i];
+        const startImageUrl = sceneImageUrls[i];
         const endImageUrl = continuity && i < script.scenes.length - 1
-          ? falImageUrls[i + 1]
+          ? sceneImageUrls[i + 1]
           : undefined;
 
         console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"}, desired=${desiredDuration}s)${endImageUrl ? " → scene " + (i + 1) : ""}...`);

@@ -217,7 +217,7 @@ interface WhisperChunk {
 export async function transcribeSong(audioUrl: string): Promise<WhisperWord[]> {
   console.log("[whisper] Transcribing song for lyrics alignment...");
 
-  const result = await fal.subscribe("fal-ai/wizper", {
+  const result = await fal.subscribe("fal-ai/whisper", {
     input: {
       audio_url: audioUrl,
       task: "transcribe",

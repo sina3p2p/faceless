@@ -1,6 +1,5 @@
 import { fal } from "@fal-ai/client";
 import * as fs from "fs/promises";
-import * as path from "path";
 import { AI_VIDEO, VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
 
 fal.config({
@@ -153,13 +152,3 @@ export async function downloadAIVideo(
   await fs.writeFile(destPath, buffer);
 }
 
-export async function uploadImageForFal(
-  localPath: string
-): Promise<string> {
-  const buffer = await fs.readFile(localPath);
-  const ext = path.extname(localPath).slice(1) || "jpg";
-  const mimeType = ext === "png" ? "image/png" : "image/jpeg";
-  const file = new File([buffer], `scene.${ext}`, { type: mimeType });
-  const url = await fal.storage.upload(file);
-  return url;
-}
