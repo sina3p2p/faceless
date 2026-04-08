@@ -173,49 +173,6 @@ export async function generateKlingImage(
   }
 }
 
-export async function editKlingImage(
-  prompt: string,
-  imageUrl: string,
-  characterRefs?: CharacterRef[]
-): Promise<MediaAsset | null> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const elements: any[] = [];
-    if (characterRefs && characterRefs.length > 0) {
-      for (const ref of characterRefs) {
-        elements.push({ reference_image_urls: [ref.url] });
-      }
-    }
-
-    const elementRefs = elements.length > 0
-      ? ` ${elements.map((_, i) => `@Element${i + 1}`).join(" ")}`
-      : "";
-
-    const result = await fal.subscribe("fal-ai/kling-image/v3/image-to-image", {
-      input: {
-        prompt: `${prompt}${elementRefs}`,
-        image_url: imageUrl,
-        ...(elements.length > 0 ? { elements } : {}),
-        aspect_ratio: "9:16",
-        num_images: 1,
-        output_format: "jpeg",
-      },
-      logs: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
-
-    const data = result.data as { images?: Array<{ url: string; width: number; height: number }> };
-    const image = data?.images?.[0];
-    if (!image?.url) return null;
-
-    return { url: image.url, type: "image", source: "kling", width: image.width || 768, height: image.height || 1344 };
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : JSON.stringify(err);
-    console.error(`Kling image edit failed:`, detail);
-    return null;
-  }
-}
-
 export interface CharacterRef {
   url: string;
   description: string;

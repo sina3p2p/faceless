@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, inArray } from "drizzle-orm";
-import { generateImage, generateKlingImage, editKlingImage, generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
+import { generateImage, generateKlingImage, generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod";
 
@@ -91,15 +91,7 @@ export async function POST(
   try {
     let imageUrl: string | null = null;
 
-    if (mode === "edit" && imageModel === "kling-image-v3" && scene.assetUrl) {
-      const currentImageUrl = scene.assetUrl.startsWith("http")
-        ? scene.assetUrl
-        : await getSignedDownloadUrl(scene.assetUrl);
-
-      const allRefs = [...sceneRefs, ...charRefs];
-      const result = await editKlingImage(cleanedPrompt, currentImageUrl, allRefs.length > 0 ? allRefs : undefined);
-      imageUrl = result?.url ?? null;
-    } else if (mode === "edit" && imageModel === "nano-banana-2" && scene.assetUrl) {
+    if (mode === "edit" && (imageModel === "kling-image-v3" || imageModel === "nano-banana-2") && scene.assetUrl) {
       const currentImageUrl = scene.assetUrl.startsWith("http")
         ? scene.assetUrl
         : await getSignedDownloadUrl(scene.assetUrl);
