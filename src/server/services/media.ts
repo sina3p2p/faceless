@@ -158,7 +158,7 @@ export async function generateKlingImage(
         output_format: "jpeg",
       },
       logs: true,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     const data = result.data as { images?: Array<{ url: string; width: number; height: number }> };
@@ -183,7 +183,7 @@ export async function editKlingImage(
     const elements: any[] = [];
     if (characterRefs && characterRefs.length > 0) {
       for (const ref of characterRefs) {
-        elements.push({ frontal_image_url: ref.url });
+        elements.push({ reference_image_urls: [ref.url] });
       }
     }
 
@@ -201,7 +201,7 @@ export async function editKlingImage(
         output_format: "jpeg",
       },
       logs: true,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     const data = result.data as { images?: Array<{ url: string; width: number; height: number }> };
@@ -252,7 +252,7 @@ export async function generateNanoBananaImage(
     const result = await fal.subscribe(modelId, {
       input,
       logs: true,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
 
     const data = result.data as { images?: Array<{ url: string; width?: number; height?: number }> };
