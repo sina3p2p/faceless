@@ -47,6 +47,35 @@ const musicScriptSchema = z.object({
 export type MusicSection = z.infer<typeof musicSectionSchema>;
 export type MusicScript = z.infer<typeof musicScriptSchema>;
 
+// Phase 1: lyrics only (no visual fields)
+const musicLyricsSectionSchema = z.object({
+  sectionName: z.string().describe("Section type, e.g. 'Intro', 'Verse 1', 'Chorus', 'Bridge', 'Outro'"),
+  lyrics: z.array(z.string()).describe("Song lyrics for this section, one line per array element"),
+  durationMs: z.number().describe("Estimated section duration in milliseconds — will be replaced by actual timestamps after song generation"),
+  positiveStyles: z.array(z.string()).describe("Musical elements to include, e.g. 'electric guitar', 'driving drums', 'female vocals'"),
+  negativeStyles: z.array(z.string()).describe("Musical elements to avoid, e.g. 'saxophone', 'country twang'"),
+});
+
+const musicLyricsSchema = z.object({
+  title: z.string().describe("Catchy song title"),
+  genre: z.string().describe("Music genre/style for the AI music generator, e.g. 'pop, upbeat, catchy'"),
+  sections: z.array(musicLyricsSectionSchema),
+});
+
+export type MusicLyrics = z.infer<typeof musicLyricsSchema>;
+
+// Phase 2: visuals only (receives actual timestamps)
+const musicVisualSectionSchema = z.object({
+  imagePrompt: z.string().describe("Extremely detailed visual prompt for the key frame image of this section's video clip"),
+  visualDescription: z.string().describe("Detailed motion/action description for the AI video model — camera motion, subject motion, environmental animation"),
+});
+
+const musicVisualSchema = z.object({
+  sections: z.array(musicVisualSectionSchema),
+});
+
+export type MusicVisuals = z.infer<typeof musicVisualSchema>;
+
 // ── Script Refinement (chat-based) ──
 
 export interface ChatMessage {
@@ -451,6 +480,174 @@ KIDS MUSIC RULES:
     system: systemPrompt,
     prompt: userPrompt,
     temperature: 0.85,
+  });
+
+  return object;
+}
+
+// ── Phase 1: Music Lyrics Only (no visual fields) ──
+
+export async function generateMusicLyrics(
+  niche: string,
+  style: string,
+  topicIdea?: string,
+  targetDuration = 60,
+  model?: string,
+  previousTopics: string[] = [],
+  language = "en",
+  durations?: number[]
+): Promise<MusicLyrics> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const systemPrompt = `You are an elite songwriter. You create songs that go viral on TikTok and YouTube Shorts.
+
+OUTPUT LANGUAGE (CRITICAL):
+- ALL lyrics, song title, and sectionName MUST be written in ${langName}.
+- genre, positiveStyles, and negativeStyles MUST remain in English for best AI compatibility.
+
+SONGWRITING RULES:
+1. Write lyrics that are CATCHY, MEMORABLE, and SINGABLE. Use rhyme, repetition, and strong hooks.
+2. The chorus should be the most memorable part — repeat it 2-3 times.
+3. Keep lyrics SHORT per line (5-10 words). Each line must be at most 200 characters.
+4. Match the genre to the niche: ${niche}
+5. Total song duration MUST be approximately ${targetDuration} seconds. This is CRITICAL for cost control.
+6. ${buildMusicDurationInstruction(targetDuration, durations)}
+7. positiveStyles should describe instruments, tempo, and vocal characteristics that match the genre.
+8. negativeStyles should list elements that would clash with the desired sound.
+${niche === "kids" ? `
+KIDS MUSIC RULES:
+- Write fun, educational, catchy songs for ages 4-10.
+- Simple words, lots of repetition, energetic and joyful.
+- Genre should be upbeat pop or playful children's music.
+` : ""}`;
+
+  const seriesContext = previousTopics.length > 0
+    ? `\n\nALBUM CONTINUITY — Previous tracks:\n${previousTopics.map((t, i) => `  Track ${previousTopics.length - i}: "${t}"`).join("\n")}\n\nCreate the NEXT track. Same album feel, but fresh topic/lyrics. NEVER repeat.`
+    : "";
+
+  const userPrompt = topicIdea
+    ? `Create a viral ${niche}-themed song about: ${topicIdea}. The song should be irresistibly catchy.${seriesContext}`
+    : `Create a viral ${niche}-themed song. Pick a topic that resonates emotionally.${seriesContext}`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: musicLyricsSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
+
+  return object;
+}
+
+export async function generateStandaloneMusicLyrics(
+  prompt: string,
+  style: string,
+  characters: { name: string; description: string }[] = [],
+  targetDuration = 60,
+  model?: string,
+  language = "en",
+  durations?: number[]
+): Promise<MusicLyrics> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const charBlock = characters.length > 0
+    ? `\n\nCHARACTERS:\n${characters.map((c) => `  - ${c.name}: ${c.description}`).join("\n")}\nReference these characters in the lyrics.\n`
+    : "";
+
+  const systemPrompt = `You are an elite songwriter. Create songs that go viral on TikTok and YouTube.
+
+OUTPUT LANGUAGE (CRITICAL):
+- ALL lyrics, song title, sectionName MUST be in ${langName}.
+- genre, positiveStyles, negativeStyles MUST remain in English.
+
+SONGWRITING RULES:
+1. CATCHY, MEMORABLE, SINGABLE lyrics. Rhyme, repetition, strong hooks.
+2. Chorus = most memorable part, repeat 2-3 times.
+3. SHORT lines (5-10 words, max 200 chars each).
+4. Total song duration ~${targetDuration} seconds.
+5. ${buildMusicDurationInstruction(targetDuration, durations)}
+6. positiveStyles: instruments, tempo, vocals.
+7. negativeStyles: elements to avoid.
+${charBlock}`;
+
+  const userPrompt = buildInputTypeInstruction(prompt) + `\n\nThe song should be irresistibly catchy.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: musicLyricsSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
+
+  return object;
+}
+
+// ── Phase 2: Music Visuals (receives actual timestamps) ──
+
+interface VisualSection {
+  sectionName: string;
+  lyrics: string[];
+  durationSec: number;
+}
+
+export async function generateMusicVisuals(
+  sections: VisualSection[],
+  style: string,
+  model?: string,
+  language = "en"
+): Promise<MusicVisuals> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const sectionsContext = sections.map((s, i) =>
+    `Section ${i + 1} — "${s.sectionName}" (${s.durationSec}s):\n  Lyrics: ${s.lyrics.join(" / ")}`
+  ).join("\n\n");
+
+  const systemPrompt = `You are an elite music video director. Given a song's sections (with lyrics and ACTUAL durations from the generated audio), create detailed visual prompts for each section.
+
+The song lyrics are in ${langName}, but ALL imagePrompt and visualDescription MUST be in English.
+
+VISUAL-MUSIC SYNC RULES:
+1. MATCH ENERGY TO SECTION TYPE:
+   - Intro: Establishing shot, slow reveal, atmospheric
+   - Verse: Storytelling, medium shots, narrative progression
+   - Pre-Chorus: Building tension, camera closer, lighting intensifies
+   - Chorus: MAXIMUM energy, wide dynamic shots, vibrant colors
+   - Bridge: Contrast, new location, emotional turning point
+   - Outro: Resolution, wide pullback, fading light, closure
+
+2. LYRIC-VISUAL LITERALISM: Every section's visuals must directly reference the lyrics.
+
+3. imagePrompt DETAIL (50-100+ words minimum per section):
+   - SUBJECT: appearance, clothing, expression, pose
+   - ENVIRONMENT: setting, architecture, weather, time of day
+   - LIGHTING: light source, shadows, color temperature
+   - CAMERA: angle and framing
+   - MOOD: atmospheric elements (fog, rain, bokeh, smoke)
+   - COLOR PALETTE: dominant colors matching emotional tone
+   - STYLE: ${style}
+   - NO COPYRIGHTED CONTENT: NEVER use copyrighted character names OR iconic signature details in imagePrompt or visualDescription. Reimagine with original visuals.
+
+4. visualDescription MOTION:
+   - Camera motion, subject motion, environmental motion
+   - Match speed to music tempo
+
+5. ONE ACTION PER SECTION: Each section = ONE clear visual moment.
+
+6. VISUAL CONTINUITY: Consistent main character/subject, coherent color palette across all sections.
+
+You MUST return exactly ${sections.length} sections in the same order.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: musicVisualSchema,
+    system: systemPrompt,
+    prompt: `Generate visual prompts for this song:\n\n${sectionsContext}`,
+    temperature: 0.8,
   });
 
   return object;

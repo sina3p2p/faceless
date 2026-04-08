@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { renderVideoJob, rerenderVideoJob, generateScriptJob, renderFromScenesJob, generateMusicScriptJob, renderMusicVideoJob, generateStandaloneScriptJob, generateStandaloneMusicScriptJob, generateImagesJob } from "./renderJob";
+import { renderVideoJob, rerenderVideoJob, generateScriptJob, renderFromScenesJob, generateMusicScriptJob, renderMusicVideoJob, generateStandaloneScriptJob, generateStandaloneMusicScriptJob, generateImagesJob, generateMusicLyricsJob, generateSongJob, generateMusicVisualsJob } from "./renderJob";
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { REDIS, WORKER } from "@/lib/constants";
@@ -24,6 +24,12 @@ const worker = new Worker(
       await generateStandaloneScriptJob(job);
     } else if (job.name === "generate-standalone-music-script") {
       await generateStandaloneMusicScriptJob(job);
+    } else if (job.name === "generate-music-lyrics") {
+      await generateMusicLyricsJob(job);
+    } else if (job.name === "generate-song") {
+      await generateSongJob(job);
+    } else if (job.name === "generate-music-visuals") {
+      await generateMusicVisualsJob(job);
     } else if (job.name === "generate-images") {
       await generateImagesJob(job);
     } else if (job.name === "render-from-scenes") {

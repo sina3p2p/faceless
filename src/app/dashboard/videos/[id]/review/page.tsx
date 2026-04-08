@@ -975,6 +975,24 @@ export default function ReviewPage() {
     }
   }
 
+  // Music-specific: generate song from lyrics
+  const [generatingSong, setGeneratingSong] = useState(false);
+  async function handleGenerateSong() {
+    setGeneratingSong(true);
+    try {
+      const res = await fetch(`/api/videos/${id}/generate-song`, { method: "POST" });
+      if (res.ok) {
+        setVideo((prev) => prev ? { ...prev, status: "MUSIC_GENERATION" } : prev);
+        router.push(`/dashboard/videos/${id}`);
+      }
+    } finally {
+      setGeneratingSong(false);
+    }
+  }
+
+  const isMusicLyricsReview = video?.status === "REVIEW_MUSIC_SCRIPT";
+  const isVisualReview = video?.status === "REVIEW_VISUAL";
+
   // Poll for image progress while the worker is generating images
   useEffect(() => {
     const isGenerating = video?.status === "IMAGE_GENERATION";
@@ -1096,11 +1114,15 @@ export default function ReviewPage() {
         </Button>
 
         <h1 className="text-2xl font-bold mb-2">
-          {video?.title ?? (video?.series?.videoType === "music_video" ? "Review Song" : "Review Script")}
+          {video?.title ?? (isMusicLyricsReview ? "Review Lyrics" : isVisualReview ? "Review Visuals" : video?.series?.videoType === "music_video" ? "Review Song" : "Review Script")}
         </h1>
         <p className="text-gray-400 text-sm">
-          {video?.series?.videoType === "music_video"
-            ? "Review your song lyrics and sections, then generate preview images before creating the music video."
+          {isMusicLyricsReview
+            ? "Review and edit your song lyrics, then generate the song."
+            : isVisualReview
+            ? "Review and edit the visual prompts for each section, then generate preview images."
+            : video?.series?.videoType === "music_video"
+            ? "Review your song scenes, then generate preview images before creating the music video."
             : "Review your script, then generate preview images to approve before creating the video."}
         </p>
       </div>
@@ -1130,45 +1152,67 @@ export default function ReviewPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {!allImagesGenerated && (
+            {isMusicLyricsReview ? (
               <Button
-                variant="outline"
+                variant="primary"
                 size="sm"
-                loading={generatingAll}
-                onClick={() => handleGenerateAllImages(false)}
+                loading={generatingSong}
+                onClick={handleGenerateSong}
                 disabled={scenes.length === 0}
               >
-                {someImagesGenerated ? "Generate Remaining" : "Generate Preview Images"}
+                Generate Song
               </Button>
+            ) : (
+              <>
+                {!allImagesGenerated && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={generatingAll}
+                    onClick={() => handleGenerateAllImages(false)}
+                    disabled={scenes.length === 0}
+                  >
+                    {someImagesGenerated ? "Generate Remaining" : "Generate Preview Images"}
+                  </Button>
+                )}
+                {someImagesGenerated && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={generatingAll}
+                    onClick={() => handleGenerateAllImages(true)}
+                    disabled={scenes.length === 0}
+                  >
+                    Regenerate All Images
+                  </Button>
+                )}
+                <Button
+                  variant="primary"
+                  loading={rendering}
+                  onClick={handleStartRendering}
+                  disabled={scenes.length === 0}
+                >
+                  Generate Video
+                </Button>
+              </>
             )}
-            {someImagesGenerated && (
-              <Button
-                variant="outline"
-                size="sm"
-                loading={generatingAll}
-                onClick={() => handleGenerateAllImages(true)}
-                disabled={scenes.length === 0}
-              >
-                Regenerate All Images
-              </Button>
-            )}
-            <Button
-              variant="primary"
-              loading={rendering}
-              onClick={handleStartRendering}
-              disabled={scenes.length === 0}
-            >
-              Generate Video
-            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {!allImagesGenerated && scenes.length > 0 && (
+      {!allImagesGenerated && scenes.length > 0 && !isMusicLyricsReview && (
         <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
           <p className="text-sm text-amber-300">
             Generate preview images to see what each scene will look like before creating the video.
             You can edit prompts and regenerate until you&apos;re happy.
+          </p>
+        </div>
+      )}
+
+      {isMusicLyricsReview && scenes.length > 0 && (
+        <div className="mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+          <p className="text-sm text-violet-300">
+            Edit the lyrics and section details below. When you&apos;re happy, click &quot;Generate Song&quot; to create the music.
           </p>
         </div>
       )}
@@ -1213,34 +1257,47 @@ export default function ReviewPage() {
       {/* Bottom action */}
       {scenes.length > 0 && (
         <div className="mt-8 flex justify-center gap-3">
-          {!allImagesGenerated && (
+          {isMusicLyricsReview ? (
             <Button
-              variant="outline"
+              variant="primary"
               size="lg"
-              loading={generatingAll}
-              onClick={() => handleGenerateAllImages(false)}
+              loading={generatingSong}
+              onClick={handleGenerateSong}
             >
-              Generate Preview Images
+              Generate Song ({scenes.length} sections, ~{totalDuration.toFixed(0)}s)
             </Button>
+          ) : (
+            <>
+              {!allImagesGenerated && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  loading={generatingAll}
+                  onClick={() => handleGenerateAllImages(false)}
+                >
+                  Generate Preview Images
+                </Button>
+              )}
+              {someImagesGenerated && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  loading={generatingAll}
+                  onClick={() => handleGenerateAllImages(true)}
+                >
+                  Regenerate All Images
+                </Button>
+              )}
+              <Button
+                variant="primary"
+                size="lg"
+                loading={rendering}
+                onClick={handleStartRendering}
+              >
+                Generate Video ({scenes.length} scenes, {totalDuration.toFixed(0)}s)
+              </Button>
+            </>
           )}
-          {someImagesGenerated && (
-            <Button
-              variant="outline"
-              size="lg"
-              loading={generatingAll}
-              onClick={() => handleGenerateAllImages(true)}
-            >
-              Regenerate All Images
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            size="lg"
-            loading={rendering}
-            onClick={handleStartRendering}
-          >
-            Generate Video ({scenes.length} scenes, {totalDuration.toFixed(0)}s)
-          </Button>
         </div>
       )}
 

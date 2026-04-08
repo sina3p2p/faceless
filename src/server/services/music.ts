@@ -3,7 +3,6 @@ import { promisify } from "util";
 import * as path from "path";
 import { fal } from "@fal-ai/client";
 import { MUSIC, AI_VIDEO } from "@/lib/constants";
-import type { MusicSection } from "@/server/services/llm";
 import type { WordTimestamp } from "@/server/services/tts";
 
 fal.config({ credentials: AI_VIDEO.falKey });
@@ -46,7 +45,13 @@ export interface MusicResult {
   coverUrl?: string;
 }
 
-function buildLyricsPrompt(sections: MusicSection[]): string {
+interface SongSection {
+  sectionName: string;
+  lyrics: string[];
+  durationMs: number;
+}
+
+function buildLyricsPrompt(sections: SongSection[]): string {
   return sections
     .map((s) => {
       const tag = s.sectionName.match(/intro|verse|chorus|bridge|outro|hook|pre-chorus/i)
@@ -108,7 +113,7 @@ async function pollForCompletion(taskId: string, maxWaitMs = 300_000): Promise<S
 export async function generateSong(
   title: string,
   genre: string,
-  sections: MusicSection[],
+  sections: SongSection[],
   targetDurationSec?: number
 ): Promise<MusicResult> {
   let lyrics = buildLyricsPrompt(sections);
@@ -165,7 +170,7 @@ export interface SplitResult {
 
 export async function splitSongIntoSections(
   songPath: string,
-  sections: MusicSection[],
+  sections: SongSection[],
   outputDir: string
 ): Promise<SplitResult> {
   const actualSongMs = await getAudioDurationMs(songPath);
@@ -267,7 +272,7 @@ export interface AlignedSection {
 }
 
 export function alignLyricsToTranscription(
-  sections: MusicSection[],
+  sections: SongSection[],
   whisperWords: WhisperWord[],
   totalDurationMs: number
 ): AlignedSection[] {
@@ -380,7 +385,7 @@ export function alignLyricsToTranscription(
   return aligned;
 }
 
-function proportionalFallback(sections: MusicSection[], totalDurationMs: number): AlignedSection[] {
+function proportionalFallback(sections: SongSection[], totalDurationMs: number): AlignedSection[] {
   const requestedTotal = sections.reduce((sum, s) => sum + s.durationMs, 0);
   const scale = requestedTotal > 0 ? totalDurationMs / requestedTotal : 1;
   let offset = 0;

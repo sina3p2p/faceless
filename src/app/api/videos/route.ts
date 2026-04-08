@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
   const jobName = seriesRecord.videoType === "music_video"
-    ? "generate-music-script"
+    ? "generate-music-lyrics"
     : "generate-script";
 
   await renderQueue.add(jobName, {

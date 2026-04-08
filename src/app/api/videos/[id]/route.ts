@@ -44,11 +44,14 @@ const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
   REVIEW_SCRIPT: ["IMAGE_GENERATION"],
   IMAGE_GENERATION: ["IMAGE_REVIEW"],
   IMAGE_REVIEW: ["IMAGE_GENERATION", "VIDEO_GENERATION"],
+  REVIEW_MUSIC_SCRIPT: ["MUSIC_GENERATION"],
+  MUSIC_REVIEW: ["REVIEW_MUSIC_SCRIPT", "VIDEO_SCRIPT"],
+  REVIEW_VISUAL: ["IMAGE_GENERATION"],
 };
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
-  status: z.enum(["IMAGE_GENERATION", "IMAGE_REVIEW", "VIDEO_GENERATION"]).optional(),
+  status: z.enum(["IMAGE_GENERATION", "IMAGE_REVIEW", "VIDEO_GENERATION", "MUSIC_GENERATION", "REVIEW_MUSIC_SCRIPT", "VIDEO_SCRIPT"]).optional(),
 });
 
 export async function PATCH(

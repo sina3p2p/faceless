@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, renderJobs } from "@/server/db/schema";
+import { videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { renderQueue } from "@/lib/queue";
 import { eq } from "drizzle-orm";
+import { renderQueue } from "@/lib/queue";
 
 export async function POST(
   _req: NextRequest,
@@ -16,36 +16,27 @@ export async function POST(
 
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, id),
-    with: { series: { columns: { id: true, userId: true, videoType: true } } },
+    with: {
+      series: { columns: { userId: true, id: true, videoType: true } },
+    },
   });
 
   if (!video || video.series.userId !== user.id) return notFound("Video not found");
-  if (video.status !== "FAILED") return badRequest("Only failed videos can be retried");
+
+  if (!["REVIEW_MUSIC_SCRIPT", "MUSIC_REVIEW"].includes(video.status)) {
+    return badRequest(`Cannot generate song from status "${video.status}"`);
+  }
 
   await db
     .update(videoProjects)
-    .set({ status: "PENDING", outputUrl: null })
+    .set({ status: "MUSIC_GENERATION" })
     .where(eq(videoProjects.id, id));
 
-  await db
-    .delete(videoScenes)
-    .where(eq(videoScenes.videoProjectId, id));
-
-  await db
-    .delete(renderJobs)
-    .where(eq(renderJobs.videoProjectId, id));
-
-  await db.insert(renderJobs).values({ videoProjectId: id });
-
-  const jobName = video.series.videoType === "music_video"
-    ? "generate-music-lyrics"
-    : "generate-script";
-
-  await renderQueue.add(jobName, {
+  await renderQueue.add("generate-song", {
     videoProjectId: id,
     seriesId: video.series.id,
     userId: user.id,
   });
 
-  return NextResponse.json({ retried: true });
+  return NextResponse.json({ success: true, status: "MUSIC_GENERATION" });
 }

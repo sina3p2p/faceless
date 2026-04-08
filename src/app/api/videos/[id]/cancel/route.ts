@@ -5,7 +5,7 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { eq } from "drizzle-orm";
 import { renderQueue } from "@/lib/queue";
 
-const CANCELLABLE_STATUSES = ["PENDING", "SCRIPT", "IMAGE_GENERATION", "VIDEO_GENERATION", "RENDERING"];
+const CANCELLABLE_STATUSES = ["PENDING", "SCRIPT", "MUSIC_SCRIPT", "MUSIC_GENERATION", "VIDEO_SCRIPT", "IMAGE_GENERATION", "VIDEO_GENERATION", "RENDERING"];
 
 export async function POST(
   _req: NextRequest,

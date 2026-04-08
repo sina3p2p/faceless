@@ -135,8 +135,14 @@ export default function SeriesDetailPage() {
       case "FAILED":
       case "CANCELLED": return "danger" as const;
       case "REVIEW_SCRIPT":
+      case "REVIEW_MUSIC_SCRIPT":
+      case "MUSIC_REVIEW":
+      case "REVIEW_VISUAL":
       case "IMAGE_REVIEW": return "default" as const;
       case "SCRIPT":
+      case "MUSIC_SCRIPT":
+      case "MUSIC_GENERATION":
+      case "VIDEO_SCRIPT":
       case "IMAGE_GENERATION":
       case "VIDEO_GENERATION":
       case "RENDERING": return "warning" as const;

@@ -47,6 +47,9 @@ export default function DashboardPage() {
       case "COMPLETED": return "success";
       case "FAILED": return "danger";
       case "SCRIPT":
+      case "MUSIC_SCRIPT":
+      case "MUSIC_GENERATION":
+      case "VIDEO_SCRIPT":
       case "IMAGE_GENERATION":
       case "VIDEO_GENERATION":
       case "RENDERING": return "warning";

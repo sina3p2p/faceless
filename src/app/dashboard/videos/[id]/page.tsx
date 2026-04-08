@@ -66,6 +66,111 @@ const THUMB_MODELS = [
   { id: "nano-banana-2", label: "Nano Banana 2" },
 ] as const;
 
+function MusicReviewCard({ videoId, onStatusChange }: { videoId: string; onStatusChange: () => void }) {
+  const [songUrl, setSongUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/videos/${videoId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const config = data.config as Record<string, unknown> | null;
+        const songKey = config?.songUrl as string | undefined;
+        if (songKey) {
+          setSongUrl(`/api/media/${songKey}`);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [videoId]);
+
+  async function handleAcceptSong() {
+    setActionLoading("accept");
+    try {
+      const res = await fetch(`/api/videos/${videoId}/generate-visuals`, { method: "POST" });
+      if (res.ok) onStatusChange();
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleRerollSong() {
+    setActionLoading("reroll");
+    try {
+      const res = await fetch(`/api/videos/${videoId}/generate-song`, { method: "POST" });
+      if (res.ok) onStatusChange();
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleBackToLyrics() {
+    setActionLoading("back");
+    try {
+      const res = await fetch(`/api/videos/${videoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "REVIEW_MUSIC_SCRIPT" }),
+      });
+      if (res.ok) onStatusChange();
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <Card className="mb-8 border-violet-500/30">
+        <CardContent className="py-6 text-center">
+          <div className="animate-spin w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full mx-auto" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="mb-8 border-violet-500/30">
+      <CardHeader>
+        <h3 className="text-lg font-semibold">Listen to Your Song</h3>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {songUrl ? (
+          <audio controls className="w-full" src={songUrl}>
+            Your browser does not support audio.
+          </audio>
+        ) : (
+          <p className="text-gray-400 text-sm">Song audio not available.</p>
+        )}
+
+        <div className="flex flex-wrap gap-3 justify-center pt-2">
+          <Button
+            onClick={handleAcceptSong}
+            disabled={!!actionLoading}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            {actionLoading === "accept" ? "Processing..." : "Accept & Generate Visuals"}
+          </Button>
+          <Button
+            onClick={handleRerollSong}
+            variant="outline"
+            disabled={!!actionLoading}
+          >
+            {actionLoading === "reroll" ? "Re-rolling..." : "Re-roll Song"}
+          </Button>
+          <Button
+            onClick={handleBackToLyrics}
+            variant="ghost"
+            disabled={!!actionLoading}
+          >
+            {actionLoading === "back" ? "..." : "Back to Edit Lyrics"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -120,7 +225,7 @@ export default function VideoDetailPage() {
 
   useEffect(() => {
     if (!video) return;
-    if (["COMPLETED", "FAILED", "REVIEW_SCRIPT", "IMAGE_REVIEW"].includes(video.status)) return;
+    if (["COMPLETED", "FAILED", "REVIEW_SCRIPT", "REVIEW_MUSIC_SCRIPT", "MUSIC_REVIEW", "REVIEW_VISUAL", "IMAGE_REVIEW"].includes(video.status)) return;
     const interval = setInterval(loadVideo, 3000);
     return () => clearInterval(interval);
   }, [video, loadVideo]);
@@ -219,8 +324,14 @@ export default function VideoDetailPage() {
       case "COMPLETED": return "success" as const;
       case "FAILED": return "danger" as const;
       case "REVIEW_SCRIPT":
+      case "REVIEW_MUSIC_SCRIPT":
+      case "MUSIC_REVIEW":
+      case "REVIEW_VISUAL":
       case "IMAGE_REVIEW": return "default" as const;
       case "SCRIPT":
+      case "MUSIC_SCRIPT":
+      case "MUSIC_GENERATION":
+      case "VIDEO_SCRIPT":
       case "IMAGE_GENERATION":
       case "VIDEO_GENERATION":
       case "RENDERING": return "warning" as const;
@@ -254,7 +365,7 @@ export default function VideoDetailPage() {
         </Badge>
       </div>
 
-      {/* Review prompt */}
+      {/* Review script prompt */}
       {video.status === "REVIEW_SCRIPT" && (
         <Card className="mb-8 border-violet-500/30">
           <CardContent className="py-6 text-center">
@@ -263,6 +374,62 @@ export default function VideoDetailPage() {
             </p>
             <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
               Review &amp; Edit Script
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Music lyrics review */}
+      {video.status === "REVIEW_MUSIC_SCRIPT" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">
+              Your song lyrics are ready! Review and edit them, then generate the song.
+            </p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review &amp; Edit Lyrics
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Music generation in progress */}
+      {video.status === "MUSIC_GENERATION" && (
+        <Card className="mb-8 border-amber-500/30">
+          <CardContent className="py-6 text-center">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <div className="animate-spin w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full" />
+              <p className="text-gray-300">Generating your song...</p>
+            </div>
+            <p className="text-gray-500 text-sm">This may take 1-3 minutes</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Music review (listen + approve) */}
+      {video.status === "MUSIC_REVIEW" && <MusicReviewCard videoId={id} onStatusChange={loadVideo} />}
+
+      {/* Visual script generation in progress */}
+      {video.status === "VIDEO_SCRIPT" && (
+        <Card className="mb-8 border-amber-500/30">
+          <CardContent className="py-6 text-center">
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <div className="animate-spin w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full" />
+              <p className="text-gray-300">Generating visual prompts for your scenes...</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Review visuals prompt */}
+      {video.status === "REVIEW_VISUAL" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">
+              Visual prompts are ready! Review and edit them, then generate preview images.
+            </p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review Visual Prompts
             </Button>
           </CardContent>
         </Card>
@@ -297,7 +464,7 @@ export default function VideoDetailPage() {
       )}
 
       {/* Progress */}
-      {job && !["COMPLETED", "FAILED", "REVIEW_SCRIPT", "IMAGE_REVIEW", "IMAGE_GENERATION"].includes(video.status) && (
+      {job && !["COMPLETED", "FAILED", "REVIEW_SCRIPT", "REVIEW_MUSIC_SCRIPT", "MUSIC_GENERATION", "MUSIC_REVIEW", "VIDEO_SCRIPT", "REVIEW_VISUAL", "IMAGE_REVIEW", "IMAGE_GENERATION"].includes(video.status) && (
         <Card className="mb-8">
           <CardContent className="py-6">
             <div className="flex items-center justify-between mb-3">
