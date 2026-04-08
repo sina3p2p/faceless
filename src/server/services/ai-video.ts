@@ -15,6 +15,7 @@ function resolveModel(videoModelKey?: string) {
   return {
     modelId: entry?.modelId ?? AI_VIDEO.defaultI2vModel,
     durations: entry?.durations ?? [5, 10],
+    endFrame: entry?.endFrame ?? false,
   };
 }
 
@@ -43,8 +44,9 @@ export async function generateVideoFromImage(
   videoModelKey?: string,
   endImageUrl?: string,
 ): Promise<VideoResult> {
-  const { modelId, durations } = resolveModel(videoModelKey);
+  const { modelId, durations, endFrame } = resolveModel(videoModelKey);
   const apiDuration = pickBestDuration(desiredDuration, durations);
+  const useEndImage = endFrame && !!endImageUrl;
 
   const input: Record<string, unknown> = {
     prompt,
@@ -53,11 +55,17 @@ export async function generateVideoFromImage(
 
   if (modelId.includes("kling-video/v3") || modelId.includes("kling-video/o3")) {
     input.start_image_url = imageUrl;
-    if (endImageUrl) input.end_image_url = endImageUrl;
+    if (useEndImage) input.end_image_url = endImageUrl;
     input.generate_audio = false;
   } else if (modelId.includes("kling-video")) {
     input.image_url = imageUrl;
-    if (endImageUrl) input.tail_image_url = endImageUrl;
+    if (useEndImage) input.tail_image_url = endImageUrl;
+  } else if (modelId.includes("hailuo") || modelId.includes("minimax")) {
+    input.image_url = imageUrl;
+    if (useEndImage) input.end_image_url = endImageUrl;
+  } else if (modelId.includes("wan-")) {
+    input.image_url = imageUrl;
+    if (useEndImage) input.end_image_url = endImageUrl;
   } else {
     input.image_url = imageUrl;
   }
