@@ -6,15 +6,33 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { VideoModelSelector } from "@/components/model-selectors";
+
+interface MediaVersion {
+  id: string;
+  type: "image" | "video";
+  url: string;
+  key: string;
+  prompt: string | null;
+  modelUsed: string | null;
+  createdAt: string;
+}
 
 interface Scene {
   id: string;
   sceneOrder: number;
   text: string;
+  imagePrompt: string | null;
+  visualDescription: string | null;
   duration: number | null;
   assetType: string | null;
   assetUrl: string | null;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  imageKey: string | null;
+  videoKey: string | null;
   audioUrl: string | null;
+  media: MediaVersion[];
 }
 
 interface VideoDetail {
@@ -34,7 +52,12 @@ interface VideoDetail {
     error: string | null;
     attempts: number;
   }>;
-  series: { name: string; niche: string };
+  series: {
+    name: string;
+    niche: string;
+    videoModel: string | null;
+    sceneContinuity: number | null;
+  };
 }
 
 const THUMB_MODELS = [
@@ -57,6 +80,21 @@ export default function VideoDetailPage() {
   const [showThumbPanel, setShowThumbPanel] = useState(false);
   const [thumbError, setThumbError] = useState<string | null>(null);
 
+  // Per-scene video regeneration
+  const [regenScene, setRegenScene] = useState<Scene | null>(null);
+  const [regenPrompt, setRegenPrompt] = useState("");
+  const [regenModel, setRegenModel] = useState("");
+  const [regenDuration, setRegenDuration] = useState<"5" | "10">("5");
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenError, setRegenError] = useState<string | null>(null);
+
+  // Version picker
+  const [versionScene, setVersionScene] = useState<Scene | null>(null);
+
+  // Rerender
+  const [rerendering, setRerendering] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
   const loadVideo = useCallback(() => {
     fetch(`/api/videos/${id}`)
       .then((r) => r.json())
@@ -69,6 +107,13 @@ export default function VideoDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  const loadScenes = useCallback(async () => {
+    const res = await fetch(`/api/videos/${id}/scenes`);
+    if (!res.ok) return;
+    const data = await res.json();
+    setVideo((prev) => prev ? { ...prev, scenes: data.scenes } : prev);
+  }, [id]);
+
   useEffect(() => {
     loadVideo();
   }, [loadVideo]);
@@ -79,6 +124,12 @@ export default function VideoDetailPage() {
     const interval = setInterval(loadVideo, 3000);
     return () => clearInterval(interval);
   }, [video, loadVideo]);
+
+  useEffect(() => {
+    if (video?.status === "COMPLETED" && video.scenes.length > 0 && !video.scenes[0]?.media) {
+      loadScenes();
+    }
+  }, [video?.status, video?.scenes, loadScenes]);
 
   useEffect(() => {
     if (video?.status === "COMPLETED" && !downloadUrl) {
@@ -108,6 +159,59 @@ export default function VideoDetailPage() {
       window.open(data.url, "_blank");
     }
     setDownloading(false);
+  }
+
+  async function handleRegenClip() {
+    if (!regenScene) return;
+    setRegenerating(true);
+    setRegenError(null);
+    try {
+      const res = await fetch(`/api/videos/${id}/scenes/${regenScene.id}/generate-video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          visualDescription: regenPrompt || undefined,
+          videoModel: regenModel || undefined,
+          duration: regenDuration,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setRegenError(data.error || "Video generation failed");
+        return;
+      }
+      setRegenScene(null);
+      setHasChanges(true);
+      await loadScenes();
+    } catch {
+      setRegenError("Request failed");
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function handleSelectMedia(sceneId: string, mediaId: string) {
+    const res = await fetch(`/api/videos/${id}/scenes/${sceneId}/select-media`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mediaId }),
+    });
+    if (res.ok) {
+      setHasChanges(true);
+      setVersionScene(null);
+      await loadScenes();
+    }
+  }
+
+  async function handleRerender() {
+    setRerendering(true);
+    const res = await fetch(`/api/videos/${id}/rerender`, { method: "POST" });
+    if (res.ok) {
+      setHasChanges(false);
+      setDownloadUrl(null);
+      loadVideo();
+    }
+    setRerendering(false);
   }
 
   const statusVariant = (status: string) => {
@@ -188,6 +292,21 @@ export default function VideoDetailPage() {
             )}
             <Button loading={retrying} onClick={handleRetry}>
               Retry Generation
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Re-render banner */}
+      {hasChanges && video.status === "COMPLETED" && (
+        <Card className="mb-8 border-amber-500/30 bg-amber-500/5">
+          <CardContent className="py-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-300">Scene clips have been changed</p>
+              <p className="text-xs text-gray-400 mt-0.5">Re-render to compose a new final video with your updated clips.</p>
+            </div>
+            <Button loading={rerendering} onClick={handleRerender}>
+              Re-render Video
             </Button>
           </CardContent>
         </Card>
@@ -382,7 +501,7 @@ export default function VideoDetailPage() {
         </Card>
       )}
 
-      {/* Script & Scenes */}
+      {/* Scenes */}
       {video.scenes.length > 0 && (
         <Card>
           <CardHeader>
@@ -392,45 +511,112 @@ export default function VideoDetailPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {video.scenes.map((scene) => (
-                <div
-                  key={scene.id}
-                  className="flex gap-4 p-4 rounded-xl bg-white/[0.02] border border-white/5"
-                >
-                  <div className="w-8 h-8 rounded-full bg-violet-600/20 flex items-center justify-center text-sm font-medium text-violet-400 shrink-0">
-                    {scene.sceneOrder + 1}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-gray-300 text-sm">{scene.text}</p>
-                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                      {scene.duration && <span className="font-mono">{scene.duration}s</span>}
-                      {scene.assetType && (
-                        <Badge variant="default">{scene.assetType}</Badge>
-                      )}
-                      {scene.assetUrl && (
-                        <a
-                          href={`/api/media/${scene.assetUrl}`}
-                          download={`scene_${scene.sceneOrder + 1}.${scene.assetType === "video" ? "mp4" : "jpg"}`}
-                          className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                          {scene.assetType === "video" ? "Video" : "Image"}
-                        </a>
-                      )}
-                      {scene.audioUrl && (
-                        <a
-                          href={`/api/media/${scene.audioUrl}`}
-                          download={`scene_${scene.sceneOrder + 1}_audio.mp3`}
-                          className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                          Audio
-                        </a>
-                      )}
+              {video.scenes.map((scene) => {
+                const imageVersions = (scene.media || []).filter((m) => m.type === "image");
+                const videoVersions = (scene.media || []).filter((m) => m.type === "video");
+
+                return (
+                  <div
+                    key={scene.id}
+                    className="rounded-xl bg-white/[0.02] border border-white/5 overflow-hidden"
+                  >
+                    <div className="flex gap-4 p-4">
+                      <div className="w-8 h-8 rounded-full bg-violet-600/20 flex items-center justify-center text-sm font-medium text-violet-400 shrink-0">
+                        {scene.sceneOrder + 1}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <p className="text-gray-300 text-sm">{scene.text}</p>
+                        <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 flex-wrap">
+                          {scene.duration && <span className="font-mono">{scene.duration}s</span>}
+                          {scene.assetType && (
+                            <Badge variant="default">{scene.assetType}</Badge>
+                          )}
+                          {scene.imageUrl && (
+                            <a
+                              href={scene.imageUrl}
+                              download={`scene_${scene.sceneOrder + 1}.jpg`}
+                              className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                              Image
+                            </a>
+                          )}
+                          {scene.videoUrl && (
+                            <a
+                              href={scene.videoUrl}
+                              download={`scene_${scene.sceneOrder + 1}.mp4`}
+                              className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                              Video
+                            </a>
+                          )}
+                          {scene.audioUrl && (
+                            <a
+                              href={scene.audioUrl}
+                              download={`scene_${scene.sceneOrder + 1}_audio.mp3`}
+                              className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                              Audio
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Scene media preview (right side) */}
+                      <div className="shrink-0 flex flex-col gap-2 items-end">
+                        {scene.videoUrl ? (
+                          <video
+                            src={scene.videoUrl}
+                            className="w-24 h-24 rounded-lg object-cover bg-black"
+                            muted
+                            loop
+                            onMouseEnter={(e) => e.currentTarget.play()}
+                            onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                          />
+                        ) : scene.imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={scene.imageUrl}
+                            alt={`Scene ${scene.sceneOrder + 1}`}
+                            className="w-24 h-24 rounded-lg object-cover"
+                          />
+                        ) : null}
+                      </div>
                     </div>
+
+                    {/* Action bar for COMPLETED videos */}
+                    {video.status === "COMPLETED" && (
+                      <div className="border-t border-white/5 px-4 py-2 flex items-center gap-2 bg-white/[0.01]">
+                        <button
+                          onClick={() => {
+                            setRegenScene(scene);
+                            setRegenPrompt(scene.visualDescription || scene.text);
+                            setRegenModel(video.series.videoModel || "");
+                            setRegenDuration("5");
+                            setRegenError(null);
+                          }}
+                          className="text-xs text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                          Regenerate Clip
+                        </button>
+                        {(imageVersions.length > 1 || videoVersions.length > 1) && (
+                          <button
+                            onClick={() => setVersionScene(scene)}
+                            className="text-xs text-gray-400 hover:text-gray-300 transition-colors inline-flex items-center gap-1"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                            Versions ({imageVersions.length + videoVersions.length})
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -442,6 +628,217 @@ export default function VideoDetailPage() {
         {video.duration && <p>Duration: {video.duration} seconds</p>}
         <p>Video ID: {video.id}</p>
       </div>
+
+      {/* ─── Regenerate Clip Modal ─── */}
+      {regenScene && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">
+                Regenerate Clip — Scene {regenScene.sceneOrder + 1}
+              </h3>
+              <button
+                onClick={() => setRegenScene(null)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Current clip preview */}
+            {regenScene.videoUrl && (
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-1.5">Current clip:</p>
+                <video
+                  src={regenScene.videoUrl}
+                  controls
+                  className="w-full rounded-lg bg-black max-h-48 object-contain"
+                />
+              </div>
+            )}
+
+            {!regenScene.videoUrl && regenScene.imageUrl && (
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 mb-1.5">Source image:</p>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={regenScene.imageUrl}
+                  alt="Source"
+                  className="w-full rounded-lg max-h-48 object-contain"
+                />
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Visual Description
+                </label>
+                <textarea
+                  value={regenPrompt}
+                  onChange={(e) => setRegenPrompt(e.target.value)}
+                  rows={3}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white resize-y focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+                  placeholder="Describe what the video clip should show..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                  Duration
+                </label>
+                <div className="flex gap-2">
+                  {(["5", "10"] as const).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setRegenDuration(d)}
+                      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                        regenDuration === d
+                          ? "bg-violet-600 text-white"
+                          : "bg-white/5 text-gray-400 hover:bg-white/10 border border-white/10"
+                      }`}
+                    >
+                      {d}s
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <VideoModelSelector value={regenModel} onChange={setRegenModel} />
+
+              {regenError && (
+                <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-3">
+                  <p className="text-sm text-red-400">{regenError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="primary"
+                  loading={regenerating}
+                  onClick={handleRegenClip}
+                  disabled={!regenScene.imageUrl && !regenScene.assetUrl}
+                >
+                  Generate Video Clip
+                </Button>
+                <Button variant="ghost" onClick={() => setRegenScene(null)}>
+                  Cancel
+                </Button>
+              </div>
+
+              {!regenScene.imageUrl && !regenScene.assetUrl && (
+                <p className="text-xs text-amber-400">
+                  This scene has no source image. Generate an image first on the review page.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Version Picker Modal ─── */}
+      {versionScene && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">
+                Media Versions — Scene {versionScene.sceneOrder + 1}
+              </h3>
+              <button
+                onClick={() => setVersionScene(null)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Images */}
+            {(() => {
+              const imgs = (versionScene.media || []).filter((m) => m.type === "image");
+              if (imgs.length === 0) return null;
+              return (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-300 mb-3">Images ({imgs.length})</h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    {imgs.map((m) => {
+                      const isActive = versionScene.imageKey === m.key;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => handleSelectMedia(versionScene.id, m.id)}
+                          className={`rounded-xl border overflow-hidden transition-all ${
+                            isActive
+                              ? "border-violet-500 ring-2 ring-violet-500/50"
+                              : "border-white/10 hover:border-white/30"
+                          }`}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={m.url} alt="" className="w-full aspect-square object-cover" />
+                          <div className="p-1.5 bg-black/40">
+                            <p className="text-[10px] text-gray-400 truncate">{m.modelUsed || "unknown"}</p>
+                            {isActive && (
+                              <span className="text-[10px] font-medium text-violet-400">ACTIVE</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Videos */}
+            {(() => {
+              const vids = (versionScene.media || []).filter((m) => m.type === "video");
+              if (vids.length === 0) return null;
+              return (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-300 mb-3">Video Clips ({vids.length})</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    {vids.map((m) => {
+                      const isActive = versionScene.videoKey === m.key;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => handleSelectMedia(versionScene.id, m.id)}
+                          className={`rounded-xl border overflow-hidden transition-all ${
+                            isActive
+                              ? "border-violet-500 ring-2 ring-violet-500/50"
+                              : "border-white/10 hover:border-white/30"
+                          }`}
+                        >
+                          <video
+                            src={m.url}
+                            className="w-full aspect-video object-cover bg-black"
+                            muted
+                            loop
+                            onMouseEnter={(e) => e.currentTarget.play()}
+                            onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+                          />
+                          <div className="p-1.5 bg-black/40 flex items-center justify-between">
+                            <p className="text-[10px] text-gray-400 truncate">{m.modelUsed || "unknown"}</p>
+                            {isActive && (
+                              <span className="text-[10px] font-medium text-violet-400">ACTIVE</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <div className="mt-4 flex justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setVersionScene(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

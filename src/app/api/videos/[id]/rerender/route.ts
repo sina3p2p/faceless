@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, series } from "@/server/db/schema";
-import { getAuthUser, unauthorized, notFound, serverError } from "@/lib/api-utils";
-import { eq, asc } from "drizzle-orm";
+import { videoProjects, renderJobs } from "@/server/db/schema";
+import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
+import { eq } from "drizzle-orm";
 import { renderQueue } from "@/lib/queue";
 
 export async function POST(
@@ -16,37 +16,28 @@ export async function POST(
 
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, id),
-    with: {
-      series: { columns: { userId: true, id: true } },
-      scenes: { orderBy: asc(videoScenes.sceneOrder) },
-    },
+    with: { series: { columns: { userId: true, id: true } } },
   });
 
   if (!video || video.series.userId !== user.id) return notFound("Video not found");
-
-  if (video.scenes.length === 0) {
-    return NextResponse.json(
-      { error: "No scenes to render" },
-      { status: 400 }
-    );
-  }
 
   await db
     .update(videoProjects)
     .set({ status: "RENDERING" })
     .where(eq(videoProjects.id, id));
 
-  try {
-    await renderQueue.add("rerender-video", {
-      videoProjectId: id,
-      seriesId: video.series.id,
-      userId: user.id,
-      rerender: true,
-    });
-  } catch (err) {
-    console.error("Failed to queue re-render:", err);
-    return serverError("Failed to queue re-render job");
-  }
+  await db.insert(renderJobs).values({
+    videoProjectId: id,
+    step: "COMPOSE",
+    status: "QUEUED",
+    progress: 0,
+  });
 
-  return NextResponse.json({ success: true, status: "RENDERING" });
+  await renderQueue.add("rerender-video", {
+    videoProjectId: id,
+    seriesId: video.series.id,
+    userId: user.id,
+  });
+
+  return NextResponse.json({ success: true });
 }

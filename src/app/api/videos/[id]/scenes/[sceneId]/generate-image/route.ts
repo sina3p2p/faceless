@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes } from "@/server/db/schema";
+import { videoProjects, videoScenes, sceneMedia } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, inArray } from "drizzle-orm";
 import { generateImage, generateKlingImage, generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
@@ -76,14 +76,15 @@ export async function POST(
         eq(videoScenes.videoProjectId, videoId),
         inArray(videoScenes.id, referenceSceneIds)
       ),
-      columns: { id: true, assetUrl: true, text: true },
+      columns: { id: true, imageUrl: true, assetUrl: true, text: true },
     });
 
     for (const rs of refScenes) {
-      if (!rs.assetUrl) continue;
-      const url = rs.assetUrl.startsWith("http")
-        ? rs.assetUrl
-        : await getSignedDownloadUrl(rs.assetUrl);
+      const imgKey = rs.imageUrl || rs.assetUrl;
+      if (!imgKey) continue;
+      const url = imgKey.startsWith("http")
+        ? imgKey
+        : await getSignedDownloadUrl(imgKey);
       sceneRefs.push({ url, description: rs.text?.slice(0, 100) || "reference scene" });
     }
   }
@@ -91,10 +92,11 @@ export async function POST(
   try {
     let imageUrl: string | null = null;
 
-    if (mode === "edit" && (imageModel === "kling-image-v3" || imageModel === "nano-banana-2") && scene.assetUrl) {
-      const currentImageUrl = scene.assetUrl.startsWith("http")
-        ? scene.assetUrl
-        : await getSignedDownloadUrl(scene.assetUrl);
+    const currentImageKey = scene.imageUrl || scene.assetUrl;
+    if (mode === "edit" && (imageModel === "kling-image-v3" || imageModel === "nano-banana-2") && currentImageKey) {
+      const currentImageUrl = currentImageKey.startsWith("http")
+        ? currentImageKey
+        : await getSignedDownloadUrl(currentImageKey);
 
       const refDescriptions = sceneRefs.length > 0
         ? ` Use the other reference image(s) ONLY for character appearance, clothing, and facial features — do NOT copy their background, composition, or layout.`
@@ -140,6 +142,7 @@ export async function POST(
     const updates: Record<string, unknown> = {
       assetUrl: key,
       assetType: "image",
+      imageUrl: key,
       modelUsed: imageModel,
     };
     if (mode === "regenerate" && promptOverride) {
@@ -151,7 +154,15 @@ export async function POST(
       .set(updates)
       .where(and(eq(videoScenes.id, sceneId), eq(videoScenes.videoProjectId, videoId)));
 
-    return NextResponse.json({ assetUrl: key, imageModel, mode });
+    await db.insert(sceneMedia).values({
+      sceneId,
+      type: "image",
+      url: key,
+      prompt: cleanedPrompt,
+      modelUsed: imageModel,
+    });
+
+    return NextResponse.json({ assetUrl: key, imageUrl: key, imageModel, mode });
   } catch (err) {
     console.error(`Image generation failed for scene ${sceneId}:`, err);
     return NextResponse.json(

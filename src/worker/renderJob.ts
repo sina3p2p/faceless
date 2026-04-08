@@ -40,6 +40,24 @@ import type { RenderJobData } from "@/lib/queue";
 const client = postgres(DATABASE.url);
 const db = drizzle(client, { schema });
 
+async function insertSceneMedia(
+  sceneId: string,
+  type: "image" | "video",
+  url: string,
+  prompt?: string | null,
+  modelUsed?: string | null,
+  metadata?: Record<string, unknown> | null
+) {
+  await db.insert(schema.sceneMedia).values({
+    sceneId,
+    type,
+    url,
+    prompt: prompt ?? undefined,
+    modelUsed: modelUsed ?? undefined,
+    metadata: metadata ?? undefined,
+  });
+}
+
 async function getPreviousTopics(seriesId: string, currentVideoId: string): Promise<string[]> {
   const prev = await db.query.videoProjects.findMany({
     where: and(
@@ -493,20 +511,26 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
         const mediaKey = `scenes/${videoProjectId}/media_${i}.${mediaExt}`;
         await uploadFile(mediaKey, mediaBuffer, mediaMime);
 
+        const isVideo = mediaPaths[i].type === "video";
+        const model = seriesRecord.imageModel || "dall-e-3";
+
         const sceneUpdates: Record<string, unknown> = {
           audioUrl: audioKey,
           assetUrl: mediaKey,
           assetType: mediaPaths[i].type,
+          [isVideo ? "videoUrl" : "imageUrl"]: mediaKey,
           captionData: ttsResults[i].wordTimestamps,
           duration: ttsDurations[i] ?? existingScenes[i].duration,
         };
         if (!existingScenes[i].modelUsed) {
-          sceneUpdates.modelUsed = seriesRecord.imageModel || "dall-e-3";
+          sceneUpdates.modelUsed = model;
         }
         await db
           .update(schema.videoScenes)
           .set(sceneUpdates)
           .where(eq(schema.videoScenes.id, existingScenes[i].id));
+
+        await insertSceneMedia(existingScenes[i].id, isVideo ? "video" : "image", mediaKey, existingScenes[i].imagePrompt, model);
       })
     );
 
@@ -678,16 +702,22 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
         const mediaKey = `scenes/${videoProjectId}/media_${i}.${mediaExt}`;
         await uploadFile(mediaKey, mediaBuffer, mediaMime);
 
+        const isVideo = mediaPaths[i].type === "video";
+        const model = seriesRecord.imageModel || "dall-e-3";
+
         await db
           .update(schema.videoScenes)
           .set({
             audioUrl: audioKey,
             assetUrl: mediaKey,
             assetType: mediaPaths[i].type,
+            [isVideo ? "videoUrl" : "imageUrl"]: mediaKey,
             captionData: ttsResults[i].wordTimestamps,
-            modelUsed: seriesRecord.imageModel || "dall-e-3",
+            modelUsed: model,
           })
           .where(eq(schema.videoScenes.id, sceneIds[i]));
+
+        await insertSceneMedia(sceneIds[i], isVideo ? "video" : "image", mediaKey, script.scenes[i].imagePrompt, model);
       })
     );
 
@@ -767,22 +797,24 @@ export async function rerenderVideoJob(job: Job<RenderJobData>) {
 
     const composerScenes: ComposerScene[] = await Promise.all(
       scenes.map(async (scene, i) => {
+        const mediaKey = scene.videoUrl || scene.assetUrl || scene.imageUrl;
+        const hasVideo = !!scene.videoUrl || scene.assetType === "video";
+        const ext = hasVideo ? "mp4" : "jpg";
         const audioPath = path.join(workDir, `audio_${i}.mp3`);
-        const ext = scene.assetType === "video" ? "mp4" : "jpg";
         const mediaPath = path.join(workDir, `media_${i}.${ext}`);
 
-        const [audioUrl, assetUrl] = await Promise.all([
+        const [audioUrl, mediaUrl] = await Promise.all([
           scene.audioUrl ? getSignedDownloadUrl(scene.audioUrl) : null,
-          scene.assetUrl ? getSignedDownloadUrl(scene.assetUrl) : null,
+          mediaKey ? getSignedDownloadUrl(mediaKey) : null,
         ]);
 
         if (audioUrl) await downloadFile(audioUrl, audioPath);
-        if (assetUrl) await downloadFile(assetUrl, mediaPath);
+        if (mediaUrl) await downloadFile(mediaUrl, mediaPath);
 
         return {
           audioPath,
           mediaPath,
-          mediaType: (scene.assetType || "image") as "video" | "image",
+          mediaType: (hasVideo ? "video" : "image") as "video" | "image",
           text: scene.text,
           duration: scene.duration ?? 5,
           wordTimestamps: (scene.captionData as { word: string; start: number; end: number }[]) || [],
@@ -1181,6 +1213,8 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
         const mediaKey = `scenes/${videoProjectId}/media_${i}.${mediaExt}`;
         await uploadFile(mediaKey, mediaBuffer, mediaMime);
 
+        const isVideo = mediaPaths[i].type === "video";
+        const model = seriesRecord.imageModel || "dall-e-3";
         const sectionWordTimestamps = alignedSections?.[i]?.wordTimestamps || [];
 
         await db
@@ -1189,11 +1223,14 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
             audioUrl: songKey,
             assetUrl: mediaKey,
             assetType: mediaPaths[i].type,
+            [isVideo ? "videoUrl" : "imageUrl"]: mediaKey,
             duration: actualDurationsSec[i] ?? existingScenes[i].duration,
             captionData: sectionWordTimestamps.length > 0 ? sectionWordTimestamps : null,
-            modelUsed: seriesRecord.imageModel || "dall-e-3",
+            modelUsed: model,
           })
           .where(eq(schema.videoScenes.id, scene.id));
+
+        await insertSceneMedia(scene.id, isVideo ? "video" : "image", mediaKey, scene.imagePrompt, model);
       })
     );
 

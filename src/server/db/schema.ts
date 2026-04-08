@@ -142,10 +142,24 @@ export const videoScenes = pgTable("video_scenes", {
   searchQuery: text("search_query"),
   captionData: json("caption_data"),
   audioUrl: text("audio_url"),
+  imageUrl: text("image_url"),
+  videoUrl: text("video_url"),
+  // deprecated — kept for backward compat with existing data
   assetUrl: text("asset_url"),
   assetType: text("asset_type"),
   modelUsed: text("model_used"),
   duration: real("duration"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const sceneMedia = pgTable("scene_media", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sceneId: text("scene_id").notNull().references(() => videoScenes.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  url: text("url").notNull(),
+  prompt: text("prompt"),
+  modelUsed: text("model_used"),
+  metadata: json("metadata"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -217,8 +231,13 @@ export const videoProjectsRelations = relations(videoProjects, ({ one, many }) =
   renderJobs: many(renderJobs),
 }));
 
-export const videoScenesRelations = relations(videoScenes, ({ one }) => ({
+export const videoScenesRelations = relations(videoScenes, ({ one, many }) => ({
   videoProject: one(videoProjects, { fields: [videoScenes.videoProjectId], references: [videoProjects.id] }),
+  mediaVersions: many(sceneMedia),
+}));
+
+export const sceneMediaRelations = relations(sceneMedia, ({ one }) => ({
+  scene: one(videoScenes, { fields: [sceneMedia.sceneId], references: [videoScenes.id] }),
 }));
 
 export const renderJobsRelations = relations(renderJobs, ({ one }) => ({

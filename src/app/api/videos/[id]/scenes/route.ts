@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, series } from "@/server/db/schema";
+import { videoProjects, videoScenes, series, sceneMedia } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
 
 export async function GET(
@@ -17,7 +17,10 @@ export async function GET(
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, id),
     with: {
-      scenes: { orderBy: asc(videoScenes.sceneOrder) },
+      scenes: {
+        orderBy: asc(videoScenes.sceneOrder),
+        with: { mediaVersions: { orderBy: desc(sceneMedia.createdAt) } },
+      },
       series: { columns: { userId: true } },
     },
   });
@@ -26,10 +29,26 @@ export async function GET(
 
   const scenesWithUrls = await Promise.all(
     video.scenes.map(async (scene) => {
-      const [audioUrl, assetUrl] = await Promise.all([
+      const imgKey = scene.imageUrl || scene.assetUrl;
+      const vidKey = scene.videoUrl;
+
+      const [audioUrl, imageUrl, videoUrl] = await Promise.all([
         scene.audioUrl ? getSignedDownloadUrl(scene.audioUrl) : null,
-        scene.assetUrl ? getSignedDownloadUrl(scene.assetUrl) : null,
+        imgKey ? getSignedDownloadUrl(imgKey) : null,
+        vidKey ? getSignedDownloadUrl(vidKey) : null,
       ]);
+
+      const media = await Promise.all(
+        (scene.mediaVersions || []).map(async (m) => ({
+          id: m.id,
+          type: m.type,
+          url: await getSignedDownloadUrl(m.url),
+          key: m.url,
+          prompt: m.prompt,
+          modelUsed: m.modelUsed,
+          createdAt: m.createdAt.toISOString(),
+        }))
+      );
 
       return {
         id: scene.id,
@@ -42,7 +61,12 @@ export async function GET(
         assetType: scene.assetType,
         wordTimestamps: scene.captionData || [],
         audioUrl,
-        assetUrl,
+        assetUrl: imageUrl || videoUrl,
+        imageUrl,
+        videoUrl,
+        imageKey: imgKey,
+        videoKey: vidKey,
+        media,
       };
     })
   );
