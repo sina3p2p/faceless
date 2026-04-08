@@ -410,3 +410,161 @@ KIDS MUSIC RULES:
 
   return object;
 }
+
+// ── Standalone Script Generation (no series context) ──
+
+interface StandaloneCharacter {
+  name: string;
+  description: string;
+}
+
+function buildCharacterBlock(characters: StandaloneCharacter[]): string {
+  if (characters.length === 0) return "";
+  const entries = characters.map((c, i) => `  - ${c.name} (@Element${i + 1}): ${c.description}`).join("\n");
+  return `\n\nCHARACTERS (you MUST reference these by name in every imagePrompt and visualDescription. Use the exact name so the image model can match the face reference):\n${entries}\n`;
+}
+
+function buildInputTypeInstruction(prompt: string): string {
+  if (prompt.length < 200) {
+    return `Expand this idea into a compelling video narrative. Create a complete story arc with vivid scenes.\n\nIDEA: ${prompt}`;
+  }
+  return `Adapt the following story into a scene-by-scene video script. Preserve the plot, characters, and key moments. Break it into scenes suitable for short-form video.\n\nSTORY:\n${prompt}`;
+}
+
+export async function generateStandaloneScript(
+  prompt: string,
+  style: string,
+  characters: StandaloneCharacter[] = [],
+  targetDuration = 45,
+  model?: string,
+  sceneContinuity = true,
+  language = "en"
+): Promise<VideoScript> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const systemPrompt = `You are an elite short-form video scriptwriter. You create compelling visual stories for TikTok, YouTube Shorts, and Instagram Reels.
+
+OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
+- ALL text content (title, hook, scene narration/text, CTA) MUST be written in ${langName}.
+- imagePrompt, visualDescription, and searchQuery MUST remain in English for best AI model compatibility.
+- This rule overrides everything else. Even if the story is in a different language, the output narration must be in ${langName}.
+
+STORYTELLING RULES:
+1. HOOK (scene 1): Start with a captivating opening that makes scrolling impossible. Establish the story's world immediately.
+2. BUILD-UP (scenes 2-4): Develop the story with vivid details, escalating tension or wonder. Each scene must end with an implicit pull to the next.
+3. CLIMAX (scene 4-5): The emotional peak — the most dramatic, surprising, or touching moment.
+4. RESOLUTION (final scene): A satisfying conclusion with a CTA that invites engagement.
+
+CRITICAL RULES:
+- Each scene narration = 15-25 words. Short punchy sentences.
+- Total duration should be ${targetDuration} seconds
+- Aim for 5-7 scenes
+- searchQuery must be HYPER-SPECIFIC
+
+ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
+- Each scene must show exactly ONE clear action or moment.
+- BAD: "She opens the door, walks in, and sits down" — 3 actions.
+- GOOD: Scene 1 = "She opens the door", Scene 2 = "She walks into the room", Scene 3 = "She sits down"
+- The visualDescription and imagePrompt must describe only ONE moment/pose/action.
+
+IMAGE PROMPT QUALITY (most important — this drives the entire video quality):
+- Each imagePrompt must be 50-100 words minimum.
+- NEVER write vague prompts. Be EXTREMELY specific.
+- Describe ONE clear subject doing ONE clear action in ONE clear environment.
+- Always include the art style: ${style}.
+- For people: describe age, ethnicity, clothing, facial expression, body language, hair.
+- For places: describe architecture, textures, weather, time of day, vegetation, materials.
+- Include motion cues: "camera slowly pushes in", "wind moves the curtains", etc.
+- EACH scene's imagePrompt must be visually DIFFERENT. Vary camera angles, color palettes, and compositions.
+${["claymation", "gothic-clay"].includes(style) ? `
+CLAYMATION STYLE RULES:
+- Every subject must look handcrafted from clay/plasticine with visible fingerprint marks, rounded edges, matte finish
+- Environments must look like miniature handmade diorama sets
+- Characters: exaggerated proportions, oversized heads, rounded features, visible seam lines
+- Always include: "Claymation stop-motion style, everything made of sculpted clay and plasticine"` : ""}${style === "gothic-clay" ? `
+GOTHIC CLAY VARIANT:
+- Dark moody atmosphere: gothic arches, stone walls of gray/purple clay, candelabras, cobwebs
+- Color palette: deep purples, dark greens, charcoal grays, midnight blues
+- Mood: mysterious, elegant, slightly eerie but stylish` : ""}${sceneContinuity ? `
+SCENE CONTINUITY MODE (CRITICAL):
+- Video clips transition from scene N's image to scene N+1's image.
+- Each imagePrompt must be visually COMPATIBLE with neighbors.
+- Maintain a CONSISTENT main subject/character across all scenes.
+- Add one EXTRA FINAL scene as the visual closing frame (ending scene with CTA narration).
+- Total scenes should be 6-8 (including the ending scene).` : ""}${buildCharacterBlock(characters)}`;
+
+  const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. Make it visually stunning and emotionally compelling.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: videoScriptSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
+
+  return object;
+}
+
+export async function generateStandaloneMusicScript(
+  prompt: string,
+  style: string,
+  characters: StandaloneCharacter[] = [],
+  targetDuration = 60,
+  model?: string,
+  language = "en"
+): Promise<MusicScript> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const systemPrompt = `You are an elite songwriter AND music video director. You create songs that go viral on TikTok and YouTube, paired with cinematic visuals perfectly synchronized with the music.
+
+OUTPUT LANGUAGE (CRITICAL):
+- ALL lyrics, song title, and sectionName MUST be written in ${langName}.
+- imagePrompt, visualDescription, genre, positiveStyles, negativeStyles MUST remain in English.
+
+SONGWRITING RULES:
+1. Write lyrics that are CATCHY, MEMORABLE, and SINGABLE. Use rhyme, repetition, strong hooks.
+2. The chorus should be the most memorable part — repeat it 2-3 times.
+3. Keep lyrics SHORT per line (5-10 words). Each line must be at most 200 characters.
+4. Total song duration MUST be approximately ${targetDuration} seconds.
+5. ${targetDuration <= 30
+    ? "Aim for 3-4 SHORT sections only (Intro + Verse + Chorus + Outro). Keep each section to 2-4 lines MAX."
+    : targetDuration <= 45
+    ? "Aim for 4-5 sections (Intro + Verse + Chorus + Verse + Outro). Keep lyrics concise — 2-4 lines per section."
+    : "Aim for 5-7 sections: Intro + 2 Verses + 2 Choruses + Bridge/Outro."}
+6. positiveStyles: instruments, tempo, vocal characteristics matching the genre.
+7. negativeStyles: elements that would clash with the desired sound.
+
+VISUAL-MUSIC SYNC RULES:
+1. MATCH ENERGY TO SECTION TYPE:
+   - Intro: Establishing shot, slow reveal, atmospheric
+   - Verse: Storytelling scenes, medium shots, narrative progression
+   - Chorus: MAXIMUM energy. Wide dynamic shots, dramatic lighting, vibrant colors
+   - Bridge: Contrast — new location, perspective shift, emotional turning point
+   - Outro: Resolution. Wide pullback, fading light, closure
+
+2. LYRIC-VISUAL LITERALISM: Every section's visuals must directly reference the lyrics being sung.
+
+3. imagePrompt DETAIL: Be as detailed as possible — subject, environment, lighting, camera angle, mood, color palette, style: ${style}.
+
+4. visualDescription MOTION: Specific movement and action for the AI video generator with camera/subject/environmental motion.
+
+ONE ACTION PER SECTION: Each section's visuals must show exactly ONE clear action.
+
+5. VISUAL CONTINUITY: Maintain consistent main character/subject and coherent color palette throughout.
+${buildCharacterBlock(characters)}`;
+
+  const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. The song should be irresistibly catchy and the visuals cinematic.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: musicScriptSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
+
+  return object;
+}

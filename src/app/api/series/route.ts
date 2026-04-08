@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { series, videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 
 const createSeriesSchema = z.object({
@@ -36,7 +36,7 @@ export async function GET() {
     })
     .from(series)
     .leftJoin(videoProjects, eq(videoProjects.seriesId, series.id))
-    .where(eq(series.userId, user.id))
+    .where(and(eq(series.userId, user.id), eq(series.isInternal, false)))
     .groupBy(series.id)
     .orderBy(desc(series.createdAt));
 

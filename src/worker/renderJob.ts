@@ -12,7 +12,7 @@ import postgres from "postgres";
 import { eq, and, ne, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE } from "@/lib/constants";
-import { generateVideoScript, generateMusicScript, type MusicScript } from "@/server/services/llm";
+import { generateVideoScript, generateMusicScript, generateStandaloneScript, generateStandaloneMusicScript, type MusicScript } from "@/server/services/llm";
 import { generateSong, transcribeSong, alignLyricsToTranscription, type AlignedSection } from "@/server/services/music";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import {
@@ -893,6 +893,162 @@ export async function generateMusicScriptJob(job: Job<RenderJobData>) {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     console.error(`Music script generation failed for ${videoProjectId}:`, errorMessage);
+    await updateVideoStatus(videoProjectId, "FAILED");
+    await db
+      .update(schema.renderJobs)
+      .set({ status: "FAILED", error: errorMessage })
+      .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
+    throw error;
+  }
+}
+
+export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      columns: { config: true },
+    });
+    const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;
+    const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 45;
+
+    const prompt = (seriesRecord.topicIdeas as string[])?.[0] || "";
+    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+    const characters = charImages.map((c) => {
+      const parts = c.description.split(":").map((s) => s.trim());
+      return parts.length >= 2
+        ? { name: parts[0], description: parts.slice(1).join(":").trim() }
+        : { name: `Character`, description: c.description };
+    });
+
+    console.log(`Standalone script generation starting: prompt="${prompt.slice(0, 80)}...", targetDuration=${targetDuration}s`);
+    await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
+    await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
+    await job.updateProgress(10);
+
+    const script = await generateStandaloneScript(
+      prompt,
+      seriesRecord.style,
+      characters,
+      targetDuration,
+      seriesRecord.llmModel || undefined,
+      !!seriesRecord.sceneContinuity,
+      seriesRecord.language || "en"
+    );
+
+    await db
+      .update(schema.videoProjects)
+      .set({
+        title: script.title,
+        script: JSON.stringify(script),
+        duration: script.totalDuration,
+      })
+      .where(eq(schema.videoProjects.id, videoProjectId));
+
+    for (let i = 0; i < script.scenes.length; i++) {
+      await db.insert(schema.videoScenes).values({
+        videoProjectId,
+        sceneOrder: i,
+        text: script.scenes[i].text,
+        imagePrompt: script.scenes[i].imagePrompt,
+        visualDescription: script.scenes[i].visualDescription,
+        searchQuery: script.scenes[i].searchQuery,
+        duration: script.scenes[i].duration,
+      });
+    }
+
+    await updateVideoStatus(videoProjectId, "REVIEW");
+    await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
+    await job.updateProgress(100);
+
+    console.log(`Standalone script ready for review: ${script.title} (${script.scenes.length} scenes)`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`Standalone script generation failed for ${videoProjectId}:`, errorMessage);
+    await updateVideoStatus(videoProjectId, "FAILED");
+    await db
+      .update(schema.renderJobs)
+      .set({ status: "FAILED", error: errorMessage })
+      .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
+    throw error;
+  }
+}
+
+export async function generateStandaloneMusicScriptJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      columns: { config: true },
+    });
+    const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;
+    const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 60;
+
+    const prompt = (seriesRecord.topicIdeas as string[])?.[0] || "";
+    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+    const characters = charImages.map((c) => {
+      const parts = c.description.split(":").map((s) => s.trim());
+      return parts.length >= 2
+        ? { name: parts[0], description: parts.slice(1).join(":").trim() }
+        : { name: `Character`, description: c.description };
+    });
+
+    console.log(`Standalone music script generation starting: prompt="${prompt.slice(0, 80)}...", targetDuration=${targetDuration}s`);
+    await updateVideoStatus(videoProjectId, "GENERATING_SCRIPT");
+    await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
+    await job.updateProgress(10);
+
+    const musicScript = await generateStandaloneMusicScript(
+      prompt,
+      seriesRecord.style,
+      characters,
+      targetDuration,
+      seriesRecord.llmModel || undefined,
+      seriesRecord.language || "en"
+    );
+
+    await db
+      .update(schema.videoProjects)
+      .set({
+        title: musicScript.title,
+        script: JSON.stringify(musicScript),
+        duration: musicScript.totalDuration,
+      })
+      .where(eq(schema.videoProjects.id, videoProjectId));
+
+    for (let i = 0; i < musicScript.sections.length; i++) {
+      const section = musicScript.sections[i];
+      await db.insert(schema.videoScenes).values({
+        videoProjectId,
+        sceneOrder: i,
+        text: section.lyrics.join("\n"),
+        imagePrompt: section.imagePrompt,
+        visualDescription: section.visualDescription,
+        searchQuery: section.sectionName,
+        duration: Math.round(section.durationMs / 1000),
+      });
+    }
+
+    await updateVideoStatus(videoProjectId, "REVIEW");
+    await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
+    await job.updateProgress(100);
+
+    console.log(`Standalone music script ready for review: ${musicScript.title} (${musicScript.sections.length} sections)`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`Standalone music script generation failed for ${videoProjectId}:`, errorMessage);
     await updateVideoStatus(videoProjectId, "FAILED");
     await db
       .update(schema.renderJobs)
