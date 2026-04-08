@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { NICHES, ART_STYLES, CAPTION_STYLES, VIDEO_TYPES, DEFAULT_LLM_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
+import { NICHES, ART_STYLES, CAPTION_STYLES, DEFAULT_LLM_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
-import { LLMModelSelector, ImageModelSelector, VideoModelSelector } from "@/components/model-selectors";
+import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector } from "@/components/model-selectors";
 
 export default function NewSeriesPage() {
   const router = useRouter();
@@ -20,7 +20,7 @@ export default function NewSeriesPage() {
     niche: NICHES[0].id as string,
     style: ART_STYLES[0].id as string,
     captionStyle: CAPTION_STYLES[0].id as string,
-    videoType: VIDEO_TYPES[0].id as string,
+    videoType: "faceless" as string,
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
@@ -108,28 +108,7 @@ export default function NewSeriesPage() {
               required
             />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Video Type
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {VIDEO_TYPES.map((vt) => (
-                  <button
-                    key={vt.id}
-                    type="button"
-                    onClick={() => setForm({ ...form, videoType: vt.id })}
-                    className={`rounded-xl border p-4 text-left transition-all ${
-                      form.videoType === vt.id
-                        ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                        : "border-white/10 bg-white/5 hover:border-white/20"
-                    }`}
-                  >
-                    <p className="font-medium text-white">{vt.label}</p>
-                    <p className="text-xs text-gray-400 mt-1">{vt.description}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <VideoTypeSelector value={form.videoType} onChange={(v) => setForm({ ...form, videoType: v })} />
 
             <LLMModelSelector value={form.llmModel} onChange={(v) => setForm({ ...form, llmModel: v })} />
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
