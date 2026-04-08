@@ -45,6 +45,8 @@ export async function generateVideoFromImage(
     input.image_url = imageUrl;
   }
 
+  console.log(`[ai-video] fal.subscribe(${modelId}) input:`, JSON.stringify(input));
+
   const result = await fal.subscribe(modelId, {
     input,
     logs: true,

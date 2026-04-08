@@ -925,15 +925,18 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
 
     if (existingScenes.length === 0) throw new Error("No scenes to render");
 
-    const scriptJson = (await db.query.videoProjects.findFirst({
+    const videoProject = await db.query.videoProjects.findFirst({
       where: eq(schema.videoProjects.id, videoProjectId),
-      columns: { script: true },
-    }))?.script;
+      columns: { script: true, config: true },
+    });
 
-    const musicScript: MusicScript | null = scriptJson ? JSON.parse(scriptJson) : null;
+    const musicScript: MusicScript | null = videoProject?.script ? JSON.parse(videoProject.script) : null;
     if (!musicScript) throw new Error("No music script found");
 
-    console.log(`Music video render starting: ${existingScenes.length} sections`);
+    const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;
+    const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 60;
+
+    console.log(`Music video render starting: ${existingScenes.length} sections, targetDuration=${targetDuration}s`);
 
     await updateVideoStatus(videoProjectId, "GENERATING_ASSETS");
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 10);
@@ -948,13 +951,14 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
     const songResult = await generateSong(
       musicScript.title,
       musicScript.genre,
-      sectionsForMusic
+      sectionsForMusic,
+      targetDuration
     );
 
     const songPath = path.join(workDir, "full_song.mp3");
     await downloadFile(songResult.audioUrl, songPath);
 
-    console.log("Full song generated and downloaded");
+    console.log(`Full song ready: ${songResult.duration.toFixed(1)}s (target was ${targetDuration}s)`);
     await job.updateProgress(25);
 
     // Whisper transcription for lyrics alignment (timestamps only, no audio splitting)

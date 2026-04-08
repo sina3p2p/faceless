@@ -84,7 +84,7 @@ export const MUSIC = {
 } as const;
 
 export const VIDEO_MODELS = [
-  { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "fal-ai/kling-video/v3/standard/image-to-video", description: "#2 ranked globally, great value (~$0.42/5s)" },
+  { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "fal-ai/kling-video/v3/standard/image-to-video", description: "#2 ranked globally ($0.14/s → ~$0.70/5s)" },
   { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "fal-ai/kling-video/v3/pro/image-to-video", description: "Top-tier cinematic quality (~$0.50/5s)" },
   { id: "kling-o3", label: "Kling O3", modelId: "fal-ai/kling-video/o3/standard/image-to-video", description: "Best 3D spatial awareness (~$0.50/5s)" },
   { id: "hailuo-02-standard", label: "Hailuo 02 Standard", modelId: "fal-ai/minimax/hailuo-02/standard/image-to-video", description: "Natural motion, budget-friendly (~$0.27/5s)" },

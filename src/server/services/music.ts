@@ -108,9 +108,13 @@ async function pollForCompletion(taskId: string, maxWaitMs = 300_000): Promise<S
 export async function generateSong(
   title: string,
   genre: string,
-  sections: MusicSection[]
+  sections: MusicSection[],
+  targetDurationSec?: number
 ): Promise<MusicResult> {
-  const lyrics = buildLyricsPrompt(sections);
+  let lyrics = buildLyricsPrompt(sections);
+  if (targetDurationSec) {
+    lyrics = `[Duration: ~${targetDurationSec} seconds]\n\n${lyrics}`;
+  }
 
   console.log(`[suno] Generating song: "${title}" (${genre}), ${lyrics.length} chars of lyrics`);
 
@@ -213,16 +217,14 @@ interface WhisperChunk {
 export async function transcribeSong(audioUrl: string): Promise<WhisperWord[]> {
   console.log("[whisper] Transcribing song for lyrics alignment...");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const result = await fal.subscribe("fal-ai/wizper", {
     input: {
       audio_url: audioUrl,
       task: "transcribe",
       chunk_level: "word",
-      language: "auto",
     },
     logs: true,
-  } as any);
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = result.data as any;
@@ -303,7 +305,7 @@ export function alignLyricsToTranscription(
       let score = 0;
       for (let tw = 0; tw < targetWords.length && wi + tw < normalizedWhisper.length; tw++) {
         if (normalizedWhisper[wi + tw].normalized.includes(targetWords[tw]) ||
-            targetWords[tw].includes(normalizedWhisper[wi + tw].normalized)) {
+          targetWords[tw].includes(normalizedWhisper[wi + tw].normalized)) {
           score++;
         }
       }

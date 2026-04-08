@@ -326,8 +326,12 @@ SONGWRITING RULES:
 2. The chorus should be the most memorable part — repeat it 2-3 times.
 3. Keep lyrics SHORT per line (5-10 words). Each line must be at most 200 characters.
 4. Match the genre to the niche: ${niche}
-5. Total song duration should be approximately ${targetDuration} seconds.
-6. Aim for 5-7 sections: Intro + 2 Verses + 2 Choruses + Bridge/Outro.
+5. Total song duration MUST be approximately ${targetDuration} seconds. This is CRITICAL for cost control.
+6. ${targetDuration <= 30
+    ? "Aim for 3-4 SHORT sections only (e.g. Intro + Verse + Chorus + Outro). Keep each section to 2-4 lines of lyrics MAX. Fewer sections = shorter song."
+    : targetDuration <= 45
+    ? "Aim for 4-5 sections (e.g. Intro + Verse + Chorus + Verse + Outro). Keep lyrics concise — 2-4 lines per section."
+    : "Aim for 5-7 sections: Intro + 2 Verses + 2 Choruses + Bridge/Outro."}
 7. positiveStyles should describe instruments, tempo, and vocal characteristics that match the genre.
 8. negativeStyles should list elements that would clash with the desired sound.
 
