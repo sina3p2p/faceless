@@ -167,6 +167,16 @@ export default function CreateVideoPage() {
               </div>
             </div>
 
+            <Select
+              label="Art Style"
+              value={form.style}
+              onChange={(e) => setForm({ ...form, style: e.target.value })}
+              options={ART_STYLES.map((s) => ({
+                value: s.id,
+                label: s.label,
+              }))}
+            />
+
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Duration
@@ -184,6 +194,118 @@ export default function CreateVideoPage() {
                 <span className="text-sm text-white font-medium w-12 text-right">{form.targetDuration}s</span>
               </div>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                AI Script Model
+              </label>
+              <div className="space-y-2">
+                {LLM_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setForm({ ...form, llmModel: m.id })}
+                    className={`w-full rounded-xl border p-3 text-left transition-all ${
+                      form.llmModel === m.id
+                        ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                        : "border-white/10 bg-white/5 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-white text-sm">{m.label}</p>
+                      {m.id === DEFAULT_LLM_MODEL && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">
+                          RECOMMENDED
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Image Generation Model
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {IMAGE_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setForm({ ...form, imageModel: m.id })}
+                    className={`rounded-xl border p-3 text-left transition-all ${
+                      form.imageModel === m.id
+                        ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                        : "border-white/10 bg-white/5 hover:border-white/20"
+                    }`}
+                  >
+                    <p className="font-medium text-white text-sm">{m.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {(form.videoType === "ai_video" || form.videoType === "music_video") && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Video Generation Model
+                </label>
+                <div className="space-y-2">
+                  {VIDEO_MODELS.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setForm({ ...form, videoModel: m.id })}
+                      className={`w-full rounded-xl border p-3 text-left transition-all ${
+                        form.videoModel === m.id
+                          ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                          : "border-white/10 bg-white/5 hover:border-white/20"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-white text-sm">{m.label}</p>
+                        {m.id === DEFAULT_VIDEO_MODEL && (
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">
+                            RECOMMENDED
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {(form.videoType === "ai_video" || form.videoType === "music_video") && (
+              <div
+                onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
+                className={`rounded-xl border p-4 cursor-pointer transition-all ${
+                  form.sceneContinuity
+                    ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                    : "border-white/10 bg-white/5 hover:border-white/20"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-white">Scene Continuity</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      Each video clip smoothly transitions from one scene image to the next.
+                    </p>
+                  </div>
+                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${
+                    form.sceneContinuity ? "bg-violet-500" : "bg-white/10"
+                  }`}>
+                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                      form.sceneContinuity ? "translate-x-5" : "translate-x-0"
+                    }`} />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Characters */}
             <div>
@@ -318,118 +440,6 @@ export default function CreateVideoPage() {
 
           {showSettings && (
             <CardContent className="space-y-6 pt-0">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  AI Script Model
-                </label>
-                <div className="space-y-2">
-                  {LLM_MODELS.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setForm({ ...form, llmModel: m.id })}
-                      className={`w-full rounded-xl border p-3 text-left transition-all ${
-                        form.llmModel === m.id
-                          ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                          : "border-white/10 bg-white/5 hover:border-white/20"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-white text-sm">{m.label}</p>
-                        {m.id === DEFAULT_LLM_MODEL && (
-                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">
-                            RECOMMENDED
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Image Generation Model
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {IMAGE_MODELS.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setForm({ ...form, imageModel: m.id })}
-                      className={`rounded-xl border p-3 text-left transition-all ${
-                        form.imageModel === m.id
-                          ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                          : "border-white/10 bg-white/5 hover:border-white/20"
-                      }`}
-                    >
-                      <p className="font-medium text-white text-sm">{m.label}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {(form.videoType === "ai_video" || form.videoType === "music_video") && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Video Generation Model
-                  </label>
-                  <div className="space-y-2">
-                    {VIDEO_MODELS.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => setForm({ ...form, videoModel: m.id })}
-                        className={`w-full rounded-xl border p-3 text-left transition-all ${
-                          form.videoModel === m.id
-                            ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                            : "border-white/10 bg-white/5 hover:border-white/20"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <p className="font-medium text-white text-sm">{m.label}</p>
-                          {m.id === DEFAULT_VIDEO_MODEL && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">
-                              RECOMMENDED
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {(form.videoType === "ai_video" || form.videoType === "music_video") && (
-                <div
-                  onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
-                  className={`rounded-xl border p-4 cursor-pointer transition-all ${
-                    form.sceneContinuity
-                      ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                      : "border-white/10 bg-white/5 hover:border-white/20"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-white">Scene Continuity</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        Each video clip smoothly transitions from one scene image to the next.
-                      </p>
-                    </div>
-                    <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${
-                      form.sceneContinuity ? "bg-violet-500" : "bg-white/10"
-                    }`}>
-                      <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                        form.sceneContinuity ? "translate-x-5" : "translate-x-0"
-                      }`} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
               <Select
                 label="Script Language"
                 value={form.language}
@@ -437,16 +447,6 @@ export default function CreateVideoPage() {
                 options={LANGUAGES.map((l) => ({
                   value: l.id,
                   label: l.label,
-                }))}
-              />
-
-              <Select
-                label="Art Style"
-                value={form.style}
-                onChange={(e) => setForm({ ...form, style: e.target.value })}
-                options={ART_STYLES.map((s) => ({
-                  value: s.id,
-                  label: s.label,
                 }))}
               />
 
