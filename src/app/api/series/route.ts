@@ -13,6 +13,7 @@ const createSeriesSchema = z.object({
   llmModel: z.string().default("anthropic/claude-opus-4.6"),
   imageModel: z.string().default("dall-e-3"),
   videoModel: z.string().default("kling-3-standard"),
+  videoSize: z.string().default("9:16"),
   sceneContinuity: z.boolean().default(false),
   captionStyle: z.string().default("default"),
   language: z.string().default("en"),

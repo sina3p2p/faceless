@@ -142,6 +142,22 @@ export const WORKER = {
   limiterDuration: 60_000,
 } as const;
 
+// ── Video Sizes ──
+
+export const VIDEO_SIZES = [
+  { id: "9:16", label: "Shorts / Reels (9:16)", width: 1080, height: 1920, orientation: "portrait" as const, dalleSize: "1024x1792" as const },
+  { id: "16:9", label: "YouTube (16:9)", width: 1920, height: 1080, orientation: "landscape" as const, dalleSize: "1792x1024" as const },
+  { id: "1:1", label: "Square (1:1)", width: 1080, height: 1080, orientation: "portrait" as const, dalleSize: "1024x1024" as const },
+] as const;
+
+export const DEFAULT_VIDEO_SIZE = "9:16";
+
+export type VideoSizeId = (typeof VIDEO_SIZES)[number]["id"];
+
+export function getVideoSize(sizeId?: string | null) {
+  return VIDEO_SIZES.find((s) => s.id === sizeId) ?? VIDEO_SIZES[0];
+}
+
 // ── Video Defaults ──
 
 export const VIDEO_DEFAULTS = {

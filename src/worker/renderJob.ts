@@ -11,7 +11,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and, ne, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
-import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
+import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL, getVideoSize } from "@/lib/constants";
 import { generateVideoScript, generateMusicScript, generateStandaloneScript, generateStandaloneMusicScript, generateMusicLyrics, generateStandaloneMusicLyrics, generateMusicVisuals, type MusicScript, type MusicLyrics } from "@/server/services/llm";
 import { generateSong, transcribeSong, alignLyricsToTranscription, type AlignedSection } from "@/server/services/music";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
@@ -22,6 +22,7 @@ import {
   generateNanoBananaImage,
   resetUsedMedia,
   type MediaAsset,
+  type AspectRatio,
 } from "@/server/services/media";
 import {
   getAIVideoForScene,
@@ -196,7 +197,8 @@ async function fetchFacelessMediaParallel(
   seriesRecord: { niche: string; style: string; imageModel?: string | null; characterRefs?: CharacterRef[] },
   workDir: string,
   concurrency = 3,
-  preApproved: PreApproved = new Map()
+  preApproved: PreApproved = new Map(),
+  aspectRatio: AspectRatio = "9:16"
 ): Promise<{ path: string; type: "video" | "image" }[]> {
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
 
@@ -221,7 +223,7 @@ async function fetchFacelessMediaParallel(
 
         const imgModel = seriesRecord.imageModel || "dall-e-3";
         const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
-        const asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel, refs);
+        const asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel, refs, aspectRatio);
 
         const ext = asset.type === "video" ? "mp4" : "jpg";
         const mediaPath = path.join(workDir, `media_${i}.${ext}`);
@@ -243,17 +245,18 @@ async function generateSceneImage(
   imagePrompt: string,
   imageModel: string,
   sceneIndex: number,
-  characterRefs?: CharacterRef[]
+  characterRefs?: CharacterRef[],
+  aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset> {
   console.log(`Scene ${sceneIndex}: Generating image with ${imageModel}${characterRefs?.length ? ` with ${characterRefs.length} character ref(s)` : ""}...`);
 
   let result: MediaAsset | null = null;
   if (imageModel === "nano-banana-2") {
-    result = await generateNanoBananaImage(imagePrompt, characterRefs);
+    result = await generateNanoBananaImage(imagePrompt, characterRefs, aspectRatio);
   } else if (imageModel === "kling-image-v3") {
-    result = await generateKlingImage(imagePrompt, undefined, characterRefs);
+    result = await generateKlingImage(imagePrompt, undefined, characterRefs, aspectRatio);
   } else {
-    result = await generateImage(imagePrompt);
+    result = await generateImage(imagePrompt, aspectRatio);
   }
 
   if (!result) {
@@ -276,6 +279,8 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
     );
 
     const imageModel = seriesRecord.imageModel || "dall-e-3";
+    const sizeConfig = getVideoSize(seriesRecord.videoSize);
+    const ar = sizeConfig.id as AspectRatio;
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
@@ -305,7 +310,7 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
           const sceneIdx = existingScenes.findIndex((s) => s.id === scene.id);
           const prompt = scene.imagePrompt || scene.text;
           try {
-            const result = await generateSceneImage(prompt, imageModel, sceneIdx, characterRefs);
+            const result = await generateSceneImage(prompt, imageModel, sceneIdx, characterRefs, ar);
 
             const imgResp = await fetch(result.url);
             if (!imgResp.ok) throw new Error("Failed to download generated image");
@@ -348,7 +353,8 @@ async function fetchAIVideoMediaParallel(
   workDir: string,
   concurrency = 2,
   preApprovedImages: PreApproved = new Map(),
-  preApprovedVideos: PreApproved = new Map()
+  preApprovedVideos: PreApproved = new Map(),
+  aspectRatio: AspectRatio = "9:16"
 ): Promise<{ path: string; type: "video" | "image" }[]> {
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
   const imageModel = seriesRecord.imageModel || "dall-e-3";
@@ -401,7 +407,7 @@ async function fetchAIVideoMediaParallel(
           sceneImageUrls[i] = approved.url;
           console.log(`Scene ${i}: Using existing image`);
         } else {
-          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, charRefs);
+          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, charRefs, aspectRatio);
           sceneImageUrls[i] = generatedImage.url;
           await downloadFile(generatedImage.url, imagePath);
         }
@@ -599,11 +605,14 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
 
     const { images: preImages, videos: preVideos } = await reusePreApprovedAssets(existingScenes, workDir);
 
+    const sizeConfig = getVideoSize(seriesRecord.videoSize);
+    const ar = sizeConfig.id as AspectRatio;
+
     let mediaPaths: { path: string; type: "video" | "image" }[];
     if (videoType === "ai_video") {
-      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preImages, preVideos);
+      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preImages, preVideos, ar);
     } else {
-      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preImages);
+      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preImages, ar);
     }
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 60);
@@ -663,6 +672,8 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
       scenes: composerScenes,
       captionStyle: seriesRecord.captionStyle,
       sceneContinuity: !!seriesRecord.sceneContinuity,
+      videoWidth: sizeConfig.width,
+      videoHeight: sizeConfig.height,
     });
 
     await job.updateProgress(90);
@@ -789,9 +800,12 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       workDir
     );
 
+    const sizeConfig = getVideoSize(seriesRecord.videoSize);
+    const ar = sizeConfig.id as AspectRatio;
+
     const mediaPromise = videoType === "ai_video"
-      ? fetchAIVideoMediaParallel(script, seriesRecord, workDir)
-      : fetchFacelessMediaParallel(script, seriesRecord, workDir);
+      ? fetchAIVideoMediaParallel(script, seriesRecord, workDir, 2, new Map(), new Map(), ar)
+      : fetchFacelessMediaParallel(script, seriesRecord, workDir, 3, new Map(), ar);
 
     const [ttsResult, mediaPaths] = await Promise.all([ttsPromise, mediaPromise]);
 
@@ -853,6 +867,8 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
       scenes: composerScenes,
       captionStyle: seriesRecord.captionStyle,
       sceneContinuity: !!seriesRecord.sceneContinuity,
+      videoWidth: sizeConfig.width,
+      videoHeight: sizeConfig.height,
     });
 
     await job.updateProgress(90);
@@ -936,10 +952,13 @@ export async function rerenderVideoJob(job: Job<RenderJobData>) {
 
     await job.updateProgress(50);
 
+    const sizeConfig = getVideoSize(seriesRecord.videoSize);
     const outputPath = await composeVideo({
       scenes: composerScenes,
       captionStyle: seriesRecord.captionStyle,
       sceneContinuity: !!seriesRecord.sceneContinuity,
+      videoWidth: sizeConfig.width,
+      videoHeight: sizeConfig.height,
     });
 
     await job.updateProgress(85);
@@ -1571,11 +1590,14 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
       })),
     };
 
+    const sizeConfig = getVideoSize(seriesRecord.videoSize);
+    const ar = sizeConfig.id as AspectRatio;
+
     let mediaPaths: { path: string; type: "video" | "image" }[];
     if (seriesRecord.videoModel && seriesRecord.videoModel !== "none") {
-      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preImages, preVideos);
+      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preImages, preVideos, ar);
     } else {
-      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preImages);
+      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preImages, ar);
     }
 
     await job.updateProgress(65);
@@ -1624,6 +1646,8 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
       captionStyle: seriesRecord.captionStyle,
       globalAudioPath: songPath,
       sceneContinuity: !!seriesRecord.sceneContinuity,
+      videoWidth: sizeConfig.width,
+      videoHeight: sizeConfig.height,
     });
 
     await job.updateProgress(90);

@@ -97,14 +97,15 @@ export async function generateVideoFromImage(
 
 export async function generateVideoFromText(
   prompt: string,
-  duration: number = 5
+  duration: number = 5,
+  aspectRatio: string = "9:16"
 ): Promise<VideoResult> {
   const apiDuration = [5, 10].includes(duration) ? duration : (duration > 7 ? 10 : 5);
   const result = await fal.subscribe(T2V_MODEL, {
     input: {
       prompt,
       duration: String(apiDuration) as "5" | "10",
-      aspect_ratio: "9:16" as const,
+      aspect_ratio: aspectRatio as "9:16" | "16:9" | "1:1",
       resolution: "1080p" as const,
     },
     logs: true,

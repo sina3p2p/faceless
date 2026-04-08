@@ -21,6 +21,36 @@ export function resetUsedMedia(): void {
   usedPexelsIds.clear();
 }
 
+export type AspectRatio = "9:16" | "16:9" | "1:1";
+
+function orientationForAspect(ar: AspectRatio): "portrait" | "landscape" {
+  return ar === "16:9" ? "landscape" : "portrait";
+}
+
+function dalleSize(ar: AspectRatio): "1024x1792" | "1792x1024" | "1024x1024" {
+  if (ar === "16:9") return "1792x1024";
+  if (ar === "1:1") return "1024x1024";
+  return "1024x1792";
+}
+
+function dalleDimensions(ar: AspectRatio): { width: number; height: number } {
+  if (ar === "16:9") return { width: 1792, height: 1024 };
+  if (ar === "1:1") return { width: 1024, height: 1024 };
+  return { width: 1024, height: 1792 };
+}
+
+function fallbackDimensions(ar: AspectRatio): { width: number; height: number } {
+  if (ar === "16:9") return { width: 1344, height: 768 };
+  if (ar === "1:1") return { width: 1024, height: 1024 };
+  return { width: 768, height: 1344 };
+}
+
+function compositionSuffix(ar: AspectRatio): string {
+  if (ar === "16:9") return "Landscape 16:9 composition";
+  if (ar === "1:1") return "Square 1:1 composition";
+  return "Vertical 9:16 composition";
+}
+
 export async function searchStockVideo(
   query: string,
   orientation: "portrait" | "landscape" = "portrait"
@@ -102,14 +132,16 @@ export async function searchStockImage(
 }
 
 export async function generateImage(
-  prompt: string
+  prompt: string,
+  aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   try {
+    const dims = dalleDimensions(aspectRatio);
     const response = await openai.images.generate({
       model: "dall-e-3",
-      prompt: `${prompt}. Vertical 9:16 aspect ratio, cinematic lighting, photorealistic, no text or watermarks.`,
+      prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`,
       n: 1,
-      size: "1024x1792",
+      size: dalleSize(aspectRatio),
     });
 
     const url = response.data?.[0]?.url;
@@ -119,8 +151,8 @@ export async function generateImage(
       url,
       type: "image",
       source: "openai",
-      width: 1024,
-      height: 1792,
+      width: dims.width,
+      height: dims.height,
     };
   } catch {
     return null;
@@ -130,7 +162,8 @@ export async function generateImage(
 export async function generateKlingImage(
   prompt: string,
   referenceImageUrl?: string,
-  characterRefs?: CharacterRef[]
+  characterRefs?: CharacterRef[],
+  aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -149,11 +182,13 @@ export async function generateKlingImage(
       ? ` ${elements.map((_, i) => `@Element${i + 1}`).join(" ")}`
       : "";
 
+    const fb = fallbackDimensions(aspectRatio);
+
     const result = await fal.subscribe(AI_VIDEO.klingImageModel, {
       input: {
-        prompt: `${prompt}. Vertical 9:16 composition, highly detailed, no text or watermarks.${elementRefs}`,
+        prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks.${elementRefs}`,
         ...(elements.length > 0 ? { elements } : {}),
-        aspect_ratio: "9:16",
+        aspect_ratio: aspectRatio,
         num_images: 1,
         output_format: "jpeg",
       },
@@ -165,7 +200,7 @@ export async function generateKlingImage(
     const image = data?.images?.[0];
     if (!image?.url) return null;
 
-    return { url: image.url, type: "image", source: "kling", width: image.width || 768, height: image.height || 1344 };
+    return { url: image.url, type: "image", source: "kling", width: image.width || fb.width, height: image.height || fb.height };
   } catch (err) {
     const detail = err instanceof Error ? err.message : JSON.stringify(err);
     console.error(`Kling image generation failed:`, detail);
@@ -180,9 +215,11 @@ export interface CharacterRef {
 
 export async function generateNanoBananaImage(
   prompt: string,
-  characterRefs?: CharacterRef[]
+  characterRefs?: CharacterRef[],
+  aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   const hasRefs = characterRefs && characterRefs.length > 0;
+  const fb = fallbackDimensions(aspectRatio);
 
   try {
     const modelId = hasRefs
@@ -194,8 +231,8 @@ export async function generateNanoBananaImage(
       : "";
 
     const input: Record<string, unknown> = {
-      prompt: `${prompt}.${charContext} Vertical 9:16 composition, highly detailed, cinematic lighting, no text or watermarks.`,
-      aspect_ratio: "9:16",
+      prompt: `${prompt}.${charContext} ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
+      aspect_ratio: aspectRatio,
       output_format: "jpeg",
       resolution: "1K",
       num_images: 1,
@@ -220,8 +257,8 @@ export async function generateNanoBananaImage(
       url: image.url,
       type: "image",
       source: "nano-banana",
-      width: image.width || 768,
-      height: image.height || 1344,
+      width: image.width || fb.width,
+      height: image.height || fb.height,
     };
   } catch (err) {
     console.warn(`Nano Banana 2 image generation failed: ${err instanceof Error ? err.message : err}`);
@@ -232,15 +269,16 @@ export async function generateNanoBananaImage(
 async function generateAnyImage(
   prompt: string,
   imageModel = "dall-e-3",
-  characterRefs?: CharacterRef[]
+  characterRefs?: CharacterRef[],
+  aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   if (imageModel === "nano-banana-2") {
-    return generateNanoBananaImage(prompt, characterRefs);
+    return generateNanoBananaImage(prompt, characterRefs, aspectRatio);
   }
   if (imageModel === "kling-image-v3") {
-    return generateKlingImage(prompt, undefined, characterRefs);
+    return generateKlingImage(prompt, undefined, characterRefs, aspectRatio);
   }
-  return generateImage(prompt);
+  return generateImage(prompt, aspectRatio);
 }
 
 export async function getMediaForScene(
@@ -248,29 +286,32 @@ export async function getMediaForScene(
   imagePrompt: string,
   preferAiImage = false,
   imageModel = "dall-e-3",
-  characterRefs?: CharacterRef[]
+  characterRefs?: CharacterRef[],
+  aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset> {
+  const orientation = orientationForAspect(aspectRatio);
+
   if (preferAiImage) {
-    const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs);
+    const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs, aspectRatio);
     if (generatedImage) return generatedImage;
   }
 
-  const stockVideo = await searchStockVideo(searchQuery);
+  const stockVideo = await searchStockVideo(searchQuery, orientation);
   if (stockVideo) return stockVideo;
 
-  const stockImage = await searchStockImage(searchQuery);
+  const stockImage = await searchStockImage(searchQuery, orientation);
   if (stockImage) return stockImage;
 
   const simplifiedQuery = searchQuery.split(" ").slice(0, 2).join(" ");
   if (simplifiedQuery !== searchQuery) {
-    const fallbackVideo = await searchStockVideo(simplifiedQuery);
+    const fallbackVideo = await searchStockVideo(simplifiedQuery, orientation);
     if (fallbackVideo) return fallbackVideo;
 
-    const fallbackImage = await searchStockImage(simplifiedQuery);
+    const fallbackImage = await searchStockImage(simplifiedQuery, orientation);
     if (fallbackImage) return fallbackImage;
   }
 
-  const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs);
+  const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs, aspectRatio);
   if (generatedImage) return generatedImage;
 
   throw new Error(

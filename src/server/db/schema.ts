@@ -119,6 +119,7 @@ export const series = pgTable("series", {
   captionStyle: text("caption_style").default("default").notNull(),
   characterImages: json("character_images").$type<Array<{ url: string; description: string }>>().default([]),
   sceneContinuity: integer("scene_continuity").default(1).notNull(),
+  videoSize: text("video_size").default("9:16").notNull(),
   videoType: text("video_type").default("faceless").notNull(),
   isInternal: boolean("is_internal").default(false).notNull(),
   topicIdeas: json("topic_ideas").$type<string[]>().default([]).notNull(),

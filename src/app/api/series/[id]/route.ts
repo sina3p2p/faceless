@@ -15,6 +15,7 @@ const updateSeriesSchema = z.object({
   llmModel: z.string().optional(),
   imageModel: z.string().optional(),
   videoModel: z.string().optional(),
+  videoSize: z.string().optional(),
   sceneContinuity: z.boolean().optional(),
   defaultVoiceId: z.string().nullable().optional(),
   topicIdeas: z.array(z.string()).optional(),

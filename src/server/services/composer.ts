@@ -25,6 +25,8 @@ export interface ComposerOptions {
   globalAudioPath?: string;
   outputFormat?: string;
   sceneContinuity?: boolean;
+  videoWidth?: number;
+  videoHeight?: number;
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {
@@ -145,10 +147,12 @@ function estimateWordTimestamps(text: string, duration: number): WordTimestamp[]
 function generateAssSubtitles(
   scenes: ComposerScene[],
   style: CaptionStyleConfig,
-  sceneDurations: number[]
+  sceneDurations: number[],
+  canvasWidth?: number,
+  canvasHeight?: number
 ): string {
-  const W = VIDEO_DEFAULTS.width;
-  const H = VIDEO_DEFAULTS.height;
+  const W = canvasWidth ?? VIDEO_DEFAULTS.width;
+  const H = canvasHeight ?? VIDEO_DEFAULTS.height;
 
   let header = `[Script Info]
 Title: Faceless Captions
@@ -208,11 +212,11 @@ function formatAssTime(seconds: number): string {
 export async function composeVideo(
   options: ComposerOptions
 ): Promise<string> {
-  const { scenes, captionStyle, backgroundMusicPath, globalAudioPath, sceneContinuity } = options;
+  const { scenes, captionStyle, backgroundMusicPath, globalAudioPath, sceneContinuity, videoWidth, videoHeight } = options;
   const workDir = path.join(os.tmpdir(), `faceless-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
-  const W = VIDEO_DEFAULTS.width;
-  const H = VIDEO_DEFAULTS.height;
+  const W = videoWidth ?? VIDEO_DEFAULTS.width;
+  const H = videoHeight ?? VIDEO_DEFAULTS.height;
   const FPS = VIDEO_DEFAULTS.fps;
   const useGlobalAudio = !!globalAudioPath;
 
@@ -323,7 +327,7 @@ export async function composeVideo(
 
     if (captionStyle !== "none") {
       const styleConfig = getCaptionStyle(captionStyle);
-      const assContent = generateAssSubtitles(scenes, styleConfig, sceneDurations);
+      const assContent = generateAssSubtitles(scenes, styleConfig, sceneDurations, W, H);
       const assPath = path.join(workDir, "captions.ass");
       await fs.writeFile(assPath, assContent);
 

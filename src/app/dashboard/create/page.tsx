@@ -12,11 +12,12 @@ import {
   DEFAULT_LLM_MODEL,
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
+  DEFAULT_VIDEO_SIZE,
   LANGUAGES,
   DEFAULT_LANGUAGE,
 } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
-import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector } from "@/components/model-selectors";
+import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector, VideoSizeSelector } from "@/components/model-selectors";
 
 interface PendingCharacter {
   file: File;
@@ -41,6 +42,7 @@ export default function CreateVideoPage() {
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
+    videoSize: DEFAULT_VIDEO_SIZE as string,
     language: DEFAULT_LANGUAGE as string,
     sceneContinuity: true,
     voiceId: "",
@@ -88,6 +90,7 @@ export default function CreateVideoPage() {
           llmModel: form.llmModel,
           imageModel: form.imageModel,
           videoModel: form.videoModel,
+          videoSize: form.videoSize,
           language: form.language,
           sceneContinuity: form.sceneContinuity,
           voiceId: form.voiceId || undefined,
@@ -142,6 +145,8 @@ export default function CreateVideoPage() {
             </div>
 
             <VideoTypeSelector value={form.videoType} onChange={(v) => setForm({ ...form, videoType: v })} />
+
+            <VideoSizeSelector value={form.videoSize} onChange={(v) => setForm({ ...form, videoSize: v })} />
 
             <Select
               label="Art Style"

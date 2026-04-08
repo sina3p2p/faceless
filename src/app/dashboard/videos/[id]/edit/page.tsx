@@ -216,6 +216,7 @@ export default function VideoEditorPage() {
   const [rerendering, setRerendering] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [videoTitle, setVideoTitle] = useState("");
+  const [videoSize, setVideoSize] = useState<string>("9:16");
   const [hasChanges, setHasChanges] = useState(false);
 
   const sensors = useSensors(
@@ -245,6 +246,7 @@ export default function VideoEditorPage() {
       if (videoRes.ok) {
         const data = await videoRes.json();
         setVideoTitle(data.title ?? "Untitled Video");
+        if (data.series?.videoSize) setVideoSize(data.series.videoSize);
       }
 
       if (downloadRes.ok) {
@@ -361,7 +363,7 @@ export default function VideoEditorPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Video preview */}
         <div>
-          <div className="rounded-xl overflow-hidden bg-black aspect-[9/16] max-h-[65vh] mx-auto">
+          <div className="rounded-xl overflow-hidden bg-black max-h-[65vh] mx-auto" style={{ aspectRatio: videoSize === "16:9" ? "16/9" : videoSize === "1:1" ? "1/1" : "9/16" }}>
             {videoUrl ? (
               <video
                 src={videoUrl}

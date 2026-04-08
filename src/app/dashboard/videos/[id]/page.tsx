@@ -56,6 +56,7 @@ interface VideoDetail {
     name: string;
     niche: string;
     videoModel: string | null;
+    videoSize: string | null;
     sceneContinuity: number | null;
   };
 }
@@ -516,19 +517,24 @@ export default function VideoDetailPage() {
             <h2 className="font-semibold">Your Video</h2>
           </CardHeader>
           <CardContent>
-            {downloadUrl ? (
-              <div className="aspect-[9/16] max-w-sm mx-auto rounded-xl overflow-hidden bg-black mb-4">
-                <video
-                  src={downloadUrl}
-                  controls
-                  className="w-full h-full object-contain"
-                />
-              </div>
-            ) : (
-              <div className="aspect-[9/16] max-w-sm mx-auto rounded-xl bg-white/5 flex items-center justify-center mb-4">
-                <p className="text-gray-500">Click download to preview</p>
-              </div>
-            )}
+            {(() => {
+              const vs = video.series?.videoSize;
+              const arCss = vs === "16:9" ? "16/9" : vs === "1:1" ? "1/1" : "9/16";
+              const maxW = vs === "16:9" ? "max-w-2xl" : vs === "1:1" ? "max-w-md" : "max-w-sm";
+              return downloadUrl ? (
+                <div className={`${maxW} mx-auto rounded-xl overflow-hidden bg-black mb-4`} style={{ aspectRatio: arCss }}>
+                  <video
+                    src={downloadUrl}
+                    controls
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ) : (
+                <div className={`${maxW} mx-auto rounded-xl bg-white/5 flex items-center justify-center mb-4`} style={{ aspectRatio: arCss }}>
+                  <p className="text-gray-500">Click download to preview</p>
+                </div>
+              );
+            })()}
             <div className="flex justify-center gap-3">
               <Button loading={downloading} onClick={handleDownload}>
                 Download MP4

@@ -19,7 +19,7 @@ export async function GET(
     with: {
       scenes: { orderBy: asc(videoScenes.sceneOrder) },
       renderJobs: { orderBy: desc(renderJobs.createdAt), limit: 1 },
-      series: { columns: { name: true, niche: true, style: true, imageModel: true, videoModel: true, videoType: true, sceneContinuity: true, userId: true } },
+      series: { columns: { name: true, niche: true, style: true, imageModel: true, videoModel: true, videoSize: true, videoType: true, sceneContinuity: true, userId: true } },
     },
   });
 
@@ -34,6 +34,7 @@ export async function GET(
       style: seriesData.style,
       imageModel: seriesData.imageModel,
       videoModel: seriesData.videoModel,
+      videoSize: seriesData.videoSize,
       videoType: seriesData.videoType,
       sceneContinuity: seriesData.sceneContinuity,
     },

@@ -6,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { NICHES, ART_STYLES, CAPTION_STYLES, DEFAULT_LLM_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
+import { NICHES, ART_STYLES, CAPTION_STYLES, DEFAULT_LLM_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL, DEFAULT_VIDEO_SIZE, LANGUAGES, DEFAULT_LANGUAGE } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
-import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector } from "@/components/model-selectors";
+import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector, VideoSizeSelector } from "@/components/model-selectors";
 
 interface CharacterImage {
   url: string;
@@ -25,6 +25,7 @@ interface SeriesData {
   llmModel: string | null;
   imageModel: string | null;
   videoModel: string | null;
+  videoSize: string | null;
   language: string | null;
   sceneContinuity: number;
   characterImages: CharacterImage[] | null;
@@ -49,6 +50,7 @@ export default function EditSeriesPage() {
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
+    videoSize: DEFAULT_VIDEO_SIZE as string,
     language: DEFAULT_LANGUAGE as string,
     sceneContinuity: false,
     defaultVoiceId: "",
@@ -68,6 +70,7 @@ export default function EditSeriesPage() {
           llmModel: data.llmModel || DEFAULT_LLM_MODEL,
           imageModel: data.imageModel || DEFAULT_IMAGE_MODEL,
           videoModel: data.videoModel || DEFAULT_VIDEO_MODEL,
+          videoSize: data.videoSize || DEFAULT_VIDEO_SIZE,
           language: data.language || DEFAULT_LANGUAGE,
           sceneContinuity: !!data.sceneContinuity,
           defaultVoiceId: data.defaultVoiceId || "",
@@ -99,6 +102,7 @@ export default function EditSeriesPage() {
         llmModel: form.llmModel,
         imageModel: form.imageModel,
         videoModel: form.videoModel,
+        videoSize: form.videoSize,
         language: form.language,
         sceneContinuity: form.sceneContinuity,
         defaultVoiceId: form.defaultVoiceId || null,
@@ -145,6 +149,8 @@ export default function EditSeriesPage() {
             />
 
             <VideoTypeSelector value={form.videoType} onChange={(v) => setForm({ ...form, videoType: v })} />
+
+            <VideoSizeSelector value={form.videoSize} onChange={(v) => setForm({ ...form, videoSize: v })} />
 
             <LLMModelSelector value={form.llmModel} onChange={(v) => setForm({ ...form, llmModel: v })} />
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
