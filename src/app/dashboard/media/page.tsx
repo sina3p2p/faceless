@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 interface MediaItem {
   id: string;
@@ -54,36 +54,6 @@ function formatDate(iso: string) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function MediaGrid({ items, type }: { items: MediaItem[]; type: Tab }) {
-  const [lightbox, setLightbox] = useState<MediaItem | null>(null);
-
-  if (items.length === 0) {
-    return (
-      <div className="text-center py-20 text-gray-500">
-        <p className="text-lg mb-1">No {type} yet</p>
-        <p className="text-sm">Generated {type} from your videos will appear here.</p>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className={type === "audio"
-        ? "flex flex-col gap-3"
-        : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
-      }>
-        {items.map((item) => (
-          <MediaCard key={item.id} item={item} type={type} onClick={() => setLightbox(item)} />
-        ))}
-      </div>
-
-      {lightbox && (
-        <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
-      )}
-    </>
-  );
 }
 
 function MediaCard({
@@ -234,35 +204,115 @@ function Lightbox({ item, onClose }: { item: MediaItem; onClose: () => void }) {
   );
 }
 
-export default function MediaPage() {
-  const [tab, setTab] = useState<Tab>("videos");
-  const [data, setData] = useState<{ videos: MediaItem[]; images: MediaItem[]; audio: MediaItem[] }>({
-    videos: [],
-    images: [],
-    audio: [],
-  });
-  const [loading, setLoading] = useState(true);
+function MediaGrid({ items, type, loading, hasMore, sentinelRef }: {
+  items: MediaItem[];
+  type: Tab;
+  loading: boolean;
+  hasMore: boolean;
+  sentinelRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const [lightbox, setLightbox] = useState<MediaItem | null>(null);
 
-  const loadData = useCallback(async () => {
+  if (!loading && items.length === 0) {
+    return (
+      <div className="text-center py-20 text-gray-500">
+        <p className="text-lg mb-1">No {type} yet</p>
+        <p className="text-sm">Generated {type} from your videos will appear here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className={type === "audio"
+        ? "flex flex-col gap-3"
+        : "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
+      }>
+        {items.map((item) => (
+          <MediaCard key={item.id} item={item} type={type} onClick={() => setLightbox(item)} />
+        ))}
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-8">
+          <div className="animate-spin w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full" />
+        </div>
+      )}
+
+      {hasMore && !loading && <div ref={sentinelRef} className="h-10" />}
+
+      {!hasMore && items.length > 0 && (
+        <p className="text-center text-xs text-gray-600 py-6">All {items.length} items loaded</p>
+      )}
+
+      {lightbox && (
+        <Lightbox item={lightbox} onClose={() => setLightbox(null)} />
+      )}
+    </>
+  );
+}
+
+export default function MediaPage() {
+  const [tab, setTab] = useState<Tab>("images");
+  const [items, setItems] = useState<MediaItem[]>([]);
+  const [total, setTotal] = useState(0);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialLoad, setInitialLoad] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const fetchingRef = useRef(false);
+
+  const fetchPage = useCallback(async (activeTab: Tab, pageCursor: string | null, reset: boolean) => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    setLoading(true);
+
     try {
-      const res = await fetch("/api/media");
-      if (res.ok) {
-        setData(await res.json());
-      }
+      const params = new URLSearchParams({ tab: activeTab, limit: "20" });
+      if (pageCursor) params.set("cursor", pageCursor);
+
+      const res = await fetch(`/api/media?${params}`);
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const newItems: MediaItem[] = data.items;
+
+      setItems((prev) => reset ? newItems : [...prev, ...newItems]);
+      setCursor(data.nextCursor);
+      setHasMore(!!data.nextCursor);
+      setTotal(data.total);
     } finally {
       setLoading(false);
+      setInitialLoad(false);
+      fetchingRef.current = false;
     }
   }, []);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    setItems([]);
+    setCursor(null);
+    setHasMore(true);
+    setInitialLoad(true);
+    fetchPage(tab, null, true);
+  }, [tab, fetchPage]);
 
-  const counts = {
-    videos: data.videos.length,
-    images: data.images.length,
-    audio: data.audio.length,
-  };
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !fetchingRef.current) {
+          fetchPage(tab, cursor, false);
+        }
+      },
+      { rootMargin: "200px" }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [tab, cursor, hasMore, fetchPage]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -286,21 +336,27 @@ export default function MediaPage() {
           >
             {t.icon}
             {t.label}
-            <span className={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-              tab === t.id ? "bg-white/20 text-white" : "bg-white/5 text-gray-500"
-            }`}>
-              {counts[t.id]}
-            </span>
+            {!initialLoad && tab === t.id && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white">
+                {total}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
-      {loading ? (
+      {initialLoad ? (
         <div className="flex items-center justify-center py-20">
           <div className="animate-spin w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full" />
         </div>
       ) : (
-        <MediaGrid items={data[tab]} type={tab} />
+        <MediaGrid
+          items={items}
+          type={tab}
+          loading={loading}
+          hasMore={hasMore}
+          sentinelRef={sentinelRef}
+        />
       )}
     </div>
   );

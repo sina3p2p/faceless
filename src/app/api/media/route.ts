@@ -1,9 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { series, videoProjects, videoScenes } from "@/server/db/schema";
 import { getAuthUser, unauthorized } from "@/lib/api-utils";
-import { eq, asc, desc, and, isNotNull, or } from "drizzle-orm";
+import { eq, asc, desc, lt, or } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
+
+const PAGE_SIZE = 20;
 
 interface MediaItem {
   id: string;
@@ -17,9 +19,14 @@ interface MediaItem {
   createdAt: string;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return unauthorized();
+
+  const { searchParams } = new URL(req.url);
+  const tab = (searchParams.get("tab") || "images") as "videos" | "images" | "audio";
+  const cursor = searchParams.get("cursor");
+  const limit = Math.min(Number(searchParams.get("limit")) || PAGE_SIZE, 50);
 
   const userSeries = await db.query.series.findMany({
     where: eq(series.userId, user.id),
@@ -27,40 +34,63 @@ export async function GET() {
   });
 
   if (userSeries.length === 0) {
-    return NextResponse.json({ videos: [], images: [], audio: [] });
+    return NextResponse.json({ items: [], nextCursor: null, total: 0 });
   }
 
   const seriesIds = userSeries.map((s) => s.id);
   const seriesMap = new Map(userSeries.map((s) => [s.id, s.name]));
 
-  const projects = await db.query.videoProjects.findMany({
-    where: or(...seriesIds.map((sid) => eq(videoProjects.seriesId, sid))),
-    columns: { id: true, seriesId: true, title: true, outputUrl: true, createdAt: true },
-    orderBy: desc(videoProjects.createdAt),
-    with: {
-      scenes: {
-        orderBy: asc(videoScenes.sceneOrder),
-        columns: {
-          id: true,
-          sceneOrder: true,
-          imageUrl: true,
-          videoUrl: true,
-          audioUrl: true,
-          assetUrl: true,
-          assetType: true,
-          imagePrompt: true,
-          visualDescription: true,
-          modelUsed: true,
-          createdAt: true,
-        },
-      },
-    },
-  });
+  const projectWhere = or(...seriesIds.map((sid) => eq(videoProjects.seriesId, sid)));
 
-  const images: MediaItem[] = [];
-  const videoClips: MediaItem[] = [];
-  const audioItems: MediaItem[] = [];
-  const finalVideos: MediaItem[] = [];
+  const projectQuery = cursor
+    ? db.query.videoProjects.findMany({
+        where: projectWhere,
+        columns: { id: true, seriesId: true, title: true, outputUrl: true, createdAt: true },
+        orderBy: desc(videoProjects.createdAt),
+        with: {
+          scenes: {
+            orderBy: asc(videoScenes.sceneOrder),
+            columns: {
+              id: true,
+              sceneOrder: true,
+              imageUrl: true,
+              videoUrl: true,
+              audioUrl: true,
+              assetUrl: true,
+              assetType: true,
+              imagePrompt: true,
+              visualDescription: true,
+              modelUsed: true,
+              createdAt: true,
+            },
+          },
+        },
+      })
+    : db.query.videoProjects.findMany({
+        where: projectWhere,
+        columns: { id: true, seriesId: true, title: true, outputUrl: true, createdAt: true },
+        orderBy: desc(videoProjects.createdAt),
+        with: {
+          scenes: {
+            orderBy: asc(videoScenes.sceneOrder),
+            columns: {
+              id: true,
+              sceneOrder: true,
+              imageUrl: true,
+              videoUrl: true,
+              audioUrl: true,
+              assetUrl: true,
+              assetType: true,
+              imagePrompt: true,
+              visualDescription: true,
+              modelUsed: true,
+              createdAt: true,
+            },
+          },
+        },
+      });
+
+  const projects = await projectQuery;
 
   const resolveUrl = async (key: string | null) => {
     if (!key) return null;
@@ -68,13 +98,15 @@ export async function GET() {
     return getSignedDownloadUrl(key);
   };
 
+  const allItems: MediaItem[] = [];
+
   for (const project of projects) {
     const sName = seriesMap.get(project.seriesId) || "Unknown";
 
-    if (project.outputUrl) {
+    if (tab === "videos" && project.outputUrl) {
       const url = await resolveUrl(project.outputUrl);
       if (url) {
-        finalVideos.push({
+        allItems.push({
           id: `final-${project.id}`,
           type: "video",
           url,
@@ -89,28 +121,30 @@ export async function GET() {
     }
 
     for (const scene of project.scenes) {
-      const imgKey = scene.imageUrl || (scene.assetType === "image" ? scene.assetUrl : null);
-      if (imgKey) {
-        const url = await resolveUrl(imgKey);
-        if (url) {
-          images.push({
-            id: `img-${scene.id}`,
-            type: "image",
-            url,
-            videoTitle: project.title,
-            seriesName: sName,
-            sceneIndex: scene.sceneOrder,
-            prompt: scene.imagePrompt || scene.visualDescription,
-            model: scene.modelUsed,
-            createdAt: scene.createdAt.toISOString(),
-          });
+      if (tab === "images") {
+        const imgKey = scene.imageUrl || (scene.assetType === "image" ? scene.assetUrl : null);
+        if (imgKey) {
+          const url = await resolveUrl(imgKey);
+          if (url) {
+            allItems.push({
+              id: `img-${scene.id}`,
+              type: "image",
+              url,
+              videoTitle: project.title,
+              seriesName: sName,
+              sceneIndex: scene.sceneOrder,
+              prompt: scene.imagePrompt || scene.visualDescription,
+              model: scene.modelUsed,
+              createdAt: scene.createdAt.toISOString(),
+            });
+          }
         }
       }
 
-      if (scene.videoUrl) {
+      if (tab === "videos" && scene.videoUrl) {
         const url = await resolveUrl(scene.videoUrl);
         if (url) {
-          videoClips.push({
+          allItems.push({
             id: `vid-${scene.id}`,
             type: "video",
             url,
@@ -124,10 +158,10 @@ export async function GET() {
         }
       }
 
-      if (scene.audioUrl) {
+      if (tab === "audio" && scene.audioUrl) {
         const url = await resolveUrl(scene.audioUrl);
         if (url) {
-          audioItems.push({
+          allItems.push({
             id: `aud-${scene.id}`,
             type: "audio",
             url,
@@ -143,9 +177,18 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({
-    videos: [...finalVideos, ...videoClips],
-    images,
-    audio: audioItems,
-  });
+  allItems.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const total = allItems.length;
+
+  let startIdx = 0;
+  if (cursor) {
+    const cursorIdx = allItems.findIndex((item) => item.id === cursor);
+    startIdx = cursorIdx >= 0 ? cursorIdx + 1 : 0;
+  }
+
+  const page = allItems.slice(startIdx, startIdx + limit);
+  const nextCursor = startIdx + limit < total ? page[page.length - 1]?.id ?? null : null;
+
+  return NextResponse.json({ items: page, nextCursor, total });
 }
