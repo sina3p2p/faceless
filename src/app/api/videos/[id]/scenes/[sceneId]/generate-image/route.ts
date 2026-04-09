@@ -3,8 +3,9 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes, sceneMedia } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, inArray } from "drizzle-orm";
-import { generateImage, generateKlingImage, generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
+import { generateImage, generateKlingImage, generateNanoBananaImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { getVideoSize } from "@/lib/constants";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -26,7 +27,7 @@ export async function POST(
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoId),
     with: {
-      series: { columns: { userId: true, imageModel: true, style: true, characterImages: true } },
+      series: { columns: { userId: true, imageModel: true, style: true, characterImages: true, videoSize: true } },
     },
   });
 
@@ -55,6 +56,8 @@ export async function POST(
     : (userInstruction || scene.imagePrompt || scene.text);
 
   const imageModel = parsed.data.imageModel || video.series.imageModel || "dall-e-3";
+  const sizeConfig = getVideoSize(video.series.videoSize);
+  const aspectRatio = sizeConfig.id as AspectRatio;
 
   // Resolve series-level character images
   const rawChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
@@ -110,18 +113,18 @@ export async function POST(
         ...charRefs,
       ];
 
-      const result = await generateNanoBananaImage(editPrompt, allRefs);
+      const result = await generateNanoBananaImage(editPrompt, allRefs, aspectRatio);
       imageUrl = result?.url ?? null;
     } else if (imageModel === "nano-banana-2") {
       const allRefs = [...sceneRefs, ...charRefs];
-      const result = await generateNanoBananaImage(cleanedPrompt, allRefs.length > 0 ? allRefs : undefined);
+      const result = await generateNanoBananaImage(cleanedPrompt, allRefs.length > 0 ? allRefs : undefined, aspectRatio);
       imageUrl = result?.url ?? null;
     } else if (imageModel === "kling-image-v3") {
       const refUrl = sceneRefs[0]?.url;
-      const result = await generateKlingImage(cleanedPrompt, refUrl, charRefs.length > 0 ? charRefs : undefined);
+      const result = await generateKlingImage(cleanedPrompt, refUrl, charRefs.length > 0 ? charRefs : undefined, aspectRatio);
       imageUrl = result?.url ?? null;
     } else {
-      const result = await generateImage(cleanedPrompt);
+      const result = await generateImage(cleanedPrompt, aspectRatio);
       imageUrl = result?.url ?? null;
     }
 

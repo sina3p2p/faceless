@@ -23,6 +23,16 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { IMAGE_MODELS } from "@/lib/constants";
 
+interface MediaVersion {
+  id: string;
+  type: string;
+  url: string;
+  key: string;
+  prompt: string | null;
+  modelUsed: string | null;
+  createdAt: string;
+}
+
 interface Scene {
   id: string;
   sceneOrder: number;
@@ -36,6 +46,7 @@ interface Scene {
   assetType: string | null;
   audioUrl: string | null;
   assetRefs: string[] | null;
+  media?: MediaVersion[];
 }
 
 interface StoryAssetItem {
@@ -550,20 +561,24 @@ function PromptEditModal({
   scene,
   scenes,
   imageModel,
+  videoId,
   onClose,
   onSubmit,
   onUndo,
   onUploadImage,
+  onSelectMedia,
   regenerating,
   undoing,
 }: {
   scene: Scene;
   scenes: Scene[];
   imageModel: string;
+  videoId: string;
   onClose: () => void;
   onSubmit: (prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[], modelOverride?: string) => void;
   onUndo: (() => void) | null;
   onUploadImage: (file: File) => void;
+  onSelectMedia: (sceneId: string, mediaId: string) => void;
   regenerating: boolean;
   undoing: boolean;
 }) {
@@ -622,6 +637,49 @@ function PromptEditModal({
                   {undoing ? "Undoing..." : "Undo"}
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Previous versions gallery */}
+          {scene.media && scene.media.length > 1 && (
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-gray-400 mb-2">
+                Previous versions ({scene.media.length})
+              </label>
+              <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+                {scene.media.map((m) => {
+                  const isCurrent = scene.assetUrl === m.url;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => {
+                        if (!isCurrent) onSelectMedia(scene.id, m.id);
+                      }}
+                      className={`relative shrink-0 rounded-lg overflow-hidden border-2 transition-all hover:opacity-100 ${
+                        isCurrent
+                          ? "border-violet-500 ring-1 ring-violet-500/30 opacity-100"
+                          : "border-white/10 opacity-60 hover:border-white/30"
+                      }`}
+                      title={`${m.modelUsed || "Unknown model"} — ${new Date(m.createdAt).toLocaleTimeString()}`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={m.url}
+                        alt=""
+                        className="w-16 h-16 object-cover"
+                      />
+                      {isCurrent && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-violet-500/20">
+                          <svg className="w-4 h-4 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -1246,6 +1304,21 @@ export default function ReviewPage() {
     setRegenerating(false);
   }
 
+  async function handleSelectMedia(sceneId: string, mediaId: string) {
+    try {
+      const res = await fetch(`/api/videos/${id}/scenes/${sceneId}/select-media`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mediaId }),
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } catch {
+      console.error("Failed to select media version");
+    }
+  }
+
   async function handleUndo() {
     if (!editingScene || !previousAssetUrl) return;
     setUndoing(true);
@@ -1534,10 +1607,12 @@ export default function ReviewPage() {
           scene={editingScene}
           scenes={scenes}
           imageModel={video?.series?.imageModel || "dall-e-3"}
+          videoId={id}
           onClose={() => { setEditingScene(null); setPreviousAssetUrl(null); }}
           onSubmit={handleGenerateImage}
           onUndo={previousAssetUrl ? handleUndo : null}
           onUploadImage={(file) => handleUploadImage(editingScene.id, file)}
+          onSelectMedia={handleSelectMedia}
           regenerating={regenerating}
           undoing={undoing}
         />
