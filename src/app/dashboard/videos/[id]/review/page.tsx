@@ -66,6 +66,7 @@ interface VideoDetail {
   status: string;
   duration: number | null;
   script: string | null;
+  config: { pipelineMode?: "manual" | "auto" } | null;
   series: { name: string; niche: string; imageModel: string | null; videoType: string; storyAssets?: StoryAssetItem[] };
 }
 
@@ -1639,6 +1640,32 @@ export default function ReviewPage() {
             ? "Review generated images, then approve to generate motion."
             : "Review your content and approve to continue."}
         </p>
+        {/* Auto-approve toggle */}
+        <div className="mt-3 flex items-center gap-3">
+          <div
+            onClick={async () => {
+              const next = video?.config?.pipelineMode === "auto" ? "manual" : "auto";
+              await fetch(`/api/videos/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pipelineMode: next }),
+              });
+              setVideo((prev) => prev ? { ...prev, config: { ...prev.config, pipelineMode: next } } : prev);
+            }}
+            className="flex items-center gap-2 cursor-pointer select-none"
+          >
+            <div className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
+              video?.config?.pipelineMode === "auto" ? "bg-violet-500" : "bg-white/10"
+            }`}>
+              <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                video?.config?.pipelineMode === "auto" ? "translate-x-4" : "translate-x-0"
+              }`} />
+            </div>
+            <span className="text-xs text-gray-400">
+              {video?.config?.pipelineMode === "auto" ? "Auto Pipeline" : "Manual Review"}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Stats bar */}
@@ -1713,11 +1740,11 @@ export default function ReviewPage() {
                 <Button
                   variant="primary"
                   size="sm"
-                  loading={generatingMotion}
-                  onClick={handleGenerateMotion}
+                  loading={approving}
+                  onClick={() => handleApprove("approve-images")}
                   disabled={scenes.length === 0}
                 >
-                  Approve &amp; Generate Motion
+                  Approve Images &amp; Generate Motion
                 </Button>
               </>
             ) : (
@@ -1907,7 +1934,7 @@ export default function ReviewPage() {
       )}
 
       {/* New pipeline bottom actions */}
-      {(isScenesReview || isTTSReview || isPromptsReview || isNewMotionReview) && scenes.length > 0 && !isProcessing && (
+      {(isScenesReview || isTTSReview || isPromptsReview || isImageReview || isNewMotionReview) && scenes.length > 0 && !isProcessing && (
         <div className="mb-6">
           <Card>
             <CardContent className="py-3 flex items-center justify-end gap-2">
@@ -2030,10 +2057,10 @@ export default function ReviewPage() {
               <Button
                 variant="primary"
                 size="lg"
-                loading={generatingMotion}
-                onClick={handleGenerateMotion}
+                loading={approving}
+                onClick={() => handleApprove("approve-images")}
               >
-                Approve &amp; Generate Motion
+                Approve Images &amp; Generate Motion
               </Button>
             </>
           ) : (

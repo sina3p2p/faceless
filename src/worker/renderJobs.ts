@@ -9,8 +9,6 @@ import {
   schema,
   eq,
   execAsync,
-  getModelDurations,
-  getPreviousTopics,
   insertSceneMedia,
   updateJobStep,
   updateVideoStatus,
@@ -20,11 +18,10 @@ import {
   failJob,
 } from "./shared";
 import {
-  fetchFacelessMediaParallel,
   fetchAIVideoMediaParallel,
 } from "./mediaJobs";
 import { getVideoSize } from "@/lib/constants";
-import { generateVideoScript, type MusicScript } from "@/server/services/llm";
+import { type MusicScript } from "@/server/services/llm";
 import { type AlignedSection } from "@/server/services/music";
 import {
   resetUsedMedia,
@@ -143,12 +140,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
     const sizeConfig = getVideoSize(seriesRecord.videoSize);
     const ar = sizeConfig.id as AspectRatio;
 
-    let mediaPaths: { path: string; type: "video" | "image" }[];
-    if (videoType === "ai_video" || videoType === "dialogue") {
-      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, preVideos, ar);
-    } else {
-      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, ar);
-    }
+    const mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, preVideos, ar);
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 60);
     await job.updateProgress(60);
@@ -234,188 +226,6 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`Render from scenes failed for ${videoProjectId}:`, msg);
-    throw error;
-  } finally {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
-  }
-}
-
-export async function renderVideoJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
-  const workDir = path.join(os.tmpdir(), `faceless-render-${uuid()}`);
-  await fs.mkdir(workDir, { recursive: true });
-
-  resetUsedMedia();
-
-  try {
-    const seriesRecordRaw = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
-    });
-
-    if (!seriesRecordRaw) throw new Error(`Series not found: ${seriesId}`);
-
-    const storyAssetsRV = await resolveStoryAssets(
-      seriesRecordRaw.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null,
-      seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null
-    );
-    const seriesRecord = { ...seriesRecordRaw, storyAssets: storyAssetsRV };
-
-    const videoType = seriesRecord.videoType || "standalone";
-
-    const videoProject = await db.query.videoProjects.findFirst({
-      where: eq(schema.videoProjects.id, videoProjectId),
-      columns: { config: true },
-    });
-    const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;
-    const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 45;
-
-    console.log(`Render job starting: type=${videoType}, series=${seriesId}, targetDuration=${targetDuration}s`);
-
-    await updateVideoStatus(videoProjectId, "SCRIPT");
-    await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
-    await job.updateProgress(10);
-
-    const topicIdeas = seriesRecord.topicIdeas as string[];
-    const topicIdea =
-      topicIdeas.length > 0
-        ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
-        : undefined;
-
-    const previousTopics = await getPreviousTopics(seriesId, videoProjectId);
-
-    const script = await generateVideoScript(
-      seriesRecord.niche,
-      seriesRecord.style,
-      topicIdea,
-      targetDuration,
-      seriesRecord.llmModel || undefined,
-      !!seriesRecord.sceneContinuity,
-      previousTopics,
-      seriesRecord.language || "en",
-      getModelDurations(seriesRecord.videoModel)
-    );
-
-    await db
-      .update(schema.videoProjects)
-      .set({
-        title: script.title,
-        script: JSON.stringify(script),
-        duration: script.totalDuration,
-      })
-      .where(eq(schema.videoProjects.id, videoProjectId));
-
-    const sceneIds: string[] = [];
-    for (let i = 0; i < script.scenes.length; i++) {
-      const [inserted] = await db.insert(schema.videoScenes).values({
-        videoProjectId,
-        sceneOrder: i,
-        text: script.scenes[i].text,
-        duration: script.scenes[i].duration,
-      }).returning({ id: schema.videoScenes.id });
-      sceneIds.push(inserted.id);
-    }
-
-    await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 25);
-    await job.updateProgress(25);
-
-    await updateVideoStatus(videoProjectId, "IMAGE_GENERATION");
-    await updateJobStep(videoProjectId, "TTS", "ACTIVE", 30);
-    await job.updateProgress(30);
-
-    const sceneTexts = script.scenes.map((s) => s.text);
-
-    const ttsPromise = generateTTSParallel(
-      sceneTexts,
-      seriesRecord.defaultVoiceId ?? undefined,
-      workDir
-    );
-
-    const sizeConfig = getVideoSize(seriesRecord.videoSize);
-    const ar = sizeConfig.id as AspectRatio;
-
-    const mediaPromise = videoType === "ai_video"
-      ? fetchAIVideoMediaParallel(script, seriesRecord, workDir, undefined, new Map(), new Map(), ar)
-      : fetchFacelessMediaParallel(script, seriesRecord, workDir, undefined, new Map(), ar);
-
-    const [ttsResult, mediaPaths] = await Promise.all([ttsPromise, mediaPromise]);
-
-    const { audioPaths, ttsResults } = ttsResult;
-
-    await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 70);
-    await job.updateProgress(70);
-
-    await Promise.all(
-      sceneTexts.map(async (_, i) => {
-        const audioBuffer = await fs.readFile(audioPaths[i]);
-        const audioKey = `scenes/${videoProjectId}/audio_${i}.mp3`;
-        await uploadFile(audioKey, audioBuffer, "audio/mpeg");
-
-        const mediaBuffer = await fs.readFile(mediaPaths[i].path);
-        const mediaExt = mediaPaths[i].type === "video" ? "mp4" : "jpg";
-        const mediaMime = mediaPaths[i].type === "video" ? "video/mp4" : "image/jpeg";
-        const mediaKey = `scenes/${videoProjectId}/media_${i}.${mediaExt}`;
-        await uploadFile(mediaKey, mediaBuffer, mediaMime);
-
-        const isVideo = mediaPaths[i].type === "video";
-        const model = seriesRecord.imageModel || "dall-e-3";
-
-        await db
-          .update(schema.videoScenes)
-          .set({
-            audioUrl: audioKey,
-            assetUrl: mediaKey,
-            assetType: mediaPaths[i].type,
-            [isVideo ? "videoUrl" : "imageUrl"]: mediaKey,
-            captionData: ttsResults[i].wordTimestamps,
-            modelUsed: model,
-          })
-          .where(eq(schema.videoScenes.id, sceneIds[i]));
-
-        await insertSceneMedia(sceneIds[i], isVideo ? "video" : "image", mediaKey, script.scenes[i].imagePrompt, model);
-      })
-    );
-
-    await job.updateProgress(73);
-
-    await updateVideoStatus(videoProjectId, "VIDEO_GENERATION");
-    await updateVideoStatus(videoProjectId, "RENDERING");
-    await updateJobStep(videoProjectId, "COMPOSE", "ACTIVE", 75);
-    await job.updateProgress(75);
-
-    const composerScenes: ComposerScene[] = sceneTexts.map((text, i) => ({
-      audioPath: audioPaths[i],
-      mediaPath: mediaPaths[i].path,
-      mediaType: mediaPaths[i].type,
-      text,
-      duration: script.scenes[i].duration,
-      wordTimestamps: ttsResults[i].wordTimestamps,
-    }));
-
-    const outputPath = await composeVideo({
-      scenes: composerScenes,
-      captionStyle: seriesRecord.captionStyle,
-      sceneContinuity: !!seriesRecord.sceneContinuity,
-      videoWidth: sizeConfig.width,
-      videoHeight: sizeConfig.height,
-    });
-
-    await job.updateProgress(90);
-
-    const outputBuffer = await fs.readFile(outputPath);
-    const s3Key = `videos/${userId}/${videoProjectId}/output.mp4`;
-    await uploadFile(s3Key, outputBuffer, "video/mp4");
-
-    await updateVideoStatus(videoProjectId, "COMPLETED", { outputUrl: s3Key });
-    await updateJobStep(videoProjectId, "DONE", "COMPLETED", 100);
-    await job.updateProgress(100);
-
-    await recordUsage(userId, "video_generated", 1, {
-      videoProjectId,
-      duration: script.totalDuration,
-    });
-  } catch (error) {
-    const msg = await failJob(videoProjectId, error);
-    console.error(`Render job failed for ${videoProjectId}:`, msg);
     throw error;
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
@@ -583,12 +393,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
     const sizeConfig = getVideoSize(seriesRecord.videoSize);
     const ar = sizeConfig.id as AspectRatio;
 
-    let mediaPaths: { path: string; type: "video" | "image" }[];
-    if (seriesRecord.videoModel && seriesRecord.videoModel !== "none") {
-      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, preVideos, ar);
-    } else {
-      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, ar);
-    }
+    const mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, preVideos, ar);
 
     await job.updateProgress(65);
 

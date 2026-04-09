@@ -158,11 +158,9 @@ export default function EditSeriesPage() {
             <LLMModelSelector value={form.llmModel} onChange={(v) => setForm({ ...form, llmModel: v })} />
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
 
-            {(form.videoType === "ai_video" || form.videoType === "music_video") && (
-              <VideoModelSelector value={form.videoModel} onChange={(v) => setForm({ ...form, videoModel: v })} />
-            )}
+            <VideoModelSelector value={form.videoModel} onChange={(v) => setForm({ ...form, videoModel: v })} />
 
-            {(form.videoType === "ai_video" || form.videoType === "music_video") && (
+            {(form.videoType !== "music_video") && (
               <div
                 onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
                 className={`rounded-xl border p-4 cursor-pointer transition-all ${

@@ -50,7 +50,7 @@ export default function CreateVideoPage() {
 
   const [form, setForm] = useState({
     prompt: "",
-    videoType: "ai_video" as string,
+    videoType: "standalone" as string,
     style: ART_STYLES[0].id as string,
     captionStyle: CAPTION_STYLES[0].id as string,
     llmModel: DEFAULT_LLM_MODEL as string,

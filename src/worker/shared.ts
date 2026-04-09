@@ -12,7 +12,7 @@ import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL, WORKER } from "@/lib/const
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
-import type { generateVideoScript } from "@/server/services/llm";
+import type { VideoScript } from "@/server/services/llm";
 
 const client = postgres(DATABASE.url);
 export const db = drizzle(client, { schema });
@@ -179,7 +179,7 @@ export async function generateTTSParallel(
 
 export type PreApproved = Map<number, { path: string; type: "video" | "image"; url: string }>;
 
-export type ScriptInput = Pick<Awaited<ReturnType<typeof generateVideoScript>>, "scenes">;
+export type ScriptInput = Pick<VideoScript, "scenes">;
 
 export async function reusePreApprovedAssets(
   scenes: Array<{ imageUrl?: string | null; videoUrl?: string | null; assetUrl?: string | null; assetType?: string | null }>,

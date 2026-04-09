@@ -4,12 +4,10 @@ import { videoProjects, videoScenes, series } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, asc } from "drizzle-orm";
 import {
-  refineVideoScript,
   refineNarrationScript,
   refineStory,
   refineMusicScript,
   type ChatMessage,
-  type VideoScript,
   type NarrationScript,
   type MusicScript,
 } from "@/server/services/llm";
@@ -156,14 +154,13 @@ export async function POST(
         changes: buildChanges(video.scenes, refined.scenes),
       });
     } else {
-      const currentScript: VideoScript = {
+      const currentScript: NarrationScript = {
         title: video.title || "Untitled",
         hook: "",
         scenes: video.scenes.map((s) => ({
+          sceneTitle: (s as Record<string, unknown>).sceneTitle as string || "",
           text: s.text,
-          visualDescription: s.visualDescription || "",
-          imagePrompt: s.imagePrompt || "",
-          assetRefs: (s.assetRefs as string[]) ?? [],
+          directorNote: (s as Record<string, unknown>).directorNote as string || "",
           duration: s.duration ?? 5,
         })),
         cta: "",
@@ -174,7 +171,7 @@ export async function POST(
       if (scriptJson?.hook) currentScript.hook = scriptJson.hook;
       if (scriptJson?.cta) currentScript.cta = scriptJson.cta;
 
-      const refined = await refineVideoScript(
+      const refined = await refineNarrationScript(
         currentScript,
         message,
         chatHistory as ChatMessage[],
@@ -186,9 +183,11 @@ export async function POST(
         script: refined,
         scenes: refined.scenes.map((s, i) => ({
           sceneOrder: i,
+          sceneTitle: s.sceneTitle,
+          directorNote: s.directorNote,
           text: s.text,
-          imagePrompt: s.imagePrompt,
-          visualDescription: s.visualDescription,
+          imagePrompt: "",
+          visualDescription: "",
           duration: s.duration,
         })),
         title: refined.title,

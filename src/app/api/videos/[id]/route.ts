@@ -62,9 +62,15 @@ const patchSchema = z.object({
   script: z.string().optional(),
   pipelineMode: z.enum(["manual", "auto"]).optional(),
   status: z.enum([
-    "SCENE_SPLIT", "TTS_GENERATION", "PROMPT_GENERATION", "IMAGE_GENERATION",
-    "MOTION_GENERATION", "VIDEO_GENERATION",
-    "IMAGE_REVIEW", "REVIEW_VISUAL", "MUSIC_GENERATION", "REVIEW_MUSIC_SCRIPT",
+    // Story-first pipeline
+    "REVIEW_STORY", "SCENE_SPLIT", "REVIEW_SCENES",
+    "TTS_GENERATION", "TTS_REVIEW",
+    "PROMPT_GENERATION", "REVIEW_PROMPTS",
+    "IMAGE_GENERATION", "IMAGE_REVIEW",
+    "MOTION_GENERATION", "REVIEW_MOTION",
+    "VIDEO_GENERATION",
+    // Legacy
+    "REVIEW_VISUAL", "MUSIC_GENERATION", "REVIEW_MUSIC_SCRIPT",
   ]).optional(),
 });
 

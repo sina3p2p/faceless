@@ -1,9 +1,9 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { generateScriptJob, generateMusicScriptJob, generateStandaloneScriptJob, generateStandaloneMusicScriptJob, generateDialogueScriptJob } from "./scriptJobs";
+import { generateMusicScriptJob, generateStandaloneMusicScriptJob } from "./scriptJobs";
 import { generateMusicLyricsJob, generateSongJob, generateMusicVisualsJob } from "./musicJobs";
-import { generateImagesJob, generateMotionJob as legacyGenerateMotionJob } from "./mediaJobs";
-import { renderVideoJob, rerenderVideoJob, renderFromScenesJob, renderMusicVideoJob } from "./renderJobs";
+import { generateImagesJob } from "./mediaJobs";
+import { rerenderVideoJob, renderFromScenesJob, renderMusicVideoJob } from "./renderJobs";
 import {
   generateStoryJob,
   splitScenesJob,
@@ -45,12 +45,8 @@ const worker = new Worker(
       await generateFrameVideosJob(job);
     } else if (job.name === "compose-final") {
       await composeFinalJob(job);
-    } else if (job.name === "generate-script") {
-      await generateScriptJob(job);
     } else if (job.name === "generate-music-script") {
       await generateMusicScriptJob(job);
-    } else if (job.name === "generate-standalone-script") {
-      await generateStandaloneScriptJob(job);
     } else if (job.name === "generate-standalone-music-script") {
       await generateStandaloneMusicScriptJob(job);
     } else if (job.name === "generate-music-lyrics") {
@@ -59,12 +55,8 @@ const worker = new Worker(
       await generateSongJob(job);
     } else if (job.name === "generate-music-visuals") {
       await generateMusicVisualsJob(job);
-    } else if (job.name === "generate-dialogue-script") {
-      await generateDialogueScriptJob(job);
     } else if (job.name === "generate-images") {
       await generateImagesJob(job);
-    } else if (job.name === "generate-motion") {
-      await legacyGenerateMotionJob(job);
     } else if (job.name === "render-from-scenes") {
       await renderFromScenesJob(job);
     } else if (job.name === "render-music-video") {
@@ -72,7 +64,7 @@ const worker = new Worker(
     } else if (job.name === "rerender-video") {
       await rerenderVideoJob(job);
     } else {
-      await renderVideoJob(job);
+      throw new Error(`Unknown job name: ${job.name}`);
     }
     logger.info("Job completed", {
       jobId: job.id,
