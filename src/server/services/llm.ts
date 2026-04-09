@@ -12,7 +12,6 @@ export const openrouter = createOpenRouter({
 const videoSceneSchema = z.object({
   text: z.string().describe("Narration text for this scene. Punchy, conversational, micro-cliffhangers. 1-3 sentences max."),
   visualDescription: z.string().describe("Rich detailed description of visual action on screen — movements, gestures, camera motion, environment changes. Must describe MOTION and ACTION, not a static image. Must also describe how the scene ENDS (motion settling, camera resting) for smooth transition to the next scene."),
-  searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
   imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT (appearance, clothing, expression), ACTION/MOTION, ENVIRONMENT, LIGHTING, CAMERA angle/movement, MOOD/ATMOSPHERE, and STYLE. Single detailed paragraph."),
   assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include characters who are visible, the location where the scene takes place, and any props that are shown. If no story assets were provided, return an empty array."),
   duration: z.number().describe("Duration of this scene in seconds"),
@@ -113,7 +112,7 @@ RULES:
 
 LANGUAGE RULE (CRITICAL):
 - The user may write their instructions in ANY language, but the script output (title, hook, narration text, CTA) MUST ALWAYS be written in ${langName}.
-- imagePrompt, visualDescription, and searchQuery should remain in English for best AI model compatibility.
+- imagePrompt and visualDescription should remain in English for best AI model compatibility.
 - Never switch the script language based on the user's input language. Always output narration in ${langName}.`;
 
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
@@ -267,11 +266,11 @@ export async function generateVideoScript(
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
 
-  const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
+  const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in viral short-form content.
 
 OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
 - ALL text content (title, hook, scene narration/text, CTA) MUST be written in ${langName}.
-- imagePrompt, visualDescription, and searchQuery MUST remain in English for best AI model compatibility.
+- imagePrompt and visualDescription MUST remain in English for best AI model compatibility.
 - This rule overrides everything else. Even if the topic or niche name is in a different language, the output narration must be in ${langName}.
 
 VIRAL SCRIPT FORMULA (follow this exactly):
@@ -297,7 +296,6 @@ CRITICAL RULES:
 - NEVER use filler words or generic phrases
 - Write like you're telling a secret to a friend, not giving a lecture
 - Every single sentence must either reveal new info or build tension
-- searchQuery must be HYPER-SPECIFIC (e.g. "abandoned underground bunker" not "dark place")
 ${buildDurationInstruction(targetDuration, durations)}
 
 ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
@@ -376,7 +374,6 @@ KIDS CONTENT RULES (this overrides tone guidelines above):
 - Use excitement and wonder instead of tension ("Guess what?!", "How cool is THAT?!")
 - Narration should sound like a friendly, enthusiastic teacher or storyteller
 - imagePrompt should be colorful, bright, cartoonish or playful — never dark or moody
-- searchQuery should target kid-friendly footage (colorful animals, space, nature, cartoons)
 - CTA should be fun: "Which one was YOUR favorite?" or "Can you guess what happens next?"
 ` : ""}${sceneContinuity ? `
 SCENE CONTINUITY MODE (CRITICAL — follow these rules):
@@ -749,7 +746,7 @@ export async function generateStandaloneScript(
 
 OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
 - ALL text content (title, hook, scene narration/text, CTA) MUST be written in ${langName}.
-- imagePrompt, visualDescription, and searchQuery MUST remain in English for best AI model compatibility.
+- imagePrompt and visualDescription MUST remain in English for best AI model compatibility.
 - This rule overrides everything else. Even if the story is in a different language, the output narration must be in ${langName}.
 
 STORYTELLING RULES:
@@ -761,8 +758,6 @@ STORYTELLING RULES:
 CRITICAL RULES:
 - Each scene narration = 15-25 words. Short punchy sentences.
 ${buildDurationInstruction(targetDuration, durations)}
-- searchQuery must be HYPER-SPECIFIC
-
 ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
 - Each scene must show exactly ONE clear action or moment.
 - BAD: "She opens the door, walks in, and sits down" — 3 actions.
@@ -906,7 +901,6 @@ const dialogueSceneSchema = z.object({
   visualDescription: z.string().describe("MOTION PROMPT for the AI video generator (30-60 words). Describe the speaking character's gestures, head tilts, hand movements, lip sync, facial expression changes, and camera motion (slow push in, orbit, over-the-shoulder). Must describe CONTINUOUS MOTION, not a static pose. Must also describe how the clip ENDS for a smooth cut to the next speaker."),
   imagePrompt: z.string().describe("Detailed prompt for AI image generation (50-100+ words). Show the speaking character clearly."),
   assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include the speaking character, the location, and any visible props."),
-  searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
   duration: z.number().describe("Duration of this scene in seconds"),
 });
 
@@ -939,7 +933,7 @@ export async function generateDialogueScript(
 
 OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
 - ALL text content (title, hook, dialogue text, CTA) MUST be written in ${langName}.
-- imagePrompt, visualDescription, and searchQuery MUST remain in English for best AI model compatibility.
+- imagePrompt and visualDescription MUST remain in English for best AI model compatibility.
 
 DIALOGUE RULES:
 1. Each scene is ONE character's spoken turn (or a Narrator line for scene-setting).
@@ -1054,7 +1048,6 @@ export type NarrationDialogueScript = z.infer<typeof narrationDialogueScriptSche
 
 const imagePromptOutputSceneSchema = z.object({
   imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT (appearance, clothing, expression), ACTION/MOTION, ENVIRONMENT, LIGHTING, CAMERA angle/movement, MOOD/ATMOSPHERE, and STYLE. Single detailed paragraph."),
-  searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
   assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include characters who are visible, the location where the scene takes place, and any props that are shown. If no story assets were provided, return an empty array."),
 });
 
@@ -1092,7 +1085,7 @@ export async function generateNarrationScript(
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
 
-  const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
+  const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in viral short-form content.
 
 You are the creative lead for a video production team. You write the narration AND a detailed creative brief (directorNote) for each scene that your art director and video director will use to create the visuals.
 
@@ -1332,7 +1325,7 @@ export async function generateImagePrompts(
 
 Each scene includes a "Director's Note" — a rich creative brief from the creative director describing the visual world in detail. USE THIS AS YOUR PRIMARY REFERENCE. The director's note describes the setting, subjects, mood, lighting, camera angle, and symbolism. Your imagePrompt should translate this vision into a specific, technically precise prompt for an AI image generator.
 
-The narration is in ${langName}, but ALL imagePrompt and searchQuery output MUST be in English for best AI model compatibility.
+The narration is in ${langName}, but ALL imagePrompt output MUST be in English for best AI model compatibility.
 
 You MUST return exactly ${scenes.length} scenes in the same order as the input.
 
@@ -1347,8 +1340,6 @@ IMAGE PROMPT QUALITY (CRITICAL — these drive the key frame image for each vide
 - Include motion cues: "camera slowly pushes in", "wind gently moves the curtains", "smoke rises from the ground".
 - EACH scene's imagePrompt must be visually DIFFERENT from the others. Vary camera angles, color palettes, and compositions across scenes.
 - Think like a cinematographer — every frame should be visually stunning enough to pause and admire.
-- searchQuery must be HYPER-SPECIFIC (e.g. "abandoned underground bunker" not "dark place")
-
 ONE ACTION PER SCENE (CRITICAL):
 - Each imagePrompt must describe only ONE moment/pose/action, never a sequence.
 
@@ -1386,7 +1377,6 @@ LEGO MOVIE STYLE RULES (CRITICAL — follow these for every imagePrompt):
 ${niche === "kids" ? `
 KIDS CONTENT RULES:
 - imagePrompt should be colorful, bright, cartoonish or playful — never dark or moody
-- searchQuery should target kid-friendly footage (colorful animals, space, nature, cartoons)
 ` : ""}${sceneContinuity ? `
 SCENE CONTINUITY MODE (CRITICAL):
 - Video clips will be generated using IMAGE PAIRS: each clip transitions from scene N's image to scene N+1's image.
@@ -1582,7 +1572,6 @@ OUTPUT FORMAT:
 - Then write the full narration as flowing prose paragraphs
 - No scene breaks, no bullet points, no structural formatting beyond paragraphs
 - No word limits — write as much as the story needs to be told properly
-- The story should work as a voiceover narration for a short-form video
 
 OUTPUT LANGUAGE (CRITICAL):
 - The title and ALL narration MUST be written in ${langName}.
