@@ -140,9 +140,7 @@ export async function POST(req: NextRequest) {
 
   const jobName = data.videoType === "music_video"
     ? "generate-music-lyrics"
-    : data.videoType === "dialogue"
-      ? "generate-dialogue-script"
-      : "generate-standalone-script";
+    : "generate-story";
 
   await renderQueue.add(jobName, {
     videoProjectId: videoProject.id,

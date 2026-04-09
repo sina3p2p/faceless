@@ -64,7 +64,7 @@ const worker = new Worker(
     } else if (job.name === "rerender-video") {
       await rerenderVideoJob(job);
     } else {
-      throw new Error(`Unknown job name: ${job.name}`);
+      logger.warn("Skipping unknown/removed job", { jobName: job.name, jobId: job.id });
     }
     logger.info("Job completed", {
       jobId: job.id,
