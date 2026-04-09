@@ -54,6 +54,7 @@ function SortableSceneCard({
   onDelete,
   onUpdate,
   onEditPrompt,
+  onUploadImage,
   generatingImage,
   isMusicVideo,
   isDialogue,
@@ -65,6 +66,7 @@ function SortableSceneCard({
   onDelete: () => void;
   onUpdate: (updates: { text?: string; duration?: number; speaker?: string }) => void;
   onEditPrompt: () => void;
+  onUploadImage: (file: File) => void;
   generatingImage: boolean;
   isMusicVideo?: boolean;
   isDialogue?: boolean;
@@ -81,6 +83,7 @@ function SortableSceneCard({
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(scene.text);
   const [duration, setDuration] = useState(scene.duration);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setText(scene.text);
@@ -191,6 +194,19 @@ function SortableSceneCard({
             </div>
           )}
 
+          {/* Hidden file input for image upload */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUploadImage(file);
+              e.target.value = "";
+            }}
+          />
+
           {/* Preview image */}
           {scene.assetUrl && (
             <div className="mt-2 relative group">
@@ -200,12 +216,21 @@ function SortableSceneCard({
                 alt={`Scene ${index + 1}`}
                 className="w-full max-w-[200px] rounded-lg border border-white/10"
               />
-              <button
-                onClick={(e) => { e.stopPropagation(); onEditPrompt(); }}
-                className="absolute top-2 right-2 px-2 py-1 rounded-md bg-black/70 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-600"
-              >
-                Edit & Regenerate
-              </button>
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  className="px-2 py-1 rounded-md bg-black/70 text-white text-xs hover:bg-violet-600"
+                  title="Upload your own image"
+                >
+                  Upload
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEditPrompt(); }}
+                  className="px-2 py-1 rounded-md bg-black/70 text-white text-xs hover:bg-violet-600"
+                >
+                  Edit & Regenerate
+                </button>
+              </div>
             </div>
           )}
 
@@ -219,12 +244,21 @@ function SortableSceneCard({
           <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
             <span className="font-mono">{duration.toFixed(1)}s</span>
             {!scene.assetUrl && !generatingImage && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onEditPrompt(); }}
-                className="text-violet-400 hover:text-violet-300 transition-colors"
-              >
-                Edit prompt
-              </button>
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onEditPrompt(); }}
+                  className="text-violet-400 hover:text-violet-300 transition-colors"
+                >
+                  Edit prompt
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  className="text-violet-400 hover:text-violet-300 transition-colors inline-flex items-center gap-1"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l4-4m0 0l4 4m-4-4v12" /></svg>
+                  Upload image
+                </button>
+              </>
             )}
             {scene.assetUrl && (
               <a
@@ -404,6 +438,7 @@ function PromptEditModal({
   onClose,
   onSubmit,
   onUndo,
+  onUploadImage,
   regenerating,
   undoing,
 }: {
@@ -413,11 +448,13 @@ function PromptEditModal({
   onClose: () => void;
   onSubmit: (prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[], modelOverride?: string) => void;
   onUndo: (() => void) | null;
+  onUploadImage: (file: File) => void;
   regenerating: boolean;
   undoing: boolean;
 }) {
   const [selectedModel, setSelectedModel] = useState(imageModel);
   const canEdit = !!scene.assetUrl;
+  const modalFileInputRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"regenerate" | "edit">("regenerate");
   const [regenPrompt, setRegenPrompt] = useState(scene.imagePrompt || scene.text);
   const [editInstruction, setEditInstruction] = useState("");
@@ -566,9 +603,28 @@ function PromptEditModal({
             </>
           )}
 
+          <input
+            ref={modalFileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) { onUploadImage(file); onClose(); }
+              e.target.value = "";
+            }}
+          />
+
           <div className="flex gap-3">
             <Button variant="ghost" onClick={onClose} className="flex-1">
               Cancel
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => modalFileInputRef.current?.click()}
+              className="flex-1"
+            >
+              Upload Image
             </Button>
             <Button
               variant="primary"
@@ -936,6 +992,31 @@ export default function ReviewPage() {
     fetch(`/api/videos/${id}/scenes/${sceneId}`, { method: "DELETE" });
   }
 
+  async function handleUploadImage(sceneId: string, file: File) {
+    setGeneratingSceneIds((prev) => new Set(prev).add(sceneId));
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const uploadRes = await fetch("/api/upload-temp", { method: "POST", body: fd });
+      if (!uploadRes.ok) return;
+      const { url: key } = await uploadRes.json();
+
+      await fetch(`/api/videos/${id}/scenes/${sceneId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assetUrl: key, imageUrl: key, assetType: "image" }),
+      });
+
+      await loadData();
+    } finally {
+      setGeneratingSceneIds((prev) => {
+        const next = new Set(prev);
+        next.delete(sceneId);
+        return next;
+      });
+    }
+  }
+
   async function generateImageForScene(
     sceneId: string,
     promptOverride?: string,
@@ -1256,6 +1337,7 @@ export default function ReviewPage() {
                 onDelete={() => handleDeleteScene(scene.id)}
                 onUpdate={(updates) => handleUpdateScene(scene.id, updates)}
                 onEditPrompt={() => setEditingScene(scene)}
+                onUploadImage={(file) => handleUploadImage(scene.id, file)}
                 generatingImage={generatingSceneIds.has(scene.id)}
                 isMusicVideo={video?.series?.videoType === "music_video"}
                 isDialogue={video?.series?.videoType === "dialogue"}
@@ -1327,6 +1409,7 @@ export default function ReviewPage() {
           onClose={() => { setEditingScene(null); setPreviousAssetUrl(null); }}
           onSubmit={handleGenerateImage}
           onUndo={previousAssetUrl ? handleUndo : null}
+          onUploadImage={(file) => handleUploadImage(editingScene.id, file)}
           regenerating={regenerating}
           undoing={undoing}
         />
