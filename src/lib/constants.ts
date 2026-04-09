@@ -65,10 +65,11 @@ export const MEDIA = {
   get openaiApiKey() { return env("OPENAI_API_KEY"); },
 } as const;
 
-// ── AI Video (fal.ai) ──
+// ── AI Video (fal.ai + Runway) ──
 
 export const AI_VIDEO = {
   get falKey() { return env("FAL_KEY"); },
+  get runwayApiKey() { return env("RUNWAYML_API_SECRET"); },
   defaultI2vModel: "fal-ai/kling-video/v3/standard/image-to-video",
   t2vModel: "fal-ai/wan-25-preview/text-to-video",
   klingImageModel: "fal-ai/kling-image/v3/text-to-image",
@@ -84,15 +85,17 @@ export const MUSIC = {
 } as const;
 
 export const VIDEO_MODELS = [
-  { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "fal-ai/kling-video/v3/standard/image-to-video", description: "#2 ranked globally ($0.14/s → ~$0.70/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
-  { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "fal-ai/kling-video/v3/pro/image-to-video", description: "Top-tier cinematic quality (~$0.50/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
-  { id: "kling-o3", label: "Kling O3", modelId: "fal-ai/kling-video/o3/standard/image-to-video", description: "Best 3D spatial awareness (~$0.50/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
-  { id: "hailuo-02-standard", label: "Hailuo 02 Standard", modelId: "fal-ai/minimax/hailuo-02/standard/image-to-video", description: "Natural motion, budget-friendly (~$0.27/6s)", durations: [6, 10] as number[], endFrame: true },
-  { id: "hailuo-02-pro", label: "Hailuo 02 Pro", modelId: "fal-ai/minimax/hailuo-02/pro/image-to-video", description: "1080p, great prompt following (~$0.48/6s)", durations: [6, 10] as number[], endFrame: true },
-  { id: "pixverse-v6", label: "PixVerse V6", modelId: "fal-ai/pixverse/v6/image-to-video", description: "Lifelike physics (~$0.45/5s)", durations: [5, 10] as number[], endFrame: false },
-  { id: "kling-25-turbo", label: "Kling 2.5 Turbo Pro", modelId: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video", description: "Fast & cheap legacy model (~$0.35/5s)", durations: [5, 10] as number[], endFrame: true },
-  { id: "ltx-2-pro", label: "LTX 2.0 Pro", modelId: "fal-ai/ltx-2/image-to-video", description: "Best bang-for-buck (~$0.30/5s)", durations: [6, 8, 10] as number[], endFrame: false },
-  { id: "wan-25", label: "Wan 2.5", modelId: "fal-ai/wan-25-preview/image-to-video", description: "Cheapest option (~$0.25/5s)", durations: [5, 10] as number[], endFrame: true },
+  { id: "runway-gen4-turbo", label: "Runway Gen-4 Turbo", modelId: "gen4_turbo", provider: "runway" as const, description: "Best quality + value ($0.05/s → ~$0.25/5s)", durations: [5, 10] as number[], endFrame: false },
+  { id: "runway-gen4.5", label: "Runway Gen-4.5", modelId: "gen4.5", provider: "runway" as const, description: "#1 ranked globally, premium ($0.12/s → ~$0.60/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false },
+  { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "fal-ai/kling-video/v3/standard/image-to-video", provider: "fal" as const, description: "#2 ranked globally ($0.14/s → ~$0.70/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
+  { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "fal-ai/kling-video/v3/pro/image-to-video", provider: "fal" as const, description: "Top-tier cinematic quality (~$0.50/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
+  { id: "kling-o3", label: "Kling O3", modelId: "fal-ai/kling-video/o3/standard/image-to-video", provider: "fal" as const, description: "Best 3D spatial awareness (~$0.50/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
+  { id: "hailuo-02-standard", label: "Hailuo 02 Standard", modelId: "fal-ai/minimax/hailuo-02/standard/image-to-video", provider: "fal" as const, description: "Natural motion, budget-friendly (~$0.27/6s)", durations: [6, 10] as number[], endFrame: true },
+  { id: "hailuo-02-pro", label: "Hailuo 02 Pro", modelId: "fal-ai/minimax/hailuo-02/pro/image-to-video", provider: "fal" as const, description: "1080p, great prompt following (~$0.48/6s)", durations: [6, 10] as number[], endFrame: true },
+  { id: "pixverse-v6", label: "PixVerse V6", modelId: "fal-ai/pixverse/v6/image-to-video", provider: "fal" as const, description: "Lifelike physics (~$0.45/5s)", durations: [5, 10] as number[], endFrame: false },
+  { id: "kling-25-turbo", label: "Kling 2.5 Turbo Pro", modelId: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video", provider: "fal" as const, description: "Fast & cheap legacy model (~$0.35/5s)", durations: [5, 10] as number[], endFrame: true },
+  { id: "ltx-2-pro", label: "LTX 2.0 Pro", modelId: "fal-ai/ltx-2/image-to-video", provider: "fal" as const, description: "Best bang-for-buck (~$0.30/5s)", durations: [6, 8, 10] as number[], endFrame: false },
+  { id: "wan-25", label: "Wan 2.5", modelId: "fal-ai/wan-25-preview/image-to-video", provider: "fal" as const, description: "Cheapest option (~$0.25/5s)", durations: [5, 10] as number[], endFrame: true },
 ] as const;
 
 export const DEFAULT_VIDEO_MODEL = "kling-3-standard";

@@ -11,7 +11,7 @@ export const openrouter = createOpenRouter({
 
 const videoSceneSchema = z.object({
   text: z.string().describe("Narration text for this scene. Punchy, conversational, micro-cliffhangers. 1-3 sentences max."),
-  visualDescription: z.string().describe("Rich detailed description of visual action on screen — movements, gestures, camera motion, environment changes. Must describe MOTION and ACTION, not a static image."),
+  visualDescription: z.string().describe("Rich detailed description of visual action on screen — movements, gestures, camera motion, environment changes. Must describe MOTION and ACTION, not a static image. Must also describe how the scene ENDS (motion settling, camera resting) for smooth transition to the next scene."),
   searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
   imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT (appearance, clothing, expression), ACTION/MOTION, ENVIRONMENT, LIGHTING, CAMERA angle/movement, MOOD/ATMOSPHERE, and STYLE. Single detailed paragraph."),
   assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include characters who are visible, the location where the scene takes place, and any props that are shown. If no story assets were provided, return an empty array."),
@@ -317,6 +317,17 @@ VISUAL DESCRIPTION — AI VIDEO MOTION PROMPT (CRITICAL — this drives REAL vid
 - GOOD visualDescription: "Camera slowly pushes in on the man's face as his eyes widen with realization, shadows shifting across the dimly lit room, dust particles floating in a beam of light"
 - NEVER write static descriptions. Every visualDescription MUST contain at least one camera movement AND one subject/environment movement.
 
+SCENE TRANSITIONS (CRITICAL — smooth visual flow between scenes):
+- Each visualDescription must describe how the scene ENDS so it transitions naturally to the next scene.
+- End each clip with a natural resting point: a slow fade, a camera pulling back, a subject settling into a pose, or the motion decelerating.
+- Think about VISUAL CONTINUITY between consecutive scenes:
+  - If scene N ends with a wide establishing shot and scene N+1 opens on a close-up, describe the camera pulling back at the END of scene N.
+  - If scene N is indoors and scene N+1 is outdoors, end scene N with the subject moving toward a door/window/exit.
+  - If scenes share the same character, end with the character in a transitional pose (turning away, walking toward camera, looking offscreen toward the next location).
+- AVOID abrupt endings: don't end a clip with fast motion or a sudden action mid-swing. Instead, let the motion resolve — a hand coming to rest, a head turn completing, a camera settling.
+- BAD transition: scene ends with a character mid-jump → next scene is a calm interior (jarring hard cut)
+- GOOD transition: scene ends with character landing softly and looking toward a distant light → next scene opens in the lit interior
+
 IMAGE PROMPT QUALITY (drives the key frame image for each video clip):
 - Each imagePrompt must be 50-100 words minimum. SHORT/LAZY prompts = ugly videos.
 - NEVER write vague prompts like "a mysterious scene" or "something dramatic happens". Be EXTREMELY specific.
@@ -454,6 +465,7 @@ The visuals must feel like they were CHOREOGRAPHED to the music. Think like a re
    - Include subject motion: "character turns to face camera", "wind blows through hair", "walks forward through fog", "hands reach toward the sky".
    - Include environmental motion: "clouds drifting", "rain falling", "fire flickering", "leaves swirling in wind", "neon signs flickering".
    - Match motion SPEED to music tempo: slow songs = slow deliberate moves, upbeat songs = dynamic fast cuts.
+   - SCENE TRANSITIONS: Each visualDescription must describe how the clip ENDS to cut smoothly into the next section. End with motion decelerating, camera settling, or the subject transitioning (turning, walking away, fading into atmosphere). Avoid ending mid-action.
 
    ONE ACTION PER SECTION (CRITICAL — AI video models CANNOT handle multiple actions):
    - Each section's imagePrompt and visualDescription must show exactly ONE clear action or moment. NEVER pack multiple actions into one section.
@@ -653,6 +665,7 @@ VISUAL-MUSIC SYNC RULES:
    - Describe SPECIFIC camera motion (dolly, orbit, crane, tracking), subject motion, and environment motion.
    - Match motion speed to the clip duration and music tempo.
    - NEVER write static descriptions — every clip MUST have continuous motion.
+   - SCENE TRANSITIONS: Describe how each clip ENDS — motion should decelerate, camera should settle, or the subject should reach a natural resting pose. This prevents jarring hard cuts between sections. End with transitional motion (camera pulling back, subject turning, fading atmosphere) that leads naturally into the next section's opening.
 
 5. ONE ACTION PER SECTION: Each section = ONE clear visual moment.
 
@@ -756,6 +769,17 @@ VISUAL DESCRIPTION — AI VIDEO MOTION PROMPT (CRITICAL — this drives REAL vid
 - GOOD visualDescription: "Camera slowly pushes in on the woman as she turns to face the viewer, wind gently moving her hair, flower petals drifting past in the warm afternoon light"
 - NEVER write static descriptions. Every visualDescription MUST contain at least one camera movement AND one subject/environment movement.
 
+SCENE TRANSITIONS (CRITICAL — smooth visual flow between scenes):
+- Each visualDescription must describe how the scene ENDS so it transitions naturally to the next scene.
+- End each clip with a natural resting point: a slow fade, a camera pulling back, a subject settling into a pose, or the motion decelerating.
+- Think about VISUAL CONTINUITY between consecutive scenes:
+  - If scene N ends wide and scene N+1 opens close-up, describe the camera pulling back at the END of scene N.
+  - If scene N is indoors and scene N+1 is outdoors, end scene N with the subject moving toward a door/window/exit.
+  - If scenes share the same character, end with the character in a transitional pose (turning away, walking toward camera, looking offscreen).
+- AVOID abrupt endings: don't end a clip with fast motion or a sudden action mid-swing. Let the motion resolve — a hand coming to rest, a head turn completing, a camera settling.
+- BAD: scene ends with character mid-jump → next scene is calm interior (jarring cut)
+- GOOD: scene ends with character landing softly, looking toward a distant light → next scene opens in the lit interior
+
 IMAGE PROMPT QUALITY (drives the key frame image for each video clip):
 - Each imagePrompt must be 50-100 words minimum.
 - NEVER write vague prompts. Be EXTREMELY specific.
@@ -836,7 +860,7 @@ VISUAL-MUSIC SYNC RULES:
 3. imagePrompt DETAIL: Be as detailed as possible — subject, environment, lighting, camera angle, mood, color palette, style: ${style}.
    - NO COPYRIGHTED CONTENT: NEVER use copyrighted character names OR their iconic signature details in imagePrompt or visualDescription — image models REJECT these. Reimagine with original visuals. Lyrics CAN use real names.
 
-4. visualDescription MOTION: Specific movement and action for the AI video generator with camera/subject/environmental motion.
+4. visualDescription MOTION: Specific movement and action for the AI video generator with camera/subject/environmental motion. Each clip must describe how it ENDS — motion decelerating, camera settling, subject reaching a resting pose — to ensure smooth transitions between sections.
 
 ONE ACTION PER SECTION: Each section's visuals must show exactly ONE clear action.
 
@@ -861,7 +885,7 @@ ${buildAssetBlock(characters)}`;
 const dialogueSceneSchema = z.object({
   speaker: z.string().describe("Who is speaking: exact character name or 'Narrator'"),
   text: z.string().describe("What this character says, or narrator description"),
-  visualDescription: z.string().describe("MOTION PROMPT for the AI video generator (30-60 words). Describe the speaking character's gestures, head tilts, hand movements, lip sync, facial expression changes, and camera motion (slow push in, orbit, over-the-shoulder). Must describe CONTINUOUS MOTION, not a static pose."),
+  visualDescription: z.string().describe("MOTION PROMPT for the AI video generator (30-60 words). Describe the speaking character's gestures, head tilts, hand movements, lip sync, facial expression changes, and camera motion (slow push in, orbit, over-the-shoulder). Must describe CONTINUOUS MOTION, not a static pose. Must also describe how the clip ENDS for a smooth cut to the next speaker."),
   imagePrompt: z.string().describe("Detailed prompt for AI image generation (50-100+ words). Show the speaking character clearly."),
   assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include the speaking character, the location, and any visible props."),
   searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
@@ -925,6 +949,12 @@ VISUAL DESCRIPTION — AI VIDEO MOTION PROMPT (CRITICAL — this drives REAL vid
   - Include camera motion: "slow push in", "over-the-shoulder shot", "camera orbits to reveal the other character".
 - BAD: "Character A standing and talking" (STATIC)
 - GOOD: "Camera slowly pushes in on Character A's face as she leans forward, eyes narrowing with suspicion, gesturing emphatically with her right hand, warm lamplight flickering across her features"
+
+SCENE TRANSITIONS (CRITICAL — smooth visual flow between dialogue turns):
+- Each visualDescription must describe how the clip ENDS so it cuts naturally to the next speaker.
+- End each speaking turn with a settling motion: the character finishing their gesture, leaning back, or turning to look at the other character.
+- Use conversational camera transitions: end with a slow pan toward the next speaker, or the current speaker glancing offscreen toward the other character.
+- AVOID ending mid-gesture or mid-expression — let the motion resolve before the cut.
 
 IMAGE PROMPT QUALITY (drives the key frame image for each video clip):
 - Each imagePrompt must be 50-100 words minimum.

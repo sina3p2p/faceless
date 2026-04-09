@@ -25,6 +25,7 @@
     "@openrouter/ai-sdk-provider": "^2.5.0",
     "@remotion/media-utils": "^4.0.445",
     "@remotion/player": "^4.0.445",
+    "@runwayml/sdk": "^3.18.0",
     "ai": "^6.0.149",
     "bullmq": "^5.73.0",
     "drizzle-orm": "^0.45.2",

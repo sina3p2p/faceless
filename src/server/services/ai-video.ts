@@ -1,4 +1,5 @@
 import { fal } from "@fal-ai/client";
+import RunwayML from "@runwayml/sdk";
 import * as fs from "fs/promises";
 import { AI_VIDEO, VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
 
@@ -8,11 +9,20 @@ fal.config({
 
 const T2V_MODEL = AI_VIDEO.t2vModel;
 
+let _runwayClient: RunwayML | null = null;
+function getRunwayClient(): RunwayML {
+  if (!_runwayClient) {
+    _runwayClient = new RunwayML({ apiKey: AI_VIDEO.runwayApiKey });
+  }
+  return _runwayClient;
+}
+
 function resolveModel(videoModelKey?: string) {
   const key = videoModelKey || DEFAULT_VIDEO_MODEL;
   const entry = VIDEO_MODELS.find((m) => m.id === key);
   return {
     modelId: entry?.modelId ?? AI_VIDEO.defaultI2vModel,
+    provider: entry?.provider ?? ("fal" as const),
     durations: entry?.durations ?? [5, 10],
     endFrame: entry?.endFrame ?? false,
   };
@@ -36,15 +46,52 @@ interface VideoResult {
   durationSeconds: number;
 }
 
-export async function generateVideoFromImage(
+const RUNWAY_RATIO_MAP: Record<string, string> = {
+  "9:16": "720:1280",
+  "16:9": "1280:720",
+  "1:1": "960:960",
+};
+
+async function generateVideoViaRunway(
   imageUrl: string,
   prompt: string,
-  desiredDuration: number = 5,
-  videoModelKey?: string,
+  apiDuration: number,
+  modelId: string,
+  aspectRatio: string = "9:16",
+): Promise<VideoResult> {
+  const client = getRunwayClient();
+  const ratio = RUNWAY_RATIO_MAP[aspectRatio] || "768:1280";
+
+  console.log(`[ai-video] runway.imageToVideo(${modelId}) duration=${apiDuration}s ratio=${ratio}`);
+
+  type RunwayRatio = "1280:720" | "720:1280" | "1104:832" | "832:1104" | "960:960" | "1584:672";
+
+  const task = await client.imageToVideo
+    .create({
+      model: modelId as "gen4_turbo" | "gen4.5",
+      promptImage: imageUrl,
+      promptText: prompt,
+      ratio: ratio as RunwayRatio,
+      duration: apiDuration,
+    })
+    .waitForTaskOutput();
+
+  const videoUrl = task.output?.[0];
+  if (!videoUrl) {
+    throw new Error(`Runway ${modelId} returned no video URL`);
+  }
+
+  return { videoUrl, durationSeconds: apiDuration };
+}
+
+async function generateVideoViaFal(
+  imageUrl: string,
+  prompt: string,
+  apiDuration: number,
+  modelId: string,
+  endFrame: boolean,
   endImageUrl?: string,
 ): Promise<VideoResult> {
-  const { modelId, durations, endFrame } = resolveModel(videoModelKey);
-  const apiDuration = pickBestDuration(desiredDuration, durations);
   const useEndImage = endFrame && !!endImageUrl;
 
   const input: Record<string, unknown> = {
@@ -69,7 +116,7 @@ export async function generateVideoFromImage(
     input.image_url = imageUrl;
   }
 
-  console.log(`[ai-video] fal.subscribe(${modelId}) desired=${desiredDuration}s api=${apiDuration}s input:`, JSON.stringify(input));
+  console.log(`[ai-video] fal.subscribe(${modelId}) api=${apiDuration}s input:`, JSON.stringify(input));
 
   const result = await fal.subscribe(modelId, {
     input,
@@ -89,10 +136,25 @@ export async function generateVideoFromImage(
     throw new Error(`fal.ai image-to-video (${modelId}) returned no video URL`);
   }
 
-  return {
-    videoUrl: data.video.url,
-    durationSeconds: apiDuration,
-  };
+  return { videoUrl: data.video.url, durationSeconds: apiDuration };
+}
+
+export async function generateVideoFromImage(
+  imageUrl: string,
+  prompt: string,
+  desiredDuration: number = 5,
+  videoModelKey?: string,
+  endImageUrl?: string,
+  aspectRatio: string = "9:16",
+): Promise<VideoResult> {
+  const { modelId, provider, durations, endFrame } = resolveModel(videoModelKey);
+  const apiDuration = pickBestDuration(desiredDuration, durations);
+
+  if (provider === "runway") {
+    return generateVideoViaRunway(imageUrl, prompt, apiDuration, modelId, aspectRatio);
+  }
+
+  return generateVideoViaFal(imageUrl, prompt, apiDuration, modelId, endFrame, endImageUrl);
 }
 
 export async function generateVideoFromText(
@@ -135,10 +197,11 @@ export async function getAIVideoForScene(
   desiredDuration: number = 5,
   videoModelKey?: string,
   endImageUrl?: string,
+  aspectRatio: string = "9:16",
 ): Promise<VideoResult> {
   const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
   console.log(`[ai-video] Trying image-to-video (${modelLabel}) desired=${desiredDuration}s${endImageUrl ? " with end frame" : ""} for: "${prompt.slice(0, 60)}..."`);
-  return await generateVideoFromImage(imageUrl, prompt, desiredDuration, videoModelKey, endImageUrl);
+  return await generateVideoFromImage(imageUrl, prompt, desiredDuration, videoModelKey, endImageUrl, aspectRatio);
 }
 
 export async function downloadAIVideo(
