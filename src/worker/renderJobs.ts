@@ -14,11 +14,10 @@ import {
   insertSceneMedia,
   updateJobStep,
   updateVideoStatus,
-  resolveCharacterRefs,
+  resolveStoryAssets,
   generateTTSParallel,
   reusePreApprovedAssets,
   failJob,
-  type CharacterRef,
 } from "./shared";
 import {
   fetchFacelessMediaParallel,
@@ -53,8 +52,11 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
     });
     if (!seriesRecordRaw) throw new Error(`Series not found: ${seriesId}`);
 
-    const characterRefs = await resolveCharacterRefs(seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null);
-    const seriesRecord = { ...seriesRecordRaw, characterRefs };
+    const storyAssets = await resolveStoryAssets(
+      seriesRecordRaw.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null,
+      seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null
+    );
+    const seriesRecord = { ...seriesRecordRaw, storyAssets };
 
     const videoType = seriesRecord.videoType || "faceless";
 
@@ -72,7 +74,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
 
     const script = scriptJson ? JSON.parse(scriptJson) : null;
 
-    console.log(`Render from scenes starting: type=${videoType}, ${existingScenes.length} scenes`);
+    console.log(`Render from scenes starting: type=${videoType}, ${existingScenes.length} scenes, ${storyAssets.length} story assets`);
 
     await updateVideoStatus(videoProjectId, "VIDEO_GENERATION");
     await updateJobStep(videoProjectId, "TTS", "ACTIVE", 10);
@@ -130,8 +132,10 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
         visualDescription: s.visualDescription || script?.scenes?.[i]?.visualDescription || s.text,
         searchQuery: s.searchQuery || script?.scenes?.[i]?.searchQuery || s.text.split(" ").slice(0, 4).join(" "),
         imagePrompt: s.imagePrompt || script?.scenes?.[i]?.imagePrompt || s.text,
+        assetRefs: (s.assetRefs as string[]) ?? [],
         duration: ttsDurations[i] ?? s.duration ?? 5,
       })),
+      sceneAssetRefs: existingScenes.map((s) => (s.assetRefs as string[] | null) ?? null),
     };
 
     const { images: preImages, videos: preVideos } = await reusePreApprovedAssets(existingScenes, workDir);
@@ -250,8 +254,11 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
 
     if (!seriesRecordRaw) throw new Error(`Series not found: ${seriesId}`);
 
-    const characterRefs = await resolveCharacterRefs(seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null);
-    const seriesRecord = { ...seriesRecordRaw, characterRefs };
+    const storyAssetsRV = await resolveStoryAssets(
+      seriesRecordRaw.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null,
+      seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null
+    );
+    const seriesRecord = { ...seriesRecordRaw, storyAssets: storyAssetsRV };
 
     const videoType = seriesRecord.videoType || "faceless";
 
@@ -512,8 +519,11 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
     });
     if (!seriesRecordRaw) throw new Error(`Series not found: ${seriesId}`);
 
-    const characterRefs = await resolveCharacterRefs(seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null);
-    const seriesRecord = { ...seriesRecordRaw, characterRefs };
+    const storyAssetsMV = await resolveStoryAssets(
+      seriesRecordRaw.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null,
+      seriesRecordRaw.characterImages as Array<{ url: string; description: string }> | null
+    );
+    const seriesRecord = { ...seriesRecordRaw, storyAssets: storyAssetsMV };
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
@@ -564,8 +574,10 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
         visualDescription: s.visualDescription || musicScript.sections[i]?.visualDescription || s.text,
         searchQuery: s.searchQuery || musicScript.sections[i]?.sectionName || "cinematic",
         imagePrompt: s.imagePrompt || musicScript.sections[i]?.imagePrompt || s.text,
+        assetRefs: (s.assetRefs as string[]) ?? [],
         duration: actualDurationsSec[i],
       })),
+      sceneAssetRefs: existingScenes.map((s) => (s.assetRefs as string[] | null) ?? null),
     };
 
     const sizeConfig = getVideoSize(seriesRecord.videoSize);

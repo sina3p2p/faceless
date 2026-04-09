@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 interface GenerateCharacterModalProps {
   open: boolean;
   onClose: () => void;
+  assetType?: "character" | "location" | "prop";
   onCharacterGenerated: (character: {
     url: string;
     previewUrl: string;
@@ -32,11 +33,31 @@ interface ChatMessage {
   toolCalls?: ToolCall[];
 }
 
+const ASSET_LABELS: Record<string, { title: string; placeholder: string; hint: string }> = {
+  character: {
+    title: "Generate Character",
+    placeholder: "Describe your character...",
+    hint: 'e.g. "A fierce viking warrior woman with braided red hair and battle scars"',
+  },
+  location: {
+    title: "Generate Location",
+    placeholder: "Describe the location...",
+    hint: 'e.g. "A cozy Victorian living room with warm fireplace and bookshelves"',
+  },
+  prop: {
+    title: "Generate Prop",
+    placeholder: "Describe the prop/object...",
+    hint: 'e.g. "An ancient leather-bound spellbook with glowing runes"',
+  },
+};
+
 export function GenerateCharacterModal({
   open,
   onClose,
+  assetType = "character",
   onCharacterGenerated,
 }: GenerateCharacterModalProps) {
+  const labels = ASSET_LABELS[assetType] || ASSET_LABELS.character;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -77,7 +98,7 @@ export function GenerateCharacterModal({
         const res = await fetch("/api/generate-character", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: updatedMessages }),
+          body: JSON.stringify({ messages: updatedMessages, assetType }),
         });
 
         if (!res.ok) {
@@ -135,7 +156,7 @@ export function GenerateCharacterModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
           <h2 className="text-lg font-semibold text-white">
-            Generate Character
+            {labels.title}
           </h2>
           <button
             onClick={onClose}
@@ -177,11 +198,10 @@ export function GenerateCharacterModal({
                 </svg>
               </div>
               <p className="text-gray-400 text-sm">
-                Describe the character you want to create.
+                Describe the {assetType} you want to create.
               </p>
               <p className="text-gray-600 text-xs mt-1">
-                e.g. &quot;A fierce viking warrior woman with braided red hair
-                and battle scars&quot;
+                {labels.hint}
               </p>
             </div>
           )}
@@ -243,9 +263,9 @@ export function GenerateCharacterModal({
               }}
               placeholder={
                 messages.length === 0
-                  ? "Describe your character..."
+                  ? labels.placeholder
                   : latestImage
-                    ? "Ask for changes or describe a new character..."
+                    ? `Ask for changes or describe a new ${assetType}...`
                     : "Answer the questions or add more details..."
               }
               rows={2}

@@ -19,6 +19,17 @@ const createSeriesSchema = z.object({
   language: z.string().default("en"),
   videoType: z.enum(["faceless", "ai_video", "music_video", "dialogue"]).default("faceless"),
   topicIdeas: z.array(z.string()).default([]),
+  storyAssets: z
+    .array(
+      z.object({
+        id: z.string(),
+        type: z.enum(["character", "location", "prop"]),
+        name: z.string(),
+        description: z.string(),
+        url: z.string(),
+      })
+    )
+    .default([]),
 });
 
 export async function GET() {

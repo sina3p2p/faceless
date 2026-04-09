@@ -211,6 +211,8 @@ export async function generateKlingImage(
 export interface CharacterRef {
   url: string;
   description: string;
+  name?: string;
+  type?: "character" | "location" | "prop";
 }
 
 const GEMINI_IMAGE_MODEL = "google/gemini-3.1-flash-image-preview";
@@ -241,15 +243,16 @@ export async function generateNanoBananaImage(
     // Build multimodal content parts
     const contentParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
 
-    // Add character reference images as native multimodal input
     if (hasRefs) {
-      const charDescriptions = characterRefs.map((c, i) =>
-        `[Character ${i + 1}: ${c.description || "reference character"}]`
-      ).join(", ");
+      const refLabels = characterRefs.map((c, i) => {
+        const typeName = c.type ? c.type.charAt(0).toUpperCase() + c.type.slice(1) : "Character";
+        const label = c.name || `${typeName} ${i + 1}`;
+        return `[${typeName} "${label}": ${c.description || "reference"}]`;
+      }).join(", ");
 
       contentParts.push({
         type: "text",
-        text: `Generate an image with these characters maintaining their exact appearance from the reference images: ${charDescriptions}\n\n${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
+        text: `Generate an image using these reference assets — maintain their exact appearance: ${refLabels}\n\n${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
       });
 
       const imagePromises = characterRefs.map(async (c) => {

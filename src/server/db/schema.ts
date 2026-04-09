@@ -118,6 +118,7 @@ export const series = pgTable("series", {
   language: text("language").default("en").notNull(),
   captionStyle: text("caption_style").default("none").notNull(),
   characterImages: json("character_images").$type<Array<{ url: string; description: string }>>().default([]),
+  storyAssets: json("story_assets").$type<Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }>>().default([]),
   sceneContinuity: integer("scene_continuity").default(1).notNull(),
   videoSize: text("video_size").default("9:16").notNull(),
   videoType: text("video_type").default("faceless").notNull(),
@@ -158,6 +159,7 @@ export const videoScenes = pgTable("video_scenes", {
   assetType: text("asset_type"),
   modelUsed: text("model_used"),
   speaker: text("speaker"),
+  assetRefs: json("asset_refs").$type<string[]>(),
   duration: real("duration"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });

@@ -14,6 +14,7 @@ const videoSceneSchema = z.object({
   visualDescription: z.string().describe("Rich detailed description of visual action on screen — movements, gestures, camera motion, environment changes. Must describe MOTION and ACTION, not a static image."),
   searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
   imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT (appearance, clothing, expression), ACTION/MOTION, ENVIRONMENT, LIGHTING, CAMERA angle/movement, MOOD/ATMOSPHERE, and STYLE. Single detailed paragraph."),
+  assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include characters who are visible, the location where the scene takes place, and any props that are shown. If no story assets were provided, return an empty array."),
   duration: z.number().describe("Duration of this scene in seconds"),
 });
 
@@ -554,7 +555,7 @@ KIDS MUSIC RULES:
 export async function generateStandaloneMusicLyrics(
   prompt: string,
   style: string,
-  characters: { name: string; description: string }[] = [],
+  characters: StoryAsset[] = [],
   targetDuration = 60,
   model?: string,
   language = "en",
@@ -564,7 +565,7 @@ export async function generateStandaloneMusicLyrics(
   const langName = getLanguageName(language);
 
   const charBlock = characters.length > 0
-    ? `\n\nCHARACTERS:\n${characters.map((c) => `  - ${c.name}: ${c.description}`).join("\n")}\nReference these characters in the lyrics.\n`
+    ? `\n\nCHARACTERS / ASSETS:\n${characters.map((c) => `  - ${c.name} (${c.type}): ${c.description}`).join("\n")}\nReference these in the lyrics where appropriate.\n`
     : "";
 
   const systemPrompt = `You are an elite songwriter. Create songs that go viral on TikTok and YouTube.
@@ -672,15 +673,33 @@ You MUST return exactly ${sections.length} sections in the same order.`;
 
 // ── Standalone Script Generation (no series context) ──
 
-interface StandaloneCharacter {
+export interface StoryAsset {
   name: string;
   description: string;
+  type: "character" | "location" | "prop";
 }
 
-function buildCharacterBlock(characters: StandaloneCharacter[]): string {
-  if (characters.length === 0) return "";
-  const entries = characters.map((c, i) => `  - ${c.name} (@Element${i + 1}): ${c.description}`).join("\n");
-  return `\n\nCHARACTERS (you MUST reference these by name in every imagePrompt and visualDescription. Use the exact name so the image model can match the face reference):\n${entries}\n`;
+function buildAssetBlock(assets: StoryAsset[]): string {
+  if (assets.length === 0) return "";
+  const characters = assets.filter((a) => a.type === "character");
+  const locations = assets.filter((a) => a.type === "location");
+  const props = assets.filter((a) => a.type === "prop");
+
+  let block = "\n\nSTORY ASSETS (you MUST reference these by exact name in imagePrompt, visualDescription, and assetRefs):";
+  if (characters.length > 0) {
+    block += "\n  Characters:";
+    characters.forEach((c) => { block += `\n    - ${c.name}: ${c.description}`; });
+  }
+  if (locations.length > 0) {
+    block += "\n  Locations:";
+    locations.forEach((l) => { block += `\n    - ${l.name}: ${l.description}`; });
+  }
+  if (props.length > 0) {
+    block += "\n  Props:";
+    props.forEach((p) => { block += `\n    - ${p.name}: ${p.description}`; });
+  }
+  block += "\n\nASSET RULES:\n- Every scene's imagePrompt MUST describe the assigned assets using their provided descriptions above. If a scene takes place at a location asset, describe that location exactly as defined. If a character asset appears, describe their appearance as defined.\n- The assetRefs array for each scene MUST list the exact names of all assets visible in that scene.\n- Characters: include when the character is visible in the scene.\n- Locations: include when the scene takes place at that location.\n- Props: include when the prop is visible in the scene.\n";
+  return block;
 }
 
 function buildInputTypeInstruction(prompt: string): string {
@@ -693,7 +712,7 @@ function buildInputTypeInstruction(prompt: string): string {
 export async function generateStandaloneScript(
   prompt: string,
   style: string,
-  characters: StandaloneCharacter[] = [],
+  characters: StoryAsset[] = [],
   targetDuration = 45,
   model?: string,
   sceneContinuity = true,
@@ -762,7 +781,7 @@ SCENE CONTINUITY MODE (CRITICAL):
 - Each imagePrompt must be visually COMPATIBLE with neighbors.
 - Maintain a CONSISTENT main subject/character across all scenes.
 - Add one EXTRA FINAL scene as the visual closing frame (ending scene with CTA narration).
-- Total scenes should be 6-8 (including the ending scene).` : ""}${buildCharacterBlock(characters)}`;
+- Total scenes should be 6-8 (including the ending scene).` : ""}${buildAssetBlock(characters)}`;
 
   const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. Make it visually stunning and emotionally compelling.`;
 
@@ -780,7 +799,7 @@ SCENE CONTINUITY MODE (CRITICAL):
 export async function generateStandaloneMusicScript(
   prompt: string,
   style: string,
-  characters: StandaloneCharacter[] = [],
+  characters: StoryAsset[] = [],
   targetDuration = 60,
   model?: string,
   language = "en",
@@ -822,7 +841,7 @@ VISUAL-MUSIC SYNC RULES:
 ONE ACTION PER SECTION: Each section's visuals must show exactly ONE clear action.
 
 5. VISUAL CONTINUITY: Maintain consistent main character/subject and coherent color palette throughout.
-${buildCharacterBlock(characters)}`;
+${buildAssetBlock(characters)}`;
 
   const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. The song should be irresistibly catchy and the visuals cinematic.`;
 
@@ -844,6 +863,7 @@ const dialogueSceneSchema = z.object({
   text: z.string().describe("What this character says, or narrator description"),
   visualDescription: z.string().describe("MOTION PROMPT for the AI video generator (30-60 words). Describe the speaking character's gestures, head tilts, hand movements, lip sync, facial expression changes, and camera motion (slow push in, orbit, over-the-shoulder). Must describe CONTINUOUS MOTION, not a static pose."),
   imagePrompt: z.string().describe("Detailed prompt for AI image generation (50-100+ words). Show the speaking character clearly."),
+  assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include the speaking character, the location, and any visible props."),
   searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
   duration: z.number().describe("Duration of this scene in seconds"),
 });
@@ -861,7 +881,7 @@ export type DialogueScript = z.infer<typeof dialogueScriptSchema>;
 export async function generateDialogueScript(
   prompt: string,
   style: string,
-  characters: StandaloneCharacter[],
+  characters: StoryAsset[],
   targetDuration = 45,
   model?: string,
   sceneContinuity = false,
@@ -871,7 +891,7 @@ export async function generateDialogueScript(
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
 
-  const charList = characters.map((c, i) => `  - ${c.name} (@Element${i + 1}): ${c.description}`).join("\n");
+  const charList = characters.map((c) => `  - ${c.name}: ${c.description}`).join("\n");
 
   const systemPrompt = `You are an elite dialogue scriptwriter for short-form video. You create compelling conversations between characters for TikTok, YouTube Shorts, and Instagram Reels.
 
@@ -919,7 +939,9 @@ CLAYMATION STYLE RULES:
 - Include: "Claymation stop-motion style, everything made of sculpted clay and plasticine"` : ""}${sceneContinuity ? `
 SCENE CONTINUITY MODE:
 - Maintain consistent character appearances across all scenes.
-- Visual style and environment should feel cohesive.` : ""}`;
+- Visual style and environment should feel cohesive.` : ""}${buildAssetBlock(characters.filter((c) => c.type !== "character"))}
+
+ASSET REFS: For each scene, the assetRefs array must include the speaking character's name plus any location or prop assets visible in the scene.`;
 
   const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. Create an engaging dialogue between the characters that feels natural and compelling.`;
 

@@ -12,8 +12,9 @@ import {
   getPreviousTopics,
   updateJobStep,
   updateVideoStatus,
-  parseCharacters,
+  parseStoryAssets,
   failJob,
+  type StoryAssetInput,
 } from "./shared";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
 import {
@@ -188,8 +189,9 @@ export async function generateMusicLyricsJob(job: Job<RenderJobData>) {
 
     if (isStandalone) {
       const prompt = topicIdeas[0] || "";
+      const storyAssets = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
       const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
-      const characters = parseCharacters(charImages);
+      const characters = parseStoryAssets(storyAssets, charImages);
       lyrics = await generateStandaloneMusicLyrics(
         prompt, seriesRecord.style, characters, targetDuration,
         seriesRecord.llmModel || undefined, seriesRecord.language || "en",

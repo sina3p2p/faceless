@@ -82,6 +82,14 @@ export interface CharacterRef {
   description: string;
 }
 
+export interface StoryAssetRef {
+  id: string;
+  type: "character" | "location" | "prop";
+  name: string;
+  description: string;
+  url: string;
+}
+
 export async function resolveCharacterRefs(
   characterImages: Array<{ url: string; description: string }> | null | undefined
 ): Promise<CharacterRef[]> {
@@ -92,6 +100,47 @@ export async function resolveCharacterRefs(
       description: c.description,
     }))
   );
+}
+
+export async function resolveStoryAssets(
+  storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null | undefined,
+  characterImages?: Array<{ url: string; description: string }> | null
+): Promise<StoryAssetRef[]> {
+  if (storyAssets && storyAssets.length > 0) {
+    return Promise.all(
+      storyAssets.map(async (a) => ({
+        ...a,
+        url: a.url.startsWith("http") ? a.url : await getSignedDownloadUrl(a.url),
+      }))
+    );
+  }
+  // Backward compat: treat old characterImages as character-type assets
+  if (characterImages && characterImages.length > 0) {
+    return Promise.all(
+      characterImages.map(async (c, i) => {
+        const parts = c.description.split(":").map((s) => s.trim());
+        const name = parts.length >= 2 ? parts[0] : `Character ${i + 1}`;
+        const desc = parts.length >= 2 ? parts.slice(1).join(":").trim() : c.description;
+        return {
+          id: `legacy-${i}`,
+          type: "character" as const,
+          name,
+          description: desc,
+          url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
+        };
+      })
+    );
+  }
+  return [];
+}
+
+export function filterAssetsByRefs(
+  allAssets: StoryAssetRef[],
+  assetRefs: string[] | null | undefined
+): StoryAssetRef[] {
+  if (!assetRefs || assetRefs.length === 0) return allAssets;
+  const refSet = new Set(assetRefs.map((r) => r.toLowerCase()));
+  return allAssets.filter((a) => refSet.has(a.name.toLowerCase()));
 }
 
 export async function generateTTSParallel(
@@ -177,6 +226,27 @@ export function parseCharacters(charImages: Array<{ url: string; description: st
       ? { name: parts[0], description: parts.slice(1).join(":").trim() }
       : { name: "Character", description: c.description };
   });
+}
+
+export interface StoryAssetInput {
+  id: string;
+  type: "character" | "location" | "prop";
+  name: string;
+  description: string;
+  url: string;
+}
+
+export function parseStoryAssets(
+  storyAssets: StoryAssetInput[] | null | undefined,
+  charImages?: Array<{ url: string; description: string }> | null
+): Array<{ name: string; description: string; type: "character" | "location" | "prop" }> {
+  if (storyAssets && storyAssets.length > 0) {
+    return storyAssets.map((a) => ({ name: a.name, description: a.description, type: a.type }));
+  }
+  if (charImages && charImages.length > 0) {
+    return parseCharacters(charImages).map((c) => ({ ...c, type: "character" as const }));
+  }
+  return [];
 }
 
 export async function failJob(videoProjectId: string, error: unknown) {

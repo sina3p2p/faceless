@@ -8,8 +8,9 @@ import {
   getPreviousTopics,
   updateJobStep,
   updateVideoStatus,
-  parseCharacters,
+  parseStoryAssets,
   failJob,
+  type StoryAssetInput,
 } from "./shared";
 import {
   generateVideoScript,
@@ -78,6 +79,7 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
         imagePrompt: script.scenes[i].imagePrompt,
         visualDescription: script.scenes[i].visualDescription,
         searchQuery: script.scenes[i].searchQuery,
+        assetRefs: script.scenes[i].assetRefs ?? [],
         duration: script.scenes[i].duration,
       });
     }
@@ -185,8 +187,9 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
     const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 45;
 
     const prompt = (seriesRecord.topicIdeas as string[])?.[0] || "";
+    const storyAssets = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
     const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
-    const characters = parseCharacters(charImages);
+    const characters = parseStoryAssets(storyAssets, charImages);
 
     console.log(`Standalone script generation starting: prompt="${prompt.slice(0, 80)}...", targetDuration=${targetDuration}s`);
     await updateVideoStatus(videoProjectId, "SCRIPT");
@@ -221,6 +224,7 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
         imagePrompt: script.scenes[i].imagePrompt,
         visualDescription: script.scenes[i].visualDescription,
         searchQuery: script.scenes[i].searchQuery,
+        assetRefs: script.scenes[i].assetRefs ?? [],
         duration: script.scenes[i].duration,
       });
     }
@@ -254,8 +258,9 @@ export async function generateStandaloneMusicScriptJob(job: Job<RenderJobData>) 
     const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 60;
 
     const prompt = (seriesRecord.topicIdeas as string[])?.[0] || "";
-    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
-    const characters = parseCharacters(charImages);
+    const storyAssets2 = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
+    const charImages2 = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+    const characters = parseStoryAssets(storyAssets2, charImages2);
 
     console.log(`Standalone music script generation starting: prompt="${prompt.slice(0, 80)}...", targetDuration=${targetDuration}s`);
     await updateVideoStatus(videoProjectId, "SCRIPT");
@@ -323,8 +328,9 @@ export async function generateDialogueScriptJob(job: Job<RenderJobData>) {
     const targetDuration = typeof videoConfig.targetDuration === "number" ? videoConfig.targetDuration : 45;
 
     const prompt = (seriesRecord.topicIdeas as string[])?.[0] || "";
-    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
-    const characters = parseCharacters(charImages);
+    const storyAssets3 = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
+    const charImages3 = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+    const characters = parseStoryAssets(storyAssets3, charImages3);
 
     console.log(`Dialogue script generation starting: prompt="${prompt.slice(0, 80)}...", characters=${characters.length}, targetDuration=${targetDuration}s`);
     await updateVideoStatus(videoProjectId, "SCRIPT");
@@ -359,6 +365,7 @@ export async function generateDialogueScriptJob(job: Job<RenderJobData>) {
         imagePrompt: script.scenes[i].imagePrompt,
         visualDescription: script.scenes[i].visualDescription,
         searchQuery: script.scenes[i].searchQuery,
+        assetRefs: script.scenes[i].assetRefs ?? [],
         duration: script.scenes[i].duration,
         speaker: script.scenes[i].speaker,
       });

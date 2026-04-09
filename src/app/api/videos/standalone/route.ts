@@ -29,6 +29,18 @@ const standaloneSchema = z.object({
       })
     )
     .optional(),
+  storyAssets: z
+    .array(
+      z.object({
+        id: z.string(),
+        type: z.enum(["character", "location", "prop"]),
+        imageUrl: z.string(),
+        name: z.string(),
+        description: z.string(),
+        voiceId: z.string().optional(),
+      })
+    )
+    .optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -53,11 +65,44 @@ export async function POST(req: NextRequest) {
     ? data.prompt.slice(0, 47) + "..."
     : data.prompt;
 
-  const characterImages = (data.characters ?? []).map((c) => ({
-    url: c.imageUrl,
-    description: c.name ? `${c.name}: ${c.description}` : c.description,
-    ...(c.voiceId ? { voiceId: c.voiceId } : {}),
-  }));
+  // Build storyAssets from the new format, or auto-migrate from legacy characters
+  let storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> = [];
+  const characterImages: Array<{ url: string; description: string; voiceId?: string }> = [];
+
+  if (data.storyAssets && data.storyAssets.length > 0) {
+    storyAssets = data.storyAssets.map((a) => ({
+      id: a.id,
+      type: a.type,
+      name: a.name,
+      description: a.description,
+      url: a.imageUrl,
+    }));
+    // Also build legacy characterImages for backward compat
+    for (const a of data.storyAssets) {
+      characterImages.push({
+        url: a.imageUrl,
+        description: a.name ? `${a.name}: ${a.description}` : a.description,
+        ...(a.voiceId ? { voiceId: a.voiceId } : {}),
+      });
+    }
+  } else if (data.characters && data.characters.length > 0) {
+    // Legacy path: auto-migrate characters to storyAssets
+    for (const c of data.characters) {
+      const id = crypto.randomUUID();
+      storyAssets.push({
+        id,
+        type: "character",
+        name: c.name || "Character",
+        description: c.description,
+        url: c.imageUrl,
+      });
+      characterImages.push({
+        url: c.imageUrl,
+        description: c.name ? `${c.name}: ${c.description}` : c.description,
+        ...(c.voiceId ? { voiceId: c.voiceId } : {}),
+      });
+    }
+  }
 
   const [internalSeries] = await db
     .insert(series)
@@ -76,6 +121,7 @@ export async function POST(req: NextRequest) {
       sceneContinuity: data.sceneContinuity ? 1 : 0,
       videoType: data.videoType,
       characterImages,
+      storyAssets,
       isInternal: true,
       topicIdeas: [data.prompt],
     })

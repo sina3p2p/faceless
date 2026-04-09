@@ -15,6 +15,7 @@ const updateSchema = z.object({
   assetUrl: z.string().optional(),
   assetType: z.string().optional(),
   imageUrl: z.string().optional(),
+  assetRefs: z.array(z.string()).optional(),
 });
 
 async function verifyOwnership(videoId: string, userId: string) {
@@ -51,6 +52,7 @@ export async function PATCH(
   if (parsed.data.assetUrl !== undefined) updates.assetUrl = parsed.data.assetUrl;
   if (parsed.data.assetType !== undefined) updates.assetType = parsed.data.assetType;
   if (parsed.data.imageUrl !== undefined) updates.imageUrl = parsed.data.imageUrl;
+  if (parsed.data.assetRefs !== undefined) updates.assetRefs = parsed.data.assetRefs;
 
   if (Object.keys(updates).length === 0) return badRequest("No updates provided");
 

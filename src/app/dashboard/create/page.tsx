@@ -20,20 +20,30 @@ import { VoiceSelector } from "@/components/voice-selector";
 import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector, VideoSizeSelector } from "@/components/model-selectors";
 import { GenerateCharacterModal } from "@/components/generate-character-modal";
 
-interface PendingCharacter {
+type AssetType = "character" | "location" | "prop";
+
+interface PendingAsset {
   file: File | null;
   preview: string;
   name: string;
   description: string;
+  type: AssetType;
   generatedUrl?: string;
   voiceId?: string;
 }
+
+const ASSET_TYPES: { id: AssetType; label: string; icon: string }[] = [
+  { id: "character", label: "Character", icon: "M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" },
+  { id: "location", label: "Location", icon: "M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" },
+  { id: "prop", label: "Prop", icon: "M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" },
+];
 
 export default function CreateVideoPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [pendingCharacters, setPendingCharacters] = useState<PendingCharacter[]>([]);
+  const [pendingAssets, setPendingAssets] = useState<PendingAsset[]>([]);
+  const [newAssetType, setNewAssetType] = useState<AssetType>("character");
   const [describingIdx, setDescribingIdx] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showCharGenModal, setShowCharGenModal] = useState(false);
@@ -70,26 +80,22 @@ export default function CreateVideoPage() {
     setError("");
 
     try {
-      const characters: Array<{ imageUrl: string; name: string; description: string; voiceId?: string }> = [];
+      const storyAssets: Array<{ id: string; type: AssetType; imageUrl: string; name: string; description: string; voiceId?: string }> = [];
 
-      for (const char of pendingCharacters) {
-        if (char.generatedUrl) {
-          characters.push({
-            imageUrl: char.generatedUrl,
-            name: char.name,
-            description: char.description,
-            voiceId: char.voiceId || undefined,
+      for (const asset of pendingAssets) {
+        let imageUrl = asset.generatedUrl;
+        if (!imageUrl && asset.file) {
+          imageUrl = (await uploadCharacterImage(asset.file)) || undefined;
+        }
+        if (imageUrl) {
+          storyAssets.push({
+            id: crypto.randomUUID(),
+            type: asset.type,
+            imageUrl,
+            name: asset.name || `${asset.type} ${storyAssets.length + 1}`,
+            description: asset.description,
+            voiceId: asset.voiceId || undefined,
           });
-        } else if (char.file) {
-          const url = await uploadCharacterImage(char.file);
-          if (url) {
-            characters.push({
-              imageUrl: url,
-              name: char.name,
-              description: char.description,
-              voiceId: char.voiceId || undefined,
-            });
-          }
         }
       }
 
@@ -109,7 +115,7 @@ export default function CreateVideoPage() {
           sceneContinuity: form.sceneContinuity,
           voiceId: form.voiceId || undefined,
           targetDuration: form.targetDuration,
-          characters: characters.length > 0 ? characters : undefined,
+          storyAssets: storyAssets.length > 0 ? storyAssets : undefined,
         }),
       });
 
@@ -224,54 +230,76 @@ export default function CreateVideoPage() {
               </div>
             )}
 
-            {/* Characters */}
+            {/* Story Assets */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Characters (optional)
+                Story Assets (optional)
               </label>
               <p className="text-xs text-gray-500 mb-3">
-                Upload character images with names so the AI keeps them consistent throughout the video.
+                Add characters, locations, and props. The AI will keep them consistent across scenes.
               </p>
 
               <div className="space-y-4">
-                {pendingCharacters.map((char, idx) => (
+                {pendingAssets.map((asset, idx) => (
                   <div key={idx} className="flex gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
                     <div className="relative shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={char.preview} alt={char.name || `Character ${idx + 1}`} className="w-24 h-24 rounded-lg border border-white/10 object-cover" />
+                      <img src={asset.preview} alt={asset.name || `Asset ${idx + 1}`} className="w-24 h-24 rounded-lg border border-white/10 object-cover" />
                       <button
                         type="button"
                         onClick={() => {
-                          URL.revokeObjectURL(char.preview);
-                          setPendingCharacters((prev) => prev.filter((_, i) => i !== idx));
+                          URL.revokeObjectURL(asset.preview);
+                          setPendingAssets((prev) => prev.filter((_, i) => i !== idx));
                         }}
                         className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center text-[10px] hover:bg-red-400"
                       >
                         &times;
                       </button>
+                      <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                        asset.type === "character" ? "bg-violet-500/80 text-white" :
+                        asset.type === "location" ? "bg-blue-500/80 text-white" :
+                        "bg-amber-500/80 text-white"
+                      }`}>
+                        {asset.type}
+                      </span>
                     </div>
                     <div className="flex-1 min-w-0 space-y-2">
-                      <Input
-                        placeholder="Character name (e.g. Cinderella)"
-                        value={char.name}
-                        onChange={(e) => {
-                          setPendingCharacters((prev) =>
-                            prev.map((c, i) => (i === idx ? { ...c, name: e.target.value } : c))
-                          );
-                        }}
-                        className="py-1.5! text-sm!"
-                      />
+                      <div className="flex gap-2">
+                        <select
+                          value={asset.type}
+                          onChange={(e) => {
+                            setPendingAssets((prev) =>
+                              prev.map((a, i) => (i === idx ? { ...a, type: e.target.value as AssetType } : a))
+                            );
+                          }}
+                          className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-xs text-white focus:border-violet-500 focus:outline-none"
+                        >
+                          {ASSET_TYPES.map((t) => (
+                            <option key={t.id} value={t.id}>{t.label}</option>
+                          ))}
+                        </select>
+                        <Input
+                          placeholder={asset.type === "character" ? "Character name" : asset.type === "location" ? "Location name" : "Prop name"}
+                          value={asset.name}
+                          onChange={(e) => {
+                            setPendingAssets((prev) =>
+                              prev.map((a, i) => (i === idx ? { ...a, name: e.target.value } : a))
+                            );
+                          }}
+                          className="py-1.5! text-sm! flex-1"
+                        />
+                      </div>
                       <textarea
                         className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 focus:outline-none transition-colors resize-none h-[52px]"
-                        placeholder="Describe this character..."
-                        value={char.description}
+                        placeholder={`Describe this ${asset.type}...`}
+                        value={asset.description}
                         onChange={(e) => {
-                          setPendingCharacters((prev) =>
-                            prev.map((c, i) => (i === idx ? { ...c, description: e.target.value } : c))
+                          setPendingAssets((prev) =>
+                            prev.map((a, i) => (i === idx ? { ...a, description: e.target.value } : a))
                           );
                         }}
                       />
-                      {char.file && (
+                      {asset.file && (
                         <button
                           type="button"
                           disabled={describingIdx === idx}
@@ -279,15 +307,15 @@ export default function CreateVideoPage() {
                             setDescribingIdx(idx);
                             try {
                               const fd = new FormData();
-                              fd.append("file", char.file!);
+                              fd.append("file", asset.file!);
                               const res = await fetch("/api/describe-character", {
                                 method: "POST",
                                 body: fd,
                               });
                               if (res.ok) {
                                 const data = await res.json();
-                                setPendingCharacters((prev) =>
-                                  prev.map((c, i) => (i === idx ? { ...c, description: data.description } : c))
+                                setPendingAssets((prev) =>
+                                  prev.map((a, i) => (i === idx ? { ...a, description: data.description } : a))
                                 );
                               }
                             } finally {
@@ -309,25 +337,46 @@ export default function CreateVideoPage() {
                           )}
                         </button>
                       )}
-                      <div className="mt-2">
-                        <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-medium mb-1">
-                          Voice
-                        </label>
-                        <VoiceSelector
-                          value={char.voiceId || ""}
-                          onChange={(voiceId) => {
-                            setPendingCharacters((prev) =>
-                              prev.map((c, i) => (i === idx ? { ...c, voiceId } : c))
-                            );
-                          }}
-                        />
-                      </div>
+                      {asset.type === "character" && (
+                        <div className="mt-2">
+                          <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-medium mb-1">
+                            Voice
+                          </label>
+                          <VoiceSelector
+                            value={asset.voiceId || ""}
+                            onChange={(voiceId) => {
+                              setPendingAssets((prev) =>
+                                prev.map((a, i) => (i === idx ? { ...a, voiceId } : a))
+                              );
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="flex gap-3 mt-3">
+              {/* Asset type selector for new items */}
+              <div className="flex items-center gap-2 mt-3 mb-2">
+                <span className="text-xs text-gray-500">Add as:</span>
+                {ASSET_TYPES.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setNewAssetType(t.id)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                      newAssetType === t.id
+                        ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+                        : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-3">
                 <label className="flex-1 flex items-center justify-center h-20 rounded-xl border-2 border-dashed border-white/10 hover:border-violet-500/50 cursor-pointer transition-colors bg-white/5">
                   <div className="text-center">
                     <p className="text-sm text-gray-400">+ Upload Image</p>
@@ -340,9 +389,9 @@ export default function CreateVideoPage() {
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        setPendingCharacters((prev) => [
+                        setPendingAssets((prev) => [
                           ...prev,
-                          { file, preview: URL.createObjectURL(file), name: "", description: "" },
+                          { file, preview: URL.createObjectURL(file), name: "", description: "", type: newAssetType },
                         ]);
                       }
                       e.target.value = "";
@@ -424,10 +473,10 @@ export default function CreateVideoPage() {
         </Card>
 
         {form.videoType === "dialogue" && (() => {
-          const charsWithVoices = pendingCharacters.filter((c) => c.voiceId);
+          const charsWithVoices = pendingAssets.filter((a) => a.type === "character" && a.voiceId);
           return charsWithVoices.length < 2 ? (
             <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
-              Assign voices to at least 2 characters to use Dialogue mode.
+              Assign voices to at least 2 character assets to use Dialogue mode.
             </div>
           ) : null;
         })()}
@@ -451,7 +500,7 @@ export default function CreateVideoPage() {
             loading={loading}
             disabled={
               !form.prompt.trim() ||
-              (form.videoType === "dialogue" && pendingCharacters.filter((c) => c.voiceId).length < 2)
+              (form.videoType === "dialogue" && pendingAssets.filter((a) => a.type === "character" && a.voiceId).length < 2)
             }
           >
             Generate Video
@@ -462,14 +511,16 @@ export default function CreateVideoPage() {
       <GenerateCharacterModal
         open={showCharGenModal}
         onClose={() => setShowCharGenModal(false)}
+        assetType={newAssetType}
         onCharacterGenerated={(char) => {
-          setPendingCharacters((prev) => [
+          setPendingAssets((prev) => [
             ...prev,
             {
               file: null,
               preview: char.previewUrl,
               name: "",
               description: char.description,
+              type: newAssetType,
               generatedUrl: char.url,
             },
           ]);

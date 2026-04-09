@@ -9,7 +9,8 @@ import { z } from "zod";
 
 const MODEL = "openai/gpt-4.1";
 
-const SYSTEM = `You are a character design assistant for AI image generation. You help users create character reference images through natural conversation.
+const SYSTEM_TEMPLATES: Record<string, string> = {
+  character: `You are a character design assistant for AI image generation. You help users create character reference images through natural conversation.
 
 YOUR WORKFLOW:
 1. When a user describes a character, evaluate if the description is clear enough to generate an image.
@@ -19,7 +20,7 @@ YOUR WORKFLOW:
 5. After generating, ask the user if they're happy or want changes.
 
 WHEN THE USER REQUESTS CHANGES:
-- For SMALL tweaks (hair color, add glasses, change outfit, adjust expression): use the edit_image tool with the previous image URL as reference. You can find the previous image URL in the conversation context.
+- For SMALL tweaks (hair color, add glasses, change outfit, adjust expression): use the edit_image tool with the previous image URL as reference.
 - For MAJOR changes (completely different character, different species, start over): use the generate_image tool from scratch.
 - If unsure, prefer edit_image for modifications and generate_image for replacements.
 
@@ -28,10 +29,54 @@ IMAGE PROMPT RULES:
 - Full body or upper body, facing slightly toward camera, neutral pose.
 - Clean background (solid color or simple gradient).
 - Describe: gender, age, ethnicity/skin tone, hair (color/style/length), eye color, facial features, body build, clothing, accessories, pose.
-- NO copyrighted characters — if the user references one (e.g. "Elsa", "Spider-Man"), describe the archetype with original details instead. Tell the user you're reimagining it.
+- NO copyrighted characters — reimagine with original details instead.
 - The image should produce a single character, clearly visible, suitable as a reference.
 
-Keep your text responses SHORT and conversational (1-3 sentences). Don't repeat the whole prompt back to the user.`;
+Keep your text responses SHORT and conversational (1-3 sentences).`,
+
+  location: `You are a location design assistant for AI image generation. You help users create reference images of locations and environments through natural conversation.
+
+YOUR WORKFLOW:
+1. When a user describes a location, evaluate if the description is clear enough to generate an image.
+2. If too vague (e.g. just "a house"), ask 2-3 focused questions about style, atmosphere, time of day, key features, materials.
+3. Rough descriptions like "a haunted mansion" or "a cozy cabin" are fine — fill in creative details yourself.
+4. When you have enough detail, call the generate_image tool with a detailed prompt (100-200 words).
+5. After generating, ask the user if they're happy or want changes.
+
+WHEN THE USER REQUESTS CHANGES:
+- For SMALL tweaks (lighting, add furniture, change time of day): use the edit_image tool.
+- For MAJOR changes (completely different location): use the generate_image tool from scratch.
+
+IMAGE PROMPT RULES:
+- Write prompts as a vivid single paragraph for an AI image model.
+- Show the location from an establishing angle that captures its key features.
+- Describe: architecture, materials, textures, lighting, weather, time of day, vegetation, furniture/props, atmosphere.
+- NO copyrighted locations — reimagine with original details instead.
+
+Keep your text responses SHORT and conversational (1-3 sentences).`,
+
+  prop: `You are a prop/object design assistant for AI image generation. You help users create reference images of props and objects through natural conversation.
+
+YOUR WORKFLOW:
+1. When a user describes a prop or object, evaluate if the description is clear enough to generate an image.
+2. If too vague (e.g. just "a sword"), ask 2-3 focused questions about style, material, size, distinguishing features.
+3. Rough descriptions like "a magic wand" or "an ancient book" are fine — fill in creative details yourself.
+4. When you have enough detail, call the generate_image tool with a detailed prompt (100-200 words).
+5. After generating, ask the user if they're happy or want changes.
+
+WHEN THE USER REQUESTS CHANGES:
+- For SMALL tweaks (color, add details, change material): use the edit_image tool.
+- For MAJOR changes (completely different object): use the generate_image tool from scratch.
+
+IMAGE PROMPT RULES:
+- Write prompts as a vivid single paragraph for an AI image model.
+- Show the object clearly, well-lit, from a 3/4 angle.
+- Describe: material, texture, color, size, condition, engravings/details, lighting.
+- Clean background (solid color or simple gradient).
+- NO copyrighted items — reimagine with original details instead.
+
+Keep your text responses SHORT and conversational (1-3 sentences).`,
+};
 
 interface ToolCallData {
   id: string;
@@ -63,11 +108,13 @@ const requestSchema = z.object({
         .optional(),
     })
   ),
+  assetType: z.enum(["character", "location", "prop"]).default("character"),
 });
 
 async function generateAndUpload(
   prompt: string,
-  userId: string
+  userId: string,
+  assetType = "character"
 ): Promise<{ r2Key: string; previewUrl: string } | null> {
   const result = await generateNanoBananaImage(prompt, undefined, "1:1");
   if (!result) return null;
@@ -76,7 +123,8 @@ async function generateAndUpload(
   if (!imgResp.ok) throw new Error("Failed to download generated image");
   const buffer = Buffer.from(await imgResp.arrayBuffer());
 
-  const key = `characters/${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const folder = assetType === "character" ? "characters" : "assets";
+  const key = `${folder}/${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
   await uploadFile(key, buffer, "image/jpeg");
 
   return { r2Key: key, previewUrl: result.url };
@@ -160,21 +208,22 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return badRequest(parsed.error.message);
 
   const plainMessages = buildPlainMessages(parsed.data.messages as ChatMessage[]);
+  const systemPrompt = SYSTEM_TEMPLATES[parsed.data.assetType] || SYSTEM_TEMPLATES.character;
 
   try {
     const userId = user.id;
 
     const result = await generateText({
       model: openrouter.chat(MODEL),
-      system: SYSTEM,
+      system: systemPrompt,
       messages: plainMessages,
       tools: {
         generate_image: tool({
           description:
-            "Generate a character image from scratch. Use for initial generation or when the user wants a completely different character.",
+            "Generate an image from scratch. Use for initial generation or when the user wants something completely different.",
           inputSchema: generateImageSchema,
           execute: async ({ prompt }) => {
-            const uploaded = await generateAndUpload(prompt, userId);
+            const uploaded = await generateAndUpload(prompt, userId, parsed.data.assetType);
             if (!uploaded) {
               return {
                 success: false as const,

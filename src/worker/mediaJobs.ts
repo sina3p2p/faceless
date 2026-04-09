@@ -8,8 +8,10 @@ import {
   eq,
   insertSceneMedia,
   updateVideoStatus,
-  resolveCharacterRefs,
+  resolveStoryAssets,
+  filterAssetsByRefs,
   type CharacterRef,
+  type StoryAssetRef,
   type PreApproved,
   type ScriptInput,
 } from "./shared";
@@ -104,8 +106,8 @@ export async function generateSceneImage(
 }
 
 export async function fetchAIVideoMediaParallel(
-  script: ScriptInput,
-  seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null; sceneContinuity?: number; characterRefs?: CharacterRef[] },
+  script: ScriptInput & { sceneAssetRefs?: (string[] | null)[] },
+  seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null; sceneContinuity?: number; characterRefs?: CharacterRef[]; storyAssets?: StoryAssetRef[] },
   workDir: string,
   concurrency = WORKER.parallelVideos,
   preApprovedImages: PreApproved = new Map(),
@@ -115,7 +117,8 @@ export async function fetchAIVideoMediaParallel(
   const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
   const imageModel = seriesRecord.imageModel || "dall-e-3";
   const continuity = !!seriesRecord.sceneContinuity;
-  const charRefs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
+  const allAssets = seriesRecord.storyAssets ?? [];
+  const charRefs = allAssets.length > 0 ? undefined : (seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined);
 
   const scenesNeedingVideo: number[] = [];
   for (let i = 0; i < script.scenes.length; i++) {
@@ -162,7 +165,10 @@ export async function fetchAIVideoMediaParallel(
           sceneImageUrls[i] = approved.url;
           console.log(`Scene ${i}: Using existing image`);
         } else {
-          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, charRefs, aspectRatio);
+          const sceneRefs = allAssets.length > 0
+            ? filterAssetsByRefs(allAssets, script.sceneAssetRefs?.[i] ?? null)
+            : charRefs;
+          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, sceneRefs, aspectRatio);
           sceneImageUrls[i] = generatedImage.url;
           await downloadFile(generatedImage.url, imagePath);
         }
@@ -213,7 +219,8 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
     });
     if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
 
-    const characterRefs = await resolveCharacterRefs(
+    const allAssets = await resolveStoryAssets(
+      seriesRecord.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null,
       seriesRecord.characterImages as Array<{ url: string; description: string }> | null
     );
 
@@ -238,7 +245,7 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
       return;
     }
 
-    console.log(`[generate-images] Generating ${targets.length} images with ${imageModel} (parallel batches of ${WORKER.parallelImages})`);
+    console.log(`[generate-images] Generating ${targets.length} images with ${imageModel} (parallel batches of ${WORKER.parallelImages}), ${allAssets.length} story assets`);
 
     const BATCH_SIZE = WORKER.parallelImages;
     for (let i = 0; i < targets.length; i += BATCH_SIZE) {
@@ -248,8 +255,10 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
         batch.map(async (scene) => {
           const sceneIdx = existingScenes.findIndex((s) => s.id === scene.id);
           const prompt = scene.imagePrompt || scene.text;
+          const sceneAssetRefs = scene.assetRefs as string[] | null;
+          const sceneRefs = filterAssetsByRefs(allAssets, sceneAssetRefs);
           try {
-            const result = await generateSceneImage(prompt, imageModel, sceneIdx, characterRefs, ar);
+            const result = await generateSceneImage(prompt, imageModel, sceneIdx, sceneRefs, ar);
 
             const imgResp = await fetch(result.url);
             if (!imgResp.ok) throw new Error("Failed to download generated image");

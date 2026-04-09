@@ -100,6 +100,7 @@ export async function POST(
           visualDescription: s.visualDescription || "",
           searchQuery: s.searchQuery || "",
           imagePrompt: s.imagePrompt || "",
+          assetRefs: (s.assetRefs as string[]) ?? [],
           duration: s.duration ?? 5,
         })),
         cta: "",
