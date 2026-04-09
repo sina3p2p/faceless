@@ -356,7 +356,17 @@ GOTHIC CLAY VARIANT (apply ON TOP of claymation rules):
 - Color palette: deep purples, dark greens, charcoal grays, midnight blues, with pops of color on the main character
 - Characters wear dramatic clothing: fur coats, velvet capes, dark dresses, sunglasses — all sculpted from clay
 - Environment is always a gothic setting: clay castles, cathedrals, haunted mansions, dark forests — all as miniature clay dioramas
-- Mood: mysterious, elegant, slightly eerie but stylish — think Tim Burton meets Wallace and Gromit` : ""}
+- Mood: mysterious, elegant, slightly eerie but stylish — think Tim Burton meets Wallace and Gromit` : ""}${style === "lego" ? `
+LEGO MOVIE STYLE RULES (CRITICAL — follow these for every imagePrompt):
+- Everything in the scene MUST look like it is built from LEGO bricks — characters, environments, props, vehicles, nature, even water and fire
+- Characters are LEGO minifigures: cylindrical heads with printed faces, C-shaped claw hands, short legs, smooth plastic skin with subtle reflections and molding seam lines
+- Environments are LEGO diorama builds: brick-by-brick constructed buildings, studded baseplates as floors, transparent colored bricks for windows/water/fire
+- Describe LEGO-specific textures: visible studs on surfaces, smooth ABS plastic sheen, click-together joints, tiny scratches and fingerprints on well-played-with pieces
+- Props must be LEGO accessories: LEGO swords, LEGO coffee cups, LEGO flowers (single-piece molded), LEGO hair pieces
+- Nature elements are LEGO parts: green plate pieces for grass, blue transparent studs for water droplets, orange/yellow flame pieces, bushy LEGO tree elements
+- Lighting should be bright and saturated with soft studio-like lighting, as if photographing a real LEGO set on a tabletop
+- Color palette: bold primary colors (red, blue, yellow) with clean white and black accents — the signature LEGO look
+- ALWAYS include in every imagePrompt: "LEGO brick style, everything constructed from LEGO bricks and minifigures, plastic toy aesthetic"` : ""}
 ${niche === "kids" ? `
 KIDS CONTENT RULES (this overrides tone guidelines above):
 - Target age: 4-10 years old
@@ -799,7 +809,15 @@ CLAYMATION STYLE RULES:
 GOTHIC CLAY VARIANT:
 - Dark moody atmosphere: gothic arches, stone walls of gray/purple clay, candelabras, cobwebs
 - Color palette: deep purples, dark greens, charcoal grays, midnight blues
-- Mood: mysterious, elegant, slightly eerie but stylish` : ""}${sceneContinuity ? `
+- Mood: mysterious, elegant, slightly eerie but stylish` : ""}${style === "lego" ? `
+LEGO MOVIE STYLE RULES:
+- Everything MUST look built from LEGO bricks — characters, environments, props, vehicles, nature
+- Characters are LEGO minifigures: cylindrical heads with printed faces, C-shaped claw hands, short legs, smooth plastic with molding seam lines
+- Environments: brick-by-brick builds, studded baseplates, transparent colored bricks for windows/water/fire
+- LEGO textures: visible studs, ABS plastic sheen, click-together joints
+- Props: LEGO accessories (LEGO swords, cups, flowers). Nature: green plate grass, transparent blue water studs, flame pieces
+- Bright saturated studio lighting, bold primary colors (red, blue, yellow)
+- ALWAYS include: "LEGO brick style, everything constructed from LEGO bricks and minifigures, plastic toy aesthetic"` : ""}${sceneContinuity ? `
 SCENE CONTINUITY MODE (CRITICAL):
 - Video clips transition from scene N's image to scene N+1's image.
 - Each imagePrompt must be visually COMPATIBLE with neighbors.
@@ -966,7 +984,12 @@ IMAGE PROMPT QUALITY (drives the key frame image for each video clip):
 ${["claymation", "gothic-clay"].includes(style) ? `
 CLAYMATION STYLE RULES:
 - Every subject must look handcrafted from clay/plasticine
-- Include: "Claymation stop-motion style, everything made of sculpted clay and plasticine"` : ""}${sceneContinuity ? `
+- Include: "Claymation stop-motion style, everything made of sculpted clay and plasticine"` : ""}${style === "lego" ? `
+LEGO MOVIE STYLE RULES:
+- Characters are LEGO minifigures with cylindrical heads, printed faces, C-shaped claw hands
+- Everything built from LEGO bricks: environments, props, nature elements
+- Bright saturated colors, ABS plastic sheen, visible studs on surfaces
+- Include: "LEGO brick style, everything constructed from LEGO bricks and minifigures, plastic toy aesthetic"` : ""}${sceneContinuity ? `
 SCENE CONTINUITY MODE:
 - Maintain consistent character appearances across all scenes.
 - Visual style and environment should feel cohesive.` : ""}${buildAssetBlock(characters.filter((c) => c.type !== "character"))}

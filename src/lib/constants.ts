@@ -209,6 +209,7 @@ export const ART_STYLES = [
   { id: "claymation", label: "Claymation 3D" },
   { id: "gothic-clay", label: "Gothic Clay" },
   { id: "pixar", label: "Pixar / 3D Render" },
+  { id: "lego", label: "Lego Movie" },
 ] as const;
 
 export const CAPTION_STYLES = [
