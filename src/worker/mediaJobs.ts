@@ -64,12 +64,11 @@ export async function fetchFacelessMediaParallel(
         }
 
         const scene = script.scenes[i];
-        const searchQuery = scene.searchQuery || scene.visualDescription;
         const imagePrompt = scene.imagePrompt || scene.visualDescription;
 
         const imgModel = seriesRecord.imageModel || "dall-e-3";
         const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
-        const asset = await getMediaForScene(searchQuery, imagePrompt, true, imgModel, refs, aspectRatio);
+        const asset = await getMediaForScene(imagePrompt, true, imgModel, refs, aspectRatio);
 
         const ext = asset.type === "video" ? "mp4" : "jpg";
         const mediaPath = path.join(workDir, `media_${i}.${ext}`);
@@ -274,11 +273,10 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
           .update(schema.videoScenes)
           .set({
             imagePrompt: scenePrompt.imagePrompt,
-            searchQuery: scenePrompt.searchQuery,
             assetRefs: scenePrompt.assetRefs,
           })
           .where(eq(schema.videoScenes.id, existingScenes[i].id));
-        existingScenes[i] = { ...existingScenes[i], imagePrompt: scenePrompt.imagePrompt, searchQuery: scenePrompt.searchQuery };
+        existingScenes[i] = { ...existingScenes[i], imagePrompt: scenePrompt.imagePrompt };
       }
       console.log(`[generate-images] Image Agent generated ${result.scenes.length} prompts`);
     }
