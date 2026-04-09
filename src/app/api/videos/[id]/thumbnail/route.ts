@@ -51,7 +51,7 @@ export async function POST(
     const title = video.title || "Untitled Video";
     const style = video.series.style || "cinematic";
     const niche = video.series.niche || "general";
-    const videoType = video.series.videoType || "faceless";
+    const videoType = video.series.videoType || "standalone";
 
     const hook = video.scenes?.[0]?.text?.slice(0, 120) || "";
     const keyVisual = video.scenes?.[0]?.visualDescription?.slice(0, 150)

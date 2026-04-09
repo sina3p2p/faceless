@@ -198,37 +198,29 @@ export default function CreateVideoPage() {
 
             <LLMModelSelector value={form.llmModel} onChange={(v) => setForm({ ...form, llmModel: v })} />
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
+            <VideoModelSelector value={form.videoModel} onChange={(v) => setForm({ ...form, videoModel: v })} />
 
-            {form.videoType !== "faceless" && (
-              <VideoModelSelector value={form.videoModel} onChange={(v) => setForm({ ...form, videoModel: v })} />
-            )}
-
-            {form.videoType !== "faceless" && (
-              <div
-                onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
-                className={`rounded-xl border p-4 cursor-pointer transition-all ${
-                  form.sceneContinuity
-                    ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                    : "border-white/10 bg-white/5 hover:border-white/20"
+            <div
+              onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
+              className={`rounded-xl border p-4 cursor-pointer transition-all ${form.sceneContinuity
+                ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                : "border-white/10 bg-white/5 hover:border-white/20"
                 }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Scene Continuity</p>
-                    <p className="text-xs text-gray-400 mt-1">
-                      Each video clip smoothly transitions from one scene image to the next.
-                    </p>
-                  </div>
-                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${
-                    form.sceneContinuity ? "bg-violet-500" : "bg-white/10"
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-white">Scene Continuity</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Each video clip smoothly transitions from one scene image to the next.
+                  </p>
+                </div>
+                <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${form.sceneContinuity ? "bg-violet-500" : "bg-white/10"
                   }`}>
-                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                      form.sceneContinuity ? "translate-x-5" : "translate-x-0"
+                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${form.sceneContinuity ? "translate-x-5" : "translate-x-0"
                     }`} />
-                  </div>
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Story Assets */}
             <div>
@@ -255,11 +247,10 @@ export default function CreateVideoPage() {
                       >
                         &times;
                       </button>
-                      <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                        asset.type === "character" ? "bg-violet-500/80 text-white" :
+                      <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${asset.type === "character" ? "bg-violet-500/80 text-white" :
                         asset.type === "location" ? "bg-blue-500/80 text-white" :
-                        "bg-amber-500/80 text-white"
-                      }`}>
+                          "bg-amber-500/80 text-white"
+                        }`}>
                         {asset.type}
                       </span>
                     </div>
@@ -365,11 +356,10 @@ export default function CreateVideoPage() {
                     key={t.id}
                     type="button"
                     onClick={() => setNewAssetType(t.id)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      newAssetType === t.id
-                        ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
-                        : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
-                    }`}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${newAssetType === t.id
+                      ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+                      : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+                      }`}
                   >
                     {t.label}
                   </button>

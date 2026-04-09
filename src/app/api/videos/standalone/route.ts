@@ -8,7 +8,7 @@ import { z } from "zod/v4";
 
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
-  videoType: z.enum(["faceless", "ai_video", "music_video", "dialogue"]).default("ai_video"),
+  videoType: z.enum(["standalone", "music_video", "dialogue"]).default("standalone"),
   style: z.string().default("cinematic"),
   imageModel: z.string().default("dall-e-3"),
   videoModel: z.string().default("kling-3-standard"),
