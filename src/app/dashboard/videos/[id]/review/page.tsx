@@ -179,6 +179,7 @@ function SortableSceneCard({
   showMotionEdit,
   showDirectorNote,
   showAudioPlayer,
+  showDuration,
 }: {
   scene: Scene;
   index: number;
@@ -196,6 +197,7 @@ function SortableSceneCard({
   showMotionEdit?: boolean;
   showDirectorNote?: boolean;
   showAudioPlayer?: boolean;
+  showDuration?: boolean;
 }) {
   const {
     attributes,
@@ -466,7 +468,7 @@ function SortableSceneCard({
           )}
 
           <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-            <span className="font-mono">{duration.toFixed(1)}s</span>
+            {showDuration && <span className="font-mono">{duration.toFixed(1)}s</span>}
             {!scene.assetUrl && !generatingImage && (
               <>
                 <button
@@ -521,8 +523,8 @@ function SortableSceneCard({
         </button>
       </div>
 
-      {/* Duration slider (shown when selected) */}
-      {isSelected && (
+      {/* Duration slider (shown when selected, only after TTS) */}
+      {isSelected && showDuration && (
         <div className="px-4 pb-4 pt-1 border-t border-white/5 ml-14">
           <div className="flex items-center gap-3">
             <label className="text-xs text-gray-500 whitespace-nowrap">Duration</label>
@@ -1430,6 +1432,7 @@ export default function ReviewPage() {
   const isPromptsReview = video?.status === "REVIEW_PROMPTS";
   const isNewMotionReview = video?.status === "REVIEW_MOTION";
   const isProcessing = ["STORY", "SCENE_SPLIT", "TTS_GENERATION", "PROMPT_GENERATION", "MOTION_GENERATION", "IMAGE_GENERATION", "VIDEO_GENERATION", "RENDERING"].includes(video?.status || "");
+  const hasTTSRun = !isStoryReview && !isScenesReview && !isNarrationReview;
 
   // Poll for any processing status
   useEffect(() => {
@@ -1646,10 +1649,12 @@ export default function ReviewPage() {
               <span className="text-gray-500">Scenes:</span>{" "}
               <span className="text-white font-medium">{scenes.length}</span>
             </div>
-            <div>
-              <span className="text-gray-500">Duration:</span>{" "}
-              <span className="text-white font-medium font-mono">{totalDuration.toFixed(1)}s</span>
-            </div>
+            {hasTTSRun && (
+              <div>
+                <span className="text-gray-500">Duration:</span>{" "}
+                <span className="text-white font-medium font-mono">{totalDuration.toFixed(1)}s</span>
+              </div>
+            )}
             {(someImagesGenerated || generatingAll) && (
               <div className="flex items-center gap-1.5">
                 <span className="text-gray-500">Images:</span>{" "}
@@ -1968,6 +1973,7 @@ export default function ReviewPage() {
                 showMotionEdit={isMotionReview || isNewMotionReview}
                 showDirectorNote={true}
                 showAudioPlayer={isTTSReview || isPromptsReview || isNewMotionReview}
+                showDuration={hasTTSRun}
               />
             ))}
           </div>
@@ -1990,7 +1996,7 @@ export default function ReviewPage() {
               loading={generatingSong}
               onClick={handleGenerateSong}
             >
-              Generate Song ({scenes.length} sections, ~{totalDuration.toFixed(0)}s)
+              Generate Song ({scenes.length} sections)
             </Button>
           ) : isMotionReview ? (
             <>
@@ -2008,7 +2014,7 @@ export default function ReviewPage() {
                 loading={rendering}
                 onClick={handleStartRendering}
               >
-                Generate Video ({scenes.length} scenes, {totalDuration.toFixed(0)}s)
+                Generate Video ({scenes.length} scenes)
               </Button>
             </>
           ) : isImageReview && !isMusicVideo ? (
@@ -2058,7 +2064,7 @@ export default function ReviewPage() {
                 loading={rendering}
                 onClick={handleStartRendering}
               >
-                Generate Video ({scenes.length} scenes, {totalDuration.toFixed(0)}s)
+                Generate Video ({scenes.length} scenes)
               </Button>
             </>
           )}

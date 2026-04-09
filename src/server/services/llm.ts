@@ -10,7 +10,7 @@ export const openrouter = createOpenRouter({
 // ── Zod Schemas ──
 
 const videoSceneSchema = z.object({
-  text: z.string().describe("Narration text for this scene. Punchy, conversational, micro-cliffhangers. 1-3 sentences max."),
+  text: z.string().describe("Narration text for this scene. Write as much as the story needs — rich, vivid, conversational. No word limit."),
   visualDescription: z.string().describe("Rich detailed description of visual action on screen — movements, gestures, camera motion, environment changes. Must describe MOTION and ACTION, not a static image. Must also describe how the scene ENDS (motion settling, camera resting) for smooth transition to the next scene."),
   imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT (appearance, clothing, expression), ACTION/MOTION, ENVIRONMENT, LIGHTING, CAMERA angle/movement, MOOD/ATMOSPHERE, and STYLE. Single detailed paragraph."),
   assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include characters who are visible, the location where the scene takes place, and any props that are shown. If no story assets were provided, return an empty array."),
@@ -291,12 +291,12 @@ VIRAL SCRIPT FORMULA (follow this exactly):
 
 4. CTA (final scene): End with something that makes them comment, like, or follow. Best: ask a polarizing question or tease the "Part 2".
 
-CRITICAL RULES:
-- Each scene narration = 15-25 words. Short punchy sentences WIN.
-- NEVER use filler words or generic phrases
-- Write like you're telling a secret to a friend, not giving a lecture
-- Every single sentence must either reveal new info or build tension
-${buildDurationInstruction(targetDuration, durations)}
+NARRATION RULES:
+- Write as much as the story needs per scene — NO word limit. Let the story breathe.
+- Be vivid, descriptive, and immersive. Paint pictures with words.
+- Write like you're telling a captivating story to a friend
+- Every sentence must either reveal new info, build tension, or deepen the world
+- Use as many scenes as the story naturally requires — do NOT compress the story into fewer scenes
 
 ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
 - Each scene must show exactly ONE clear action or moment. NEVER pack multiple actions into one scene.
@@ -755,9 +755,10 @@ STORYTELLING RULES:
 3. CLIMAX (scene 4-5): The emotional peak — the most dramatic, surprising, or touching moment.
 4. RESOLUTION (final scene): A satisfying conclusion with a CTA that invites engagement.
 
-CRITICAL RULES:
-- Each scene narration = 15-25 words. Short punchy sentences.
-${buildDurationInstruction(targetDuration, durations)}
+NARRATION RULES:
+- Write as much as the story needs per scene — NO word limit. Let the story breathe.
+- Be vivid, descriptive, and immersive. Use as many scenes as the story requires.
+
 ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
 - Each scene must show exactly ONE clear action or moment.
 - BAD: "She opens the door, walks in, and sits down" — 3 actions.
@@ -950,7 +951,7 @@ ${charList}
 SCENE STRUCTURE:
 - Start with a hook that pulls viewers in (a Narrator intro or a character's provocative opening line).
 - Build the conversation with escalating stakes, reveals, or comedy.
-- Each scene = one speaker's turn. Keep dialogue lines 10-25 words.
+- Each scene = one speaker's turn. Write as much dialogue as feels natural.
 - Total conversation should feel like a natural exchange, not scripted Q&A.
 ${buildDurationInstruction(targetDuration, durations)}
 
@@ -1011,7 +1012,7 @@ ASSET REFS: For each scene, the assetRefs array must include the speaking charac
 
 const narrationSceneSchema = z.object({
   sceneTitle: z.string().describe("Short descriptive title for this scene (2-5 words), like a chapter heading. E.g. 'The Birth of a Giant', 'Into the Abyss', 'The Final Goodbye'"),
-  text: z.string().describe("Narration text for this scene. Punchy, conversational, micro-cliffhangers. 1-3 sentences max."),
+  text: z.string().describe("Narration text for this scene. Write as much as the story needs — rich, vivid, conversational. No word limit."),
   directorNote: z.string().describe("RICH creative brief for the visual team (NO word limit — be as detailed as possible). Describe: the SETTING (exact location, time period, weather, time of day, architecture, materials), the SUBJECTS (who/what is in the scene — appearance, clothing, posture, facial expression, age, ethnicity), the ACTION (what is physically happening in this one moment), the MOOD/ATMOSPHERE (emotional tone, tension level, color palette, lighting quality), the CAMERA PERSPECTIVE (where the viewer is watching from, what feels close vs far), and any SYMBOLIC or FORESHADOWING elements. Write as if you are a film director giving a brief to your cinematographer and production designer. The more detail you provide, the better the final video will look."),
   duration: z.number().describe("Duration of this scene in seconds"),
 });
@@ -1116,11 +1117,11 @@ VIRAL SCRIPT FORMULA (follow this exactly):
 4. CTA (final scene): End with something that makes them comment, like, or follow. Best: ask a polarizing question or tease the "Part 2".
 
 NARRATION TEXT RULES:
-- Each scene narration (text) = 15-25 words. Short punchy sentences WIN.
-- NEVER use filler words or generic phrases
-- Write like you're telling a secret to a friend, not giving a lecture
-- Every single sentence must either reveal new info or build tension
-${buildDurationInstruction(targetDuration, durations)}
+- Write as much as the story needs per scene — NO word limit. Let the story breathe.
+- Be vivid, descriptive, and immersive. Paint pictures with words.
+- Write like you're telling a captivating story to a friend
+- Every sentence must either reveal new info, build tension, or deepen the world
+- Use as many scenes as the story naturally requires — do NOT compress the story
 
 DIRECTOR NOTE RULES (CRITICAL — this is what makes the video look amazing):
 - NO WORD LIMIT. Be as detailed as possible. More detail = better video.
@@ -1208,8 +1209,8 @@ STORYTELLING RULES:
 4. RESOLUTION (final scene): A satisfying conclusion with a CTA that invites engagement.
 
 NARRATION TEXT RULES:
-- Each scene narration (text) = 15-25 words. Short punchy sentences.
-${buildDurationInstruction(targetDuration, durations)}
+- Write as much as the story needs per scene — NO word limit. Let the story breathe.
+- Be vivid, descriptive, and immersive. Use as many scenes as the story requires.
 
 DIRECTOR NOTE RULES (CRITICAL — this is what makes the video look amazing):
 - NO WORD LIMIT. Be as detailed as possible. More detail = better video.
@@ -1278,7 +1279,7 @@ ${charList}
 SCENE STRUCTURE:
 - Start with a hook that pulls viewers in (a Narrator intro or a character's provocative opening line).
 - Build the conversation with escalating stakes, reveals, or comedy.
-- Each scene = one speaker's turn. Keep dialogue lines 10-25 words.
+- Each scene = one speaker's turn. Write as much dialogue as feels natural.
 - Total conversation should feel like a natural exchange, not scripted Q&A.
 ${buildDurationInstruction(targetDuration, durations)}
 ${sceneContinuity ? `
