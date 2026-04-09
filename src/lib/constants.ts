@@ -140,6 +140,10 @@ export const WORKER = {
   concurrency: 2,
   limiterMax: 4,
   limiterDuration: 60_000,
+  parallelImages: 5,
+  parallelVideos: 5,
+  parallelTTS: 3,
+  parallelFacelessMedia: 3,
 } as const;
 
 // ── Video Sizes ──

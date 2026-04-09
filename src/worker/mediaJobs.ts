@@ -13,7 +13,7 @@ import {
   type PreApproved,
   type ScriptInput,
 } from "./shared";
-import { getVideoSize } from "@/lib/constants";
+import { getVideoSize, WORKER } from "@/lib/constants";
 import {
   getMediaForScene,
   generateImage,
@@ -34,7 +34,7 @@ export async function fetchFacelessMediaParallel(
   script: ScriptInput,
   seriesRecord: { niche: string; style: string; imageModel?: string | null; characterRefs?: CharacterRef[] },
   workDir: string,
-  concurrency = 3,
+  concurrency = WORKER.parallelFacelessMedia,
   preApproved: PreApproved = new Map(),
   aspectRatio: AspectRatio = "9:16"
 ): Promise<{ path: string; type: "video" | "image" }[]> {
@@ -107,7 +107,7 @@ export async function fetchAIVideoMediaParallel(
   script: ScriptInput,
   seriesRecord: { niche: string; style: string; imageModel?: string | null; videoModel?: string | null; sceneContinuity?: number; characterRefs?: CharacterRef[] },
   workDir: string,
-  concurrency = 2,
+  concurrency = WORKER.parallelVideos,
   preApprovedImages: PreApproved = new Map(),
   preApprovedVideos: PreApproved = new Map(),
   aspectRatio: AspectRatio = "9:16"
@@ -238,9 +238,9 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
       return;
     }
 
-    console.log(`[generate-images] Generating ${targets.length} images with ${imageModel} (parallel batches of 3)`);
+    console.log(`[generate-images] Generating ${targets.length} images with ${imageModel} (parallel batches of ${WORKER.parallelImages})`);
 
-    const BATCH_SIZE = 3;
+    const BATCH_SIZE = WORKER.parallelImages;
     for (let i = 0; i < targets.length; i += BATCH_SIZE) {
       const batch = targets.slice(i, i + BATCH_SIZE);
 

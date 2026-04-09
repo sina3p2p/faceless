@@ -8,7 +8,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and, ne, desc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
-import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
+import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL, WORKER } from "@/lib/constants";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
@@ -98,7 +98,7 @@ export async function generateTTSParallel(
   sceneTexts: string[],
   voiceId: string | undefined,
   workDir: string,
-  concurrency = 3,
+  concurrency = WORKER.parallelTTS,
   perSceneVoiceIds?: (string | undefined)[]
 ): Promise<{ audioPaths: string[]; ttsResults: TTSResult[] }> {
   const audioPaths: string[] = new Array(sceneTexts.length);

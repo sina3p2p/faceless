@@ -42,7 +42,7 @@ export default function CreateVideoPage() {
     prompt: "",
     videoType: "ai_video" as string,
     style: ART_STYLES[0].id as string,
-    captionStyle: CAPTION_STYLES[1].id as string,
+    captionStyle: CAPTION_STYLES[0].id as string,
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,

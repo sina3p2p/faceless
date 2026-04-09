@@ -16,7 +16,7 @@ const standaloneSchema = z.object({
   llmModel: z.string().default("anthropic/claude-opus-4.6"),
   voiceId: z.string().optional(),
   language: z.string().default("en"),
-  captionStyle: z.string().default("default"),
+  captionStyle: z.string().default("none"),
   sceneContinuity: z.boolean().default(true),
   targetDuration: z.number().min(10).max(180).optional(),
   characters: z

@@ -116,7 +116,7 @@ export const series = pgTable("series", {
   imageModel: text("image_model").default("dall-e-3"),
   videoModel: text("video_model").default("kling-3-standard"),
   language: text("language").default("en").notNull(),
-  captionStyle: text("caption_style").default("default").notNull(),
+  captionStyle: text("caption_style").default("none").notNull(),
   characterImages: json("character_images").$type<Array<{ url: string; description: string }>>().default([]),
   sceneContinuity: integer("scene_continuity").default(1).notNull(),
   videoSize: text("video_size").default("9:16").notNull(),

@@ -15,7 +15,7 @@ const createSeriesSchema = z.object({
   videoModel: z.string().default("kling-3-standard"),
   videoSize: z.string().default("9:16"),
   sceneContinuity: z.boolean().default(false),
-  captionStyle: z.string().default("default"),
+  captionStyle: z.string().default("none"),
   language: z.string().default("en"),
   videoType: z.enum(["faceless", "ai_video", "music_video", "dialogue"]).default("faceless"),
   topicIdeas: z.array(z.string()).default([]),

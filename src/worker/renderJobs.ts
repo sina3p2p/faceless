@@ -104,7 +104,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
       sceneTexts,
       seriesRecord.defaultVoiceId ?? undefined,
       workDir,
-      3,
+      undefined,
       perSceneVoiceIds
     );
     const { audioPaths, ttsResults } = ttsResult;
@@ -141,9 +141,9 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
 
     let mediaPaths: { path: string; type: "video" | "image" }[];
     if (videoType === "ai_video" || videoType === "dialogue") {
-      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preImages, preVideos, ar);
+      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, preVideos, ar);
     } else {
-      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preImages, ar);
+      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, ar);
     }
 
     await updateJobStep(videoProjectId, "MEDIA", "ACTIVE", 60);
@@ -327,8 +327,8 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     const ar = sizeConfig.id as AspectRatio;
 
     const mediaPromise = videoType === "ai_video"
-      ? fetchAIVideoMediaParallel(script, seriesRecord, workDir, 2, new Map(), new Map(), ar)
-      : fetchFacelessMediaParallel(script, seriesRecord, workDir, 3, new Map(), ar);
+      ? fetchAIVideoMediaParallel(script, seriesRecord, workDir, undefined, new Map(), new Map(), ar)
+      : fetchFacelessMediaParallel(script, seriesRecord, workDir, undefined, new Map(), ar);
 
     const [ttsResult, mediaPaths] = await Promise.all([ttsPromise, mediaPromise]);
 
@@ -573,9 +573,9 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
 
     let mediaPaths: { path: string; type: "video" | "image" }[];
     if (seriesRecord.videoModel && seriesRecord.videoModel !== "none") {
-      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, 2, preImages, preVideos, ar);
+      mediaPaths = await fetchAIVideoMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, preVideos, ar);
     } else {
-      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, 3, preImages, ar);
+      mediaPaths = await fetchFacelessMediaParallel(sceneScript, seriesRecord, workDir, undefined, preImages, ar);
     }
 
     await job.updateProgress(65);
