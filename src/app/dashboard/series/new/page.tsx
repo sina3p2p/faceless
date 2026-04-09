@@ -22,7 +22,7 @@ export default function NewSeriesPage() {
     niche: NICHES[0].id as string,
     style: ART_STYLES[0].id as string,
     captionStyle: CAPTION_STYLES[0].id as string,
-    videoType: "faceless" as string,
+    videoType: "standalone" as string,
     llmModel: DEFAULT_LLM_MODEL as string,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,

@@ -43,10 +43,15 @@ export async function GET(
 }
 
 const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
+  // Story-first pipeline
+  REVIEW_STORY: ["SCENE_SPLIT"],
+  REVIEW_SCENES: ["TTS_GENERATION", "SCENE_SPLIT"],
+  TTS_REVIEW: ["PROMPT_GENERATION", "TTS_GENERATION"],
+  REVIEW_PROMPTS: ["IMAGE_GENERATION", "PROMPT_GENERATION"],
+  IMAGE_REVIEW: ["IMAGE_GENERATION", "MOTION_GENERATION"],
+  REVIEW_MOTION: ["MOTION_GENERATION", "VIDEO_GENERATION"],
+  // Legacy pipeline
   REVIEW_SCRIPT: ["IMAGE_GENERATION"],
-  IMAGE_GENERATION: ["IMAGE_REVIEW"],
-  IMAGE_REVIEW: ["IMAGE_GENERATION", "VIDEO_SCRIPT"],
-  VIDEO_SCRIPT: ["REVIEW_VISUAL"],
   REVIEW_VISUAL: ["VIDEO_SCRIPT", "VIDEO_GENERATION"],
   REVIEW_MUSIC_SCRIPT: ["MUSIC_GENERATION"],
   MUSIC_REVIEW: ["REVIEW_MUSIC_SCRIPT", "VIDEO_SCRIPT"],
@@ -54,7 +59,13 @@ const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
 
 const patchSchema = z.object({
   title: z.string().min(1).optional(),
-  status: z.enum(["IMAGE_GENERATION", "IMAGE_REVIEW", "VIDEO_GENERATION", "VIDEO_SCRIPT", "REVIEW_VISUAL", "MUSIC_GENERATION", "REVIEW_MUSIC_SCRIPT"]).optional(),
+  script: z.string().optional(),
+  pipelineMode: z.enum(["manual", "auto"]).optional(),
+  status: z.enum([
+    "SCENE_SPLIT", "TTS_GENERATION", "PROMPT_GENERATION", "IMAGE_GENERATION",
+    "MOTION_GENERATION", "VIDEO_GENERATION",
+    "IMAGE_REVIEW", "REVIEW_VISUAL", "MUSIC_GENERATION", "REVIEW_MUSIC_SCRIPT",
+  ]).optional(),
 });
 
 export async function PATCH(
@@ -79,6 +90,11 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   if (parsed.data.title !== undefined) updates.title = parsed.data.title;
+  if (parsed.data.script !== undefined) updates.script = parsed.data.script;
+  if (parsed.data.pipelineMode !== undefined) {
+    const existingConfig = (video as Record<string, unknown>).config as Record<string, unknown> || {};
+    updates.config = { ...existingConfig, pipelineMode: parsed.data.pipelineMode };
+  }
   if (parsed.data.status !== undefined) {
     const allowed = ALLOWED_STATUS_TRANSITIONS[video.status];
     if (!allowed || !allowed.includes(parsed.data.status)) {

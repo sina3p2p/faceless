@@ -2,8 +2,18 @@ import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import { generateScriptJob, generateMusicScriptJob, generateStandaloneScriptJob, generateStandaloneMusicScriptJob, generateDialogueScriptJob } from "./scriptJobs";
 import { generateMusicLyricsJob, generateSongJob, generateMusicVisualsJob } from "./musicJobs";
-import { generateImagesJob, generateMotionJob } from "./mediaJobs";
+import { generateImagesJob, generateMotionJob as legacyGenerateMotionJob } from "./mediaJobs";
 import { renderVideoJob, rerenderVideoJob, renderFromScenesJob, renderMusicVideoJob } from "./renderJobs";
+import {
+  generateStoryJob,
+  splitScenesJob,
+  generateTTSJob,
+  generatePromptsJob,
+  generateFrameImagesJob,
+  generateMotionJob as pipelineGenerateMotionJob,
+  generateFrameVideosJob,
+  composeFinalJob,
+} from "./pipelineJobs";
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { REDIS, WORKER } from "@/lib/constants";
@@ -19,7 +29,23 @@ const worker = new Worker(
   async (job) => {
     const startTime = Date.now();
     logger.info("Job started", { jobId: job.id, jobName: job.name, data: job.data });
-    if (job.name === "generate-script") {
+    if (job.name === "generate-story") {
+      await generateStoryJob(job);
+    } else if (job.name === "split-scenes") {
+      await splitScenesJob(job);
+    } else if (job.name === "generate-tts") {
+      await generateTTSJob(job);
+    } else if (job.name === "generate-prompts") {
+      await generatePromptsJob(job);
+    } else if (job.name === "generate-frame-images") {
+      await generateFrameImagesJob(job);
+    } else if (job.name === "generate-pipeline-motion") {
+      await pipelineGenerateMotionJob(job);
+    } else if (job.name === "generate-frame-videos") {
+      await generateFrameVideosJob(job);
+    } else if (job.name === "compose-final") {
+      await composeFinalJob(job);
+    } else if (job.name === "generate-script") {
       await generateScriptJob(job);
     } else if (job.name === "generate-music-script") {
       await generateMusicScriptJob(job);
@@ -38,7 +64,7 @@ const worker = new Worker(
     } else if (job.name === "generate-images") {
       await generateImagesJob(job);
     } else if (job.name === "generate-motion") {
-      await generateMotionJob(job);
+      await legacyGenerateMotionJob(job);
     } else if (job.name === "render-from-scenes") {
       await renderFromScenesJob(job);
     } else if (job.name === "render-music-video") {

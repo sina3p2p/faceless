@@ -17,6 +17,26 @@ export const planTierEnum = pgEnum("plan_tier", ["FREE", "STARTER", "PRO"]);
 
 export const videoStatusEnum = pgEnum("video_status", [
   "PENDING",
+  // New story-first pipeline
+  "STORY",
+  "REVIEW_STORY",
+  "SCENE_SPLIT",
+  "REVIEW_SCENES",
+  "TTS_GENERATION",
+  "TTS_REVIEW",
+  "PROMPT_GENERATION",
+  "REVIEW_PROMPTS",
+  "MOTION_GENERATION",
+  "REVIEW_MOTION",
+  // Shared statuses
+  "IMAGE_GENERATION",
+  "IMAGE_REVIEW",
+  "VIDEO_GENERATION",
+  "RENDERING",
+  "COMPLETED",
+  "FAILED",
+  "CANCELLED",
+  // Legacy statuses (kept for backward compat with in-progress projects)
   "SCRIPT",
   "REVIEW_SCRIPT",
   "MUSIC_SCRIPT",
@@ -25,13 +45,6 @@ export const videoStatusEnum = pgEnum("video_status", [
   "MUSIC_REVIEW",
   "VIDEO_SCRIPT",
   "REVIEW_VISUAL",
-  "IMAGE_GENERATION",
-  "IMAGE_REVIEW",
-  "VIDEO_GENERATION",
-  "RENDERING",
-  "COMPLETED",
-  "FAILED",
-  "CANCELLED",
 ]);
 
 export const renderStepEnum = pgEnum("render_step", [
@@ -121,7 +134,7 @@ export const series = pgTable("series", {
   storyAssets: json("story_assets").$type<Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }>>().default([]),
   sceneContinuity: integer("scene_continuity").default(1).notNull(),
   videoSize: text("video_size").default("9:16").notNull(),
-  videoType: text("video_type").default("faceless").notNull(),
+  videoType: text("video_type").default("standalone").notNull(),
   isInternal: boolean("is_internal").default(false).notNull(),
   topicIdeas: json("topic_ideas").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -146,6 +159,8 @@ export const videoScenes = pgTable("video_scenes", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   videoProjectId: text("video_project_id").notNull().references(() => videoProjects.id, { onDelete: "cascade" }),
   sceneOrder: integer("scene_order").notNull(),
+  sceneTitle: text("scene_title"),
+  directorNote: text("director_note"),
   text: text("text").notNull(),
   imagePrompt: text("image_prompt"),
   visualDescription: text("visual_description"),
@@ -172,6 +187,20 @@ export const sceneMedia = pgTable("scene_media", {
   prompt: text("prompt"),
   modelUsed: text("model_used"),
   metadata: json("metadata"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const sceneFrames = pgTable("scene_frames", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sceneId: text("scene_id").notNull().references(() => videoScenes.id, { onDelete: "cascade" }),
+  frameOrder: integer("frame_order").notNull(),
+  clipDuration: real("clip_duration"),
+  imagePrompt: text("image_prompt"),
+  visualDescription: text("visual_description"),
+  imageUrl: text("image_url"),
+  videoUrl: text("video_url"),
+  modelUsed: text("model_used"),
+  assetRefs: json("asset_refs").$type<string[]>(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -246,10 +275,15 @@ export const videoProjectsRelations = relations(videoProjects, ({ one, many }) =
 export const videoScenesRelations = relations(videoScenes, ({ one, many }) => ({
   videoProject: one(videoProjects, { fields: [videoScenes.videoProjectId], references: [videoProjects.id] }),
   mediaVersions: many(sceneMedia),
+  frames: many(sceneFrames),
 }));
 
 export const sceneMediaRelations = relations(sceneMedia, ({ one }) => ({
   scene: one(videoScenes, { fields: [sceneMedia.sceneId], references: [videoScenes.id] }),
+}));
+
+export const sceneFramesRelations = relations(sceneFrames, ({ one }) => ({
+  scene: one(videoScenes, { fields: [sceneFrames.sceneId], references: [videoScenes.id] }),
 }));
 
 export const renderJobsRelations = relations(renderJobs, ({ one }) => ({

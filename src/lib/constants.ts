@@ -36,6 +36,10 @@ export const LLM = {
   defaultModel: "anthropic/claude-opus-4.6",
   fallbackModel: "openai/gpt-4.1",
   visionModel: "google/gemini-2.5-pro",
+  storyModel: "anthropic/claude-opus-4.6",
+  directorModel: "anthropic/claude-opus-4.6",
+  promptModel: "anthropic/claude-opus-4.6",
+  motionModel: "google/gemini-2.5-pro",
 } as const;
 
 export const LLM_MODELS = [
@@ -251,8 +255,7 @@ export function getLanguageName(code: string): string {
 }
 
 export const VIDEO_TYPES = [
-  { id: "faceless", label: "Faceless", description: "Stock footage and AI images with voiceover" },
-  { id: "ai_video", label: "AI Video", description: "AI-generated animated video clips per scene (higher cost)" },
+  { id: "standalone", label: "Standalone", description: "Story-driven video with AI-generated visuals and voiceover" },
   { id: "music_video", label: "Music Video", description: "AI-generated song with vocals + cinematic visuals (~$3-4/video)" },
   { id: "dialogue", label: "Dialogue", description: "Conversational story between characters with different voices" },
 ] as const;

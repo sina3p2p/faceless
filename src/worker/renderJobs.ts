@@ -58,7 +58,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
     );
     const seriesRecord = { ...seriesRecordRaw, storyAssets };
 
-    const videoType = seriesRecord.videoType || "faceless";
+    const videoType = seriesRecord.videoType || "standalone";
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
@@ -260,7 +260,7 @@ export async function renderVideoJob(job: Job<RenderJobData>) {
     );
     const seriesRecord = { ...seriesRecordRaw, storyAssets: storyAssetsRV };
 
-    const videoType = seriesRecord.videoType || "faceless";
+    const videoType = seriesRecord.videoType || "standalone";
 
     const videoProject = await db.query.videoProjects.findFirst({
       where: eq(schema.videoProjects.id, videoProjectId),

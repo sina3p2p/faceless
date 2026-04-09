@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { VIDEO_TYPES } from "@/lib/constants";
 
 const DURATION_PRESETS = [
   { label: "15s", value: 15, hint: "Quick test" },
@@ -166,7 +167,7 @@ export default function SeriesDetailPage() {
           <p className="text-gray-400 mt-1">
             {series.niche} &middot; {series.style} &middot;{" "}
             {series.captionStyle} captions &middot;{" "}
-            {series.videoType === "ai_video" ? "AI Video" : "Faceless"}
+            {VIDEO_TYPES.find(t => t.id === series.videoType)?.label || series.videoType}
           </p>
         </div>
         <div className="flex items-center gap-3">

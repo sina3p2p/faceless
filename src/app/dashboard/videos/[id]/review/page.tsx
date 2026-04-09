@@ -36,6 +36,8 @@ interface MediaVersion {
 interface Scene {
   id: string;
   sceneOrder: number;
+  sceneTitle: string | null;
+  directorNote: string | null;
   text: string;
   imagePrompt: string | null;
   visualDescription: string | null;
@@ -63,6 +65,7 @@ interface VideoDetail {
   title: string | null;
   status: string;
   duration: number | null;
+  script: string | null;
   series: { name: string; niche: string; imageModel: string | null; videoType: string; storyAssets?: StoryAssetItem[] };
 }
 
@@ -174,13 +177,15 @@ function SortableSceneCard({
   isDialogue,
   storyAssets,
   showMotionEdit,
+  showDirectorNote,
+  showAudioPlayer,
 }: {
   scene: Scene;
   index: number;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: () => void;
-  onUpdate: (updates: { text?: string; duration?: number; speaker?: string; visualDescription?: string }) => void;
+  onUpdate: (updates: { text?: string; duration?: number; speaker?: string; visualDescription?: string; sceneTitle?: string; directorNote?: string }) => void;
   onEditPrompt: () => void;
   onUploadImage: (file: File) => void;
   onUpdateAssetRefs: (refs: string[]) => void;
@@ -189,6 +194,8 @@ function SortableSceneCard({
   isDialogue?: boolean;
   storyAssets: StoryAssetItem[];
   showMotionEdit?: boolean;
+  showDirectorNote?: boolean;
+  showAudioPlayer?: boolean;
 }) {
   const {
     attributes,
@@ -201,16 +208,19 @@ function SortableSceneCard({
 
   const [editing, setEditing] = useState(false);
   const [editingMotion, setEditingMotion] = useState(false);
+  const [editingDirectorNote, setEditingDirectorNote] = useState(false);
   const [text, setText] = useState(scene.text);
   const [duration, setDuration] = useState(scene.duration);
   const [motionText, setMotionText] = useState(scene.visualDescription || "");
+  const [noteText, setNoteText] = useState(scene.directorNote || "");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setText(scene.text);
     setDuration(scene.duration);
     setMotionText(scene.visualDescription || "");
-  }, [scene.text, scene.duration, scene.visualDescription]);
+    setNoteText(scene.directorNote || "");
+  }, [scene.text, scene.duration, scene.visualDescription, scene.directorNote]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -266,6 +276,13 @@ function SortableSceneCard({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
+          {/* Scene title */}
+          {scene.sceneTitle && (
+            <div className="mb-1.5">
+              <span className="text-xs font-semibold text-white/80">{scene.sceneTitle}</span>
+            </div>
+          )}
+
           {/* Speaker badge for dialogue */}
           {isDialogue && scene.speaker && (
             <div className="mb-1.5">
@@ -305,6 +322,50 @@ function SortableSceneCard({
               </p>
             )}
           </div>
+
+          {/* Audio player */}
+          {showAudioPlayer && scene.audioUrl && (
+            <div className="mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Audio</span>
+              <audio
+                src={scene.audioUrl}
+                controls
+                className="w-full mt-1 h-8"
+                preload="none"
+              />
+            </div>
+          )}
+
+          {/* Director note (collapsible) */}
+          {showDirectorNote && scene.directorNote && (
+            <div className="mb-2">
+              <button
+                className="text-[10px] uppercase tracking-wider text-amber-600 font-medium hover:text-amber-400 transition-colors flex items-center gap-1"
+                onClick={(e) => { e.stopPropagation(); setEditingDirectorNote(!editingDirectorNote); }}
+              >
+                Director&apos;s Note
+                <svg className={`w-3 h-3 transition-transform ${editingDirectorNote ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+              {editingDirectorNote ? (
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  onBlur={() => {
+                    if (noteText !== (scene.directorNote || "")) {
+                      onUpdate({ directorNote: noteText });
+                    }
+                  }}
+                  rows={6}
+                  className="w-full mt-1 bg-black/40 border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-amber-200/80 resize-y focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none leading-relaxed"
+                />
+              ) : (
+                <p className="text-xs text-amber-400/50 mt-0.5 line-clamp-2 leading-relaxed cursor-pointer hover:text-amber-400/70 transition-colors"
+                   onClick={(e) => { e.stopPropagation(); setEditingDirectorNote(true); }}>
+                  {scene.directorNote}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Image prompt preview */}
           {scene.imagePrompt && (
@@ -859,6 +920,8 @@ interface ChatMsg {
 
 interface RefinedScene {
   sceneOrder: number;
+  sceneTitle?: string;
+  directorNote?: string;
   text: string;
   imagePrompt: string;
   visualDescription: string;
@@ -1184,7 +1247,7 @@ export default function ReviewPage() {
 
   function handleUpdateScene(
     sceneId: string,
-    updates: { text?: string; duration?: number; speaker?: string; visualDescription?: string }
+    updates: { text?: string; duration?: number; speaker?: string; visualDescription?: string; sceneTitle?: string; directorNote?: string }
   ) {
     setScenes((prev) =>
       prev.map((s) => (s.id === sceneId ? { ...s, ...updates } : s))
@@ -1316,20 +1379,29 @@ export default function ReviewPage() {
   const isImageReview = video?.status === "IMAGE_REVIEW";
   const isNarrationReview = video?.status === "REVIEW_SCRIPT" && !isMusicVideo;
 
-  // Poll for image/motion progress while worker is generating
+  // New pipeline statuses
+  const isStoryReview = video?.status === "REVIEW_STORY";
+  const isScenesReview = video?.status === "REVIEW_SCENES";
+  const isTTSReview = video?.status === "TTS_REVIEW";
+  const isPromptsReview = video?.status === "REVIEW_PROMPTS";
+  const isNewMotionReview = video?.status === "REVIEW_MOTION";
+  const isProcessing = ["STORY", "SCENE_SPLIT", "TTS_GENERATION", "PROMPT_GENERATION", "MOTION_GENERATION", "IMAGE_GENERATION", "VIDEO_GENERATION", "RENDERING"].includes(video?.status || "");
+
+  // Poll for any processing status
   useEffect(() => {
     const isImageGen = video?.status === "IMAGE_GENERATION";
     const isMotionGen = video?.status === "VIDEO_SCRIPT" && !isMusicVideo;
     setGeneratingAll(isImageGen ?? false);
     setGeneratingMotion(isMotionGen ?? false);
-    if (!isImageGen && !isMotionGen) return;
+
+    if (!isProcessing) return;
 
     const interval = setInterval(async () => {
       await loadData();
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [video?.status, loadData, isMusicVideo]);
+  }, [video?.status, loadData, isMusicVideo, isProcessing]);
 
   useEffect(() => {
     if (editingScene) {
@@ -1391,6 +1463,27 @@ export default function ReviewPage() {
     }
   }
 
+  // New pipeline approve handlers
+  const [approving, setApproving] = useState(false);
+
+  async function handleApprove(endpoint: string) {
+    setApproving(true);
+    try {
+      await fetch(`/api/videos/${id}/${endpoint}`, { method: "POST" });
+      await loadData();
+    } catch { /* retry */ }
+    setApproving(false);
+  }
+
+  async function handleSaveStory(updatedMarkdown: string) {
+    await fetch(`/api/videos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ script: updatedMarkdown }),
+    });
+    setVideo((prev) => prev ? { ...prev, script: updatedMarkdown } : prev);
+  }
+
   async function handleStartRendering() {
     setRendering(true);
     try {
@@ -1412,6 +1505,8 @@ export default function ReviewPage() {
       if (existing) {
         const updates: Record<string, unknown> = {};
         if (r.text !== existing.text) updates.text = r.text;
+        if (r.sceneTitle && r.sceneTitle !== (existing.sceneTitle || "")) updates.sceneTitle = r.sceneTitle;
+        if (r.directorNote && r.directorNote !== (existing.directorNote || "")) updates.directorNote = r.directorNote;
         if (r.imagePrompt !== (existing.imagePrompt || "")) updates.imagePrompt = r.imagePrompt;
         if (r.visualDescription !== (existing.visualDescription || "")) updates.visualDescription = r.visualDescription;
         if (r.searchQuery !== (existing.searchQuery || "")) updates.searchQuery = r.searchQuery;
@@ -1464,20 +1559,38 @@ export default function ReviewPage() {
         </Button>
 
         <h1 className="text-2xl font-bold mb-2">
-          {video?.title ?? (isMusicLyricsReview ? "Review Lyrics" : isMotionReview ? "Review Motion" : isVisualReview ? "Review Visuals" : isMusicVideo ? "Review Song" : "Review Script")}
+          {video?.title ?? (
+            isStoryReview ? "Review Story" :
+            isScenesReview ? "Review Scenes" :
+            isTTSReview ? "Review Audio" :
+            isPromptsReview ? "Review Image Prompts" :
+            isNewMotionReview ? "Review Motion" :
+            isMusicLyricsReview ? "Review Lyrics" :
+            isMotionReview ? "Review Motion" :
+            isVisualReview ? "Review Visuals" :
+            isMusicVideo ? "Review Song" :
+            isProcessing ? "Processing..." :
+            "Review"
+          )}
         </h1>
         <p className="text-gray-400 text-sm">
-          {isMusicLyricsReview
+          {isStoryReview
+            ? "Review and edit your story, then approve to split into scenes."
+            : isScenesReview
+            ? "Review the scene breakdown and director's notes, then generate audio."
+            : isTTSReview
+            ? "Listen to the generated audio for each scene, then generate image prompts."
+            : isPromptsReview
+            ? "Review the image prompts before generating images. Edit any prompts to refine the visuals."
+            : isNewMotionReview
+            ? "Review the motion descriptions for each frame, then generate the final video."
+            : isProcessing
+            ? "Your video is being processed..."
+            : isMusicLyricsReview
             ? "Review and edit your song lyrics, then generate the song."
-            : isMotionReview
-            ? "Review and edit the motion descriptions for each scene, then generate the final video."
-            : isVisualReview
-            ? "Review and edit the visual prompts for each section, then generate preview images."
-            : isNarrationReview
-            ? "Review your narration script, then generate preview images."
-            : isMusicVideo
-            ? "Review your song scenes, then generate preview images before creating the music video."
-            : "Review your script and images, then approve to continue."}
+            : isImageReview
+            ? "Review generated images, then approve to generate motion."
+            : "Review your content and approve to continue."}
         </p>
       </div>
 
@@ -1648,6 +1761,134 @@ export default function ReviewPage() {
         </div>
       )}
 
+      {/* Processing indicator for new pipeline */}
+      {isProcessing && (
+        <div className="mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-8 flex flex-col items-center gap-3">
+          <div className="animate-spin w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full" />
+          <p className="text-sm text-violet-300">
+            {video?.status === "STORY" && "Writing your story..."}
+            {video?.status === "SCENE_SPLIT" && "Splitting story into scenes..."}
+            {video?.status === "TTS_GENERATION" && "Generating audio narration..."}
+            {video?.status === "PROMPT_GENERATION" && "Creating image prompts for each frame..."}
+            {video?.status === "MOTION_GENERATION" && "Designing motion for each frame..."}
+            {video?.status === "IMAGE_GENERATION" && "Generating images..."}
+            {video?.status === "VIDEO_GENERATION" && "Generating video clips..."}
+            {video?.status === "RENDERING" && "Composing final video..."}
+          </p>
+        </div>
+      )}
+
+      {/* REVIEW_STORY: Full story editor */}
+      {isStoryReview && video?.script && (
+        <div className="mb-6">
+          <div className="mb-4 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+            <p className="text-sm text-violet-300">
+              Read your story below. Edit it directly, or use the AI chat to refine it.
+              When you&apos;re happy, approve to split into scenes.
+            </p>
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <textarea
+                value={video.script}
+                onChange={(e) => {
+                  const updated = e.target.value;
+                  setVideo((prev) => prev ? { ...prev, script: updated } : prev);
+                }}
+                onBlur={() => {
+                  if (video.script) handleSaveStory(video.script);
+                }}
+                rows={20}
+                className="w-full bg-transparent border-none text-sm text-gray-200 resize-y focus:outline-none leading-relaxed font-mono"
+                placeholder="Your story will appear here..."
+              />
+            </CardContent>
+          </Card>
+          <div className="mt-6 flex justify-center">
+            <Button
+              variant="primary"
+              size="lg"
+              loading={approving}
+              onClick={() => handleApprove("approve-story")}
+            >
+              Approve Story &amp; Split into Scenes
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* REVIEW_SCENES banner */}
+      {isScenesReview && scenes.length > 0 && (
+        <div className="mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+          <p className="text-sm text-violet-300">
+            Review the scene breakdown below. Each scene has a title, narration text, and director&apos;s note.
+            Edit any scene, then approve to generate audio.
+          </p>
+        </div>
+      )}
+
+      {/* TTS_REVIEW banner */}
+      {isTTSReview && scenes.length > 0 && (
+        <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-sm text-emerald-300">
+            Listen to the generated audio for each scene using the play buttons.
+            When you&apos;re satisfied, approve to generate image prompts.
+          </p>
+        </div>
+      )}
+
+      {/* REVIEW_PROMPTS / IMAGE_REVIEW / REVIEW_MOTION banners */}
+      {isPromptsReview && (
+        <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <p className="text-sm text-amber-300">
+            Review the image prompts for each frame. Edit any prompt before generating images to save on generation costs.
+          </p>
+        </div>
+      )}
+
+      {isNewMotionReview && (
+        <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-sm text-emerald-300">
+            Review the motion descriptions for each frame. These control how the AI video model animates each image.
+          </p>
+        </div>
+      )}
+
+      {/* New pipeline bottom actions */}
+      {(isScenesReview || isTTSReview || isPromptsReview || isNewMotionReview) && scenes.length > 0 && !isProcessing && (
+        <div className="mb-6">
+          <Card>
+            <CardContent className="py-3 flex items-center justify-end gap-2">
+              {isScenesReview && (
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-scenes")}>
+                  Approve Scenes &amp; Generate Audio
+                </Button>
+              )}
+              {isTTSReview && (
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-tts")}>
+                  Approve Audio &amp; Generate Prompts
+                </Button>
+              )}
+              {isPromptsReview && (
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-prompts")}>
+                  Approve Prompts &amp; Generate Images
+                </Button>
+              )}
+              {isImageReview && !isMusicVideo && (
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-images")}>
+                  Approve Images &amp; Generate Motion
+                </Button>
+              )}
+              {isNewMotionReview && (
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-motion")}>
+                  Approve Motion &amp; Generate Video
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Scene list */}
       <DndContext
         sensors={sensors}
@@ -1677,7 +1918,9 @@ export default function ReviewPage() {
                 isMusicVideo={isMusicVideo}
                 isDialogue={video?.series?.videoType === "dialogue"}
                 storyAssets={video?.series?.storyAssets ?? []}
-                showMotionEdit={isMotionReview}
+                showMotionEdit={isMotionReview || isNewMotionReview}
+                showDirectorNote={true}
+                showAudioPlayer={isTTSReview || isPromptsReview || isNewMotionReview}
               />
             ))}
           </div>

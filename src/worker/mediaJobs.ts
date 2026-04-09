@@ -253,6 +253,8 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
         text: s.text,
         duration: s.duration ?? 5,
         speaker: s.speaker ?? undefined,
+        directorNote: s.directorNote ?? undefined,
+        sceneTitle: s.sceneTitle ?? undefined,
       }));
 
       const result = await generateImagePrompts(
@@ -365,6 +367,8 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       text: s.text,
       duration: s.duration ?? 5,
       imagePrompt: s.imagePrompt || s.text,
+      directorNote: s.directorNote ?? undefined,
+      sceneTitle: s.sceneTitle ?? undefined,
     }));
 
     const imageUrls: string[] = [];

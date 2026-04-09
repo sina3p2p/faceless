@@ -69,7 +69,7 @@ export default function EditSeriesPage() {
           niche: data.niche,
           style: data.style,
           captionStyle: data.captionStyle,
-          videoType: data.videoType || "faceless",
+          videoType: data.videoType || "standalone",
           llmModel: data.llmModel || DEFAULT_LLM_MODEL,
           imageModel: data.imageModel || DEFAULT_IMAGE_MODEL,
           videoModel: data.videoModel || DEFAULT_VIDEO_MODEL,

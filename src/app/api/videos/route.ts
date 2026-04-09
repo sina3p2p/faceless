@@ -10,6 +10,7 @@ import { z } from "zod/v4";
 const createVideoSchema = z.object({
   seriesId: z.string().min(1),
   targetDuration: z.number().min(10).max(180).optional(),
+  pipelineMode: z.enum(["manual", "auto"]).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -71,22 +72,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const config = parsed.data.targetDuration
-    ? { targetDuration: parsed.data.targetDuration }
-    : undefined;
+  const config: Record<string, unknown> = {};
+  if (parsed.data.targetDuration) config.targetDuration = parsed.data.targetDuration;
+  if (parsed.data.pipelineMode) config.pipelineMode = parsed.data.pipelineMode;
 
   const [videoProject] = await db
     .insert(videoProjects)
-    .values({ seriesId: seriesRecord.id, status: "PENDING", config })
+    .values({ seriesId: seriesRecord.id, status: "PENDING", config: Object.keys(config).length > 0 ? config : undefined })
     .returning();
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
   const jobName = seriesRecord.videoType === "music_video"
     ? "generate-music-lyrics"
-    : seriesRecord.videoType === "dialogue"
-      ? "generate-dialogue-script"
-      : "generate-script";
+    : "generate-story";
 
   await renderQueue.add(jobName, {
     videoProjectId: videoProject.id,

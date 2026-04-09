@@ -6,6 +6,7 @@ import { eq, and, asc } from "drizzle-orm";
 import {
   refineVideoScript,
   refineNarrationScript,
+  refineStory,
   refineMusicScript,
   type ChatMessage,
   type VideoScript,
@@ -48,6 +49,28 @@ export async function POST(
   const isMusic = video.series.videoType === "music_video";
 
   try {
+    if (video.status === "REVIEW_STORY") {
+      const currentStory = video.script || "";
+
+      const refined = await refineStory(
+        currentStory,
+        message,
+        chatHistory as ChatMessage[],
+        video.series.language || "en",
+        video.series.llmModel || undefined
+      );
+
+      const titleMatch = refined.match(/^#\s+(.+)$/m);
+      const title = titleMatch ? titleMatch[1].trim() : video.title || "Untitled";
+
+      return NextResponse.json({
+        script: refined,
+        title,
+        scenes: [],
+        changes: [{ scene: 0, type: "modified" as const, fields: [{ field: "story", old: currentStory.slice(0, 100), new: refined.slice(0, 100) }] }],
+      });
+    }
+
     if (isMusic) {
       const currentScript: MusicScript = {
         title: video.title || "Untitled",
@@ -98,7 +121,9 @@ export async function POST(
         title: video.title || "Untitled",
         hook: "",
         scenes: video.scenes.map((s) => ({
+          sceneTitle: (s as Record<string, unknown>).sceneTitle as string || "",
           text: s.text,
+          directorNote: (s as Record<string, unknown>).directorNote as string || "",
           duration: s.duration ?? 5,
         })),
         cta: "",
@@ -121,6 +146,8 @@ export async function POST(
         script: refined,
         scenes: refined.scenes.map((s, i) => ({
           sceneOrder: i,
+          sceneTitle: s.sceneTitle,
+          directorNote: s.directorNote,
           text: s.text,
           imagePrompt: "",
           visualDescription: "",

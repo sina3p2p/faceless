@@ -1016,7 +1016,9 @@ ASSET REFS: For each scene, the assetRefs array must include the speaking charac
 // ── Narration-Only Schemas (Script Agent output) ──
 
 const narrationSceneSchema = z.object({
+  sceneTitle: z.string().describe("Short descriptive title for this scene (2-5 words), like a chapter heading. E.g. 'The Birth of a Giant', 'Into the Abyss', 'The Final Goodbye'"),
   text: z.string().describe("Narration text for this scene. Punchy, conversational, micro-cliffhangers. 1-3 sentences max."),
+  directorNote: z.string().describe("RICH creative brief for the visual team (NO word limit — be as detailed as possible). Describe: the SETTING (exact location, time period, weather, time of day, architecture, materials), the SUBJECTS (who/what is in the scene — appearance, clothing, posture, facial expression, age, ethnicity), the ACTION (what is physically happening in this one moment), the MOOD/ATMOSPHERE (emotional tone, tension level, color palette, lighting quality), the CAMERA PERSPECTIVE (where the viewer is watching from, what feels close vs far), and any SYMBOLIC or FORESHADOWING elements. Write as if you are a film director giving a brief to your cinematographer and production designer. The more detail you provide, the better the final video will look."),
   duration: z.number().describe("Duration of this scene in seconds"),
 });
 
@@ -1031,8 +1033,10 @@ const narrationScriptSchema = z.object({
 export type NarrationScript = z.infer<typeof narrationScriptSchema>;
 
 const narrationDialogueSceneSchema = z.object({
+  sceneTitle: z.string().describe("Short descriptive title for this scene (2-5 words), like a chapter heading"),
   speaker: z.string().describe("Who is speaking: exact character name or 'Narrator'"),
   text: z.string().describe("What this character says, or narrator description"),
+  directorNote: z.string().describe("RICH creative brief for the visual team (NO word limit). Describe the setting, the speaking character's body language/expression/gestures, the mood, the lighting, the camera angle (over-the-shoulder, close-up, wide two-shot), and how this moment FEELS emotionally. Write as if briefing a cinematographer."),
   duration: z.number().describe("Duration of this scene in seconds"),
 });
 
@@ -1090,11 +1094,15 @@ export async function generateNarrationScript(
 
   const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
 
-Your job is to write the NARRATION SCRIPT ONLY — story, pacing, and dialogue. Visual prompts and motion descriptions will be created separately by dedicated specialists. Focus entirely on making the STORY irresistible.
+You are the creative lead for a video production team. You write the narration AND a detailed creative brief (directorNote) for each scene that your art director and video director will use to create the visuals.
+
+The narration (text) is what the viewer HEARS — short, punchy, scroll-stopping.
+The directorNote is what the visual team READS — unlimited detail, like a real film director briefing a crew.
 
 OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
-- ALL text content (title, hook, scene narration/text, CTA) MUST be written in ${langName}.
-- This rule overrides everything else. Even if the topic or niche name is in a different language, the output narration must be in ${langName}.
+- ALL text content (title, hook, scene narration/text, CTA, sceneTitle) MUST be written in ${langName}.
+- directorNote MUST be written in English (for best AI model compatibility).
+- This rule overrides everything else.
 
 VIRAL SCRIPT FORMULA (follow this exactly):
 
@@ -1114,12 +1122,24 @@ VIRAL SCRIPT FORMULA (follow this exactly):
 
 4. CTA (final scene): End with something that makes them comment, like, or follow. Best: ask a polarizing question or tease the "Part 2".
 
-CRITICAL RULES:
-- Each scene narration = 15-25 words. Short punchy sentences WIN.
+NARRATION TEXT RULES:
+- Each scene narration (text) = 15-25 words. Short punchy sentences WIN.
 - NEVER use filler words or generic phrases
 - Write like you're telling a secret to a friend, not giving a lecture
 - Every single sentence must either reveal new info or build tension
 ${buildDurationInstruction(targetDuration, durations)}
+
+DIRECTOR NOTE RULES (CRITICAL — this is what makes the video look amazing):
+- NO WORD LIMIT. Be as detailed as possible. More detail = better video.
+- For each scene, describe the COMPLETE visual world as if briefing a film crew:
+  - SETTING: Exact location, time period, time of day, weather, architecture, materials, textures, colors
+  - SUBJECTS: Who/what is in the scene — appearance, age, ethnicity, clothing, posture, facial expression, hair, body language
+  - ACTION: The single physical moment happening — what is moving, what is still
+  - MOOD: Emotional atmosphere — tense, joyful, eerie, triumphant. Color palette. Lighting quality (golden hour, harsh fluorescent, candlelight, moonlit)
+  - CAMERA: Where the viewer watches from — low angle looking up (power), bird's eye (scale), close-up (intimacy), wide establishing shot (context)
+  - SYMBOLISM: Any visual metaphors, foreshadowing, or irony the visual team should convey
+- Think like a director writing shot notes for a $100M film production
+- Each directorNote should be a COMPLETE world — someone reading it should be able to paint the scene without seeing the narration
 
 ONE ACTION PER SCENE (CRITICAL — each scene will become one video clip):
 - Each scene must describe exactly ONE clear action or moment. NEVER pack multiple actions into one scene.
@@ -1178,12 +1198,14 @@ export async function generateNarrationStandaloneScript(
     ? `\n\nSTORY CHARACTERS (reference these in the narration):\n${characters.filter(c => c.type === "character").map(c => `  - ${c.name}: ${c.description}`).join("\n")}\n`
     : "";
 
-  const systemPrompt = `You are an elite short-form video scriptwriter. You create compelling stories for TikTok, YouTube Shorts, and Instagram Reels.
+  const systemPrompt = `You are the creative lead for a video production team. You write the narration AND a detailed creative brief (directorNote) for each scene.
 
-Your job is to write the NARRATION SCRIPT ONLY — story, pacing, and dialogue. Visual prompts and motion descriptions will be created separately by dedicated specialists. Focus entirely on making the STORY irresistible.
+The narration (text) is what the viewer HEARS — short, punchy.
+The directorNote is what the visual team READS — unlimited detail, like a real film director briefing a crew.
 
 OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
-- ALL text content (title, hook, scene narration/text, CTA) MUST be written in ${langName}.
+- ALL text content (title, hook, scene narration/text, CTA, sceneTitle) MUST be written in ${langName}.
+- directorNote MUST be written in English (for best AI model compatibility).
 - This rule overrides everything else.
 
 STORYTELLING RULES:
@@ -1192,9 +1214,15 @@ STORYTELLING RULES:
 3. CLIMAX (scene 4-5): The emotional peak — the most dramatic, surprising, or touching moment.
 4. RESOLUTION (final scene): A satisfying conclusion with a CTA that invites engagement.
 
-CRITICAL RULES:
-- Each scene narration = 15-25 words. Short punchy sentences.
+NARRATION TEXT RULES:
+- Each scene narration (text) = 15-25 words. Short punchy sentences.
 ${buildDurationInstruction(targetDuration, durations)}
+
+DIRECTOR NOTE RULES (CRITICAL — this is what makes the video look amazing):
+- NO WORD LIMIT. Be as detailed as possible. More detail = better video.
+- Describe the COMPLETE visual world: SETTING (location, time, weather, architecture), SUBJECTS (appearance, clothing, expression), ACTION (the single moment happening), MOOD (emotional atmosphere, color palette, lighting), CAMERA (angle, framing), SYMBOLISM (visual metaphors, foreshadowing).
+- Think like a director writing shot notes for a $100M film production.
+- Each directorNote should be a COMPLETE world — someone reading it should be able to paint the scene.
 
 ONE ACTION PER SCENE (CRITICAL — each scene will become one video clip):
 - Each scene must describe exactly ONE clear action or moment.
@@ -1233,12 +1261,14 @@ export async function generateNarrationDialogueScript(
 
   const charList = characters.map((c) => `  - ${c.name}: ${c.description}`).join("\n");
 
-  const systemPrompt = `You are an elite dialogue scriptwriter for short-form video. You create compelling conversations between characters for TikTok, YouTube Shorts, and Instagram Reels.
+  const systemPrompt = `You are the creative lead for a dialogue video production. You write the dialogue AND a detailed creative brief (directorNote) for each scene.
 
-Your job is to write the DIALOGUE SCRIPT ONLY — who says what, pacing, and dramatic structure. Visual prompts and motion descriptions will be created separately by dedicated specialists.
+The text is what the character SAYS — the viewer hears it. Keep it punchy and natural.
+The directorNote is what the visual team READS — unlimited detail describing the character's body language, the environment, camera angle, mood, and emotional undercurrent.
 
 OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
-- ALL text content (title, hook, dialogue text, CTA) MUST be written in ${langName}.
+- ALL text content (title, hook, dialogue text, CTA, sceneTitle) MUST be written in ${langName}.
+- directorNote MUST be written in English (for best AI model compatibility).
 
 DIALOGUE RULES:
 1. Each scene is ONE character's spoken turn (or a Narrator line for scene-setting).
@@ -1279,7 +1309,7 @@ SCENE CONTINUITY MODE:
 // ── Image Agent: Art Director ──
 
 export async function generateImagePrompts(
-  scenes: Array<{ text: string; duration: number; speaker?: string }>,
+  scenes: Array<{ text: string; duration: number; speaker?: string; directorNote?: string; sceneTitle?: string }>,
   niche: string,
   style: string,
   assets: StoryAsset[] = [],
@@ -1290,11 +1320,17 @@ export async function generateImagePrompts(
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
 
-  const scenesContext = scenes.map((s, i) =>
-    `Scene ${i + 1} (${s.duration}s)${s.speaker ? ` [${s.speaker}]` : ""}: "${s.text}"`
-  ).join("\n");
+  const scenesContext = scenes.map((s, i) => {
+    let entry = `Scene ${i + 1}${s.sceneTitle ? ` — "${s.sceneTitle}"` : ""} (${s.duration}s)${s.speaker ? ` [${s.speaker}]` : ""}:\n  Narration: "${s.text}"`;
+    if (s.directorNote) {
+      entry += `\n  Director's Note: ${s.directorNote}`;
+    }
+    return entry;
+  }).join("\n\n");
 
-  const systemPrompt = `You are an elite art director for short-form video. Given a narration script, create detailed image prompts for each scene that will be used to generate AI images.
+  const systemPrompt = `You are an elite art director for short-form video. Given a narration script with detailed director's notes, create image prompts for each scene.
+
+Each scene includes a "Director's Note" — a rich creative brief from the creative director describing the visual world in detail. USE THIS AS YOUR PRIMARY REFERENCE. The director's note describes the setting, subjects, mood, lighting, camera angle, and symbolism. Your imagePrompt should translate this vision into a specific, technically precise prompt for an AI image generator.
 
 The narration is in ${langName}, but ALL imagePrompt and searchQuery output MUST be in English for best AI model compatibility.
 
@@ -1373,16 +1409,18 @@ SCENE CONTINUITY MODE (CRITICAL):
 // ── Motion Agent: Video Director (with Vision) ──
 
 export async function generateMotionDescriptions(
-  scenes: Array<{ text: string; duration: number; imagePrompt: string }>,
+  scenes: Array<{ text: string; duration: number; imagePrompt: string; directorNote?: string; sceneTitle?: string }>,
   style: string,
   imageUrls: string[],
   model?: string
 ): Promise<MotionOutput> {
   const primaryModel = model || LLM.visionModel || LLM.defaultModel;
 
-  const systemPrompt = `You are an elite video director specializing in AI-generated video clips. Given a narration script, image prompts, and the ACTUAL GENERATED IMAGES for each scene, write motion descriptions that will be sent to an AI image-to-video model.
+  const systemPrompt = `You are an elite video director specializing in AI-generated video clips. Given a narration script with director's notes, image prompts, and the ACTUAL GENERATED IMAGES for each scene, write motion descriptions that will be sent to an AI image-to-video model.
 
-You can SEE each scene's generated image. Use what you see — the actual composition, subject placement, colors, and framing — to write motion that works perfectly with the real image.
+Each scene includes a "Director's Note" — a rich creative brief describing the intended mood, atmosphere, and emotional energy. Use this to understand WHAT KIND of motion fits the scene (tense = slow deliberate moves, triumphant = sweeping camera, intimate = subtle close-up shifts).
+
+You can SEE each scene's generated image. Use what you see — the actual composition, subject placement, colors, and framing — combined with the director's intent to write motion that is both technically correct AND emotionally perfect.
 
 You MUST return exactly ${scenes.length} scenes in the same order as the input.
 
@@ -1424,12 +1462,17 @@ Visual style context: ${style}.`;
     contentParts.push({ type: "text", text: "Here are the scenes with their narration and actual generated images:\n\n" });
 
     for (let i = 0; i < scenes.length; i++) {
-      contentParts.push({ type: "text", text: `--- Scene ${i + 1} (${scenes[i].duration}s) ---\nNarration: "${scenes[i].text}"\nImage prompt used: ${scenes[i].imagePrompt}\nGenerated image:` });
+      let sceneHeader = `--- Scene ${i + 1}${scenes[i].sceneTitle ? ` — "${scenes[i].sceneTitle}"` : ""} (${scenes[i].duration}s) ---\nNarration: "${scenes[i].text}"\nImage prompt used: ${scenes[i].imagePrompt}`;
+      if (scenes[i].directorNote) {
+        sceneHeader += `\nDirector's Note: ${scenes[i].directorNote}`;
+      }
+      sceneHeader += "\nGenerated image:";
+      contentParts.push({ type: "text", text: sceneHeader });
       contentParts.push({ type: "image", image: new URL(imageUrls[i]) });
       contentParts.push({ type: "text", text: "\n" });
     }
 
-    contentParts.push({ type: "text", text: "\nGenerate a visualDescription for each scene. Base your motion descriptions on what you actually see in each image above." });
+    contentParts.push({ type: "text", text: "\nGenerate a visualDescription for each scene. Use the director's note for emotional intent and the actual image for physical composition." });
 
     const { object } = await generateObject({
       model: openrouter.chat(primaryModel),
@@ -1442,9 +1485,11 @@ Visual style context: ${style}.`;
     return object;
   }
 
-  const scenesContext = scenes.map((s, i) =>
-    `Scene ${i + 1} (${s.duration}s): "${s.text}"\nImage prompt: ${s.imagePrompt}`
-  ).join("\n\n");
+  const scenesContext = scenes.map((s, i) => {
+    let entry = `Scene ${i + 1}${s.sceneTitle ? ` — "${s.sceneTitle}"` : ""} (${s.duration}s): "${s.text}"\nImage prompt: ${s.imagePrompt}`;
+    if (s.directorNote) entry += `\nDirector's Note: ${s.directorNote}`;
+    return entry;
+  }).join("\n\n");
 
   const { object } = await generateObject({
     model: openrouter.chat(primaryModel),
@@ -1469,7 +1514,7 @@ export async function refineNarrationScript(
   const primaryModel = model || LLM.defaultModel;
   const langName = getLanguageName(language);
 
-  const systemPrompt = `You are a collaborative video script editor. The user has a narration script and wants to improve it through conversation.
+  const systemPrompt = `You are a collaborative video script editor. The user has a narration script with director's notes and wants to improve it through conversation.
 
 CURRENT SCRIPT:
 ${JSON.stringify(currentScript, null, 2)}
@@ -1478,16 +1523,19 @@ RULES:
 - Apply the user's requested changes to the script and return the COMPLETE modified script
 - Only change what the user asks for — preserve everything else exactly as-is
 - If the user asks to change a specific scene, only modify that scene
-- If the user asks for tone/style changes, apply them across all scenes
+- If the user asks for tone/style changes, apply them across all scenes (including directorNotes)
 - Maintain the same JSON structure
 - If the user's request is vague, make your best creative judgment
 - You can add, remove, reorder, or merge scenes if the user asks
 - ONE ACTION PER SCENE: Each scene must show exactly ONE clear action.
-- Do NOT add imagePrompt, visualDescription, or searchQuery fields — those will be handled by a separate specialist.
+- When adding new scenes, always include sceneTitle and a detailed directorNote
+- When modifying a scene's narration, update the directorNote to match if the visual intent changed
+- directorNote should always be in English. sceneTitle and text follow the language rule below.
 
 LANGUAGE RULE (CRITICAL):
-- The user may write their instructions in ANY language, but the script output (title, hook, narration text, CTA) MUST ALWAYS be written in ${langName}.
-- Never switch the script language based on the user's input language. Always output narration in ${langName}.`;
+- The user may write their instructions in ANY language, but the script output (title, hook, narration text, CTA, sceneTitle) MUST ALWAYS be written in ${langName}.
+- directorNote MUST be in English (for AI model compatibility).
+- Never switch the script language based on the user's input language.`;
 
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
   for (const msg of chatHistory) {
@@ -1501,6 +1549,340 @@ LANGUAGE RULE (CRITICAL):
     system: systemPrompt,
     messages,
     temperature: 0.7,
+  });
+
+  return object;
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── Story-First Pipeline: Story, Director, Prompt, Motion ──
+// ══════════════════════════════════════════════════════════════
+
+// ── Story Agent (generateText → markdown) ──
+
+export async function generateStory(
+  niche: string,
+  style: string,
+  topicIdea?: string,
+  language = "en",
+  model?: string,
+  previousTopics: string[] = []
+): Promise<string> {
+  const primaryModel = model || LLM.storyModel;
+  const langName = getLanguageName(language);
+
+  const seriesContext = previousTopics.length > 0
+    ? `\n\nSERIES CONTINUITY — Previous episodes (most recent first):\n${previousTopics.map((t, i) => `  Episode ${previousTopics.length - i}: "${t}"`).join("\n")}\n\nCreate the NEXT episode. Build on the world/theme. NEVER repeat. Explore a fresh angle. Escalate the intrigue.`
+    : "";
+
+  const systemPrompt = `You are an elite storyteller. Write a COMPLETE story as flowing prose in markdown format.
+
+OUTPUT FORMAT:
+- Start with a # Title (the story's title — SEO-optimized, emotionally compelling)
+- Then write the full narration as flowing prose paragraphs
+- No scene breaks, no bullet points, no structural formatting beyond paragraphs
+- No word limits — write as much as the story needs to be told properly
+- The story should work as a voiceover narration for a short-form video
+
+OUTPUT LANGUAGE (CRITICAL):
+- The title and ALL narration MUST be written in ${langName}.
+- This rule overrides everything else.
+
+STORYTELLING RULES:
+- Open with a line that makes scrolling IMPOSSIBLE (pattern interrupt, shocking claim, mystery)
+- Build with specific details — dates, numbers, sensory descriptions, escalating stakes
+- Every paragraph must either reveal new information or build tension
+- End with something that makes viewers comment, follow, or share
+- Write like you're telling a secret to a friend, not giving a lecture
+- The story should have a complete arc: hook → build-up → climax → resolution
+${niche === "kids" ? `
+KIDS CONTENT RULES:
+- Target age: 4-10 years old. Simple, cheerful language.
+- NO scary, violent, dark, or mature content.
+- Fun and educational. Use excitement and wonder.
+` : ""}`;
+
+  const userPrompt = topicIdea
+    ? `Write a compelling ${niche} story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.${seriesContext}`
+    : `Write a compelling ${niche} story. The intended visual style is ${style}. Pick a topic that creates instant curiosity.${seriesContext}`;
+
+  return generateText(systemPrompt, userPrompt, { model: primaryModel, temperature: 0.85 });
+}
+
+export async function refineStory(
+  currentStory: string,
+  userMessage: string,
+  chatHistory: ChatMessage[] = [],
+  language = "en",
+  model?: string
+): Promise<string> {
+  const primaryModel = model || LLM.storyModel;
+  const langName = getLanguageName(language);
+
+  const systemPrompt = `You are a collaborative story editor. The user has a story and wants to improve it through conversation.
+
+CURRENT STORY:
+${currentStory}
+
+RULES:
+- Apply the user's requested changes and return the COMPLETE modified story in markdown
+- Keep the # Title as the first line
+- Only change what the user asks for — preserve everything else exactly as-is
+- If the user's request is vague, make your best creative judgment
+- You can restructure, expand, shorten, or completely rewrite sections if asked
+
+LANGUAGE RULE:
+- The user may write instructions in ANY language, but the story MUST be in ${langName}.`;
+
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const msg of chatHistory) {
+    messages.push({ role: msg.role, content: msg.content });
+  }
+  messages.push({ role: "user", content: userMessage });
+
+  const { text } = await aiGenerateText({
+    model: openrouter.chat(primaryModel),
+    system: systemPrompt,
+    messages,
+    temperature: 0.7,
+  });
+
+  return text;
+}
+
+// ── Director Agent (generateObject → structured scenes) ──
+
+const directorSceneSchema = z.object({
+  sceneTitle: z.string().describe("Short descriptive title for this scene (2-5 words), like a chapter heading"),
+  text: z.string().describe("The narration text chunk for this scene — extracted from the story prose. This is what the viewer HEARS."),
+  directorNote: z.string().describe("RICH creative brief for the visual team (NO word limit). Describe: SETTING (exact location, time period, weather, architecture, materials), SUBJECTS (appearance, clothing, posture, expression, age), ACTION (the single physical moment happening), MOOD (emotional atmosphere, color palette, lighting quality), CAMERA (angle, framing — low angle for power, close-up for intimacy, wide for scale), SYMBOLISM (visual metaphors, foreshadowing). Write as if briefing a cinematographer on a film set."),
+});
+
+const directorOutputSchema = z.object({
+  scenes: z.array(directorSceneSchema),
+});
+
+export type DirectorOutput = z.infer<typeof directorOutputSchema>;
+
+export async function splitStoryIntoScenes(
+  storyMarkdown: string,
+  style: string,
+  language = "en",
+  model?: string
+): Promise<DirectorOutput> {
+  const primaryModel = model || LLM.directorModel;
+  const langName = getLanguageName(language);
+
+  const systemPrompt = `You are an elite film director. Given a complete story, split it into scenes and write a detailed director's note for each.
+
+SCENE SPLITTING RULES:
+- Split at natural narrative beats — each scene = ONE clear moment, action, or emotional beat
+- NEVER cram multiple actions into one scene
+- Each scene's text should be 1-3 sentences from the original story (preserve the original wording as much as possible)
+- The text field is what the viewer HEARS as voiceover narration
+
+DIRECTOR NOTE RULES (CRITICAL — this is what makes the video look amazing):
+- NO WORD LIMIT. Be as detailed as possible. More detail = better video.
+- The visual style is: ${style}. Let this medium inform your creative vision.
+- For each scene, describe the COMPLETE visual world:
+  - SETTING: Exact location, time period, time of day, weather, architecture, materials, textures, colors
+  - SUBJECTS: Who/what is in the scene — appearance, age, ethnicity, clothing, posture, facial expression, hair, body language
+  - ACTION: The single physical moment happening — what is moving, what is still
+  - MOOD: Emotional atmosphere — tense, joyful, eerie, triumphant. Color palette. Lighting quality (golden hour, harsh fluorescent, candlelight, moonlit)
+  - CAMERA: Where the viewer watches from — low angle looking up (power), bird's eye (scale), close-up (intimacy), wide establishing shot (context)
+  - SYMBOLISM: Any visual metaphors, foreshadowing, or irony the visual team should convey
+- Think like a director writing shot notes for a $100M film production
+- Each directorNote should be self-contained — someone reading it should be able to paint the scene
+- directorNote MUST be in English (for AI model compatibility)
+
+LANGUAGE RULE:
+- sceneTitle and text MUST be in ${langName}
+- directorNote MUST be in English`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: directorOutputSchema,
+    system: systemPrompt,
+    prompt: `Split this story into scenes and write director's notes:\n\n${storyMarkdown}`,
+    temperature: 0.7,
+  });
+
+  return object;
+}
+
+// ── Image Prompt Agent (generateObject → N frames per scene) ──
+
+const framePromptSchema = z.object({
+  imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT, ACTION, ENVIRONMENT, LIGHTING, CAMERA angle, MOOD, STYLE. Single detailed paragraph."),
+  assetRefs: z.array(z.string()).default([]).describe("Asset names from story assets that appear in this frame"),
+  clipDuration: z.number().describe("Duration in seconds for this video clip. Must be one of the supported clip durations."),
+});
+
+const sceneFramePromptsSchema = z.object({
+  frames: z.array(framePromptSchema),
+});
+
+const framePromptsOutputSchema = z.object({
+  scenes: z.array(sceneFramePromptsSchema),
+});
+
+export type FramePromptsOutput = z.infer<typeof framePromptsOutputSchema>;
+
+export async function generateFramePrompts(
+  scenes: Array<{ text: string; directorNote: string; sceneTitle: string; ttsDuration: number }>,
+  style: string,
+  niche: string,
+  assets: StoryAsset[],
+  sceneContinuity: boolean,
+  supportedClipDurations: number[],
+  model?: string
+): Promise<FramePromptsOutput> {
+  const primaryModel = model || LLM.promptModel;
+
+  const scenesContext = scenes.map((s, i) =>
+    `Scene ${i + 1} — "${s.sceneTitle}" (audio: ${s.ttsDuration.toFixed(1)}s):\n  Narration: "${s.text}"\n  Director's Note: ${s.directorNote}`
+  ).join("\n\n");
+
+  const systemPrompt = `You are an elite storyboard artist. Given scenes with narration, director's notes, and exact audio durations, create image prompts for each frame.
+
+FRAME CALCULATION:
+- Supported video clip durations: ${JSON.stringify(supportedClipDurations)} seconds
+- For each scene, you know the exact audio duration. Split the scene into frames using the supported clip durations to cover the full audio (round up — extra time becomes ambient visual pause).
+- Example: audio = 14.1s, supported = [5,10] → use 10s + 5s = 2 frames
+- Example: audio = 7.3s, supported = [1,2,3,4,5,6,7,8,9,10] → use one 8s frame
+- Each frame's clipDuration MUST be one of the supported values
+
+IMAGE PROMPT QUALITY (CRITICAL):
+- Each imagePrompt must be 50-100+ words. Be EXTREMELY specific.
+- Describe ONE clear subject doing ONE clear action in ONE clear environment.
+- Always include the art style: ${style}.
+- For people: describe age, ethnicity, clothing, facial expression, body language, hair.
+- For places: describe architecture, textures, weather, time of day, materials.
+- Include composition cues: camera angle, framing, depth of field, lighting direction.
+- EACH frame must be visually DIFFERENT. Vary angles, palettes, compositions.
+- For multi-frame scenes: show visual PROGRESSION (frame 1 = establish, frame 2 = develop, frame 3 = climax).
+
+NO COPYRIGHTED CONTENT:
+- NEVER use copyrighted character names or their iconic signature details in imagePrompt.
+- Reimagine with ORIGINAL details. The narration text may use real names.
+${["claymation", "gothic-clay"].includes(style) ? `
+CLAYMATION STYLE: Every subject must look handcrafted from clay/plasticine. Visible fingerprint marks, rounded edges, matte finish. Miniature diorama sets. Always include: "Claymation stop-motion style, sculpted clay and plasticine"` : ""}${style === "gothic-clay" ? `
+GOTHIC CLAY: Dark moody atmosphere — gothic arches, gray/purple clay, candelabras, cobwebs. Deep purples, dark greens, midnight blues.` : ""}${style === "lego" ? `
+LEGO STYLE: Everything built from LEGO bricks. Minifigures with cylindrical heads, C-shaped hands. Visible studs, ABS plastic sheen. Bold primary colors. Always include: "LEGO brick style, plastic toy aesthetic"` : ""}
+${sceneContinuity ? `SCENE CONTINUITY: Consecutive frames must be visually COMPATIBLE. Maintain consistent main subject across frames.` : ""}${buildAssetBlock(assets)}
+
+You MUST return exactly ${scenes.length} scenes, each with the appropriate number of frames to cover its audio duration.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: framePromptsOutputSchema,
+    system: systemPrompt,
+    prompt: `Create storyboard frames for each scene:\n\n${scenesContext}\n\nVisual style: ${style}. Niche: ${niche}.`,
+    temperature: 0.8,
+  });
+
+  return object;
+}
+
+// ── Motion Agent (generateObject with vision → visualDescription per frame) ──
+
+const frameMotionSchema = z.object({
+  visualDescription: z.string().describe("Motion description for the AI video model (30-60 words). Describe CONTINUOUS MOTION: camera movement, subject movement, environment movement. Must describe how the clip ENDS for smooth transition to the next frame."),
+});
+
+const frameMotionOutputSchema = z.object({
+  frames: z.array(frameMotionSchema),
+});
+
+export type FrameMotionOutput = z.infer<typeof frameMotionOutputSchema>;
+
+export async function generateFrameMotion(
+  frames: Array<{
+    imagePrompt: string;
+    clipDuration: number;
+    sceneText: string;
+    directorNote: string;
+    sceneTitle: string;
+    frameOrder: number;
+    sceneOrder: number;
+  }>,
+  style: string,
+  imageUrls: string[],
+  model?: string
+): Promise<FrameMotionOutput> {
+  const primaryModel = model || LLM.motionModel;
+
+  const systemPrompt = `You are an elite video editor. You see ALL frames of the entire video in sequence. Design motion for each frame.
+
+You MUST return exactly ${frames.length} frames in the same sequence order.
+
+MOTION RULES:
+- Each visualDescription must be 30-60 words describing CONTINUOUS MOTION
+- CAMERA MOTION: "slowly dollies forward", "smooth orbit", "crane shot rising", "tracking shot", "slow push in"
+- SUBJECT MOTION: "turns head slowly", "hands reaching forward", "walking through", "wind blowing hair"
+- ENVIRONMENT MOTION: "clouds drifting", "rain falling", "leaves swirling", "fire flickering"
+- NEVER write static descriptions. Every frame MUST have camera + subject/environment motion.
+
+SEQUENCE AWARENESS (CRITICAL):
+- You see the complete video sequence. Design motion considering:
+  (1) What comes BEFORE — flow naturally from the previous frame's motion
+  (2) The clip duration — match motion speed (short clips = quick motion, long clips = slow cinematic)
+  (3) What comes AFTER — end with motion that transitions smoothly to the next frame
+- Within a scene (same sceneOrder): frames should feel like continuous progression
+- Across scenes (different sceneOrder): the last frame should settle or transition to signal a scene change
+
+MATCH MOTION TO THE IMAGE:
+- Look at subject position, depth, lighting direction, composition
+- Close-ups → subtle motion (slight head turn, eye movement)
+- Wide shots → larger camera movements (dolly, crane, orbit)
+
+Visual style: ${style}.`;
+
+  const hasImages = imageUrls.length === frames.length && imageUrls.every(url => !!url);
+
+  if (hasImages) {
+    const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: URL }> = [];
+    contentParts.push({ type: "text", text: "Here is the complete sequence of frames for the entire video:\n\n" });
+
+    for (let i = 0; i < frames.length; i++) {
+      const f = frames[i];
+      let header = `--- Frame ${i + 1} | Scene ${f.sceneOrder + 1} "${f.sceneTitle}" | Frame ${f.frameOrder + 1} | ${f.clipDuration}s clip ---`;
+      header += `\nNarration: "${f.sceneText}"`;
+      header += `\nDirector's Note: ${f.directorNote}`;
+      header += `\nImage prompt: ${f.imagePrompt}`;
+      header += "\nGenerated image:";
+      contentParts.push({ type: "text", text: header });
+      contentParts.push({ type: "image", image: new URL(imageUrls[i]) });
+      contentParts.push({ type: "text", text: "\n" });
+    }
+
+    contentParts.push({ type: "text", text: "\nDesign motion for each frame. Use the director's note for emotional intent, the actual image for physical composition, and the sequence position for transitions." });
+
+    const { object } = await generateObject({
+      model: openrouter.chat(primaryModel),
+      schema: frameMotionOutputSchema,
+      system: systemPrompt,
+      messages: [{ role: "user", content: contentParts }],
+      temperature: 0.8,
+    });
+
+    return object;
+  }
+
+  const framesContext = frames.map((f, i) => {
+    let entry = `Frame ${i + 1} | Scene ${f.sceneOrder + 1} "${f.sceneTitle}" | Frame ${f.frameOrder + 1} | ${f.clipDuration}s clip`;
+    entry += `\nNarration: "${f.sceneText}"`;
+    entry += `\nDirector's Note: ${f.directorNote}`;
+    entry += `\nImage prompt: ${f.imagePrompt}`;
+    return entry;
+  }).join("\n\n");
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: frameMotionOutputSchema,
+    system: systemPrompt,
+    prompt: `Design motion for each frame in sequence:\n\n${framesContext}`,
+    temperature: 0.8,
   });
 
   return object;

@@ -75,6 +75,8 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
       await db.insert(schema.videoScenes).values({
         videoProjectId,
         sceneOrder: i,
+        sceneTitle: script.scenes[i].sceneTitle,
+        directorNote: script.scenes[i].directorNote,
         text: script.scenes[i].text,
         duration: script.scenes[i].duration,
       });
@@ -216,6 +218,8 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
       await db.insert(schema.videoScenes).values({
         videoProjectId,
         sceneOrder: i,
+        sceneTitle: script.scenes[i].sceneTitle,
+        directorNote: script.scenes[i].directorNote,
         text: script.scenes[i].text,
         duration: script.scenes[i].duration,
       });
@@ -353,6 +357,8 @@ export async function generateDialogueScriptJob(job: Job<RenderJobData>) {
       await db.insert(schema.videoScenes).values({
         videoProjectId,
         sceneOrder: i,
+        sceneTitle: script.scenes[i].sceneTitle,
+        directorNote: script.scenes[i].directorNote,
         text: script.scenes[i].text,
         duration: script.scenes[i].duration,
         speaker: script.scenes[i].speaker,
