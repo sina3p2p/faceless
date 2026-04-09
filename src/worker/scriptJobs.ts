@@ -13,11 +13,11 @@ import {
   type StoryAssetInput,
 } from "./shared";
 import {
-  generateVideoScript,
+  generateNarrationScript,
+  generateNarrationStandaloneScript,
+  generateNarrationDialogueScript,
   generateMusicScript,
-  generateStandaloneScript,
   generateStandaloneMusicScript,
-  generateDialogueScript,
 } from "@/server/services/llm";
 import type { RenderJobData } from "@/lib/queue";
 
@@ -50,7 +50,7 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
 
     const previousTopics = await getPreviousTopics(seriesId, videoProjectId);
 
-    const script = await generateVideoScript(
+    const script = await generateNarrationScript(
       seriesRecord.niche,
       seriesRecord.style,
       topicIdea,
@@ -76,10 +76,6 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
         videoProjectId,
         sceneOrder: i,
         text: script.scenes[i].text,
-        imagePrompt: script.scenes[i].imagePrompt,
-        visualDescription: script.scenes[i].visualDescription,
-        searchQuery: script.scenes[i].searchQuery,
-        assetRefs: script.scenes[i].assetRefs ?? [],
         duration: script.scenes[i].duration,
       });
     }
@@ -88,7 +84,7 @@ export async function generateScriptJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
     await job.updateProgress(100);
 
-    console.log(`Script ready for review: ${script.title} (${script.scenes.length} scenes)`);
+    console.log(`Narration ready for review: ${script.title} (${script.scenes.length} scenes)`);
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`Script generation failed for ${videoProjectId}:`, msg);
@@ -196,7 +192,7 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
 
-    const script = await generateStandaloneScript(
+    const script = await generateNarrationStandaloneScript(
       prompt,
       seriesRecord.style,
       characters,
@@ -221,10 +217,6 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
         videoProjectId,
         sceneOrder: i,
         text: script.scenes[i].text,
-        imagePrompt: script.scenes[i].imagePrompt,
-        visualDescription: script.scenes[i].visualDescription,
-        searchQuery: script.scenes[i].searchQuery,
-        assetRefs: script.scenes[i].assetRefs ?? [],
         duration: script.scenes[i].duration,
       });
     }
@@ -233,7 +225,7 @@ export async function generateStandaloneScriptJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
     await job.updateProgress(100);
 
-    console.log(`Standalone script ready for review: ${script.title} (${script.scenes.length} scenes)`);
+    console.log(`Standalone narration ready for review: ${script.title} (${script.scenes.length} scenes)`);
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`Standalone script generation failed for ${videoProjectId}:`, msg);
@@ -337,7 +329,7 @@ export async function generateDialogueScriptJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "SCRIPT", "ACTIVE", 10);
     await job.updateProgress(10);
 
-    const script = await generateDialogueScript(
+    const script = await generateNarrationDialogueScript(
       prompt,
       seriesRecord.style,
       characters,
@@ -362,10 +354,6 @@ export async function generateDialogueScriptJob(job: Job<RenderJobData>) {
         videoProjectId,
         sceneOrder: i,
         text: script.scenes[i].text,
-        imagePrompt: script.scenes[i].imagePrompt,
-        visualDescription: script.scenes[i].visualDescription,
-        searchQuery: script.scenes[i].searchQuery,
-        assetRefs: script.scenes[i].assetRefs ?? [],
         duration: script.scenes[i].duration,
         speaker: script.scenes[i].speaker,
       });
@@ -375,7 +363,7 @@ export async function generateDialogueScriptJob(job: Job<RenderJobData>) {
     await updateJobStep(videoProjectId, "SCRIPT", "COMPLETED", 100);
     await job.updateProgress(100);
 
-    console.log(`Dialogue script ready for review: ${script.title} (${script.scenes.length} scenes)`);
+    console.log(`Dialogue narration ready for review: ${script.title} (${script.scenes.length} scenes)`);
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`Dialogue script generation failed for ${videoProjectId}:`, msg);

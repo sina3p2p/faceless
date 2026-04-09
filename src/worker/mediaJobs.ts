@@ -10,8 +10,10 @@ import {
   updateVideoStatus,
   resolveStoryAssets,
   filterAssetsByRefs,
+  parseStoryAssets,
   type CharacterRef,
   type StoryAssetRef,
+  type StoryAssetInput,
   type PreApproved,
   type ScriptInput,
 } from "./shared";
@@ -29,7 +31,11 @@ import {
   downloadAIVideo,
 } from "@/server/services/ai-video";
 import { downloadFile } from "@/server/services/composer";
-import { uploadFile } from "@/lib/storage";
+import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import {
+  generateImagePrompts,
+  generateMotionDescriptions,
+} from "@/server/services/llm";
 import type { RenderJobData } from "@/lib/queue";
 
 export async function fetchFacelessMediaParallel(
@@ -235,6 +241,46 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
 
     if (existingScenes.length === 0) throw new Error("No scenes to generate images for");
 
+    const scenesWithoutPrompts = existingScenes.filter((s) => !s.imagePrompt);
+    if (scenesWithoutPrompts.length > 0) {
+      console.log(`[generate-images] ${scenesWithoutPrompts.length}/${existingScenes.length} scenes missing imagePrompts — running Image Agent`);
+
+      const storyAssets = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
+      const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+      const assets = parseStoryAssets(storyAssets, charImages);
+
+      const narrationScenes = existingScenes.map((s) => ({
+        text: s.text,
+        duration: s.duration ?? 5,
+        speaker: s.speaker ?? undefined,
+      }));
+
+      const result = await generateImagePrompts(
+        narrationScenes,
+        seriesRecord.niche,
+        seriesRecord.style,
+        assets,
+        !!seriesRecord.sceneContinuity,
+        seriesRecord.language || "en",
+        seriesRecord.llmModel || undefined
+      );
+
+      for (let i = 0; i < existingScenes.length; i++) {
+        const scenePrompt = result.scenes[i];
+        if (!scenePrompt) continue;
+        await db
+          .update(schema.videoScenes)
+          .set({
+            imagePrompt: scenePrompt.imagePrompt,
+            searchQuery: scenePrompt.searchQuery,
+            assetRefs: scenePrompt.assetRefs,
+          })
+          .where(eq(schema.videoScenes.id, existingScenes[i].id));
+        existingScenes[i] = { ...existingScenes[i], imagePrompt: scenePrompt.imagePrompt, searchQuery: scenePrompt.searchQuery };
+      }
+      console.log(`[generate-images] Image Agent generated ${result.scenes.length} prompts`);
+    }
+
     const targets = regenerateExisting
       ? existingScenes
       : existingScenes.filter((s) => !s.imageUrl && !s.assetUrl);
@@ -290,6 +336,75 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error(`[generate-images] Failed for ${videoProjectId}:`, errorMessage);
+    await updateVideoStatus(videoProjectId, "FAILED");
+    throw error;
+  }
+}
+
+export async function generateMotionJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    await updateVideoStatus(videoProjectId, "VIDEO_SCRIPT");
+
+    const existingScenes = await db.query.videoScenes.findMany({
+      where: eq(schema.videoScenes.videoProjectId, videoProjectId),
+      orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
+    });
+
+    if (existingScenes.length === 0) throw new Error("No scenes to generate motion for");
+
+    console.log(`[generate-motion] Generating motion descriptions for ${existingScenes.length} scenes using vision model`);
+
+    const scenes = existingScenes.map((s) => ({
+      text: s.text,
+      duration: s.duration ?? 5,
+      imagePrompt: s.imagePrompt || s.text,
+    }));
+
+    const imageUrls: string[] = [];
+    for (const scene of existingScenes) {
+      const imageKey = scene.imageUrl || scene.assetUrl;
+      if (imageKey) {
+        try {
+          const signedUrl = await getSignedDownloadUrl(imageKey);
+          imageUrls.push(signedUrl);
+        } catch {
+          imageUrls.push("");
+        }
+      } else {
+        imageUrls.push("");
+      }
+    }
+
+    const result = await generateMotionDescriptions(
+      scenes,
+      seriesRecord.style,
+      imageUrls,
+      seriesRecord.llmModel || undefined
+    );
+
+    for (let i = 0; i < existingScenes.length; i++) {
+      const motionScene = result.scenes[i];
+      if (!motionScene) continue;
+      await db
+        .update(schema.videoScenes)
+        .set({ visualDescription: motionScene.visualDescription })
+        .where(eq(schema.videoScenes.id, existingScenes[i].id));
+    }
+
+    await updateVideoStatus(videoProjectId, "REVIEW_VISUAL");
+    await job.updateProgress(100);
+
+    console.log(`[generate-motion] Motion descriptions ready for review (${result.scenes.length} scenes)`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`[generate-motion] Failed for ${videoProjectId}:`, errorMessage);
     await updateVideoStatus(videoProjectId, "FAILED");
     throw error;
   }

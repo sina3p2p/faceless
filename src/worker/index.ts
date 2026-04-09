@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import { generateScriptJob, generateMusicScriptJob, generateStandaloneScriptJob, generateStandaloneMusicScriptJob, generateDialogueScriptJob } from "./scriptJobs";
 import { generateMusicLyricsJob, generateSongJob, generateMusicVisualsJob } from "./musicJobs";
-import { generateImagesJob } from "./mediaJobs";
+import { generateImagesJob, generateMotionJob } from "./mediaJobs";
 import { renderVideoJob, rerenderVideoJob, renderFromScenesJob, renderMusicVideoJob } from "./renderJobs";
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
@@ -37,6 +37,8 @@ const worker = new Worker(
       await generateDialogueScriptJob(job);
     } else if (job.name === "generate-images") {
       await generateImagesJob(job);
+    } else if (job.name === "generate-motion") {
+      await generateMotionJob(job);
     } else if (job.name === "render-from-scenes") {
       await renderFromScenesJob(job);
     } else if (job.name === "render-music-video") {

@@ -35,6 +35,7 @@ export const LLM = {
   get apiKey() { return env("OPENROUTER_API_KEY"); },
   defaultModel: "anthropic/claude-opus-4.6",
   fallbackModel: "openai/gpt-4.1",
+  visionModel: "google/gemini-2.5-pro",
 } as const;
 
 export const LLM_MODELS = [

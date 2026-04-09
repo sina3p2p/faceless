@@ -1008,3 +1008,500 @@ ASSET REFS: For each scene, the assetRefs array must include the speaking charac
 
   return object;
 }
+
+// ══════════════════════════════════════════════════════════════════
+// ── Multi-Agent Pipeline: Narration, Image, and Motion Agents ──
+// ══════════════════════════════════════════════════════════════════
+
+// ── Narration-Only Schemas (Script Agent output) ──
+
+const narrationSceneSchema = z.object({
+  text: z.string().describe("Narration text for this scene. Punchy, conversational, micro-cliffhangers. 1-3 sentences max."),
+  duration: z.number().describe("Duration of this scene in seconds"),
+});
+
+const narrationScriptSchema = z.object({
+  title: z.string().describe("SEO-optimized title with emotional trigger words"),
+  hook: z.string().describe("Opening 1-2 sentences that create instant curiosity gap (spoken in first 3 seconds)"),
+  scenes: z.array(narrationSceneSchema),
+  cta: z.string().describe("Call to action that makes viewers comment, like, or follow"),
+  totalDuration: z.number().describe("Total video duration in seconds"),
+});
+
+export type NarrationScript = z.infer<typeof narrationScriptSchema>;
+
+const narrationDialogueSceneSchema = z.object({
+  speaker: z.string().describe("Who is speaking: exact character name or 'Narrator'"),
+  text: z.string().describe("What this character says, or narrator description"),
+  duration: z.number().describe("Duration of this scene in seconds"),
+});
+
+const narrationDialogueScriptSchema = z.object({
+  title: z.string().describe("Title for this dialogue video"),
+  hook: z.string().describe("Brief hook or setup for the conversation"),
+  scenes: z.array(narrationDialogueSceneSchema),
+  cta: z.string().describe("Call to action at the end"),
+  totalDuration: z.number().describe("Total video duration in seconds"),
+});
+
+export type NarrationDialogueScript = z.infer<typeof narrationDialogueScriptSchema>;
+
+// ── Image Agent Output Schema ──
+
+const imagePromptOutputSceneSchema = z.object({
+  imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT (appearance, clothing, expression), ACTION/MOTION, ENVIRONMENT, LIGHTING, CAMERA angle/movement, MOOD/ATMOSPHERE, and STYLE. Single detailed paragraph."),
+  searchQuery: z.string().describe("2-4 specific words for stock footage search as backup"),
+  assetRefs: z.array(z.string()).default([]).describe("Array of asset names from the STORY ASSETS list that appear in this scene. Include characters who are visible, the location where the scene takes place, and any props that are shown. If no story assets were provided, return an empty array."),
+});
+
+const imagePromptOutputSchema = z.object({
+  scenes: z.array(imagePromptOutputSceneSchema),
+});
+
+export type ImagePromptOutput = z.infer<typeof imagePromptOutputSchema>;
+
+// ── Motion Agent Output Schema ──
+
+const motionOutputSceneSchema = z.object({
+  visualDescription: z.string().describe("Rich detailed description of visual action on screen (30-60 words) — camera motion, subject motion, environment motion. Must describe CONTINUOUS MOTION, not a static image. Must also describe how the scene ENDS for smooth transition to the next scene."),
+});
+
+const motionOutputSchema = z.object({
+  scenes: z.array(motionOutputSceneSchema),
+});
+
+export type MotionOutput = z.infer<typeof motionOutputSchema>;
+
+// ── Script Agent: Narration-Only Generation ──
+
+export async function generateNarrationScript(
+  niche: string,
+  style: string,
+  topicIdea?: string,
+  targetDuration = 45,
+  model?: string,
+  sceneContinuity = false,
+  previousTopics: string[] = [],
+  language = "en",
+  durations?: number[]
+): Promise<NarrationScript> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const systemPrompt = `You are an elite short-form video scriptwriter who has generated multiple viral videos with 10M+ views on TikTok, YouTube Shorts, and Instagram Reels. You specialize in faceless content.
+
+Your job is to write the NARRATION SCRIPT ONLY — story, pacing, and dialogue. Visual prompts and motion descriptions will be created separately by dedicated specialists. Focus entirely on making the STORY irresistible.
+
+OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
+- ALL text content (title, hook, scene narration/text, CTA) MUST be written in ${langName}.
+- This rule overrides everything else. Even if the topic or niche name is in a different language, the output narration must be in ${langName}.
+
+VIRAL SCRIPT FORMULA (follow this exactly):
+
+1. HOOK (scene 1): Start with a pattern interrupt. Use one of these proven formats:
+   - "This [thing] was hidden for [time] and nobody knew why..."
+   - "Scientists can't explain why [shocking claim]..."
+   - "In [year], something happened that changed everything..."
+   - A bold controversial statement or impossible-sounding fact
+   The hook must make scrolling IMPOSSIBLE.
+
+2. BUILD-UP (scenes 2-3): Layer information that deepens curiosity. Each scene must end with an implicit "but then..." that pulls the viewer to the next scene. Use:
+   - Specific numbers and dates (they feel more credible)
+   - Sensory details ("the room went silent", "a chill ran down...")
+   - Escalating stakes
+
+3. CLIMAX (scene 4-5): The payoff. Reveal the most shocking/interesting part. This is where retention spikes.
+
+4. CTA (final scene): End with something that makes them comment, like, or follow. Best: ask a polarizing question or tease the "Part 2".
+
+CRITICAL RULES:
+- Each scene narration = 15-25 words. Short punchy sentences WIN.
+- NEVER use filler words or generic phrases
+- Write like you're telling a secret to a friend, not giving a lecture
+- Every single sentence must either reveal new info or build tension
+${buildDurationInstruction(targetDuration, durations)}
+
+ONE ACTION PER SCENE (CRITICAL — each scene will become one video clip):
+- Each scene must describe exactly ONE clear action or moment. NEVER pack multiple actions into one scene.
+- BAD: "Brush teeth, wash face, and comb hair" — this is 3 separate actions.
+- GOOD: Scene 1 = "Brush teeth with a big smile", Scene 2 = "Splash water on face", Scene 3 = "Comb hair in the mirror"
+- If the story needs multiple actions, SPLIT them into separate scenes.
+${niche === "kids" ? `
+KIDS CONTENT RULES (this overrides tone guidelines above):
+- Target age: 4-10 years old
+- Use simple, cheerful language a child can understand
+- NO scary, violent, dark, or mature content whatsoever
+- Make it FUN and EDUCATIONAL
+- Use excitement and wonder instead of tension ("Guess what?!", "How cool is THAT?!")
+- Narration should sound like a friendly, enthusiastic teacher or storyteller
+- CTA should be fun: "Which one was YOUR favorite?" or "Can you guess what happens next?"
+` : ""}${sceneContinuity ? `
+SCENE CONTINUITY MODE:
+- You MUST add one EXTRA FINAL scene at the end (the "ending scene"). This scene serves as the visual closing frame of the video.
+- The ending scene's narration should contain the CTA.
+- Total scenes should be 6-8 (including the ending scene).
+` : ""}`;
+
+  const seriesContext = previousTopics.length > 0
+    ? `\n\nSERIES CONTINUITY — Think of this as a Netflix-style series. Here are the previous episodes (most recent first):\n${previousTopics.map((t, i) => `  Episode ${previousTopics.length - i}: "${t}"`).join("\n")}\n\nYour job is to create the NEXT episode. Rules:\n- Build on the world/theme established by previous episodes — viewers should feel this belongs in the same series\n- Reference or connect to earlier episodes when it makes sense (e.g. "remember when we talked about X? Well..."), but the video MUST stand on its own\n- NEVER repeat the same topic, story, or script as a previous episode\n- Explore a fresh angle, a deeper layer, a sequel, a related mystery, or the "other side of the story"\n- If the series has a recurring character/narrator persona, maintain it\n- Escalate — each episode should feel like the stakes or intrigue are building`
+    : "";
+
+  const userPrompt = topicIdea
+    ? `Create a ${niche} viral video script about: ${topicIdea}. Visual style: ${style}. Make it impossible to scroll past.${seriesContext}`
+    : `Create a ${niche} viral video script. Visual style: ${style}. Pick a topic that will make people STOP scrolling and watch till the end. Think: "I need to know what happens next."${seriesContext}`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: narrationScriptSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
+
+  return object;
+}
+
+export async function generateNarrationStandaloneScript(
+  prompt: string,
+  style: string,
+  characters: StoryAsset[] = [],
+  targetDuration = 45,
+  model?: string,
+  sceneContinuity = true,
+  language = "en",
+  durations?: number[]
+): Promise<NarrationScript> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const charBlock = characters.length > 0
+    ? `\n\nSTORY CHARACTERS (reference these in the narration):\n${characters.filter(c => c.type === "character").map(c => `  - ${c.name}: ${c.description}`).join("\n")}\n`
+    : "";
+
+  const systemPrompt = `You are an elite short-form video scriptwriter. You create compelling stories for TikTok, YouTube Shorts, and Instagram Reels.
+
+Your job is to write the NARRATION SCRIPT ONLY — story, pacing, and dialogue. Visual prompts and motion descriptions will be created separately by dedicated specialists. Focus entirely on making the STORY irresistible.
+
+OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
+- ALL text content (title, hook, scene narration/text, CTA) MUST be written in ${langName}.
+- This rule overrides everything else.
+
+STORYTELLING RULES:
+1. HOOK (scene 1): Start with a captivating opening that makes scrolling impossible. Establish the story's world immediately.
+2. BUILD-UP (scenes 2-4): Develop the story with vivid details, escalating tension or wonder. Each scene must end with an implicit pull to the next.
+3. CLIMAX (scene 4-5): The emotional peak — the most dramatic, surprising, or touching moment.
+4. RESOLUTION (final scene): A satisfying conclusion with a CTA that invites engagement.
+
+CRITICAL RULES:
+- Each scene narration = 15-25 words. Short punchy sentences.
+${buildDurationInstruction(targetDuration, durations)}
+
+ONE ACTION PER SCENE (CRITICAL — each scene will become one video clip):
+- Each scene must describe exactly ONE clear action or moment.
+- BAD: "She opens the door, walks in, and sits down" — 3 actions.
+- GOOD: Scene 1 = "She opens the door", Scene 2 = "She walks into the room", Scene 3 = "She sits down"
+${sceneContinuity ? `
+SCENE CONTINUITY MODE:
+- Add one EXTRA FINAL scene as the visual closing frame (ending scene with CTA narration).
+- Total scenes should be 6-8 (including the ending scene).` : ""}${charBlock}`;
+
+  const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. Make it emotionally compelling.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: narrationScriptSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
+
+  return object;
+}
+
+export async function generateNarrationDialogueScript(
+  prompt: string,
+  style: string,
+  characters: StoryAsset[],
+  targetDuration = 45,
+  model?: string,
+  sceneContinuity = false,
+  language = "en",
+  durations?: number[]
+): Promise<NarrationDialogueScript> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const charList = characters.map((c) => `  - ${c.name}: ${c.description}`).join("\n");
+
+  const systemPrompt = `You are an elite dialogue scriptwriter for short-form video. You create compelling conversations between characters for TikTok, YouTube Shorts, and Instagram Reels.
+
+Your job is to write the DIALOGUE SCRIPT ONLY — who says what, pacing, and dramatic structure. Visual prompts and motion descriptions will be created separately by dedicated specialists.
+
+OUTPUT LANGUAGE (CRITICAL — do NOT ignore):
+- ALL text content (title, hook, dialogue text, CTA) MUST be written in ${langName}.
+
+DIALOGUE RULES:
+1. Each scene is ONE character's spoken turn (or a Narrator line for scene-setting).
+2. The "speaker" field must be the EXACT character name from the list below, or "Narrator" for narration.
+3. Alternate between characters naturally. Don't have the same character speak twice in a row unless dramatically appropriate.
+4. Narrator lines should be used sparingly for scene-setting, transitions, or dramatic emphasis — NOT for every turn.
+5. Each character should have a distinct speaking style that reflects their personality.
+6. Build dramatic tension, humor, or emotional depth through the conversation.
+7. End with a satisfying or cliffhanger conclusion.
+
+CHARACTERS (CRITICAL — only these speakers are valid):
+${charList}
+
+SCENE STRUCTURE:
+- Start with a hook that pulls viewers in (a Narrator intro or a character's provocative opening line).
+- Build the conversation with escalating stakes, reveals, or comedy.
+- Each scene = one speaker's turn. Keep dialogue lines 10-25 words.
+- Total conversation should feel like a natural exchange, not scripted Q&A.
+${buildDurationInstruction(targetDuration, durations)}
+${sceneContinuity ? `
+SCENE CONTINUITY MODE:
+- Maintain consistent character interactions across all scenes.
+- End with a satisfying conclusion.` : ""}`;
+
+  const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. Create an engaging dialogue between the characters that feels natural and compelling.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: narrationDialogueScriptSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
+
+  return object;
+}
+
+// ── Image Agent: Art Director ──
+
+export async function generateImagePrompts(
+  scenes: Array<{ text: string; duration: number; speaker?: string }>,
+  niche: string,
+  style: string,
+  assets: StoryAsset[] = [],
+  sceneContinuity = false,
+  language = "en",
+  model?: string
+): Promise<ImagePromptOutput> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const scenesContext = scenes.map((s, i) =>
+    `Scene ${i + 1} (${s.duration}s)${s.speaker ? ` [${s.speaker}]` : ""}: "${s.text}"`
+  ).join("\n");
+
+  const systemPrompt = `You are an elite art director for short-form video. Given a narration script, create detailed image prompts for each scene that will be used to generate AI images.
+
+The narration is in ${langName}, but ALL imagePrompt and searchQuery output MUST be in English for best AI model compatibility.
+
+You MUST return exactly ${scenes.length} scenes in the same order as the input.
+
+IMAGE PROMPT QUALITY (CRITICAL — these drive the key frame image for each video clip):
+- Each imagePrompt must be 50-100 words minimum. SHORT/LAZY prompts = ugly videos.
+- NEVER write vague prompts like "a mysterious scene" or "something dramatic happens". Be EXTREMELY specific.
+- Describe ONE clear subject doing ONE clear action in ONE clear environment. Do NOT cram multiple unrelated things.
+- Always include the art style: ${style}.
+- For people: describe age, ethnicity, clothing, facial expression, body language, hair.
+- For places: describe architecture, textures, weather, time of day, vegetation, materials.
+- For objects: describe size, material, color, condition, position relative to camera.
+- Include motion cues: "camera slowly pushes in", "wind gently moves the curtains", "smoke rises from the ground".
+- EACH scene's imagePrompt must be visually DIFFERENT from the others. Vary camera angles, color palettes, and compositions across scenes.
+- Think like a cinematographer — every frame should be visually stunning enough to pause and admire.
+- searchQuery must be HYPER-SPECIFIC (e.g. "abandoned underground bunker" not "dark place")
+
+ONE ACTION PER SCENE (CRITICAL):
+- Each imagePrompt must describe only ONE moment/pose/action, never a sequence.
+
+NO COPYRIGHTED CONTENT IN IMAGE PROMPTS (CRITICAL):
+- NEVER use trademarked or copyrighted character names (e.g. "Cinderella", "Elsa", "Spider-Man") in imagePrompt.
+- Also avoid their ICONIC signature details (e.g. "glass slippers" = Cinderella, "ice powers" = Elsa).
+- Image models will REJECT prompts too close to copyrighted characters.
+- Reimagine characters with ORIGINAL details. The narration text may use real names — only imagePrompt must be original.
+${["claymation", "gothic-clay"].includes(style) ? `
+CLAYMATION STYLE RULES (CRITICAL — follow these for every imagePrompt):
+- Every subject, object, and environment MUST look like it is handcrafted from clay, plasticine, or polymer clay
+- Describe visible clay textures: fingerprint marks, smooth rounded edges, slightly imperfect surfaces, soft matte finish
+- Environments must look like miniature handmade diorama sets with clay props and sculpted backdrops
+- Characters should have exaggerated proportions: slightly oversized heads, rounded features, stubby fingers, visible seam lines
+- Lighting should mimic a stop-motion studio: soft diffused overhead lighting, subtle shadows, warm color temperature
+- Include material callouts in every prompt: "sculpted from colorful plasticine", "clay figure with visible texture"
+- Props and objects should look molded: "clay smartphone", "plasticine coffee cup", "sculpted clay castle walls"
+- ALWAYS start or end imagePrompt with: "Claymation stop-motion style, everything made of sculpted clay and plasticine"` : ""}${style === "gothic-clay" ? `
+GOTHIC CLAY VARIANT (apply ON TOP of claymation rules):
+- Dark moody atmosphere — gothic arches, stone castle walls made of gray and purple clay, candelabras with clay flames, stained glass, cobwebs
+- Color palette: deep purples, dark greens, charcoal grays, midnight blues, with pops of color on the main character
+- Characters wear dramatic clothing: fur coats, velvet capes, dark dresses, sunglasses — all sculpted from clay
+- Environment is always a gothic setting: clay castles, cathedrals, haunted mansions, dark forests — all as miniature clay dioramas
+- Mood: mysterious, elegant, slightly eerie but stylish` : ""}${style === "lego" ? `
+LEGO MOVIE STYLE RULES (CRITICAL — follow these for every imagePrompt):
+- Everything in the scene MUST look like it is built from LEGO bricks — characters, environments, props, vehicles, nature, even water and fire
+- Characters are LEGO minifigures: cylindrical heads with printed faces, C-shaped claw hands, short legs, smooth plastic skin with subtle reflections and molding seam lines
+- Environments are LEGO diorama builds: brick-by-brick constructed buildings, studded baseplates as floors, transparent colored bricks for windows/water/fire
+- Describe LEGO-specific textures: visible studs on surfaces, smooth ABS plastic sheen, click-together joints
+- Props must be LEGO accessories: LEGO swords, LEGO coffee cups, LEGO flowers (single-piece molded), LEGO hair pieces
+- Nature elements are LEGO parts: green plate pieces for grass, blue transparent studs for water droplets, orange/yellow flame pieces
+- Lighting should be bright and saturated with soft studio-like lighting
+- Color palette: bold primary colors (red, blue, yellow) with clean white and black accents
+- ALWAYS include in every imagePrompt: "LEGO brick style, everything constructed from LEGO bricks and minifigures, plastic toy aesthetic"` : ""}
+${niche === "kids" ? `
+KIDS CONTENT RULES:
+- imagePrompt should be colorful, bright, cartoonish or playful — never dark or moody
+- searchQuery should target kid-friendly footage (colorful animals, space, nature, cartoons)
+` : ""}${sceneContinuity ? `
+SCENE CONTINUITY MODE (CRITICAL):
+- Video clips will be generated using IMAGE PAIRS: each clip transitions from scene N's image to scene N+1's image.
+- Each scene's imagePrompt must create a visually COMPATIBLE image with its neighbors. Avoid extreme visual jumps between consecutive scenes.
+- Maintain a CONSISTENT main subject/character across all scenes. If the first scene shows a character, keep that same character visible in subsequent scenes.` : ""}${buildAssetBlock(assets)}`;
+
+  const userPrompt = `Create image prompts for each scene of this narration script:\n\n${scenesContext}\n\nVisual style: ${style}. Niche: ${niche}. Make each scene visually stunning and cinematically compelling.`;
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: imagePromptOutputSchema,
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.8,
+  });
+
+  return object;
+}
+
+// ── Motion Agent: Video Director (with Vision) ──
+
+export async function generateMotionDescriptions(
+  scenes: Array<{ text: string; duration: number; imagePrompt: string }>,
+  style: string,
+  imageUrls: string[],
+  model?: string
+): Promise<MotionOutput> {
+  const primaryModel = model || LLM.visionModel || LLM.defaultModel;
+
+  const systemPrompt = `You are an elite video director specializing in AI-generated video clips. Given a narration script, image prompts, and the ACTUAL GENERATED IMAGES for each scene, write motion descriptions that will be sent to an AI image-to-video model.
+
+You can SEE each scene's generated image. Use what you see — the actual composition, subject placement, colors, and framing — to write motion that works perfectly with the real image.
+
+You MUST return exactly ${scenes.length} scenes in the same order as the input.
+
+VISUAL DESCRIPTION — AI VIDEO MOTION PROMPT (CRITICAL — this drives REAL video clip generation):
+- Each visualDescription is sent directly to an AI image-to-video model to generate REAL video clips (NOT just images with zoom).
+- Each visualDescription must be 30-60 words describing CONTINUOUS MOTION:
+  - CAMERA MOTION: "camera slowly dollies forward", "smooth orbit around the subject", "crane shot rising upward", "tracking shot following the character", "slow push in on face"
+  - SUBJECT MOTION: "character turns head slowly", "hands reaching forward", "walking through the corridor", "wind blowing through hair"
+  - ENVIRONMENT MOTION: "clouds drifting across the sky", "rain falling", "leaves swirling in the wind", "fire flickering"
+- BAD visualDescription: "A man standing in a room" (STATIC — produces a boring frozen image, not video)
+- GOOD visualDescription: "Camera slowly pushes in on the man's face as his eyes widen with realization, shadows shifting across the dimly lit room, dust particles floating in a beam of light"
+- NEVER write static descriptions. Every visualDescription MUST contain at least one camera movement AND one subject/environment movement.
+
+MATCH MOTION TO THE ACTUAL IMAGE:
+- Look at WHERE the subject is positioned in the image. If they're on the left, describe motion that starts from their position.
+- Look at the DEPTH of the scene. If there's a clear foreground and background, use dolly or push-in motion.
+- Look at the LIGHTING direction. Describe motion that interacts naturally with the existing light.
+- Look at the COMPOSITION. If it's a close-up, use subtle motions (slight head turn, eye movement). If it's a wide shot, use larger camera movements.
+
+SCENE TRANSITIONS (CRITICAL — smooth visual flow between scenes):
+- Each visualDescription must describe how the scene ENDS so it transitions naturally to the next scene.
+- End each clip with a natural resting point: a slow fade, a camera pulling back, a subject settling into a pose, or the motion decelerating.
+- AVOID abrupt endings: don't end a clip with fast motion or a sudden action mid-swing. Let the motion resolve.
+- If consecutive scenes share a character, end with the character in a transitional pose (turning away, looking offscreen toward the next location).
+
+ONE ACTION PER SCENE (CRITICAL — AI video models CANNOT handle multiple actions):
+- Each visualDescription must describe only ONE continuous motion sequence.
+- Split complex movements into their single most impactful element.
+
+DURATION MATCHING:
+- Match motion speed to scene duration. Short scenes (3-5s) need quick, punchy motion. Longer scenes (7-10s) can have slower, more cinematic movement.
+
+Visual style context: ${style}.`;
+
+  const hasImages = imageUrls.length === scenes.length && imageUrls.every(url => !!url);
+
+  if (hasImages) {
+    const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: URL }> = [];
+    contentParts.push({ type: "text", text: "Here are the scenes with their narration and actual generated images:\n\n" });
+
+    for (let i = 0; i < scenes.length; i++) {
+      contentParts.push({ type: "text", text: `--- Scene ${i + 1} (${scenes[i].duration}s) ---\nNarration: "${scenes[i].text}"\nImage prompt used: ${scenes[i].imagePrompt}\nGenerated image:` });
+      contentParts.push({ type: "image", image: new URL(imageUrls[i]) });
+      contentParts.push({ type: "text", text: "\n" });
+    }
+
+    contentParts.push({ type: "text", text: "\nGenerate a visualDescription for each scene. Base your motion descriptions on what you actually see in each image above." });
+
+    const { object } = await generateObject({
+      model: openrouter.chat(primaryModel),
+      schema: motionOutputSchema,
+      system: systemPrompt,
+      messages: [{ role: "user", content: contentParts }],
+      temperature: 0.8,
+    });
+
+    return object;
+  }
+
+  const scenesContext = scenes.map((s, i) =>
+    `Scene ${i + 1} (${s.duration}s): "${s.text}"\nImage prompt: ${s.imagePrompt}`
+  ).join("\n\n");
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: motionOutputSchema,
+    system: systemPrompt,
+    prompt: `Generate motion descriptions for each scene:\n\n${scenesContext}`,
+    temperature: 0.8,
+  });
+
+  return object;
+}
+
+// ── Narration-Only Refinement (for REVIEW_SCRIPT phase) ──
+
+export async function refineNarrationScript(
+  currentScript: NarrationScript,
+  userMessage: string,
+  chatHistory: ChatMessage[] = [],
+  model?: string,
+  language = "en"
+): Promise<NarrationScript> {
+  const primaryModel = model || LLM.defaultModel;
+  const langName = getLanguageName(language);
+
+  const systemPrompt = `You are a collaborative video script editor. The user has a narration script and wants to improve it through conversation.
+
+CURRENT SCRIPT:
+${JSON.stringify(currentScript, null, 2)}
+
+RULES:
+- Apply the user's requested changes to the script and return the COMPLETE modified script
+- Only change what the user asks for — preserve everything else exactly as-is
+- If the user asks to change a specific scene, only modify that scene
+- If the user asks for tone/style changes, apply them across all scenes
+- Maintain the same JSON structure
+- If the user's request is vague, make your best creative judgment
+- You can add, remove, reorder, or merge scenes if the user asks
+- ONE ACTION PER SCENE: Each scene must show exactly ONE clear action.
+- Do NOT add imagePrompt, visualDescription, or searchQuery fields — those will be handled by a separate specialist.
+
+LANGUAGE RULE (CRITICAL):
+- The user may write their instructions in ANY language, but the script output (title, hook, narration text, CTA) MUST ALWAYS be written in ${langName}.
+- Never switch the script language based on the user's input language. Always output narration in ${langName}.`;
+
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (const msg of chatHistory) {
+    messages.push({ role: msg.role, content: msg.content });
+  }
+  messages.push({ role: "user", content: userMessage });
+
+  const { object } = await generateObject({
+    model: openrouter.chat(primaryModel),
+    schema: narrationScriptSchema,
+    system: systemPrompt,
+    messages,
+    temperature: 0.7,
+  });
+
+  return object;
+}

@@ -5,9 +5,11 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { eq, and, asc } from "drizzle-orm";
 import {
   refineVideoScript,
+  refineNarrationScript,
   refineMusicScript,
   type ChatMessage,
   type VideoScript,
+  type NarrationScript,
   type MusicScript,
 } from "@/server/services/llm";
 import { z } from "zod";
@@ -90,6 +92,43 @@ export async function POST(
           visualDescription: s.visualDescription,
           duration: s.durationMs / 1000,
         }))),
+      });
+    } else if (video.status === "REVIEW_SCRIPT") {
+      const currentScript: NarrationScript = {
+        title: video.title || "Untitled",
+        hook: "",
+        scenes: video.scenes.map((s) => ({
+          text: s.text,
+          duration: s.duration ?? 5,
+        })),
+        cta: "",
+        totalDuration: video.duration || 45,
+      };
+
+      const scriptJson = video.script ? JSON.parse(video.script) : null;
+      if (scriptJson?.hook) currentScript.hook = scriptJson.hook;
+      if (scriptJson?.cta) currentScript.cta = scriptJson.cta;
+
+      const refined = await refineNarrationScript(
+        currentScript,
+        message,
+        chatHistory as ChatMessage[],
+        video.series.llmModel || undefined,
+        video.series.language || "en"
+      );
+
+      return NextResponse.json({
+        script: refined,
+        scenes: refined.scenes.map((s, i) => ({
+          sceneOrder: i,
+          text: s.text,
+          imagePrompt: "",
+          visualDescription: "",
+          searchQuery: "",
+          duration: s.duration,
+        })),
+        title: refined.title,
+        changes: buildChanges(video.scenes, refined.scenes),
       });
     } else {
       const currentScript: VideoScript = {

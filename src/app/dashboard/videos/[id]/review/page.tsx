@@ -173,13 +173,14 @@ function SortableSceneCard({
   isMusicVideo,
   isDialogue,
   storyAssets,
+  showMotionEdit,
 }: {
   scene: Scene;
   index: number;
   isSelected: boolean;
   onSelect: () => void;
   onDelete: () => void;
-  onUpdate: (updates: { text?: string; duration?: number; speaker?: string }) => void;
+  onUpdate: (updates: { text?: string; duration?: number; speaker?: string; visualDescription?: string }) => void;
   onEditPrompt: () => void;
   onUploadImage: (file: File) => void;
   onUpdateAssetRefs: (refs: string[]) => void;
@@ -187,6 +188,7 @@ function SortableSceneCard({
   isMusicVideo?: boolean;
   isDialogue?: boolean;
   storyAssets: StoryAssetItem[];
+  showMotionEdit?: boolean;
 }) {
   const {
     attributes,
@@ -198,14 +200,17 @@ function SortableSceneCard({
   } = useSortable({ id: scene.id });
 
   const [editing, setEditing] = useState(false);
+  const [editingMotion, setEditingMotion] = useState(false);
   const [text, setText] = useState(scene.text);
   const [duration, setDuration] = useState(scene.duration);
+  const [motionText, setMotionText] = useState(scene.visualDescription || "");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setText(scene.text);
     setDuration(scene.duration);
-  }, [scene.text, scene.duration]);
+    setMotionText(scene.visualDescription || "");
+  }, [scene.text, scene.duration, scene.visualDescription]);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -308,6 +313,38 @@ function SortableSceneCard({
               <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
                 {scene.imagePrompt}
               </p>
+            </div>
+          )}
+
+          {/* Motion description (editable at REVIEW_VISUAL) */}
+          {showMotionEdit && (
+            <div className="mb-2">
+              <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Motion Description</span>
+              {editingMotion ? (
+                <textarea
+                  value={motionText}
+                  onChange={(e) => setMotionText(e.target.value)}
+                  onBlur={() => {
+                    setEditingMotion(false);
+                    if (motionText !== (scene.visualDescription || "")) {
+                      onUpdate({ visualDescription: motionText });
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") { setMotionText(scene.visualDescription || ""); setEditingMotion(false); }
+                  }}
+                  autoFocus
+                  rows={3}
+                  className="w-full mt-1 bg-black/40 border border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-200 resize-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+              ) : (
+                <p
+                  className="text-xs text-emerald-400/70 cursor-text hover:text-emerald-300 transition-colors leading-relaxed mt-0.5"
+                  onClick={(e) => { e.stopPropagation(); setEditingMotion(true); }}
+                >
+                  {scene.visualDescription || "Click to add motion description..."}
+                </p>
+              )}
             </div>
           )}
 
@@ -1086,6 +1123,7 @@ export default function ReviewPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [generatingAll, setGeneratingAll] = useState(false);
+  const [generatingMotion, setGeneratingMotion] = useState(false);
   const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
   const [chatOpen, setChatOpen] = useState(false);
   const sensors = useSensors(
@@ -1146,7 +1184,7 @@ export default function ReviewPage() {
 
   function handleUpdateScene(
     sceneId: string,
-    updates: { text?: string; duration?: number; speaker?: string }
+    updates: { text?: string; duration?: number; speaker?: string; visualDescription?: string }
   ) {
     setScenes((prev) =>
       prev.map((s) => (s.id === sceneId ? { ...s, ...updates } : s))
@@ -1273,19 +1311,25 @@ export default function ReviewPage() {
 
   const isMusicLyricsReview = video?.status === "REVIEW_MUSIC_SCRIPT";
   const isVisualReview = video?.status === "REVIEW_VISUAL";
+  const isMusicVideo = video?.series?.videoType === "music_video";
+  const isMotionReview = isVisualReview && !isMusicVideo;
+  const isImageReview = video?.status === "IMAGE_REVIEW";
+  const isNarrationReview = video?.status === "REVIEW_SCRIPT" && !isMusicVideo;
 
-  // Poll for image progress while the worker is generating images
+  // Poll for image/motion progress while worker is generating
   useEffect(() => {
-    const isGenerating = video?.status === "IMAGE_GENERATION";
-    setGeneratingAll(isGenerating ?? false);
-    if (!isGenerating) return;
+    const isImageGen = video?.status === "IMAGE_GENERATION";
+    const isMotionGen = video?.status === "VIDEO_SCRIPT" && !isMusicVideo;
+    setGeneratingAll(isImageGen ?? false);
+    setGeneratingMotion(isMotionGen ?? false);
+    if (!isImageGen && !isMotionGen) return;
 
     const interval = setInterval(async () => {
       await loadData();
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [video?.status, loadData]);
+  }, [video?.status, loadData, isMusicVideo]);
 
   useEffect(() => {
     if (editingScene) {
@@ -1334,6 +1378,16 @@ export default function ReviewPage() {
       setPreviousAssetUrl(null);
     } finally {
       setUndoing(false);
+    }
+  }
+
+  async function handleGenerateMotion() {
+    setGeneratingMotion(true);
+    try {
+      await fetch(`/api/videos/${id}/generate-motion`, { method: "POST" });
+      setVideo((prev) => prev ? { ...prev, status: "VIDEO_SCRIPT" } : prev);
+    } catch {
+      setGeneratingMotion(false);
     }
   }
 
@@ -1410,16 +1464,20 @@ export default function ReviewPage() {
         </Button>
 
         <h1 className="text-2xl font-bold mb-2">
-          {video?.title ?? (isMusicLyricsReview ? "Review Lyrics" : isVisualReview ? "Review Visuals" : video?.series?.videoType === "music_video" ? "Review Song" : "Review Script")}
+          {video?.title ?? (isMusicLyricsReview ? "Review Lyrics" : isMotionReview ? "Review Motion" : isVisualReview ? "Review Visuals" : isMusicVideo ? "Review Song" : "Review Script")}
         </h1>
         <p className="text-gray-400 text-sm">
           {isMusicLyricsReview
             ? "Review and edit your song lyrics, then generate the song."
+            : isMotionReview
+            ? "Review and edit the motion descriptions for each scene, then generate the final video."
             : isVisualReview
             ? "Review and edit the visual prompts for each section, then generate preview images."
-            : video?.series?.videoType === "music_video"
+            : isNarrationReview
+            ? "Review your narration script, then generate preview images."
+            : isMusicVideo
             ? "Review your song scenes, then generate preview images before creating the music video."
-            : "Review your script, then generate preview images to approve before creating the video."}
+            : "Review your script and images, then approve to continue."}
         </p>
       </div>
 
@@ -1458,6 +1516,48 @@ export default function ReviewPage() {
               >
                 Generate Song
               </Button>
+            ) : isMotionReview ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={generatingMotion}
+                  onClick={handleGenerateMotion}
+                  disabled={scenes.length === 0}
+                >
+                  Regenerate Motion
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={rendering}
+                  onClick={handleStartRendering}
+                  disabled={scenes.length === 0}
+                >
+                  Generate Video
+                </Button>
+              </>
+            ) : isImageReview && !isMusicVideo ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  loading={generatingAll}
+                  onClick={() => handleGenerateAllImages(true)}
+                  disabled={scenes.length === 0}
+                >
+                  Regenerate All Images
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={generatingMotion}
+                  onClick={handleGenerateMotion}
+                  disabled={scenes.length === 0}
+                >
+                  Approve &amp; Generate Motion
+                </Button>
+              </>
             ) : (
               <>
                 {!allImagesGenerated && (
@@ -1496,7 +1596,42 @@ export default function ReviewPage() {
         </CardContent>
       </Card>
 
-      {!allImagesGenerated && scenes.length > 0 && !isMusicLyricsReview && (
+      {generatingMotion && scenes.length > 0 && (
+        <div className="mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4 flex items-center gap-3">
+          <div className="animate-spin w-4 h-4 border-2 border-violet-500 border-t-transparent rounded-full shrink-0" />
+          <p className="text-sm text-violet-300">
+            Generating motion descriptions for each scene using AI vision...
+          </p>
+        </div>
+      )}
+
+      {isMotionReview && scenes.length > 0 && (
+        <div className="mb-6 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+          <p className="text-sm text-emerald-300">
+            Review the motion descriptions below. These tell the AI video model how to animate each scene.
+            Edit any descriptions, then click &quot;Generate Video&quot; when ready.
+          </p>
+        </div>
+      )}
+
+      {isNarrationReview && scenes.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <p className="text-sm text-amber-300">
+            Review your narration below. When you&apos;re happy with the story, generate preview images.
+          </p>
+        </div>
+      )}
+
+      {isImageReview && !isMusicVideo && scenes.length > 0 && (
+        <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+          <p className="text-sm text-amber-300">
+            Review preview images below. You can edit prompts and regenerate until you&apos;re happy.
+            Then approve to generate motion descriptions.
+          </p>
+        </div>
+      )}
+
+      {!allImagesGenerated && scenes.length > 0 && !isMusicLyricsReview && !isNarrationReview && !isImageReview && !isMotionReview && !generatingMotion && (
         <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
           <p className="text-sm text-amber-300">
             Generate preview images to see what each scene will look like before creating the video.
@@ -1539,9 +1674,10 @@ export default function ReviewPage() {
                 onUploadImage={(file) => handleUploadImage(scene.id, file)}
                 onUpdateAssetRefs={(refs) => handleUpdateAssetRefs(scene.id, refs)}
                 generatingImage={generatingSceneIds.has(scene.id)}
-                isMusicVideo={video?.series?.videoType === "music_video"}
+                isMusicVideo={isMusicVideo}
                 isDialogue={video?.series?.videoType === "dialogue"}
                 storyAssets={video?.series?.storyAssets ?? []}
+                showMotionEdit={isMotionReview}
               />
             ))}
           </div>
@@ -1555,7 +1691,7 @@ export default function ReviewPage() {
       )}
 
       {/* Bottom action */}
-      {scenes.length > 0 && (
+      {scenes.length > 0 && !generatingMotion && (
         <div className="mt-8 flex justify-center gap-3">
           {isMusicLyricsReview ? (
             <Button
@@ -1566,6 +1702,44 @@ export default function ReviewPage() {
             >
               Generate Song ({scenes.length} sections, ~{totalDuration.toFixed(0)}s)
             </Button>
+          ) : isMotionReview ? (
+            <>
+              <Button
+                variant="outline"
+                size="lg"
+                loading={generatingMotion}
+                onClick={handleGenerateMotion}
+              >
+                Regenerate Motion
+              </Button>
+              <Button
+                variant="primary"
+                size="lg"
+                loading={rendering}
+                onClick={handleStartRendering}
+              >
+                Generate Video ({scenes.length} scenes, {totalDuration.toFixed(0)}s)
+              </Button>
+            </>
+          ) : isImageReview && !isMusicVideo ? (
+            <>
+              <Button
+                variant="outline"
+                size="lg"
+                loading={generatingAll}
+                onClick={() => handleGenerateAllImages(true)}
+              >
+                Regenerate All Images
+              </Button>
+              <Button
+                variant="primary"
+                size="lg"
+                loading={generatingMotion}
+                onClick={handleGenerateMotion}
+              >
+                Approve &amp; Generate Motion
+              </Button>
+            </>
           ) : (
             <>
               {!allImagesGenerated && (
