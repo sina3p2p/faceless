@@ -3,9 +3,8 @@ import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { generateText, tool, stepCountIs } from "ai";
 import { openrouter } from "@/server/services/llm";
 import { generateNanoBananaImage } from "@/server/services/media";
+import { editImageViaGemini } from "@/server/services/media";
 import { uploadFile } from "@/lib/storage";
-import { fal } from "@fal-ai/client";
-import { AI_VIDEO } from "@/lib/constants";
 import { z } from "zod";
 
 const MODEL = "openai/gpt-4.1";
@@ -89,34 +88,17 @@ async function editAndUpload(
   userId: string
 ): Promise<{ r2Key: string; previewUrl: string } | null> {
   try {
-    const result = await fal.subscribe(`${AI_VIDEO.nanoBananaModel}/edit`, {
-      input: {
-        prompt: `${editPrompt}. Square 1:1 composition, highly detailed, cinematic lighting, no text or watermarks.`,
-        image_urls: [sourceImageUrl],
-        aspect_ratio: "1:1",
-        output_format: "jpeg",
-        resolution: "1K",
-        num_images: 1,
-        safety_tolerance: "6",
-      },
-      logs: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    const result = await editImageViaGemini(editPrompt, sourceImageUrl, "1:1");
+    if (!result) return null;
 
-    const data = result.data as {
-      images?: Array<{ url: string; width?: number; height?: number }>;
-    };
-    const image = data?.images?.[0];
-    if (!image?.url) return null;
-
-    const imgResp = await fetch(image.url);
+    const imgResp = await fetch(result.url);
     if (!imgResp.ok) throw new Error("Failed to download edited image");
     const buffer = Buffer.from(await imgResp.arrayBuffer());
 
     const key = `characters/${userId}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
     await uploadFile(key, buffer, "image/jpeg");
 
-    return { r2Key: key, previewUrl: image.url };
+    return { r2Key: key, previewUrl: result.url };
   } catch (err) {
     console.error("Image edit failed:", err);
     return null;

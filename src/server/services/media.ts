@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { fal } from "@fal-ai/client";
-import { MEDIA, AI_VIDEO } from "@/lib/constants";
+import { MEDIA, AI_VIDEO, LLM } from "@/lib/constants";
 
 const PEXELS_API_KEY = MEDIA.pexelsApiKey;
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
@@ -213,6 +213,22 @@ export interface CharacterRef {
   description: string;
 }
 
+const GEMINI_IMAGE_MODEL = "google/gemini-3.1-flash-image-preview";
+const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
+
+async function fetchImageAsBase64(url: string): Promise<{ base64: string; mimeType: string } | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const ct = res.headers.get("content-type") || "image/jpeg";
+    const mimeType = ct.split(";")[0].trim();
+    return { base64: buffer.toString("base64"), mimeType };
+  } catch {
+    return null;
+  }
+}
+
 export async function generateNanoBananaImage(
   prompt: string,
   characterRefs?: CharacterRef[],
@@ -222,46 +238,197 @@ export async function generateNanoBananaImage(
   const fb = fallbackDimensions(aspectRatio);
 
   try {
-    const modelId = hasRefs
-      ? `${AI_VIDEO.nanoBananaModel}/edit`
-      : AI_VIDEO.nanoBananaModel;
+    // Build multimodal content parts
+    const contentParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
 
-    const charContext = hasRefs
-      ? ` Characters in scene: ${characterRefs.map((c, i) => `[Character ${i + 1}: ${c.description || "reference image"}]`).join(", ")}. Keep all characters consistent with their reference images.`
-      : "";
-
-    const input: Record<string, unknown> = {
-      prompt: `${prompt}.${charContext} ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
-      aspect_ratio: aspectRatio,
-      output_format: "jpeg",
-      resolution: "1K",
-      num_images: 1,
-      safety_tolerance: "6",
-    };
-
+    // Add character reference images as native multimodal input
     if (hasRefs) {
-      input.image_urls = characterRefs.map((c) => c.url);
+      const charDescriptions = characterRefs.map((c, i) =>
+        `[Character ${i + 1}: ${c.description || "reference character"}]`
+      ).join(", ");
+
+      contentParts.push({
+        type: "text",
+        text: `Generate an image with these characters maintaining their exact appearance from the reference images: ${charDescriptions}\n\n${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
+      });
+
+      const imagePromises = characterRefs.map(async (c) => {
+        const img = await fetchImageAsBase64(c.url);
+        if (img) {
+          contentParts.push({
+            type: "image_url",
+            image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
+          });
+        }
+      });
+      await Promise.all(imagePromises);
+    } else {
+      contentParts.push({
+        type: "text",
+        text: `${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
+      });
     }
 
-    const result = await fal.subscribe(modelId, {
-      input,
-      logs: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    const body = {
+      model: GEMINI_IMAGE_MODEL,
+      messages: [{ role: "user", content: contentParts }],
+      modalities: ["image", "text"],
+      image_config: { aspect_ratio: aspectRatio },
+    };
 
-    const data = result.data as { images?: Array<{ url: string; width?: number; height?: number }> };
-    const image = data?.images?.[0];
-    if (!image?.url) return null;
+    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${LLM.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.warn(`Gemini image generation failed (${res.status}):`, errBody);
+      return null;
+    }
+
+    const data = await res.json();
+    const message = data.choices?.[0]?.message;
+
+    // Extract base64 image from response
+    let imageDataUrl: string | null = null;
+
+    // Check for images array (OpenRouter format)
+    if (message?.images?.length > 0) {
+      imageDataUrl = message.images[0].image_url?.url || null;
+    }
+
+    // Fallback: check content parts for inline images
+    if (!imageDataUrl && Array.isArray(message?.content)) {
+      for (const part of message.content) {
+        if (part.type === "image_url" && part.image_url?.url) {
+          imageDataUrl = part.image_url.url;
+          break;
+        }
+      }
+    }
+
+    if (!imageDataUrl) {
+      console.warn("Gemini image generation returned no image");
+      return null;
+    }
+
+    // If it's a base64 data URL, convert to a hosted URL via fal storage
+    if (imageDataUrl.startsWith("data:")) {
+      const base64Match = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!base64Match) return null;
+
+      const buffer = Buffer.from(base64Match[2], "base64");
+      const blob = new Blob([buffer], { type: base64Match[1] });
+      const file = new File([blob], `gemini_${Date.now()}.jpg`, { type: base64Match[1] });
+      const hostedUrl = await fal.storage.upload(file);
+      imageDataUrl = hostedUrl;
+    }
 
     return {
-      url: image.url,
+      url: imageDataUrl,
       type: "image",
       source: "nano-banana",
-      width: image.width || fb.width,
-      height: image.height || fb.height,
+      width: fb.width,
+      height: fb.height,
     };
   } catch (err) {
-    console.warn(`Nano Banana 2 image generation failed: ${err instanceof Error ? err.message : err}`);
+    console.warn(`Gemini image generation failed: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
+}
+
+export async function editImageViaGemini(
+  editPrompt: string,
+  sourceImageUrl: string,
+  aspectRatio: AspectRatio = "1:1"
+): Promise<MediaAsset | null> {
+  const fb = fallbackDimensions(aspectRatio);
+
+  try {
+    const sourceImg = await fetchImageAsBase64(sourceImageUrl);
+    if (!sourceImg) {
+      console.warn("Failed to fetch source image for Gemini edit");
+      return null;
+    }
+
+    const contentParts = [
+      {
+        type: "image_url" as const,
+        image_url: { url: `data:${sourceImg.mimeType};base64,${sourceImg.base64}` },
+      },
+      {
+        type: "text" as const,
+        text: `Edit this image: ${editPrompt}. ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
+      },
+    ];
+
+    const body = {
+      model: GEMINI_IMAGE_MODEL,
+      messages: [{ role: "user", content: contentParts }],
+      modalities: ["image", "text"],
+      image_config: { aspect_ratio: aspectRatio },
+    };
+
+    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${LLM.apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.warn(`Gemini image edit failed (${res.status}):`, errBody);
+      return null;
+    }
+
+    const data = await res.json();
+    const message = data.choices?.[0]?.message;
+
+    let imageDataUrl: string | null = null;
+    if (message?.images?.length > 0) {
+      imageDataUrl = message.images[0].image_url?.url || null;
+    }
+    if (!imageDataUrl && Array.isArray(message?.content)) {
+      for (const part of message.content) {
+        if (part.type === "image_url" && part.image_url?.url) {
+          imageDataUrl = part.image_url.url;
+          break;
+        }
+      }
+    }
+
+    if (!imageDataUrl) {
+      console.warn("Gemini image edit returned no image");
+      return null;
+    }
+
+    if (imageDataUrl.startsWith("data:")) {
+      const base64Match = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!base64Match) return null;
+      const buffer = Buffer.from(base64Match[2], "base64");
+      const blob = new Blob([buffer], { type: base64Match[1] });
+      const file = new File([blob], `gemini_edit_${Date.now()}.jpg`, { type: base64Match[1] });
+      const hostedUrl = await fal.storage.upload(file);
+      imageDataUrl = hostedUrl;
+    }
+
+    return {
+      url: imageDataUrl,
+      type: "image",
+      source: "nano-banana",
+      width: fb.width,
+      height: fb.height,
+    };
+  } catch (err) {
+    console.warn(`Gemini image edit failed: ${err instanceof Error ? err.message : err}`);
     return null;
   }
 }
