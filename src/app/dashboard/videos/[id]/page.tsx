@@ -57,6 +57,7 @@ interface VideoDetail {
     niche: string;
     videoModel: string | null;
     videoSize: string | null;
+    videoType: string | null;
     sceneContinuity: number | null;
   };
 }
@@ -186,6 +187,27 @@ export default function VideoDetailPage() {
   const [showThumbPanel, setShowThumbPanel] = useState(false);
   const [thumbError, setThumbError] = useState<string | null>(null);
 
+  // Derive progress from video status (pipeline jobs don't update renderJobs)
+  const statusProgress: Record<string, number> = {
+    PENDING: 0,
+    STORY: 5,
+    REVIEW_STORY: 10,
+    SCENE_SPLIT: 15,
+    REVIEW_SCENES: 20,
+    TTS_GENERATION: 30,
+    TTS_REVIEW: 40,
+    PROMPT_GENERATION: 45,
+    REVIEW_PROMPTS: 50,
+    IMAGE_GENERATION: 55,
+    IMAGE_REVIEW: 65,
+    MOTION_GENERATION: 70,
+    REVIEW_MOTION: 75,
+    VIDEO_GENERATION: 80,
+    RENDERING: 90,
+    COMPLETED: 100,
+    FAILED: 0,
+  };
+
   // Per-scene video regeneration
   const [regenScene, setRegenScene] = useState<Scene | null>(null);
   const [regenPrompt, setRegenPrompt] = useState("");
@@ -226,7 +248,7 @@ export default function VideoDetailPage() {
 
   useEffect(() => {
     if (!video) return;
-    if (["COMPLETED", "FAILED", "REVIEW_SCRIPT", "REVIEW_MUSIC_SCRIPT", "MUSIC_REVIEW", "REVIEW_VISUAL", "IMAGE_REVIEW"].includes(video.status)) return;
+    if (["COMPLETED", "FAILED", "REVIEW_STORY", "REVIEW_SCENES", "TTS_REVIEW", "REVIEW_PROMPTS", "IMAGE_REVIEW", "REVIEW_MOTION", "REVIEW_SCRIPT", "REVIEW_MUSIC_SCRIPT", "MUSIC_REVIEW", "REVIEW_VISUAL"].includes(video.status)) return;
     const interval = setInterval(loadVideo, 3000);
     return () => clearInterval(interval);
   }, [video, loadVideo]);
@@ -324,18 +346,28 @@ export default function VideoDetailPage() {
     switch (status) {
       case "COMPLETED": return "success" as const;
       case "FAILED": return "danger" as const;
+      case "REVIEW_STORY":
+      case "REVIEW_SCENES":
+      case "TTS_REVIEW":
+      case "REVIEW_PROMPTS":
+      case "IMAGE_REVIEW":
+      case "REVIEW_MOTION":
       case "REVIEW_SCRIPT":
       case "REVIEW_MUSIC_SCRIPT":
       case "MUSIC_REVIEW":
-      case "REVIEW_VISUAL":
-      case "IMAGE_REVIEW": return "default" as const;
+      case "REVIEW_VISUAL": return "default" as const;
+      case "STORY":
+      case "SCENE_SPLIT":
+      case "TTS_GENERATION":
+      case "PROMPT_GENERATION":
+      case "IMAGE_GENERATION":
+      case "MOTION_GENERATION":
+      case "VIDEO_GENERATION":
+      case "RENDERING":
       case "SCRIPT":
       case "MUSIC_SCRIPT":
       case "MUSIC_GENERATION":
-      case "VIDEO_SCRIPT":
-      case "IMAGE_GENERATION":
-      case "VIDEO_GENERATION":
-      case "RENDERING": return "warning" as const;
+      case "VIDEO_SCRIPT": return "warning" as const;
       default: return "default" as const;
     }
   };
@@ -366,82 +398,74 @@ export default function VideoDetailPage() {
         </Badge>
       </div>
 
-      {/* Review script prompt */}
-      {video.status === "REVIEW_SCRIPT" && (
+      {/* ─── Review gates: show "Review" button ─── */}
+      {video.status === "REVIEW_STORY" && (
         <Card className="mb-8 border-violet-500/30">
-          <CardContent className="py-6 text-center">
-            <p className="text-gray-300 mb-4">
-              Your script is ready! Review and edit the scenes before generating the video.
-            </p>
-            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
-              Review &amp; Edit Script
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Music lyrics review */}
-      {video.status === "REVIEW_MUSIC_SCRIPT" && (
-        <Card className="mb-8 border-violet-500/30">
-          <CardContent className="py-6 text-center">
-            <p className="text-gray-300 mb-4">
-              Your song lyrics are ready! Review and edit them, then generate the song.
-            </p>
-            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
-              Review &amp; Edit Lyrics
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Music generation in progress */}
-      {video.status === "MUSIC_GENERATION" && (
-        <Card className="mb-8 border-amber-500/30">
-          <CardContent className="py-6 text-center">
-            <div className="flex items-center justify-center gap-3 mb-3">
-              <div className="animate-spin w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full" />
-              <p className="text-gray-300">Generating your song...</p>
+          <CardContent className="py-6">
+            <div className="text-center mb-4">
+              <p className="text-gray-300 mb-4">
+                Your {video.series.videoType === "music_video" ? "lyrics are" : "story is"} ready! Review and edit before proceeding.
+              </p>
+              <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+                Review &amp; Edit {video.series.videoType === "music_video" ? "Lyrics" : "Story"}
+              </Button>
             </div>
-            <p className="text-gray-500 text-sm">This may take 1-3 minutes</p>
+            {video.script && (
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wider">Preview</p>
+                <pre className="text-sm text-gray-400 whitespace-pre-wrap max-h-60 overflow-y-auto font-sans leading-relaxed">
+                  {video.script.length > 1000 ? video.script.slice(0, 1000) + "..." : video.script}
+                </pre>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Music review (listen + approve) */}
-      {video.status === "MUSIC_REVIEW" && <MusicReviewCard videoId={id} onStatusChange={loadVideo} />}
-
-      {/* Visual script generation in progress */}
-      {video.status === "VIDEO_SCRIPT" && (
-        <Card className="mb-8 border-amber-500/30">
-          <CardContent className="py-6 text-center">
-            <div className="flex items-center justify-center gap-3 mb-3">
-              <div className="animate-spin w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full" />
-              <p className="text-gray-300">Generating visual prompts for your scenes...</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Review visuals prompt */}
-      {video.status === "REVIEW_VISUAL" && (
+      {video.status === "REVIEW_SCENES" && (
         <Card className="mb-8 border-violet-500/30">
           <CardContent className="py-6 text-center">
             <p className="text-gray-300 mb-4">
-              Visual prompts are ready! Review and edit them, then generate preview images.
+              Scenes are ready! Review the breakdown before generating audio.
             </p>
             <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
-              Review Visual Prompts
+              Review Scenes
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Image review prompt */}
+      {video.status === "TTS_REVIEW" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">
+              {video.series.videoType === "music_video" ? "Song is generated! Listen and approve." : "Audio narration is ready! Listen and approve."}
+            </p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review Audio
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {video.status === "REVIEW_PROMPTS" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">
+              Visual prompts are ready! Review and edit them before generating images.
+            </p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review Prompts
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {video.status === "IMAGE_REVIEW" && (
         <Card className="mb-8 border-violet-500/30">
           <CardContent className="py-6 text-center">
             <p className="text-gray-300 mb-4">
-              Preview images are ready! Review, edit, and approve them before generating the video.
+              Preview images are ready! Review and approve them before generating video.
             </p>
             <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
               Review Images
@@ -450,33 +474,71 @@ export default function VideoDetailPage() {
         </Card>
       )}
 
-      {/* Image generation in progress */}
-      {video.status === "IMAGE_GENERATION" && (
+      {video.status === "REVIEW_MOTION" && (
         <Card className="mb-8 border-violet-500/30">
           <CardContent className="py-6 text-center">
             <p className="text-gray-300 mb-4">
-              Preview images are being generated. You can check progress on the review page.
+              Motion descriptions are ready! Review before generating video clips.
             </p>
             <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
-              View Progress
+              Review Motion
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Progress */}
-      {job && !["COMPLETED", "FAILED", "REVIEW_SCRIPT", "REVIEW_MUSIC_SCRIPT", "MUSIC_GENERATION", "MUSIC_REVIEW", "VIDEO_SCRIPT", "REVIEW_VISUAL", "IMAGE_REVIEW", "IMAGE_GENERATION"].includes(video.status) && (
-        <Card className="mb-8">
+      {/* Legacy review statuses */}
+      {video.status === "REVIEW_SCRIPT" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">Your script is ready for review.</p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review Script
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {video.status === "REVIEW_MUSIC_SCRIPT" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">Your lyrics are ready for review.</p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review Lyrics
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {video.status === "MUSIC_REVIEW" && <MusicReviewCard videoId={id} onStatusChange={loadVideo} />}
+      {video.status === "REVIEW_VISUAL" && (
+        <Card className="mb-8 border-violet-500/30">
+          <CardContent className="py-6 text-center">
+            <p className="text-gray-300 mb-4">Visual prompts are ready for review.</p>
+            <Button onClick={() => router.push(`/dashboard/videos/${id}/review`)}>
+              Review Visuals
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── Processing steps: show spinner + progress ─── */}
+      {["STORY", "SCENE_SPLIT", "TTS_GENERATION", "PROMPT_GENERATION", "IMAGE_GENERATION", "MOTION_GENERATION", "VIDEO_GENERATION", "RENDERING", "MUSIC_GENERATION", "VIDEO_SCRIPT", "SCRIPT"].includes(video.status) && (
+        <Card className="mb-8 border-amber-500/30">
           <CardContent className="py-6">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-gray-400">
-                Step: {job.step.replace(/_/g, " ")}
-              </span>
-              <span className="text-sm text-gray-400">
-                Attempt {job.attempts}/3
-              </span>
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="animate-spin w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full" />
+              <p className="text-gray-300">
+                {video.status === "STORY" || video.status === "SCRIPT" ? "Generating story..." :
+                 video.status === "SCENE_SPLIT" ? "Splitting into scenes..." :
+                 video.status === "TTS_GENERATION" || video.status === "MUSIC_GENERATION" ? (video.series.videoType === "music_video" ? "Generating song..." : "Generating audio...") :
+                 video.status === "PROMPT_GENERATION" || video.status === "VIDEO_SCRIPT" ? "Generating visual prompts..." :
+                 video.status === "IMAGE_GENERATION" ? "Generating images..." :
+                 video.status === "MOTION_GENERATION" ? "Generating motion descriptions..." :
+                 video.status === "VIDEO_GENERATION" ? "Generating video clips..." :
+                 video.status === "RENDERING" ? "Composing final video..." :
+                 "Processing..."}
+              </p>
             </div>
-            <Progress value={job.progress} label="Generation Progress" />
+            <Progress value={statusProgress[video.status] ?? 0} label="Pipeline Progress" />
           </CardContent>
         </Card>
       )}
