@@ -33,6 +33,16 @@ interface MediaVersion {
   createdAt: string;
 }
 
+interface SceneFrame {
+  id: string;
+  frameOrder: number;
+  clipDuration: number | null;
+  imagePrompt: string | null;
+  visualDescription: string | null;
+  imageUrl: string | null;
+  videoUrl: string | null;
+}
+
 interface Scene {
   id: string;
   sceneOrder: number;
@@ -49,6 +59,7 @@ interface Scene {
   audioUrl: string | null;
   assetRefs: string[] | null;
   media?: MediaVersion[];
+  frames?: SceneFrame[];
 }
 
 interface StoryAssetItem {
@@ -130,18 +141,15 @@ function AssetRefPills({
                       : [...assetRefs, asset.name];
                     onToggle(newRefs);
                   }}
-                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors ${
-                    active ? "bg-violet-500/10" : "hover:bg-white/5"
-                  }`}
+                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors ${active ? "bg-violet-500/10" : "hover:bg-white/5"
+                    }`}
                 >
-                  <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
-                    active ? "bg-violet-500 border-violet-500 text-white" : "border-white/20"
-                  }`}>
+                  <div className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${active ? "bg-violet-500 border-violet-500 text-white" : "border-white/20"
+                    }`}>
                     {active && "✓"}
                   </div>
-                  <span className={`text-[9px] uppercase font-bold tracking-wider ${
-                    asset.type === "character" ? "text-violet-400" : asset.type === "location" ? "text-blue-400" : "text-amber-400"
-                  }`}>
+                  <span className={`text-[9px] uppercase font-bold tracking-wider ${asset.type === "character" ? "text-violet-400" : asset.type === "location" ? "text-blue-400" : "text-amber-400"
+                    }`}>
                     {asset.type.slice(0, 4)}
                   </span>
                   <span className="text-xs text-gray-300 truncate">{asset.name}</span>
@@ -249,11 +257,10 @@ function SortableSceneCard({
       ref={setNodeRef}
       style={style}
       onClick={onSelect}
-      className={`rounded-xl border transition-all ${
-        isSelected
+      className={`rounded-xl border transition-all ${isSelected
           ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/20"
           : "border-white/5 bg-white/2 hover:border-white/10"
-      }`}
+        }`}
     >
       <div className="flex gap-3 p-4">
         {/* Drag handle */}
@@ -289,11 +296,10 @@ function SortableSceneCard({
           {/* Speaker badge for dialogue */}
           {isDialogue && scene.speaker && (
             <div className="mb-1.5">
-              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                scene.speaker.toLowerCase() === "narrator"
+              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${scene.speaker.toLowerCase() === "narrator"
                   ? "bg-gray-500/20 text-gray-400"
                   : "bg-violet-500/20 text-violet-400"
-              }`}>
+                }`}>
                 {scene.speaker}
               </span>
             </div>
@@ -363,20 +369,40 @@ function SortableSceneCard({
                 />
               ) : (
                 <p className="text-xs text-amber-400/50 mt-0.5 line-clamp-2 leading-relaxed cursor-pointer hover:text-amber-400/70 transition-colors"
-                   onClick={(e) => { e.stopPropagation(); setEditingDirectorNote(true); }}>
+                  onClick={(e) => { e.stopPropagation(); setEditingDirectorNote(true); }}>
                   {scene.directorNote}
                 </p>
               )}
             </div>
           )}
 
-          {/* Image prompt preview */}
+          {/* Image prompt preview — scene-level or frame-level */}
           {scene.imagePrompt && (
             <div className="mb-2">
               <span className="text-[10px] uppercase tracking-wider text-gray-600 font-medium">Image Prompt</span>
-              <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">
+              <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
                 {scene.imagePrompt}
               </p>
+            </div>
+          )}
+          {!scene.imagePrompt && scene.frames && scene.frames.length > 0 && (
+            <div className="mb-2 space-y-2">
+              {scene.frames.map((frame, fi) => (
+                <div key={frame.id} className="rounded-lg bg-white/[0.02] border border-white/5 px-3 py-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] uppercase tracking-wider text-violet-500 font-medium">Frame {fi + 1}</span>
+                    {frame.clipDuration && (
+                      <span className="text-[10px] text-gray-600 font-mono">{frame.clipDuration}s</span>
+                    )}
+                  </div>
+                  {frame.imagePrompt && (
+                    <p className="text-xs text-gray-500 leading-relaxed">{frame.imagePrompt}</p>
+                  )}
+                  {frame.imageUrl && (
+                    <img src={frame.imageUrl} alt={`Frame ${fi + 1}`} className="mt-1.5 rounded w-full max-h-40 object-cover" />
+                  )}
+                </div>
+              ))}
             </div>
           )}
 
@@ -757,11 +783,10 @@ function PromptEditModal({
                       onClick={() => {
                         if (!isCurrent) onSelectMedia(scene.id, m.id);
                       }}
-                      className={`relative shrink-0 rounded-lg overflow-hidden border-2 transition-all hover:opacity-100 ${
-                        isCurrent
+                      className={`relative shrink-0 rounded-lg overflow-hidden border-2 transition-all hover:opacity-100 ${isCurrent
                           ? "border-violet-500 ring-1 ring-violet-500/30 opacity-100"
                           : "border-white/10 opacity-60 hover:border-white/30"
-                      }`}
+                        }`}
                       title={`${m.modelUsed || "Unknown model"} — ${new Date(m.createdAt).toLocaleTimeString()}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -789,21 +814,19 @@ function PromptEditModal({
             <div className="flex gap-1 mb-4 p-1 bg-white/5 rounded-lg">
               <button
                 onClick={() => setMode("regenerate")}
-                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  mode === "regenerate"
+                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === "regenerate"
                     ? "bg-violet-600 text-white"
                     : "text-gray-400 hover:text-white"
-                }`}
+                  }`}
               >
                 Regenerate
               </button>
               <button
                 onClick={() => setMode("edit")}
-                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                  mode === "edit"
+                className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === "edit"
                     ? "bg-violet-600 text-white"
                     : "text-gray-400 hover:text-white"
-                }`}
+                  }`}
               >
                 Edit
               </button>
@@ -812,32 +835,31 @@ function PromptEditModal({
 
           {/* Model selector */}
           <div className="mb-4">
-              <label className="block text-xs font-medium text-gray-400 mb-1.5">Image Model</label>
-              <div className="flex gap-1.5 flex-wrap">
-                {IMAGE_MODELS.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedModel(m.id);
-                      if (mode === "edit" && !scene.assetUrl) setMode("regenerate");
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                      selectedModel === m.id
-                        ? "bg-violet-600 text-white"
-                        : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+            <label className="block text-xs font-medium text-gray-400 mb-1.5">Image Model</label>
+            <div className="flex gap-1.5 flex-wrap">
+              {IMAGE_MODELS.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedModel(m.id);
+                    if (mode === "edit" && !scene.assetUrl) setMode("regenerate");
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${selectedModel === m.id
+                      ? "bg-violet-600 text-white"
+                      : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
                     }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-              {selectedModel !== imageModel && (
-                <p className="text-[10px] text-amber-400/80 mt-1">
-                  Overriding series default ({IMAGE_MODELS.find((m) => m.id === imageModel)?.label || imageModel})
-                </p>
-              )}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
+            {selectedModel !== imageModel && (
+              <p className="text-[10px] text-amber-400/80 mt-1">
+                Overriding series default ({IMAGE_MODELS.find((m) => m.id === imageModel)?.label || imageModel})
+              </p>
+            )}
+          </div>
 
           {mode === "regenerate" && (
             <>
@@ -948,10 +970,10 @@ function DiffBlock({ change }: { change: SceneChange }) {
   const [expanded, setExpanded] = useState(true);
   const label =
     change.type === "added" ? "Added" :
-    change.type === "removed" ? "Removed" : `${change.fields.length} change${change.fields.length > 1 ? "s" : ""}`;
+      change.type === "removed" ? "Removed" : `${change.fields.length} change${change.fields.length > 1 ? "s" : ""}`;
   const color =
     change.type === "added" ? "text-green-400" :
-    change.type === "removed" ? "text-red-400" : "text-violet-300";
+      change.type === "removed" ? "text-red-400" : "text-violet-300";
 
   return (
     <div className="rounded-lg border border-white/10 overflow-hidden">
@@ -1098,11 +1120,10 @@ function ScriptChatPanel({
 
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${
-              msg.role === "user"
+            <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${msg.role === "user"
                 ? "bg-violet-600 text-white"
                 : "bg-white/5 border border-white/10 text-gray-300"
-            }`}>
+              }`}>
               {msg.content}
             </div>
           </div>
@@ -1243,10 +1264,19 @@ export default function ReviewPage() {
 
   const loadData = useCallback(async () => {
     try {
-      const [scenesRes, videoRes] = await Promise.all([
+      const [scenesRes, videoRes, framesRes] = await Promise.all([
         fetch(`/api/videos/${id}/scenes`),
         fetch(`/api/videos/${id}`),
+        fetch(`/api/videos/${id}/frames`),
       ]);
+
+      const framesMap: Record<string, SceneFrame[]> = {};
+      if (framesRes.ok) {
+        const framesData = await framesRes.json();
+        for (const sf of framesData.scenes ?? []) {
+          framesMap[sf.sceneId] = sf.frames ?? [];
+        }
+      }
 
       if (scenesRes.ok) {
         const data = await scenesRes.json();
@@ -1254,6 +1284,7 @@ export default function ReviewPage() {
           data.scenes.map((s: Scene) => ({
             ...s,
             duration: s.duration ?? 5,
+            frames: framesMap[s.id] ?? [],
           }))
         );
       }
@@ -1539,7 +1570,7 @@ export default function ReviewPage() {
       if (res.ok) {
         router.push(`/dashboard/videos/${id}`);
       }
-    } catch {}
+    } catch { }
     setRendering(false);
   }
 
@@ -1609,36 +1640,36 @@ export default function ReviewPage() {
         <h1 className="text-2xl font-bold mb-2">
           {video?.title ?? (
             isStoryReview ? "Review Story" :
-            isScenesReview ? "Review Scenes" :
-            isTTSReview ? "Review Audio" :
-            isPromptsReview ? "Review Image Prompts" :
-            isNewMotionReview ? "Review Motion" :
-            isMusicLyricsReview ? "Review Lyrics" :
-            isMotionReview ? "Review Motion" :
-            isVisualReview ? "Review Visuals" :
-            isMusicVideo ? "Review Song" :
-            isProcessing ? "Processing..." :
-            "Review"
+              isScenesReview ? "Review Scenes" :
+                isTTSReview ? "Review Audio" :
+                  isPromptsReview ? "Review Image Prompts" :
+                    isNewMotionReview ? "Review Motion" :
+                      isMusicLyricsReview ? "Review Lyrics" :
+                        isMotionReview ? "Review Motion" :
+                          isVisualReview ? "Review Visuals" :
+                            isMusicVideo ? "Review Song" :
+                              isProcessing ? "Processing..." :
+                                "Review"
           )}
         </h1>
         <p className="text-gray-400 text-sm">
           {isStoryReview
             ? "Review and edit your story, then approve to split into scenes."
             : isScenesReview
-            ? "Review the scene breakdown and director's notes, then generate audio."
-            : isTTSReview
-            ? "Listen to the generated audio for each scene, then generate image prompts."
-            : isPromptsReview
-            ? "Review the image prompts before generating images. Edit any prompts to refine the visuals."
-            : isNewMotionReview
-            ? "Review the motion descriptions for each frame, then generate the final video."
-            : isProcessing
-            ? "Your video is being processed..."
-            : isMusicLyricsReview
-            ? "Review and edit your song lyrics, then generate the song."
-            : isImageReview
-            ? "Review generated images, then approve to generate motion."
-            : "Review your content and approve to continue."}
+              ? "Review the scene breakdown and director's notes, then generate audio."
+              : isTTSReview
+                ? "Listen to the generated audio for each scene, then generate image prompts."
+                : isPromptsReview
+                  ? "Review the image prompts before generating images. Edit any prompts to refine the visuals."
+                  : isNewMotionReview
+                    ? "Review the motion descriptions for each frame, then generate the final video."
+                    : isProcessing
+                      ? "Your video is being processed..."
+                      : isMusicLyricsReview
+                        ? "Review and edit your song lyrics, then generate the song."
+                        : isImageReview
+                          ? "Review generated images, then approve to generate motion."
+                          : "Review your content and approve to continue."}
         </p>
         {/* Auto-approve toggle */}
         <div className="mt-3 flex items-center gap-3">
@@ -1654,12 +1685,10 @@ export default function ReviewPage() {
             }}
             className="flex items-center gap-2 cursor-pointer select-none"
           >
-            <div className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${
-              video?.config?.pipelineMode === "auto" ? "bg-violet-500" : "bg-white/10"
-            }`}>
-              <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                video?.config?.pipelineMode === "auto" ? "translate-x-4" : "translate-x-0"
-              }`} />
+            <div className={`w-9 h-5 rounded-full transition-colors flex items-center px-0.5 ${video?.config?.pipelineMode === "auto" ? "bg-violet-500" : "bg-white/10"
+              }`}>
+              <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform ${video?.config?.pipelineMode === "auto" ? "translate-x-4" : "translate-x-0"
+                }`} />
             </div>
             <span className="text-xs text-gray-400">
               {video?.config?.pipelineMode === "auto" ? "Auto Pipeline" : "Manual Review"}
