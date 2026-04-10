@@ -175,20 +175,26 @@ function FrameCard({
   frame,
   frameIndex,
   generating,
+  generatingVideo,
   showActions,
   showMotion,
+  showVideo,
   onGenerateImage,
   onUpdatePrompt,
   onUpdateMotion,
+  onRegenerateVideo,
 }: {
   frame: SceneFrame;
   frameIndex: number;
   generating: boolean;
+  generatingVideo?: boolean;
   showActions: boolean;
   showMotion?: boolean;
+  showVideo?: boolean;
   onGenerateImage?: (frameId: string, prompt?: string) => void;
   onUpdatePrompt?: (frameId: string, prompt: string) => void;
   onUpdateMotion?: (frameId: string, motion: string) => void;
+  onRegenerateVideo?: (frameId: string) => void;
 }) {
   const [editingPrompt, setEditingPrompt] = useState(false);
   const [promptText, setPromptText] = useState(frame.imagePrompt || "");
@@ -288,6 +294,57 @@ function FrameCard({
         </div>
       )}
 
+      {/* Video clip preview */}
+      {showVideo && frame.videoUrl && (
+        <div className="mt-1.5 relative group">
+          <video
+            src={frame.videoUrl}
+            className="rounded w-full max-h-40 object-cover bg-black"
+            muted
+            loop
+            playsInline
+            onMouseEnter={(e) => e.currentTarget.play()}
+            onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+          />
+          <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-green-500/80 text-white text-[9px] font-bold uppercase">
+            Video Ready
+          </div>
+          {onRegenerateVideo && !generatingVideo && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRegenerateVideo(frame.id); }}
+              className="absolute top-1 right-1 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-600"
+            >
+              Regenerate Video
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Video missing / failed indicator */}
+      {showVideo && !frame.videoUrl && frame.imageUrl && !generatingVideo && (
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[9px] font-bold uppercase">
+            No Video
+          </span>
+          {onRegenerateVideo && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onRegenerateVideo(frame.id); }}
+              className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
+            >
+              Generate Video
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Video generating spinner */}
+      {generatingVideo && (
+        <div className="mt-1.5 flex items-center gap-1.5 text-[10px] text-amber-400">
+          <div className="animate-spin w-3 h-3 border border-amber-400 border-t-transparent rounded-full" />
+          Generating video clip...
+        </div>
+      )}
+
       {!frame.imageUrl && showActions && !generating && (
         <div className="mt-1 flex items-center gap-2">
           <button
@@ -338,9 +395,12 @@ function SortableSceneCard({
   onGenerateFrameImage,
   onUpdateFramePrompt,
   onUpdateFrameMotion,
+  onRegenerateFrameVideo,
   generatingFrameIds,
+  generatingFrameVideoIds,
   showFrameActions,
   showFrameMotion,
+  showFrameVideo,
 }: {
   scene: Scene;
   index: number;
@@ -362,9 +422,12 @@ function SortableSceneCard({
   onGenerateFrameImage?: (frameId: string, prompt?: string) => void;
   onUpdateFramePrompt?: (frameId: string, prompt: string) => void;
   onUpdateFrameMotion?: (frameId: string, motion: string) => void;
+  onRegenerateFrameVideo?: (frameId: string) => void;
   generatingFrameIds?: Set<string>;
+  generatingFrameVideoIds?: Set<string>;
   showFrameActions?: boolean;
   showFrameMotion?: boolean;
+  showFrameVideo?: boolean;
 }) {
   const {
     attributes,
@@ -551,11 +614,14 @@ function SortableSceneCard({
                   frame={frame}
                   frameIndex={fi}
                   generating={generatingFrameIds?.has(frame.id) ?? false}
+                  generatingVideo={generatingFrameVideoIds?.has(frame.id) ?? false}
                   showActions={showFrameActions ?? false}
                   showMotion={showFrameMotion ?? false}
+                  showVideo={showFrameVideo ?? false}
                   onGenerateImage={onGenerateFrameImage}
                   onUpdatePrompt={onUpdateFramePrompt}
                   onUpdateMotion={onUpdateFrameMotion}
+                  onRegenerateVideo={onRegenerateFrameVideo}
                 />
               ))}
             </div>
@@ -1412,6 +1478,7 @@ export default function ReviewPage() {
   const [generatingMotion, setGeneratingMotion] = useState(false);
   const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
   const [generatingFrameIds, setGeneratingFrameIds] = useState<Set<string>>(new Set());
+  const [generatingFrameVideoIds, setGeneratingFrameVideoIds] = useState<Set<string>>(new Set());
   const [generatingAllFrames, setGeneratingAllFrames] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const sensors = useSensors(
@@ -1645,6 +1712,26 @@ export default function ReviewPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ visualDescription }),
     });
+  }
+
+  async function handleRegenerateFrameVideo(frameId: string) {
+    setGeneratingFrameVideoIds((prev) => new Set(prev).add(frameId));
+    try {
+      const res = await fetch(`/api/videos/${id}/frames/${frameId}/generate-video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } finally {
+      setGeneratingFrameVideoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(frameId);
+        return next;
+      });
+    }
   }
 
   const isMusicVideo = video?.series?.videoType === "music_video";
@@ -2222,9 +2309,12 @@ export default function ReviewPage() {
                 onGenerateFrameImage={(frameId, prompt) => handleGenerateFrameImage(frameId, prompt)}
                 onUpdateFramePrompt={handleUpdateFramePrompt}
                 onUpdateFrameMotion={handleUpdateFrameMotion}
+                onRegenerateFrameVideo={handleRegenerateFrameVideo}
                 generatingFrameIds={generatingFrameIds}
+                generatingFrameVideoIds={generatingFrameVideoIds}
                 showFrameActions={isPromptsReview || isImageReview || isNewMotionReview}
                 showFrameMotion={isNewMotionReview || isImageReview}
+                showFrameVideo={isNewMotionReview || video?.status === "COMPLETED" || video?.status === "VIDEO_GENERATION"}
               />
             ))}
           </div>
