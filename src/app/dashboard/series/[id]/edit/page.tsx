@@ -303,7 +303,7 @@ export default function EditSeriesPage() {
                             const res = await fetch("/api/describe-character", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ imageUrl: asset.url }),
+                              body: JSON.stringify({ imageUrl: asset.sheetUrl || asset.url }),
                             });
                             if (res.ok) {
                               const data = await res.json();
