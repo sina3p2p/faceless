@@ -36,9 +36,9 @@ export const LLM = {
   defaultModel: "anthropic/claude-opus-4.6",
   fallbackModel: "openai/gpt-4.1",
   visionModel: "google/gemini-2.5-pro",
-  storyModel: "anthropic/claude-sonnet-4",
-  directorModel: "anthropic/claude-sonnet-4",
-  promptModel: "anthropic/claude-sonnet-4",
+  storyModel: "anthropic/claude-opus-4.6",
+  directorModel: "anthropic/claude-opus-4.6",
+  promptModel: "anthropic/claude-opus-4.6",
   motionModel: "google/gemini-2.5-pro",
 } as const;
 
