@@ -176,22 +176,32 @@ function FrameCard({
   frameIndex,
   generating,
   showActions,
+  showMotion,
   onGenerateImage,
   onUpdatePrompt,
+  onUpdateMotion,
 }: {
   frame: SceneFrame;
   frameIndex: number;
   generating: boolean;
   showActions: boolean;
+  showMotion?: boolean;
   onGenerateImage?: (frameId: string, prompt?: string) => void;
   onUpdatePrompt?: (frameId: string, prompt: string) => void;
+  onUpdateMotion?: (frameId: string, motion: string) => void;
 }) {
   const [editingPrompt, setEditingPrompt] = useState(false);
   const [promptText, setPromptText] = useState(frame.imagePrompt || "");
+  const [editingMotion, setEditingMotion] = useState(false);
+  const [motionText, setMotionText] = useState(frame.visualDescription || "");
 
   useEffect(() => {
     setPromptText(frame.imagePrompt || "");
   }, [frame.imagePrompt]);
+
+  useEffect(() => {
+    setMotionText(frame.visualDescription || "");
+  }, [frame.visualDescription]);
 
   return (
     <div className="rounded-lg bg-white/[0.02] border border-white/5 px-3 py-2">
@@ -246,6 +256,38 @@ function FrameCard({
         </div>
       )}
 
+      {/* Motion description */}
+      {showMotion && (
+        <div className="mt-1.5">
+          <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Motion</span>
+          {editingMotion ? (
+            <textarea
+              value={motionText}
+              onChange={(e) => setMotionText(e.target.value)}
+              onBlur={() => {
+                setEditingMotion(false);
+                if (motionText !== (frame.visualDescription || "") && onUpdateMotion) {
+                  onUpdateMotion(frame.id, motionText);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { setMotionText(frame.visualDescription || ""); setEditingMotion(false); }
+              }}
+              autoFocus
+              rows={2}
+              className="w-full mt-0.5 bg-black/40 border border-emerald-500/20 rounded-lg px-3 py-2 text-xs text-emerald-200 resize-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            />
+          ) : (
+            <p
+              className="text-xs text-emerald-400/70 cursor-text hover:text-emerald-300 transition-colors leading-relaxed mt-0.5"
+              onClick={(e) => { e.stopPropagation(); setEditingMotion(true); }}
+            >
+              {frame.visualDescription || "Click to add motion description..."}
+            </p>
+          )}
+        </div>
+      )}
+
       {!frame.imageUrl && showActions && !generating && (
         <div className="mt-1 flex items-center gap-2">
           <button
@@ -295,8 +337,10 @@ function SortableSceneCard({
   showDuration,
   onGenerateFrameImage,
   onUpdateFramePrompt,
+  onUpdateFrameMotion,
   generatingFrameIds,
   showFrameActions,
+  showFrameMotion,
 }: {
   scene: Scene;
   index: number;
@@ -317,8 +361,10 @@ function SortableSceneCard({
   showDuration?: boolean;
   onGenerateFrameImage?: (frameId: string, prompt?: string) => void;
   onUpdateFramePrompt?: (frameId: string, prompt: string) => void;
+  onUpdateFrameMotion?: (frameId: string, motion: string) => void;
   generatingFrameIds?: Set<string>;
   showFrameActions?: boolean;
+  showFrameMotion?: boolean;
 }) {
   const {
     attributes,
@@ -506,8 +552,10 @@ function SortableSceneCard({
                   frameIndex={fi}
                   generating={generatingFrameIds?.has(frame.id) ?? false}
                   showActions={showFrameActions ?? false}
+                  showMotion={showFrameMotion ?? false}
                   onGenerateImage={onGenerateFrameImage}
                   onUpdatePrompt={onUpdateFramePrompt}
+                  onUpdateMotion={onUpdateFrameMotion}
                 />
               ))}
             </div>
@@ -1591,6 +1639,14 @@ export default function ReviewPage() {
     });
   }
 
+  async function handleUpdateFrameMotion(frameId: string, visualDescription: string) {
+    await fetch(`/api/videos/${id}/frames/${frameId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ visualDescription }),
+    });
+  }
+
   const isMusicVideo = video?.series?.videoType === "music_video";
   const isVisualReview = video?.status === "REVIEW_VISUAL";
   const isMotionReview = isVisualReview && !isMusicVideo;
@@ -2165,8 +2221,10 @@ export default function ReviewPage() {
                 showDuration={hasTTSRun}
                 onGenerateFrameImage={(frameId, prompt) => handleGenerateFrameImage(frameId, prompt)}
                 onUpdateFramePrompt={handleUpdateFramePrompt}
+                onUpdateFrameMotion={handleUpdateFrameMotion}
                 generatingFrameIds={generatingFrameIds}
                 showFrameActions={isPromptsReview || isImageReview || isNewMotionReview}
+                showFrameMotion={isNewMotionReview || isImageReview}
               />
             ))}
           </div>
