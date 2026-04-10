@@ -63,11 +63,12 @@ export const TTS = {
   defaultStyle: 0.3,
 } as const;
 
-// ── Media (Pexels + OpenAI) ──
+// ── Media (OpenAI + fal.ai + Runway) ──
 
 export const MEDIA = {
-  get pexelsApiKey() { return env("PEXELS_API_KEY"); },
   get openaiApiKey() { return env("OPENAI_API_KEY"); },
+  get falKey() { return env("FAL_KEY"); },
+  get runwayApiKey() { return env("RUNWAYML_API_SECRET"); },
 } as const;
 
 // ── AI Video (fal.ai + Runway) ──

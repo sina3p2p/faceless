@@ -42,3 +42,4 @@ prisma/migrations/
 # IDE
 .idea/
 .vscode/
+.cursor/

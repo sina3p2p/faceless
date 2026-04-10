@@ -8,7 +8,7 @@ AI-powered faceless short-form video generator. Create viral TikTok, Reels, and 
 - **Language**: TypeScript
 - **Database**: PostgreSQL + Drizzle ORM
 - **Queue**: BullMQ + Redis
-- **AI**: OpenRouter (LLM), ElevenLabs (TTS), Pexels (stock), OpenAI (image gen)
+- **AI**: OpenRouter (LLM), ElevenLabs (TTS), OpenAI (image gen)
 - **Video**: FFmpeg composition pipeline
 - **Billing**: Stripe
 - **Deployment**: Railway

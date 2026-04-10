@@ -17,12 +17,9 @@ import {
 } from "./shared";
 import { getVideoSize, WORKER } from "@/lib/constants";
 import {
-  getMediaForScene,
-  generateImage,
-  generateKlingImage,
-  generateNanoBananaImage,
   type MediaAsset,
   type AspectRatio,
+  generateImage,
 } from "@/server/services/media";
 import {
   getAIVideoForScene,
@@ -31,54 +28,6 @@ import {
 import { downloadFile } from "@/server/services/composer";
 import { uploadFile } from "@/lib/storage";
 import type { RenderJobData } from "@/lib/queue";
-
-export async function fetchFacelessMediaParallel(
-  script: ScriptInput,
-  seriesRecord: { niche: string; style: string; imageModel?: string | null; characterRefs?: CharacterRef[] },
-  workDir: string,
-  concurrency = WORKER.parallelFacelessMedia,
-  preApproved: PreApproved = new Map(),
-  aspectRatio: AspectRatio = "9:16"
-): Promise<{ path: string; type: "video" | "image" }[]> {
-  const mediaPaths: { path: string; type: "video" | "image" }[] = new Array(script.scenes.length);
-
-  const chunks: number[][] = [];
-  for (let i = 0; i < script.scenes.length; i += concurrency) {
-    chunks.push(
-      Array.from({ length: Math.min(concurrency, script.scenes.length - i) }, (_, j) => i + j)
-    );
-  }
-
-  for (const chunk of chunks) {
-    await Promise.all(
-      chunk.map(async (i) => {
-        if (preApproved.has(i)) {
-          mediaPaths[i] = preApproved.get(i)!;
-          return;
-        }
-
-        const scene = script.scenes[i];
-        const imagePrompt = scene.imagePrompt || scene.visualDescription;
-
-        const imgModel = seriesRecord.imageModel || "dall-e-3";
-        const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
-        const asset = await getMediaForScene(imagePrompt, imgModel, refs, aspectRatio);
-
-        const ext = asset.type === "video" ? "mp4" : "jpg";
-        const mediaPath = path.join(workDir, `media_${i}.${ext}`);
-
-        if (asset.url) {
-          await downloadFile(asset.url, mediaPath);
-        }
-
-        console.log(`Scene ${i}: media from ${asset.source} (${asset.type})`);
-        mediaPaths[i] = { path: mediaPath, type: asset.type };
-      })
-    );
-  }
-
-  return mediaPaths;
-}
 
 export async function generateSceneImage(
   imagePrompt: string,
@@ -89,18 +38,12 @@ export async function generateSceneImage(
 ): Promise<MediaAsset> {
   console.log(`Scene ${sceneIndex}: Generating image with ${imageModel}${characterRefs?.length ? ` with ${characterRefs.length} character ref(s)` : ""}...`);
 
-  let result: MediaAsset | null = null;
-  if (imageModel === "nano-banana-2") {
-    result = await generateNanoBananaImage(imagePrompt, characterRefs, aspectRatio);
-  } else if (imageModel === "kling-image-v3") {
-    result = await generateKlingImage(imagePrompt, undefined, characterRefs, aspectRatio);
-  } else {
-    result = await generateImage(imagePrompt, aspectRatio);
-  }
+  const result = await generateImage(imagePrompt, imageModel, characterRefs, aspectRatio);
 
   if (!result) {
     throw new Error(`${imageModel} failed to generate image for scene ${sceneIndex}. The job will fail — you can retry or switch to a different model in series settings.`);
   }
+
   return result;
 }
 

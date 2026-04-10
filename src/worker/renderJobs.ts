@@ -24,7 +24,6 @@ import { getVideoSize } from "@/lib/constants";
 import { type MusicScript } from "@/server/services/llm";
 import { type AlignedSection } from "@/server/services/music";
 import {
-  resetUsedMedia,
   type AspectRatio,
 } from "@/server/services/media";
 import {
@@ -40,8 +39,6 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
   const workDir = path.join(os.tmpdir(), `faceless-render-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
-
-  resetUsedMedia();
 
   try {
     const seriesRecordRaw = await db.query.series.findFirst({
@@ -321,7 +318,6 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
   const workDir = path.join(os.tmpdir(), `faceless-music-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
 
-  resetUsedMedia();
 
   try {
     const seriesRecordRaw = await db.query.series.findFirst({

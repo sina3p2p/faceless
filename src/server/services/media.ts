@@ -2,30 +2,19 @@ import OpenAI from "openai";
 import { fal } from "@fal-ai/client";
 import { MEDIA, AI_VIDEO, LLM } from "@/lib/constants";
 
-const PEXELS_API_KEY = MEDIA.pexelsApiKey;
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
-fal.config({ credentials: AI_VIDEO.falKey });
+fal.config({ credentials: MEDIA.falKey });
 
 export interface MediaAsset {
   url: string;
   type: "video" | "image";
-  source: "pexels" | "openai" | "kling" | "nano-banana";
+  source: "openai" | "kling" | "nano-banana";
   width: number;
   height: number;
 }
 
-const usedPexelsIds = new Set<number>();
-
-export function resetUsedMedia(): void {
-  usedPexelsIds.clear();
-}
-
 export type AspectRatio = "9:16" | "16:9" | "1:1";
-
-function orientationForAspect(ar: AspectRatio): "portrait" | "landscape" {
-  return ar === "16:9" ? "landscape" : "portrait";
-}
 
 function dalleSize(ar: AspectRatio): "1024x1792" | "1792x1024" | "1024x1024" {
   if (ar === "16:9") return "1792x1024";
@@ -50,7 +39,7 @@ function compositionSuffix(ar: AspectRatio): string {
   if (ar === "1:1") return "Square 1:1 composition";
   return "Vertical 9:16 composition";
 }
-export async function generateImage(
+export async function generateImageDallE3(
   prompt: string,
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
@@ -355,7 +344,7 @@ export async function editImageViaGemini(
   }
 }
 
-async function generateAnyImage(
+export async function generateImage(
   prompt: string,
   imageModel = "dall-e-3",
   characterRefs?: CharacterRef[],
@@ -367,19 +356,5 @@ async function generateAnyImage(
   if (imageModel === "kling-image-v3") {
     return generateKlingImage(prompt, undefined, characterRefs, aspectRatio);
   }
-  return generateImage(prompt, aspectRatio);
-}
-
-export async function getMediaForScene(
-  imagePrompt: string,
-  imageModel = "dall-e-3",
-  characterRefs?: CharacterRef[],
-  aspectRatio: AspectRatio = "9:16"
-): Promise<MediaAsset> {
-  const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs, aspectRatio);
-  if (generatedImage) return generatedImage;
-
-  throw new Error(
-    `Could not find or generate media for prompt: "${imagePrompt}"`
-  );
+  return generateImageDallE3(prompt, aspectRatio);
 }
