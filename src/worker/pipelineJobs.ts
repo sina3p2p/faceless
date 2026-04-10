@@ -23,7 +23,7 @@ import {
   generateStory,
   splitStoryIntoScenes,
   generateFramePrompts,
-  generateFrameMotion,
+  generateSingleFrameMotion,
 } from "@/server/services/llm";
 import {
   getAIVideoForScene,
@@ -538,8 +538,6 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       sceneText: string;
       directorNote: string;
       sceneTitle: string;
-      frameOrder: number;
-      sceneOrder: number;
       imageUrl: string;
     }> = [];
 
@@ -565,42 +563,77 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
           sceneText: scene.text,
           directorNote: scene.directorNote || "",
           sceneTitle: scene.sceneTitle || "",
-          frameOrder: frame.frameOrder,
-          sceneOrder: i,
           imageUrl: signedUrl,
         });
       }
     }
 
-    console.log(`[generate-motion] Generating motion for ${allFrameData.length} frames across ${existingScenes.length} scenes`);
+    if (allFrameData.length === 0) {
+      console.log(`[generate-motion] No frames found, skipping`);
+      await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_MOTION", "generate-frame-videos");
+      return;
+    }
 
-    const framesInput = allFrameData.map((f) => ({
-      imagePrompt: f.imagePrompt,
-      clipDuration: f.clipDuration,
-      sceneText: f.sceneText,
-      directorNote: f.directorNote,
-      sceneTitle: f.sceneTitle,
-      frameOrder: f.frameOrder,
-      sceneOrder: f.sceneOrder,
-    }));
+    // Process N-1 frames (last frame is the ending frame — no motion needed)
+    const framesToProcess = allFrameData.length > 1
+      ? allFrameData.slice(0, -1)
+      : allFrameData;
+
+    console.log(`[generate-motion] Generating motion for ${framesToProcess.length} of ${allFrameData.length} frames (last frame = ending), ${existingScenes.length} scenes`);
 
     const agents = getAgentModels(seriesRecord);
-    const imageUrls = allFrameData.map((f) => f.imageUrl);
+    const BATCH_SIZE = WORKER.parallelImages; // reuse concurrency setting
 
-    const result = await generateFrameMotion(
-      framesInput,
-      seriesRecord.style,
-      imageUrls,
-      agents.motionModel
-    );
+    for (let i = 0; i < framesToProcess.length; i += BATCH_SIZE) {
+      const batch = framesToProcess.slice(i, i + BATCH_SIZE);
 
-    for (let i = 0; i < allFrameData.length; i++) {
-      const motionFrame = result.frames[i];
-      if (!motionFrame) continue;
+      await Promise.all(
+        batch.map(async (frameData, batchIdx) => {
+          const globalIdx = i + batchIdx;
+          const currentImageUrl = frameData.imageUrl;
+          const nextImageUrl = globalIdx + 1 < allFrameData.length
+            ? allFrameData[globalIdx + 1].imageUrl
+            : null;
+
+          if (!currentImageUrl) {
+            console.warn(`[generate-motion] Frame ${frameData.frameId} has no image, skipping`);
+            return;
+          }
+
+          const result = await generateSingleFrameMotion(
+            {
+              imagePrompt: frameData.imagePrompt,
+              clipDuration: frameData.clipDuration,
+              sceneText: frameData.sceneText,
+              directorNote: frameData.directorNote,
+              sceneTitle: frameData.sceneTitle,
+            },
+            seriesRecord.style,
+            currentImageUrl,
+            nextImageUrl,
+            agents.motionModel
+          );
+
+          await db
+            .update(schema.sceneFrames)
+            .set({ visualDescription: result.visualDescription })
+            .where(eq(schema.sceneFrames.id, frameData.frameId));
+
+          console.log(`[generate-motion] Frame ${globalIdx + 1}/${framesToProcess.length} done`);
+        })
+      );
+
+      const progress = Math.round(((i + batch.length) / framesToProcess.length) * 100);
+      await job.updateProgress(progress);
+    }
+
+    // Last frame gets a default ending motion (no LLM call needed)
+    if (allFrameData.length > 1) {
+      const lastFrame = allFrameData[allFrameData.length - 1];
       await db
         .update(schema.sceneFrames)
-        .set({ visualDescription: motionFrame.visualDescription })
-        .where(eq(schema.sceneFrames.id, allFrameData[i].frameId));
+        .set({ visualDescription: "Slow gentle zoom out, the scene gradually settles, ambient motion slows to a calm stop, soft fade, peaceful conclusion." })
+        .where(eq(schema.sceneFrames.id, lastFrame.frameId));
     }
 
     console.log(`[generate-motion] Motion descriptions ready for review`);

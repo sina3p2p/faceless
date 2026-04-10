@@ -997,106 +997,74 @@ You MUST return exactly ${scenes.length} scenes, each with the appropriate numbe
   return output;
 }
 
-// ── Motion Agent (generateObject with vision → visualDescription per frame) ──
+// ── Motion Agent (per-frame: current image + next image → visualDescription) ──
 
-const frameMotionSchema = z.object({
-  visualDescription: z.string().describe("Motion description for the AI video model (30-60 words). Describe CONTINUOUS MOTION: camera movement, subject movement, environment movement. Must describe how the clip ENDS for smooth transition to the next frame."),
+const singleFrameMotionSchema = z.object({
+  visualDescription: z.string().describe("Motion description for the AI video model (30-60 words). Describe CONTINUOUS MOTION: camera movement, subject movement, environment movement. The motion must naturally transition FROM the current frame's image TOWARD the next frame's image."),
 });
 
-const frameMotionOutputSchema = z.object({
-  frames: z.array(frameMotionSchema),
-});
+export type SingleFrameMotionOutput = z.infer<typeof singleFrameMotionSchema>;
 
-export type FrameMotionOutput = z.infer<typeof frameMotionOutputSchema>;
-
-export async function generateFrameMotion(
-  frames: Array<{
+export async function generateSingleFrameMotion(
+  frame: {
     imagePrompt: string;
     clipDuration: number;
     sceneText: string;
     directorNote: string;
     sceneTitle: string;
-    frameOrder: number;
-    sceneOrder: number;
-  }>,
+  },
   style: string,
-  imageUrls: string[],
+  currentImageUrl: string,
+  nextImageUrl: string | null,
   model?: string
-): Promise<FrameMotionOutput> {
+): Promise<SingleFrameMotionOutput> {
   const primaryModel = model || LLM.motionModel;
 
-  const systemPrompt = `You are an elite video editor. You see ALL frames of the entire video in sequence. Design motion for each frame.
-
-You MUST return exactly ${frames.length} frames in the same sequence order.
+  const systemPrompt = `You are an elite video editor. Design motion for a single video clip.
 
 MOTION RULES:
-- Each visualDescription must be 30-60 words describing CONTINUOUS MOTION
+- visualDescription must be 30-60 words describing CONTINUOUS MOTION
 - CAMERA MOTION: "slowly dollies forward", "smooth orbit", "crane shot rising", "tracking shot", "slow push in"
 - SUBJECT MOTION: "turns head slowly", "hands reaching forward", "walking through", "wind blowing hair"
 - ENVIRONMENT MOTION: "clouds drifting", "rain falling", "leaves swirling", "fire flickering"
-- NEVER write static descriptions. Every frame MUST have camera + subject/environment motion.
+- NEVER write static descriptions. The frame MUST have camera + subject/environment motion.
 
-SEQUENCE AWARENESS (CRITICAL):
-- You see the complete video sequence. Design motion considering:
-  (1) What comes BEFORE — flow naturally from the previous frame's motion
-  (2) The clip duration — match motion speed (short clips = quick motion, long clips = slow cinematic)
-  (3) What comes AFTER — end with motion that transitions smoothly to the next frame
-- Within a scene (same sceneOrder): frames should feel like continuous progression
-- Across scenes (different sceneOrder): the last frame should settle or transition to signal a scene change
+TRANSITION (CRITICAL):
+- The video clip starts from the CURRENT frame image.${nextImageUrl ? "\n- The clip must visually transition TOWARD the NEXT frame image — motion should lead the eye toward what comes next." : "\n- This is the FINAL frame of the video — the clip should settle, slow down, or come to a gentle, conclusive ending."}
+- Match motion speed to clip duration: ${frame.clipDuration}s${frame.clipDuration <= 5 ? " (short = quick, purposeful motion)" : " (longer = slow, cinematic motion)"}
 
-MATCH MOTION TO THE IMAGE:
-- Look at subject position, depth, lighting direction, composition
+MATCH MOTION TO THE IMAGES:
+- Look at subject position, depth, lighting direction, composition in both images
 - Close-ups → subtle motion (slight head turn, eye movement)
 - Wide shots → larger camera movements (dolly, crane, orbit)
+- If the next frame has a different subject/location, use a cinematic transition (pan away, fade through motion, pull back to reveal)
 
 Visual style: ${style}.`;
 
-  const hasImages = imageUrls.length === frames.length && imageUrls.every(url => !!url);
+  const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: URL }> = [];
 
-  if (hasImages) {
-    const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: URL }> = [];
-    contentParts.push({ type: "text", text: "Here is the complete sequence of frames for the entire video:\n\n" });
+  contentParts.push({ type: "text", text: "CURRENT FRAME (start of clip):" });
+  contentParts.push({ type: "image", image: new URL(currentImageUrl) });
 
-    for (let i = 0; i < frames.length; i++) {
-      const f = frames[i];
-      let header = `--- Frame ${i + 1} | Scene ${f.sceneOrder + 1} "${f.sceneTitle}" | Frame ${f.frameOrder + 1} | ${f.clipDuration}s clip ---`;
-      header += `\nNarration: "${f.sceneText}"`;
-      header += `\nDirector's Note: ${f.directorNote}`;
-      header += `\nImage prompt: ${f.imagePrompt}`;
-      header += "\nGenerated image:";
-      contentParts.push({ type: "text", text: header });
-      contentParts.push({ type: "image", image: new URL(imageUrls[i]) });
-      contentParts.push({ type: "text", text: "\n" });
-    }
-
-    contentParts.push({ type: "text", text: "\nDesign motion for each frame. Use the director's note for emotional intent, the actual image for physical composition, and the sequence position for transitions." });
-
-    const { output } = await aiGenerateText({
-      model: openrouter.chat(primaryModel),
-      output: Output.object({ schema: frameMotionOutputSchema }),
-      system: systemPrompt,
-      messages: [{ role: "user", content: contentParts }],
-      temperature: 0.8,
-    });
-    if (!output) throw new Error("Failed to generate frame motion (vision)");
-
-    return output;
+  if (nextImageUrl) {
+    contentParts.push({ type: "text", text: "\nNEXT FRAME (transition target — the clip should move toward this):" });
+    contentParts.push({ type: "image", image: new URL(nextImageUrl) });
   }
 
-  const framesContext = frames.map((f, i) => {
-    let entry = `Frame ${i + 1} | Scene ${f.sceneOrder + 1} "${f.sceneTitle}" | Frame ${f.frameOrder + 1} | ${f.clipDuration}s clip`;
-    entry += `\nNarration: "${f.sceneText}"`;
-    entry += `\nDirector's Note: ${f.directorNote}`;
-    entry += `\nImage prompt: ${f.imagePrompt}`;
-    return entry;
-  }).join("\n\n");
+  let context = `\nScene: "${frame.sceneTitle}"`;
+  context += `\nNarration: "${frame.sceneText}"`;
+  context += `\nDirector's Note: ${frame.directorNote}`;
+  context += `\nClip duration: ${frame.clipDuration}s`;
+  context += `\nImage prompt: ${frame.imagePrompt}`;
+  context += `\n\nDesign the motion for this clip.`;
+  contentParts.push({ type: "text", text: context });
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: frameMotionOutputSchema }),
+    output: Output.object({ schema: singleFrameMotionSchema }),
     system: systemPrompt,
-    prompt: `Design motion for each frame in sequence:\n\n${framesContext}`,
-    temperature: 0.8,
+    messages: [{ role: "user", content: contentParts }],
+    temperature: 0.7,
   });
   if (!output) throw new Error("Failed to generate frame motion");
 
