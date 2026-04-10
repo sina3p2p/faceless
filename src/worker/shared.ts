@@ -90,18 +90,6 @@ export interface StoryAssetRef {
   url: string;
 }
 
-export async function resolveCharacterRefs(
-  characterImages: Array<{ url: string; description: string }> | null | undefined
-): Promise<CharacterRef[]> {
-  if (!characterImages || characterImages.length === 0) return [];
-  return Promise.all(
-    characterImages.map(async (c) => ({
-      url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
-      description: c.description,
-    }))
-  );
-}
-
 export async function resolveStoryAssets(
   storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null | undefined,
   characterImages?: Array<{ url: string; description: string }> | null

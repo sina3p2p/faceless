@@ -27,7 +27,7 @@ export async function POST(
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoId),
     with: {
-      series: { columns: { userId: true, imageModel: true, style: true, characterImages: true, videoSize: true } },
+      series: { columns: { userId: true, imageModel: true, style: true, storyAssets: true, characterImages: true, videoSize: true } },
     },
   });
 
@@ -59,10 +59,21 @@ export async function POST(
   const sizeConfig = getVideoSize(video.series.videoSize);
   const aspectRatio = sizeConfig.id as AspectRatio;
 
-  // Resolve series-level character images
+  // Resolve story assets (preferred) or legacy character images
+  const rawAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string }>;
   const rawChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
   const charRefs: CharacterRef[] = [];
-  if (rawChars.length > 0) {
+
+  if (rawAssets.length > 0) {
+    for (const a of rawAssets) {
+      charRefs.push({
+        url: a.url.startsWith("http") ? a.url : await getSignedDownloadUrl(a.url),
+        description: `${a.name}: ${a.description}`,
+        name: a.name,
+        type: a.type as "character" | "location" | "prop",
+      });
+    }
+  } else if (rawChars.length > 0) {
     for (const c of rawChars) {
       charRefs.push({
         url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),

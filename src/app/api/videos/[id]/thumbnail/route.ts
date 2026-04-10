@@ -26,7 +26,7 @@ export async function POST(
     with: {
       series: {
         columns: {
-          userId: true, characterImages: true, niche: true, style: true,
+          userId: true, storyAssets: true, characterImages: true, niche: true, style: true,
           videoType: true,
         },
       },
@@ -58,17 +58,18 @@ export async function POST(
       || video.scenes?.[0]?.imagePrompt?.slice(0, 150)
       || "";
 
-    const charDescs = ((video.series.characterImages ?? []) as Array<{ url: string; description: string }>)
-      .filter((c) => c.description)
-      .map((c) => c.description)
-      .join("; ");
+    const rawAssets = (video.series.storyAssets ?? []) as Array<{ name: string; description: string }>;
+    const rawChars = (video.series.characterImages ?? []) as Array<{ description: string }>;
+    const assetDescs = rawAssets.length > 0
+      ? rawAssets.filter((a) => a.description).map((a) => `${a.name}: ${a.description}`).join("; ")
+      : rawChars.filter((c) => c.description).map((c) => c.description).join("; ");
 
     prompt = [
       `A viral YouTube/TikTok thumbnail for a ${niche} video titled "${title}"`,
       `in ${style} art style.`,
       videoType === "music_video" ? "This is a music video — convey rhythm, energy, and musicality." : "",
       keyVisual ? `Key visual: ${keyVisual}.` : "",
-      charDescs ? `Featuring characters: ${charDescs}.` : "",
+      assetDescs ? `Featuring: ${assetDescs}.` : "",
       hook ? `Opening hook: "${hook}"` : "",
       `Ultra dramatic composition with bold vivid colors, extreme contrast, and cinematic depth of field.`,
       `The thumbnail must trigger curiosity and make viewers NEED to click.`,
@@ -76,15 +77,29 @@ export async function POST(
     ].filter(Boolean).join(" ");
   }
 
-  const rawChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
-  let charRefs: Array<{ url: string; description: string }> | undefined;
-  if (rawChars.length > 0 && imageModel === "nano-banana-2") {
-    charRefs = await Promise.all(
-      rawChars.map(async (c) => ({
-        url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
-        description: c.description,
-      }))
-    );
+  // Resolve asset refs for image models that support them
+  const storyAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string }>;
+  const legacyChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
+  let charRefs: Array<{ url: string; description: string; name?: string; type?: string }> | undefined;
+
+  if (imageModel === "nano-banana-2") {
+    if (storyAssets.length > 0) {
+      charRefs = await Promise.all(
+        storyAssets.map(async (a) => ({
+          url: a.url.startsWith("http") ? a.url : await getSignedDownloadUrl(a.url),
+          description: `${a.name}: ${a.description}`,
+          name: a.name,
+          type: a.type,
+        }))
+      );
+    } else if (legacyChars.length > 0) {
+      charRefs = await Promise.all(
+        legacyChars.map(async (c) => ({
+          url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
+          description: c.description,
+        }))
+      );
+    }
   }
 
   try {

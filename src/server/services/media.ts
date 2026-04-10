@@ -152,27 +152,33 @@ export async function generateNanoBananaImage(
     const contentParts: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
 
     if (hasRefs) {
-      const refLabels = characterRefs.map((c, i) => {
-        const typeName = c.type ? c.type.charAt(0).toUpperCase() + c.type.slice(1) : "Character";
-        const label = c.name || `${typeName} ${i + 1}`;
-        return `[${typeName} "${label}": ${c.description || "reference"}]`;
-      }).join(", ");
+      // Put reference images FIRST so the model sees them before the instructions
+      const imageResults = await Promise.all(
+        characterRefs.map(async (c) => {
+          const img = await fetchImageAsBase64(c.url);
+          return { ref: c, img };
+        })
+      );
 
-      contentParts.push({
-        type: "text",
-        text: `Generate an image using these reference assets — maintain their exact appearance: ${refLabels}\n\n${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
-      });
-
-      const imagePromises = characterRefs.map(async (c) => {
-        const img = await fetchImageAsBase64(c.url);
+      for (const { ref, img } of imageResults) {
         if (img) {
+          const typeName = ref.type ? ref.type.charAt(0).toUpperCase() + ref.type.slice(1) : "Character";
+          const label = ref.name || typeName;
+          contentParts.push({
+            type: "text",
+            text: `Reference image for ${typeName} "${label}" — ${ref.description || "use this exact appearance"}:`,
+          });
           contentParts.push({
             type: "image_url",
             image_url: { url: `data:${img.mimeType};base64,${img.base64}` },
           });
         }
+      }
+
+      contentParts.push({
+        type: "text",
+        text: `Now generate a NEW image following this prompt. The character(s) shown in the reference image(s) above MUST appear with the SAME face, hair, skin tone, body proportions, and clothing style — do NOT change their appearance.\n\n${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, cinematic lighting, no text or watermarks.`,
       });
-      await Promise.all(imagePromises);
     } else {
       contentParts.push({
         type: "text",
