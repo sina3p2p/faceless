@@ -13,6 +13,8 @@ import {
   generateTTSParallel,
   failJob,
   parseStoryAssets,
+  resolveStoryAssets,
+  filterAssetsByRefs,
   type StoryAssetInput,
 } from "./shared";
 import { generateSceneImage } from "./mediaJobs";
@@ -432,6 +434,11 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     const sizeConfig = getVideoSize(seriesRecord.videoSize);
     const ar = sizeConfig.id as AspectRatio;
 
+    const allAssets = await resolveStoryAssets(
+      seriesRecord.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null,
+      seriesRecord.characterImages as Array<{ url: string; description: string }> | null
+    );
+
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
@@ -456,7 +463,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       return;
     }
 
-    console.log(`[generate-frame-images] Generating ${targets.length} images with ${imageModel}`);
+    console.log(`[generate-frame-images] Generating ${targets.length} images with ${imageModel}, ${allAssets.length} story assets`);
 
     const BATCH_SIZE = WORKER.parallelImages;
     for (let i = 0; i < targets.length; i += BATCH_SIZE) {
@@ -465,8 +472,10 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       await Promise.all(
         batch.map(async ({ frame, sceneIdx }) => {
           const prompt = frame.imagePrompt || `Scene ${sceneIdx + 1}`;
+          const frameAssetRefs = frame.assetRefs as string[] | null;
+          const sceneRefs = filterAssetsByRefs(allAssets, frameAssetRefs);
           try {
-            const result = await generateSceneImage(prompt, imageModel, sceneIdx, undefined, ar);
+            const result = await generateSceneImage(prompt, imageModel, sceneIdx, sceneRefs, ar);
 
             const imgResp = await fetch(result.url);
             if (!imgResp.ok) throw new Error("Failed to download generated image");
