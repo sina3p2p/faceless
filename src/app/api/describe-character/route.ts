@@ -15,19 +15,37 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser();
   if (!user) return unauthorized();
 
-  const formData = await req.formData();
-  const file = formData.get("file") as File | null;
+  const contentType = req.headers.get("content-type") || "";
+  let dataUrl: string;
 
-  if (!file) return badRequest("No file provided");
+  if (contentType.includes("application/json")) {
+    const body = await req.json();
+    const imageUrl = body.imageUrl as string;
+    if (!imageUrl) return badRequest("No imageUrl provided");
 
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-  if (!allowedTypes.includes(file.type)) {
-    return badRequest("File must be JPEG, PNG, or WebP");
+    const { getSignedDownloadUrl } = await import("@/lib/storage");
+    const signedUrl = imageUrl.startsWith("http")
+      ? imageUrl
+      : await getSignedDownloadUrl(imageUrl);
+
+    const imgRes = await fetch(signedUrl);
+    if (!imgRes.ok) return badRequest("Could not fetch image");
+    const buffer = Buffer.from(await imgRes.arrayBuffer());
+    const mime = imgRes.headers.get("content-type") || "image/jpeg";
+    dataUrl = `data:${mime.split(";")[0]};base64,${buffer.toString("base64")}`;
+  } else {
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
+    if (!file) return badRequest("No file provided");
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      return badRequest("File must be JPEG, PNG, or WebP");
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    dataUrl = `data:${file.type};base64,${buffer.toString("base64")}`;
   }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const base64 = buffer.toString("base64");
-  const dataUrl = `data:${file.type};base64,${base64}`;
 
   try {
     const { text } = await generateText({

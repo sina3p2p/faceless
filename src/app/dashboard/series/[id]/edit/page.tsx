@@ -300,14 +300,11 @@ export default function EditSeriesPage() {
                         onClick={async () => {
                           setDescribingIdx(idx);
                           try {
-                            // Fetch the image to describe it
-                            const imgUrl = asset.url.startsWith("http") ? asset.url : `/api/media/${asset.url}`;
-                            const imgRes = await fetch(imgUrl);
-                            if (!imgRes.ok) return;
-                            const blob = await imgRes.blob();
-                            const fd = new FormData();
-                            fd.append("file", blob, "asset.jpg");
-                            const res = await fetch("/api/describe-character", { method: "POST", body: fd });
+                            const res = await fetch("/api/describe-character", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ imageUrl: asset.url }),
+                            });
                             if (res.ok) {
                               const data = await res.json();
                               setAssets((prev) => prev.map((a) => a.id === asset.id ? { ...a, description: data.description } : a));
