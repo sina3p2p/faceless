@@ -600,26 +600,30 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
             return;
           }
 
-          const result = await generateSingleFrameMotion(
-            {
-              imagePrompt: frameData.imagePrompt,
-              clipDuration: frameData.clipDuration,
-              sceneText: frameData.sceneText,
-              directorNote: frameData.directorNote,
-              sceneTitle: frameData.sceneTitle,
-            },
-            seriesRecord.style,
-            currentImageUrl,
-            nextImageUrl,
-            agents.motionModel
-          );
+          try {
+            const result = await generateSingleFrameMotion(
+              {
+                imagePrompt: frameData.imagePrompt,
+                clipDuration: frameData.clipDuration,
+                sceneText: frameData.sceneText,
+                directorNote: frameData.directorNote,
+                sceneTitle: frameData.sceneTitle,
+              },
+              seriesRecord.style,
+              currentImageUrl,
+              nextImageUrl,
+              agents.motionModel
+            );
 
-          await db
-            .update(schema.sceneFrames)
-            .set({ visualDescription: result.visualDescription })
-            .where(eq(schema.sceneFrames.id, frameData.frameId));
+            await db
+              .update(schema.sceneFrames)
+              .set({ visualDescription: result.visualDescription })
+              .where(eq(schema.sceneFrames.id, frameData.frameId));
 
-          console.log(`[generate-motion] Frame ${globalIdx + 1}/${framesToProcess.length} done`);
+            console.log(`[generate-motion] Frame ${globalIdx + 1}/${framesToProcess.length} done`);
+          } catch (err) {
+            console.error(`[generate-motion] Frame ${frameData.frameId} failed:`, err instanceof Error ? err.message : err);
+          }
         })
       );
 
@@ -687,25 +691,30 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
       await Promise.all(
         batch.map(async ({ frame, sceneIdx }) => {
-          const imageSignedUrl = await getSignedDownloadUrl(frame.imageUrl!);
-          const videoPrompt = `${frame.visualDescription || "Cinematic motion"}. ${seriesRecord.style} style, smooth camera motion.`;
-          const desiredDuration = Math.max(3, Math.round(frame.clipDuration ?? 5));
+          try {
+            const imageSignedUrl = await getSignedDownloadUrl(frame.imageUrl!);
+            const videoPrompt = `${frame.visualDescription || "Cinematic motion"}. ${seriesRecord.style} style, smooth camera motion.`;
+            const desiredDuration = Math.max(3, Math.round(frame.clipDuration ?? 5));
 
-          console.log(`[generate-frame-videos] Frame ${frame.id} (scene ${sceneIdx}): ${desiredDuration}s clip`);
+            console.log(`[generate-frame-videos] Frame ${frame.id} (scene ${sceneIdx}): ${desiredDuration}s clip`);
 
-          const videoResult = await getAIVideoForScene(imageSignedUrl, videoPrompt, desiredDuration, videoModelKey);
+            const videoResult = await getAIVideoForScene(imageSignedUrl, videoPrompt, desiredDuration, videoModelKey);
 
-          const videoResp = await fetch(videoResult.videoUrl);
-          if (!videoResp.ok) throw new Error("Failed to download video");
-          const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
+            const videoResp = await fetch(videoResult.videoUrl);
+            if (!videoResp.ok) throw new Error("Failed to download video");
+            const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
 
-          const key = `frames/${videoProjectId}/video_${frame.id}_${Date.now()}.mp4`;
-          await uploadFile(key, videoBuffer, "video/mp4");
+            const key = `frames/${videoProjectId}/video_${frame.id}_${Date.now()}.mp4`;
+            await uploadFile(key, videoBuffer, "video/mp4");
 
-          await db
-            .update(schema.sceneFrames)
-            .set({ videoUrl: key })
-            .where(eq(schema.sceneFrames.id, frame.id));
+            await db
+              .update(schema.sceneFrames)
+              .set({ videoUrl: key })
+              .where(eq(schema.sceneFrames.id, frame.id));
+          } catch (err) {
+            console.error(`[generate-frame-videos] Frame ${frame.id} (scene ${sceneIdx}) failed:`, err instanceof Error ? err.message : err);
+            // Continue with other frames — don't break the whole job
+          }
         })
       );
 
@@ -713,7 +722,17 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
       await job.updateProgress(progress);
     }
 
-    console.log(`[generate-frame-videos] All clips generated, triggering compose`);
+    // Check how many succeeded
+    const updatedFrames = await Promise.all(
+      targets.map(async ({ frame }) => {
+        const f = await db.query.sceneFrames.findFirst({ where: eq(schema.sceneFrames.id, frame.id), columns: { videoUrl: true } });
+        return !!f?.videoUrl;
+      })
+    );
+    const succeeded = updatedFrames.filter(Boolean).length;
+    const failed = targets.length - succeeded;
+
+    console.log(`[generate-frame-videos] ${succeeded}/${targets.length} clips generated${failed > 0 ? ` (${failed} failed — content moderation or other error)` : ""}, triggering compose`);
 
     await renderQueue.add("compose-final", { videoProjectId, seriesId, userId });
   } catch (error) {
