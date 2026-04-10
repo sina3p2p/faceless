@@ -21,7 +21,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { IMAGE_MODELS } from "@/lib/constants";
+import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/constants";
 
 interface MediaVersion {
   id: string;
@@ -78,7 +78,7 @@ interface VideoDetail {
   duration: number | null;
   script: string | null;
   config: { pipelineMode?: "manual" | "auto" } | null;
-  series: { name: string; niche: string; imageModel: string | null; videoType: string; storyAssets?: StoryAssetItem[] };
+  series: { name: string; niche: string; imageModel: string | null; videoModel: string | null; videoType: string; storyAssets?: StoryAssetItem[] };
 }
 
 function AssetRefPills({
@@ -183,6 +183,7 @@ function FrameCard({
   onUpdatePrompt,
   onUpdateMotion,
   onRegenerateVideo,
+  defaultVideoModel,
 }: {
   frame: SceneFrame;
   frameIndex: number;
@@ -194,12 +195,15 @@ function FrameCard({
   onGenerateImage?: (frameId: string, prompt?: string) => void;
   onUpdatePrompt?: (frameId: string, prompt: string) => void;
   onUpdateMotion?: (frameId: string, motion: string) => void;
-  onRegenerateVideo?: (frameId: string) => void;
+  onRegenerateVideo?: (frameId: string, videoModel?: string) => void;
+  defaultVideoModel?: string;
 }) {
   const [editingPrompt, setEditingPrompt] = useState(false);
   const [promptText, setPromptText] = useState(frame.imagePrompt || "");
   const [editingMotion, setEditingMotion] = useState(false);
   const [motionText, setMotionText] = useState(frame.visualDescription || "");
+  const [showVideoRegen, setShowVideoRegen] = useState(false);
+  const [selectedVideoModel, setSelectedVideoModel] = useState(defaultVideoModel || "");
 
   useEffect(() => {
     setPromptText(frame.imagePrompt || "");
@@ -296,43 +300,117 @@ function FrameCard({
 
       {/* Video clip preview */}
       {showVideo && frame.videoUrl && (
-        <div className="mt-1.5 relative group">
-          <video
-            src={frame.videoUrl}
-            className="rounded w-full max-h-40 object-cover bg-black"
-            muted
-            loop
-            playsInline
-            onMouseEnter={(e) => e.currentTarget.play()}
-            onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
-          />
-          <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-green-500/80 text-white text-[9px] font-bold uppercase">
-            Video Ready
+        <div className="mt-1.5">
+          <div className="relative group">
+            <video
+              src={frame.videoUrl}
+              className="rounded w-full max-h-40 object-cover bg-black"
+              muted
+              loop
+              playsInline
+              onMouseEnter={(e) => e.currentTarget.play()}
+              onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
+            />
+            <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-green-500/80 text-white text-[9px] font-bold uppercase">
+              Video Ready
+            </div>
+            {onRegenerateVideo && !generatingVideo && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowVideoRegen(!showVideoRegen); }}
+                className="absolute top-1 right-1 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-600"
+              >
+                Regenerate Video
+              </button>
+            )}
           </div>
-          {onRegenerateVideo && !generatingVideo && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onRegenerateVideo(frame.id); }}
-              className="absolute top-1 right-1 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-600"
-            >
-              Regenerate Video
-            </button>
+          {showVideoRegen && !generatingVideo && (
+            <div className="mt-1.5 rounded-lg bg-black/30 border border-white/10 p-2 space-y-1.5">
+              <div className="flex flex-wrap gap-1">
+                {VIDEO_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setSelectedVideoModel(m.id); }}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      selectedVideoModel === m.id
+                        ? "bg-violet-600 text-white"
+                        : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+                    }`}
+                    title={m.description}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRegenerateVideo?.(frame.id, selectedVideoModel || undefined); setShowVideoRegen(false); }}
+                  className="px-2.5 py-1 rounded-lg bg-violet-600 text-white text-[10px] font-medium hover:bg-violet-500 transition-colors"
+                >
+                  Generate
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowVideoRegen(false); }}
+                  className="px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 text-[10px] font-medium hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}
 
       {/* Video missing / failed indicator */}
       {showVideo && !frame.videoUrl && frame.imageUrl && !generatingVideo && (
-        <div className="mt-1.5 flex items-center gap-2">
-          <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[9px] font-bold uppercase">
-            No Video
-          </span>
-          {onRegenerateVideo && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onRegenerateVideo(frame.id); }}
-              className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
-            >
-              Generate Video
-            </button>
+        <div className="mt-1.5">
+          <div className="flex items-center gap-2">
+            <span className="px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[9px] font-bold uppercase">
+              No Video
+            </span>
+            {onRegenerateVideo && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowVideoRegen(!showVideoRegen); }}
+                className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
+              >
+                Generate Video
+              </button>
+            )}
+          </div>
+          {showVideoRegen && (
+            <div className="mt-1.5 rounded-lg bg-black/30 border border-white/10 p-2 space-y-1.5">
+              <div className="flex flex-wrap gap-1">
+                {VIDEO_MODELS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setSelectedVideoModel(m.id); }}
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                      selectedVideoModel === m.id
+                        ? "bg-violet-600 text-white"
+                        : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+                    }`}
+                    title={m.description}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRegenerateVideo?.(frame.id, selectedVideoModel || undefined); setShowVideoRegen(false); }}
+                  className="px-2.5 py-1 rounded-lg bg-violet-600 text-white text-[10px] font-medium hover:bg-violet-500 transition-colors"
+                >
+                  Generate
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowVideoRegen(false); }}
+                  className="px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 text-[10px] font-medium hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -401,6 +479,7 @@ function SortableSceneCard({
   showFrameActions,
   showFrameMotion,
   showFrameVideo,
+  defaultVideoModel,
 }: {
   scene: Scene;
   index: number;
@@ -422,12 +501,13 @@ function SortableSceneCard({
   onGenerateFrameImage?: (frameId: string, prompt?: string) => void;
   onUpdateFramePrompt?: (frameId: string, prompt: string) => void;
   onUpdateFrameMotion?: (frameId: string, motion: string) => void;
-  onRegenerateFrameVideo?: (frameId: string) => void;
+  onRegenerateFrameVideo?: (frameId: string, videoModel?: string) => void;
   generatingFrameIds?: Set<string>;
   generatingFrameVideoIds?: Set<string>;
   showFrameActions?: boolean;
   showFrameMotion?: boolean;
   showFrameVideo?: boolean;
+  defaultVideoModel?: string;
 }) {
   const {
     attributes,
@@ -622,6 +702,7 @@ function SortableSceneCard({
                   onUpdatePrompt={onUpdateFramePrompt}
                   onUpdateMotion={onUpdateFrameMotion}
                   onRegenerateVideo={onRegenerateFrameVideo}
+                  defaultVideoModel={defaultVideoModel}
                 />
               ))}
             </div>
@@ -1714,13 +1795,15 @@ export default function ReviewPage() {
     });
   }
 
-  async function handleRegenerateFrameVideo(frameId: string) {
+  async function handleRegenerateFrameVideo(frameId: string, videoModel?: string) {
     setGeneratingFrameVideoIds((prev) => new Set(prev).add(frameId));
     try {
+      const body: Record<string, unknown> = {};
+      if (videoModel) body.videoModel = videoModel;
       const res = await fetch(`/api/videos/${id}/frames/${frameId}/generate-video`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         await loadData();
@@ -2315,6 +2398,7 @@ export default function ReviewPage() {
                 showFrameActions={isPromptsReview || isImageReview || isNewMotionReview}
                 showFrameMotion={isNewMotionReview || isImageReview}
                 showFrameVideo={isNewMotionReview || video?.status === "COMPLETED" || video?.status === "VIDEO_GENERATION"}
+                defaultVideoModel={video?.series?.videoModel || undefined}
               />
             ))}
           </div>
