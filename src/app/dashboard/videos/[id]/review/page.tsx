@@ -171,6 +171,110 @@ function AssetRefPills({
   );
 }
 
+function FrameCard({
+  frame,
+  frameIndex,
+  generating,
+  showActions,
+  onGenerateImage,
+  onUpdatePrompt,
+}: {
+  frame: SceneFrame;
+  frameIndex: number;
+  generating: boolean;
+  showActions: boolean;
+  onGenerateImage?: (frameId: string, prompt?: string) => void;
+  onUpdatePrompt?: (frameId: string, prompt: string) => void;
+}) {
+  const [editingPrompt, setEditingPrompt] = useState(false);
+  const [promptText, setPromptText] = useState(frame.imagePrompt || "");
+
+  useEffect(() => {
+    setPromptText(frame.imagePrompt || "");
+  }, [frame.imagePrompt]);
+
+  return (
+    <div className="rounded-lg bg-white/[0.02] border border-white/5 px-3 py-2">
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-[10px] uppercase tracking-wider text-violet-500 font-medium">Frame {frameIndex + 1}</span>
+        {frame.clipDuration && (
+          <span className="text-[10px] text-gray-600 font-mono">{frame.clipDuration}s</span>
+        )}
+        {generating && (
+          <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full ml-auto" />
+        )}
+      </div>
+
+      {editingPrompt ? (
+        <textarea
+          value={promptText}
+          onChange={(e) => setPromptText(e.target.value)}
+          onBlur={() => {
+            setEditingPrompt(false);
+            if (promptText !== (frame.imagePrompt || "") && onUpdatePrompt) {
+              onUpdatePrompt(frame.id, promptText);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") { setPromptText(frame.imagePrompt || ""); setEditingPrompt(false); }
+          }}
+          autoFocus
+          rows={3}
+          className="w-full mt-1 bg-black/40 border border-violet-500/20 rounded-lg px-3 py-2 text-xs text-gray-300 resize-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
+        />
+      ) : frame.imagePrompt ? (
+        <p
+          className={`text-xs text-gray-500 leading-relaxed ${showActions ? "cursor-text hover:text-gray-400 transition-colors" : ""}`}
+          onClick={(e) => { if (showActions) { e.stopPropagation(); setEditingPrompt(true); } }}
+        >
+          {frame.imagePrompt}
+        </p>
+      ) : null}
+
+      {frame.imageUrl && (
+        <div className="mt-1.5 relative group">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={frame.imageUrl} alt={`Frame ${frameIndex + 1}`} className="rounded w-full max-h-40 object-cover" />
+          {showActions && !generating && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onGenerateImage?.(frame.id); }}
+              className="absolute top-1 right-1 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-600"
+            >
+              Regenerate
+            </button>
+          )}
+        </div>
+      )}
+
+      {!frame.imageUrl && showActions && !generating && (
+        <div className="mt-1 flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); onGenerateImage?.(frame.id); }}
+            className="text-[10px] text-violet-400 hover:text-violet-300 transition-colors"
+          >
+            Generate Image
+          </button>
+          {frame.imagePrompt && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setEditingPrompt(true); }}
+              className="text-[10px] text-gray-500 hover:text-gray-400 transition-colors"
+            >
+              Edit Prompt
+            </button>
+          )}
+        </div>
+      )}
+
+      {!frame.imageUrl && generating && (
+        <div className="mt-1 flex items-center gap-1 text-[10px] text-violet-400">
+          <div className="animate-spin w-2.5 h-2.5 border border-violet-400 border-t-transparent rounded-full" />
+          Generating...
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SortableSceneCard({
   scene,
   index,
@@ -189,6 +293,10 @@ function SortableSceneCard({
   showDirectorNote,
   showAudioPlayer,
   showDuration,
+  onGenerateFrameImage,
+  onUpdateFramePrompt,
+  generatingFrameIds,
+  showFrameActions,
 }: {
   scene: Scene;
   index: number;
@@ -207,6 +315,10 @@ function SortableSceneCard({
   showDirectorNote?: boolean;
   showAudioPlayer?: boolean;
   showDuration?: boolean;
+  onGenerateFrameImage?: (frameId: string, prompt?: string) => void;
+  onUpdateFramePrompt?: (frameId: string, prompt: string) => void;
+  generatingFrameIds?: Set<string>;
+  showFrameActions?: boolean;
 }) {
   const {
     attributes,
@@ -388,20 +500,15 @@ function SortableSceneCard({
           {!scene.imagePrompt && scene.frames && scene.frames.length > 0 && (
             <div className="mb-2 space-y-2">
               {scene.frames.map((frame, fi) => (
-                <div key={frame.id} className="rounded-lg bg-white/[0.02] border border-white/5 px-3 py-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] uppercase tracking-wider text-violet-500 font-medium">Frame {fi + 1}</span>
-                    {frame.clipDuration && (
-                      <span className="text-[10px] text-gray-600 font-mono">{frame.clipDuration}s</span>
-                    )}
-                  </div>
-                  {frame.imagePrompt && (
-                    <p className="text-xs text-gray-500 leading-relaxed">{frame.imagePrompt}</p>
-                  )}
-                  {frame.imageUrl && (
-                    <img src={frame.imageUrl} alt={`Frame ${fi + 1}`} className="mt-1.5 rounded w-full max-h-40 object-cover" />
-                  )}
-                </div>
+                <FrameCard
+                  key={frame.id}
+                  frame={frame}
+                  frameIndex={fi}
+                  generating={generatingFrameIds?.has(frame.id) ?? false}
+                  showActions={showFrameActions ?? false}
+                  onGenerateImage={onGenerateFrameImage}
+                  onUpdatePrompt={onUpdateFramePrompt}
+                />
               ))}
             </div>
           )}
@@ -1256,6 +1363,8 @@ export default function ReviewPage() {
   const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingMotion, setGeneratingMotion] = useState(false);
   const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
+  const [generatingFrameIds, setGeneratingFrameIds] = useState<Set<string>>(new Set());
+  const [generatingAllFrames, setGeneratingAllFrames] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1435,6 +1544,53 @@ export default function ReviewPage() {
     }
   }
 
+  async function handleGenerateFrameImage(frameId: string, promptOverride?: string, modelOverride?: string) {
+    setGeneratingFrameIds((prev) => new Set(prev).add(frameId));
+    try {
+      const body: Record<string, unknown> = {};
+      if (promptOverride) body.imagePrompt = promptOverride;
+      if (modelOverride) body.imageModel = modelOverride;
+
+      const res = await fetch(`/api/videos/${id}/frames/${frameId}/generate-image`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        await loadData();
+      }
+    } finally {
+      setGeneratingFrameIds((prev) => {
+        const next = new Set(prev);
+        next.delete(frameId);
+        return next;
+      });
+    }
+  }
+
+  async function handleGenerateAllFrameImages(regenerateExisting = false) {
+    setGeneratingAllFrames(true);
+    try {
+      await fetch(`/api/videos/${id}/generate-frame-images`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ regenerateExisting }),
+      });
+      setVideo((prev) => prev ? { ...prev, status: "IMAGE_GENERATION" } : prev);
+    } catch {
+      setGeneratingAllFrames(false);
+    }
+  }
+
+  async function handleUpdateFramePrompt(frameId: string, imagePrompt: string) {
+    await fetch(`/api/videos/${id}/frames/${frameId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imagePrompt }),
+    });
+  }
+
   const isMusicVideo = video?.series?.videoType === "music_video";
   const isVisualReview = video?.status === "REVIEW_VISUAL";
   const isMotionReview = isVisualReview && !isMusicVideo;
@@ -1455,6 +1611,7 @@ export default function ReviewPage() {
     const isImageGen = video?.status === "IMAGE_GENERATION";
     const isMotionGen = video?.status === "VIDEO_SCRIPT" && !isMusicVideo;
     setGeneratingAll(isImageGen ?? false);
+    setGeneratingAllFrames(isImageGen ?? false);
     setGeneratingMotion(isMotionGen ?? false);
 
     if (!isProcessing) return;
@@ -1599,6 +1756,10 @@ export default function ReviewPage() {
   const totalDuration = scenes.reduce((s, sc) => s + sc.duration, 0);
   const allImagesGenerated = scenes.length > 0 && scenes.every((s) => s.assetUrl);
   const someImagesGenerated = scenes.some((s) => s.assetUrl);
+  const allFrames = scenes.flatMap((s) => s.frames ?? []);
+  const hasFrames = allFrames.length > 0;
+  const allFrameImagesGenerated = hasFrames && allFrames.every((f) => f.imageUrl);
+  const someFrameImagesGenerated = allFrames.some((f) => f.imageUrl);
 
   if (loading) {
     return (
@@ -1730,8 +1891,8 @@ export default function ReviewPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  loading={generatingAll}
-                  onClick={() => handleGenerateAllImages(true)}
+                  loading={generatingAllFrames || generatingAll}
+                  onClick={() => hasFrames ? handleGenerateAllFrameImages(true) : handleGenerateAllImages(true)}
                   disabled={scenes.length === 0}
                 >
                   Regenerate All Images
@@ -1748,23 +1909,23 @@ export default function ReviewPage() {
               </>
             ) : (
               <>
-                {!allImagesGenerated && (
+                {!allImagesGenerated && !allFrameImagesGenerated && (
                   <Button
                     variant="outline"
                     size="sm"
-                    loading={generatingAll}
-                    onClick={() => handleGenerateAllImages(false)}
+                    loading={generatingAll || generatingAllFrames}
+                    onClick={() => hasFrames ? handleGenerateAllFrameImages(false) : handleGenerateAllImages(false)}
                     disabled={scenes.length === 0}
                   >
-                    {someImagesGenerated ? "Generate Remaining" : "Generate Preview Images"}
+                    {(someImagesGenerated || someFrameImagesGenerated) ? "Generate Remaining" : "Generate Preview Images"}
                   </Button>
                 )}
-                {someImagesGenerated && (
+                {(someImagesGenerated || someFrameImagesGenerated) && (
                   <Button
                     variant="outline"
                     size="sm"
-                    loading={generatingAll}
-                    onClick={() => handleGenerateAllImages(true)}
+                    loading={generatingAll || generatingAllFrames}
+                    onClick={() => hasFrames ? handleGenerateAllFrameImages(true) : handleGenerateAllImages(true)}
                     disabled={scenes.length === 0}
                   >
                     Regenerate All Images
@@ -1945,9 +2106,19 @@ export default function ReviewPage() {
                 </Button>
               )}
               {isImageReview && !isMusicVideo && (
-                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-images")}>
-                  Approve Images &amp; Generate Motion
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    loading={generatingAllFrames || generatingAll}
+                    onClick={() => hasFrames ? handleGenerateAllFrameImages(true) : handleGenerateAllImages(true)}
+                  >
+                    Regenerate All Images
+                  </Button>
+                  <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-images")}>
+                    Approve Images &amp; Generate Motion
+                  </Button>
+                </>
               )}
               {isNewMotionReview && (
                 <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-motion")}>
@@ -1992,6 +2163,10 @@ export default function ReviewPage() {
                 showDirectorNote={true}
                 showAudioPlayer={isTTSReview || isPromptsReview || isNewMotionReview}
                 showDuration={hasTTSRun}
+                onGenerateFrameImage={(frameId, prompt) => handleGenerateFrameImage(frameId, prompt)}
+                onUpdateFramePrompt={handleUpdateFramePrompt}
+                generatingFrameIds={generatingFrameIds}
+                showFrameActions={isPromptsReview || isImageReview || isNewMotionReview}
               />
             ))}
           </div>
@@ -2031,8 +2206,8 @@ export default function ReviewPage() {
               <Button
                 variant="outline"
                 size="lg"
-                loading={generatingAll}
-                onClick={() => handleGenerateAllImages(true)}
+                loading={generatingAllFrames || generatingAll}
+                onClick={() => hasFrames ? handleGenerateAllFrameImages(true) : handleGenerateAllImages(true)}
               >
                 Regenerate All Images
               </Button>
@@ -2047,22 +2222,22 @@ export default function ReviewPage() {
             </>
           ) : (
             <>
-              {!allImagesGenerated && (
+              {!allImagesGenerated && !allFrameImagesGenerated && (
                 <Button
                   variant="outline"
                   size="lg"
-                  loading={generatingAll}
-                  onClick={() => handleGenerateAllImages(false)}
+                  loading={generatingAll || generatingAllFrames}
+                  onClick={() => hasFrames ? handleGenerateAllFrameImages(false) : handleGenerateAllImages(false)}
                 >
                   Generate Preview Images
                 </Button>
               )}
-              {someImagesGenerated && (
+              {(someImagesGenerated || someFrameImagesGenerated) && (
                 <Button
                   variant="outline"
                   size="lg"
-                  loading={generatingAll}
-                  onClick={() => handleGenerateAllImages(true)}
+                  loading={generatingAll || generatingAllFrames}
+                  onClick={() => hasFrames ? handleGenerateAllFrameImages(true) : handleGenerateAllImages(true)}
                 >
                   Regenerate All Images
                 </Button>
