@@ -1000,7 +1000,7 @@ You MUST return exactly ${scenes.length} scenes, each with the appropriate numbe
 // ── Motion Agent (per-frame: current image + next image → visualDescription) ──
 
 const singleFrameMotionSchema = z.object({
-  visualDescription: z.string().describe("Motion description for the AI video model (30-60 words). Describe CONTINUOUS MOTION: camera movement, subject movement, environment movement. The motion must naturally transition FROM the current frame's image TOWARD the next frame's image."),
+  visualDescription: z.string().describe("Vivid motion description for an AI video model (40-80 words). Describe what every subject DOES: body movement, facial expressions, hand gestures, object interactions. Also describe environment motion and camera movement. The AI video model cannot read — it only understands visual action descriptions."),
 });
 
 export type SingleFrameMotionOutput = z.infer<typeof singleFrameMotionSchema>;
@@ -1020,43 +1020,47 @@ export async function generateSingleFrameMotion(
 ): Promise<SingleFrameMotionOutput> {
   const primaryModel = model || LLM.motionModel;
 
-  const systemPrompt = `You are an elite video editor. Design motion for a single video clip.
+  const systemPrompt = `You are an elite video director writing motion instructions for an AI video model. The video model sees the starting image and your text — it has NO other context. Your description must paint a complete picture of what happens during the clip.
 
-MOTION RULES:
-- visualDescription must be 30-60 words describing CONTINUOUS MOTION
-- CAMERA MOTION: "slowly dollies forward", "smooth orbit", "crane shot rising", "tracking shot", "slow push in"
-- SUBJECT MOTION: "turns head slowly", "hands reaching forward", "walking through", "wind blowing hair"
-- ENVIRONMENT MOTION: "clouds drifting", "rain falling", "leaves swirling", "fire flickering"
-- NEVER write static descriptions. The frame MUST have camera + subject/environment motion.
+WHAT TO DESCRIBE (in order of importance):
+1. SUBJECT ACTIONS (most important): What does each person/character/animal DO? Be specific about body parts.
+   - BAD: "the boy moves"
+   - GOOD: "the boy reaches forward with both hands, grabs the umbrella handle, and pushes it upward, his eyes widening with excitement, mouth breaking into a grin"
+2. OBJECT INTERACTIONS: How do objects move or get used?
+   - BAD: "items on the table"
+   - GOOD: "vegetables tumble from the cutting board into the sizzling pan, steam rising, oil droplets popping"
+3. ENVIRONMENT MOTION: Wind, rain, light, particles, liquid, fire — anything alive in the scene.
+   - BAD: "rain falls"
+   - GOOD: "heavy raindrops streak diagonally across the frame, splattering on the wet cobblestones, puddles rippling outward"
+4. CAMERA MOTION (least important — only add if it enhances the action):
+   - "camera slowly pushes in", "slight orbit to the right", "gentle crane up"
 
-TRANSITION (CRITICAL):
-- The video clip starts from the CURRENT frame image.${nextImageUrl ? "\n- The clip must visually transition TOWARD the NEXT frame image — motion should lead the eye toward what comes next." : "\n- This is the FINAL frame of the video — the clip should settle, slow down, or come to a gentle, conclusive ending."}
-- Match motion speed to clip duration: ${frame.clipDuration}s${frame.clipDuration <= 5 ? " (short = quick, purposeful motion)" : " (longer = slow, cinematic motion)"}
-
-MATCH MOTION TO THE IMAGES:
-- Look at subject position, depth, lighting direction, composition in both images
-- Close-ups → subtle motion (slight head turn, eye movement)
-- Wide shots → larger camera movements (dolly, crane, orbit)
-- If the next frame has a different subject/location, use a cinematic transition (pan away, fade through motion, pull back to reveal)
+RULES:
+- 40-80 words. Every word must describe VISIBLE MOTION.
+- NEVER use abstract/emotional language the video model can't render: "feeling happy", "sense of wonder", "peaceful mood"
+- NEVER say "the scene" or "the frame" — describe the actual subjects by what they look like.
+- Start with the main subject's action, not the camera.${nextImageUrl ? `
+- The clip must transition toward the NEXT frame — end the motion moving in that direction.` : `
+- This is the FINAL clip — the action should resolve and settle. The main subject finishes their action, movement gradually slows.`}
+- Clip duration: ${frame.clipDuration}s${frame.clipDuration <= 5 ? " — quick, decisive actions" : " — slower, more elaborate actions with pauses"}
 
 Visual style: ${style}.`;
 
   const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: URL }> = [];
 
-  contentParts.push({ type: "text", text: "CURRENT FRAME (start of clip):" });
+  contentParts.push({ type: "text", text: "CURRENT FRAME (the video starts from this image):" });
   contentParts.push({ type: "image", image: new URL(currentImageUrl) });
 
   if (nextImageUrl) {
-    contentParts.push({ type: "text", text: "\nNEXT FRAME (transition target — the clip should move toward this):" });
+    contentParts.push({ type: "text", text: "\nNEXT FRAME (the video should end moving toward this image):" });
     contentParts.push({ type: "image", image: new URL(nextImageUrl) });
   }
 
   let context = `\nScene: "${frame.sceneTitle}"`;
-  context += `\nNarration: "${frame.sceneText}"`;
-  context += `\nDirector's Note: ${frame.directorNote}`;
+  context += `\nWhat's happening: "${frame.sceneText}"`;
+  context += `\nDirector's intent: ${frame.directorNote}`;
   context += `\nClip duration: ${frame.clipDuration}s`;
-  context += `\nImage prompt: ${frame.imagePrompt}`;
-  context += `\n\nDesign the motion for this clip.`;
+  context += `\n\nDescribe the motion for this clip. Focus on what the subjects DO, not how the camera moves.`;
   contentParts.push({ type: "text", text: context });
 
   const { output } = await aiGenerateText({

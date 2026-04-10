@@ -574,12 +574,10 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       return;
     }
 
-    // Process N-1 frames (last frame is the ending frame — no motion needed)
-    const framesToProcess = allFrameData.length > 1
-      ? allFrameData.slice(0, -1)
-      : allFrameData;
+    // All frames get motion — last frame gets null nextImageUrl so the model writes an ending
+    const framesToProcess = allFrameData;
 
-    console.log(`[generate-motion] Generating motion for ${framesToProcess.length} of ${allFrameData.length} frames (last frame = ending), ${existingScenes.length} scenes`);
+    console.log(`[generate-motion] Generating motion for ${framesToProcess.length} frames across ${existingScenes.length} scenes`);
 
     const agents = getAgentModels(seriesRecord);
     const BATCH_SIZE = WORKER.parallelImages; // reuse concurrency setting
@@ -629,15 +627,6 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
       const progress = Math.round(((i + batch.length) / framesToProcess.length) * 100);
       await job.updateProgress(progress);
-    }
-
-    // Last frame gets a default ending motion (no LLM call needed)
-    if (allFrameData.length > 1) {
-      const lastFrame = allFrameData[allFrameData.length - 1];
-      await db
-        .update(schema.sceneFrames)
-        .set({ visualDescription: "Slow gentle zoom out, the scene gradually settles, ambient motion slows to a calm stop, soft fade, peaceful conclusion." })
-        .where(eq(schema.sceneFrames.id, lastFrame.frameId));
     }
 
     console.log(`[generate-motion] Motion descriptions ready for review`);
@@ -693,7 +682,9 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
         batch.map(async ({ frame, sceneIdx }) => {
           try {
             const imageSignedUrl = await getSignedDownloadUrl(frame.imageUrl!);
-            const videoPrompt = `${frame.visualDescription || "Cinematic motion"}. ${seriesRecord.style} style, smooth camera motion.`;
+            const videoPrompt = frame.visualDescription
+              ? `${frame.visualDescription}. ${seriesRecord.style} style.`
+              : `Cinematic motion, smooth camera movement. ${seriesRecord.style} style.`;
             const desiredDuration = Math.max(3, Math.round(frame.clipDuration ?? 5));
 
             console.log(`[generate-frame-videos] Frame ${frame.id} (scene ${sceneIdx}): ${desiredDuration}s clip`);
