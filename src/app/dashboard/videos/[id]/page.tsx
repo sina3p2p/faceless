@@ -1709,7 +1709,7 @@ export default function ReviewPage() {
     try {
       const res = await fetch(`/api/videos/${id}/render`, { method: "POST" });
       if (res.ok) {
-        router.push(`/dashboard/videos/${id}`);
+        await loadData();
       }
     } catch { }
     setRendering(false);

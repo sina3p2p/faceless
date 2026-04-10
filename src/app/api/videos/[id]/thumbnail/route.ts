@@ -78,9 +78,9 @@ export async function POST(
   }
 
   // Resolve asset refs for image models that support them
-  const storyAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string }>;
+  const storyAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }>;
   const legacyChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
-  let charRefs: Array<{ url: string; description: string; name?: string; type?: string }> | undefined;
+  let charRefs: Array<{ url: string; description: string; name?: string; type?: "character" | "location" | "prop" }> | undefined;
 
   if (imageModel === "nano-banana-2") {
     if (storyAssets.length > 0) {
