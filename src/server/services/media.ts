@@ -372,16 +372,10 @@ async function generateAnyImage(
 
 export async function getMediaForScene(
   imagePrompt: string,
-  preferAiImage = false,
   imageModel = "dall-e-3",
   characterRefs?: CharacterRef[],
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset> {
-  if (preferAiImage) {
-    const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs, aspectRatio);
-    if (generatedImage) return generatedImage;
-  }
-
   const generatedImage = await generateAnyImage(imagePrompt, imageModel, characterRefs, aspectRatio);
   if (generatedImage) return generatedImage;
 

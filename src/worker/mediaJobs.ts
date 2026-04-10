@@ -62,7 +62,7 @@ export async function fetchFacelessMediaParallel(
 
         const imgModel = seriesRecord.imageModel || "dall-e-3";
         const refs = seriesRecord.characterRefs?.length ? seriesRecord.characterRefs : undefined;
-        const asset = await getMediaForScene(imagePrompt, true, imgModel, refs, aspectRatio);
+        const asset = await getMediaForScene(imagePrompt, imgModel, refs, aspectRatio);
 
         const ext = asset.type === "video" ? "mp4" : "jpg";
         const mediaPath = path.join(workDir, `media_${i}.${ext}`);
