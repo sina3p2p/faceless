@@ -1,4 +1,4 @@
-import { generateObject, generateText as aiGenerateText } from "ai";
+import { generateText as aiGenerateText, Output } from "ai";
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
@@ -122,15 +122,16 @@ LANGUAGE RULE (CRITICAL):
 
   messages.push({ role: "user", content: userMessage });
 
-  const { object } = await generateObject({
+  const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: musicScriptSchema,
+    output: Output.object({ schema: musicScriptSchema }),
     system: systemPrompt,
     messages,
     temperature: 0.7,
   });
 
-  return object;
+  if (!output) throw new Error("Failed to generate music script refinement");
+  return output;
 }
 
 // ── Generic text generation (for non-structured calls) ──
@@ -298,13 +299,14 @@ KIDS MUSIC RULES:
     ? `Create a viral ${niche}-themed song about: ${topicIdea}. Visual style: ${style}. The song should be irresistibly catchy.${seriesContext}`
     : `Create a viral ${niche}-themed song. Visual style: ${style}. Pick a topic that resonates emotionally and makes the listener want to replay it.${seriesContext}`;
 
-  const { object } = await generateObject({
+  const { output: object } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: musicScriptSchema,
+    output: Output.object({ schema: musicScriptSchema }),
     system: systemPrompt,
     prompt: userPrompt,
     temperature: 0.85,
   });
+  if (!object) throw new Error("Failed to generate music script");
 
   return object;
 }
@@ -354,15 +356,16 @@ KIDS MUSIC RULES:
     ? `Create a viral ${niche}-themed song about: ${topicIdea}. The song should be irresistibly catchy.${seriesContext}`
     : `Create a viral ${niche}-themed song. Pick a topic that resonates emotionally.${seriesContext}`;
 
-  const { object } = await generateObject({
+  const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: musicLyricsSchema,
+    output: Output.object({ schema: musicLyricsSchema }),
     system: systemPrompt,
     prompt: userPrompt,
     temperature: 0.85,
   });
+  if (!output) throw new Error("Failed to generate music lyrics");
 
-  return object;
+  return output;
 }
 
 export async function generateStandaloneMusicLyrics(
@@ -399,15 +402,16 @@ ${charBlock}`;
 
   const userPrompt = buildInputTypeInstruction(prompt) + `\n\nThe song should be irresistibly catchy.`;
 
-  const { object } = await generateObject({
+  const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: musicLyricsSchema,
+    output: Output.object({ schema: musicLyricsSchema }),
     system: systemPrompt,
     prompt: userPrompt,
     temperature: 0.85,
   });
+  if (!output) throw new Error("Failed to generate standalone music lyrics");
 
-  return object;
+  return output;
 }
 
 // ── Phase 2: Music Visuals (receives actual timestamps) ──
@@ -474,15 +478,16 @@ VISUAL-MUSIC SYNC RULES:
 
 You MUST return exactly ${sections.length} sections in the same order.`;
 
-  const { object } = await generateObject({
+  const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: musicVisualSchema,
+    output: Output.object({ schema: musicVisualSchema }),
     system: systemPrompt,
     prompt: `Generate visual prompts for this song:\n\n${sectionsContext}`,
     temperature: 0.8,
   });
+  if (!output) throw new Error("Failed to generate music visuals");
 
-  return object;
+  return output;
 }
 
 // ── Standalone Script Generation (no series context) ──
@@ -572,13 +577,14 @@ ${buildAssetBlock(characters)}`;
 
   const userPrompt = buildInputTypeInstruction(prompt) + `\n\nVisual style: ${style}. The song should be irresistibly catchy and the visuals cinematic.`;
 
-  const { object } = await generateObject({
+  const { output: object } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: musicScriptSchema,
+    output: Output.object({ schema: musicScriptSchema }),
     system: systemPrompt,
     prompt: userPrompt,
     temperature: 0.85,
   });
+  if (!object) throw new Error("Failed to generate standalone music script");
 
   return object;
 }
@@ -690,15 +696,16 @@ LANGUAGE RULE (CRITICAL):
   }
   messages.push({ role: "user", content: userMessage });
 
-  const { object } = await generateObject({
+  const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: narrationScriptSchema,
+    output: Output.object({ schema: narrationScriptSchema }),
     system: systemPrompt,
     messages,
     temperature: 0.7,
   });
+  if (!output) throw new Error("Failed to refine narration script");
 
-  return object;
+  return output;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -845,15 +852,16 @@ LANGUAGE RULE:
 - sceneTitle and text MUST be in ${langName}
 - directorNote MUST be in English`;
 
-  const { object } = await generateObject({
+  const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: directorOutputSchema,
+    output: Output.object({ schema: directorOutputSchema }),
     system: systemPrompt,
     prompt: `Split this story into scenes and write director's notes:\n\n${storyMarkdown}`,
     temperature: 0.7,
   });
+  if (!output) throw new Error("Failed to split story into scenes");
 
-  return object;
+  return output;
 }
 
 // ── Image Prompt Agent (generateObject → N frames per scene) ──
@@ -919,15 +927,16 @@ ${sceneContinuity ? `SCENE CONTINUITY: Consecutive frames must be visually COMPA
 
 You MUST return exactly ${scenes.length} scenes, each with the appropriate number of frames to cover its audio duration.`;
 
-  const { object } = await generateObject({
+  const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: framePromptsOutputSchema,
+    output: Output.object({ schema: framePromptsOutputSchema }),
     system: systemPrompt,
     prompt: `Create storyboard frames for each scene:\n\n${scenesContext}\n\nVisual style: ${style}. Niche: ${niche}.`,
     temperature: 0.8,
   });
+  if (!output) throw new Error("Failed to generate frame prompts");
 
-  return object;
+  return output;
 }
 
 // ── Motion Agent (generateObject with vision → visualDescription per frame) ──
@@ -1004,15 +1013,16 @@ Visual style: ${style}.`;
 
     contentParts.push({ type: "text", text: "\nDesign motion for each frame. Use the director's note for emotional intent, the actual image for physical composition, and the sequence position for transitions." });
 
-    const { object } = await generateObject({
+    const { output } = await aiGenerateText({
       model: openrouter.chat(primaryModel),
-      schema: frameMotionOutputSchema,
+      output: Output.object({ schema: frameMotionOutputSchema }),
       system: systemPrompt,
       messages: [{ role: "user", content: contentParts }],
       temperature: 0.8,
     });
+    if (!output) throw new Error("Failed to generate frame motion (vision)");
 
-    return object;
+    return output;
   }
 
   const framesContext = frames.map((f, i) => {
@@ -1023,13 +1033,14 @@ Visual style: ${style}.`;
     return entry;
   }).join("\n\n");
 
-  const { object } = await generateObject({
+  const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    schema: frameMotionOutputSchema,
+    output: Output.object({ schema: frameMotionOutputSchema }),
     system: systemPrompt,
     prompt: `Design motion for each frame in sequence:\n\n${framesContext}`,
     temperature: 0.8,
   });
+  if (!output) throw new Error("Failed to generate frame motion");
 
-  return object;
+  return output;
 }
