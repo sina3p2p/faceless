@@ -176,12 +176,14 @@ function FrameCard({
   frameIndex,
   generating,
   generatingVideo,
+  generatingMotion: generatingMotionProp,
   showActions,
   showMotion,
   showVideo,
   onGenerateImage,
   onUpdatePrompt,
   onUpdateMotion,
+  onRegenerateMotion,
   onRegenerateVideo,
   defaultVideoModel,
 }: {
@@ -189,12 +191,14 @@ function FrameCard({
   frameIndex: number;
   generating: boolean;
   generatingVideo?: boolean;
+  generatingMotion?: boolean;
   showActions: boolean;
   showMotion?: boolean;
   showVideo?: boolean;
   onGenerateImage?: (frameId: string, prompt?: string) => void;
   onUpdatePrompt?: (frameId: string, prompt: string) => void;
   onUpdateMotion?: (frameId: string, motion: string) => void;
+  onRegenerateMotion?: (frameId: string) => void;
   onRegenerateVideo?: (frameId: string, videoModel?: string) => void;
   defaultVideoModel?: string;
 }) {
@@ -269,7 +273,24 @@ function FrameCard({
       {/* Motion description */}
       {showMotion && (
         <div className="mt-1.5">
-          <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Motion</span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Motion</span>
+            {onRegenerateMotion && !generatingMotionProp && frame.imageUrl && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRegenerateMotion(frame.id); }}
+                className="text-[10px] text-emerald-500/60 hover:text-emerald-400 transition-colors inline-flex items-center gap-0.5"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                Regenerate
+              </button>
+            )}
+            {generatingMotionProp && (
+              <div className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
+                <div className="animate-spin w-2.5 h-2.5 border border-emerald-400 border-t-transparent rounded-full" />
+                Generating...
+              </div>
+            )}
+          </div>
           {editingMotion ? (
             <textarea
               value={motionText}
@@ -474,8 +495,10 @@ function SortableSceneCard({
   onUpdateFramePrompt,
   onUpdateFrameMotion,
   onRegenerateFrameVideo,
+  onRegenerateFrameMotion,
   generatingFrameIds,
   generatingFrameVideoIds,
+  generatingFrameMotionIds,
   showFrameActions,
   showFrameMotion,
   showFrameVideo,
@@ -502,8 +525,10 @@ function SortableSceneCard({
   onUpdateFramePrompt?: (frameId: string, prompt: string) => void;
   onUpdateFrameMotion?: (frameId: string, motion: string) => void;
   onRegenerateFrameVideo?: (frameId: string, videoModel?: string) => void;
+  onRegenerateFrameMotion?: (frameId: string) => void;
   generatingFrameIds?: Set<string>;
   generatingFrameVideoIds?: Set<string>;
+  generatingFrameMotionIds?: Set<string>;
   showFrameActions?: boolean;
   showFrameMotion?: boolean;
   showFrameVideo?: boolean;
@@ -701,6 +726,8 @@ function SortableSceneCard({
                   onGenerateImage={onGenerateFrameImage}
                   onUpdatePrompt={onUpdateFramePrompt}
                   onUpdateMotion={onUpdateFrameMotion}
+                  onRegenerateMotion={onRegenerateFrameMotion}
+                  generatingMotion={generatingFrameMotionIds?.has(frame.id) ?? false}
                   onRegenerateVideo={onRegenerateFrameVideo}
                   defaultVideoModel={defaultVideoModel}
                 />
@@ -1560,6 +1587,7 @@ export default function ReviewPage() {
   const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
   const [generatingFrameIds, setGeneratingFrameIds] = useState<Set<string>>(new Set());
   const [generatingFrameVideoIds, setGeneratingFrameVideoIds] = useState<Set<string>>(new Set());
+  const [generatingFrameMotionIds, setGeneratingFrameMotionIds] = useState<Set<string>>(new Set());
   const [generatingAllFrames, setGeneratingAllFrames] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const sensors = useSensors(
@@ -1810,6 +1838,24 @@ export default function ReviewPage() {
       }
     } finally {
       setGeneratingFrameVideoIds((prev) => {
+        const next = new Set(prev);
+        next.delete(frameId);
+        return next;
+      });
+    }
+  }
+
+  async function handleRegenerateFrameMotion(frameId: string) {
+    setGeneratingFrameMotionIds((prev) => new Set(prev).add(frameId));
+    try {
+      const res = await fetch(`/api/videos/${id}/frames/${frameId}/generate-motion`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        await loadData();
+      }
+    } finally {
+      setGeneratingFrameMotionIds((prev) => {
         const next = new Set(prev);
         next.delete(frameId);
         return next;
@@ -2393,8 +2439,10 @@ export default function ReviewPage() {
                 onUpdateFramePrompt={handleUpdateFramePrompt}
                 onUpdateFrameMotion={handleUpdateFrameMotion}
                 onRegenerateFrameVideo={handleRegenerateFrameVideo}
+                onRegenerateFrameMotion={handleRegenerateFrameMotion}
                 generatingFrameIds={generatingFrameIds}
                 generatingFrameVideoIds={generatingFrameVideoIds}
+                generatingFrameMotionIds={generatingFrameMotionIds}
                 showFrameActions={isPromptsReview || isImageReview || isNewMotionReview}
                 showFrameMotion={isNewMotionReview || isImageReview}
                 showFrameVideo={isNewMotionReview || video?.status === "COMPLETED" || video?.status === "VIDEO_GENERATION"}
