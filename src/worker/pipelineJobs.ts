@@ -683,8 +683,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
           try {
             const imageSignedUrl = await getSignedDownloadUrl(frame.imageUrl!);
             const videoPrompt = frame.visualDescription
-              ? `${frame.visualDescription}. ${seriesRecord.style} style.`
-              : `Cinematic motion, smooth camera movement. ${seriesRecord.style} style.`;
+              || `Cinematic motion, smooth camera movement.`;
             const desiredDuration = Math.max(3, Math.round(frame.clipDuration ?? 5));
 
             console.log(`[generate-frame-videos] Frame ${frame.id} (scene ${sceneIdx}): ${desiredDuration}s clip`);
