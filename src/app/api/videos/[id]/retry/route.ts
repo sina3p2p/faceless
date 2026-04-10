@@ -37,11 +37,7 @@ export async function POST(
 
   await db.insert(renderJobs).values({ videoProjectId: id });
 
-  const jobName = video.series.videoType === "music_video"
-    ? "generate-music-lyrics"
-    : "generate-story";
-
-  await renderQueue.add(jobName, {
+  await renderQueue.add("generate-story", {
     videoProjectId: id,
     seriesId: video.series.id,
     userId: user.id,

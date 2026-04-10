@@ -1435,24 +1435,8 @@ export default function ReviewPage() {
     }
   }
 
-  // Music-specific: generate song from lyrics
-  const [generatingSong, setGeneratingSong] = useState(false);
-  async function handleGenerateSong() {
-    setGeneratingSong(true);
-    try {
-      const res = await fetch(`/api/videos/${id}/generate-song`, { method: "POST" });
-      if (res.ok) {
-        setVideo((prev) => prev ? { ...prev, status: "MUSIC_GENERATION" } : prev);
-        router.push(`/dashboard/videos/${id}`);
-      }
-    } finally {
-      setGeneratingSong(false);
-    }
-  }
-
-  const isMusicLyricsReview = video?.status === "REVIEW_MUSIC_SCRIPT";
-  const isVisualReview = video?.status === "REVIEW_VISUAL";
   const isMusicVideo = video?.series?.videoType === "music_video";
+  const isVisualReview = video?.status === "REVIEW_VISUAL";
   const isMotionReview = isVisualReview && !isMusicVideo;
   const isImageReview = video?.status === "IMAGE_REVIEW";
   const isNarrationReview = video?.status === "REVIEW_SCRIPT" && !isMusicVideo;
@@ -1644,12 +1628,10 @@ export default function ReviewPage() {
                 isTTSReview ? "Review Audio" :
                   isPromptsReview ? "Review Image Prompts" :
                     isNewMotionReview ? "Review Motion" :
-                      isMusicLyricsReview ? "Review Lyrics" :
-                        isMotionReview ? "Review Motion" :
-                          isVisualReview ? "Review Visuals" :
-                            isMusicVideo ? "Review Song" :
-                              isProcessing ? "Processing..." :
-                                "Review"
+                      isMotionReview ? "Review Motion" :
+                        isVisualReview ? "Review Visuals" :
+                          isProcessing ? "Processing..." :
+                            "Review"
           )}
         </h1>
         <p className="text-gray-400 text-sm">
@@ -1665,9 +1647,7 @@ export default function ReviewPage() {
                     ? "Review the motion descriptions for each frame, then generate the final video."
                     : isProcessing
                       ? "Your video is being processed..."
-                      : isMusicLyricsReview
-                        ? "Review and edit your song lyrics, then generate the song."
-                        : isImageReview
+                      : isImageReview
                           ? "Review generated images, then approve to generate motion."
                           : "Review your content and approve to continue."}
         </p>
@@ -1724,17 +1704,7 @@ export default function ReviewPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {isMusicLyricsReview ? (
-              <Button
-                variant="primary"
-                size="sm"
-                loading={generatingSong}
-                onClick={handleGenerateSong}
-                disabled={scenes.length === 0}
-              >
-                Generate Song
-              </Button>
-            ) : isMotionReview ? (
+            {isMotionReview ? (
               <>
                 <Button
                   variant="outline"
@@ -1852,19 +1822,11 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {!allImagesGenerated && scenes.length > 0 && !isMusicLyricsReview && !isNarrationReview && !isImageReview && !isMotionReview && !generatingMotion && (
+      {!allImagesGenerated && scenes.length > 0 && !isNarrationReview && !isImageReview && !isMotionReview && !generatingMotion && (
         <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
           <p className="text-sm text-amber-300">
             Generate preview images to see what each scene will look like before creating the video.
             You can edit prompts and regenerate until you&apos;re happy.
-          </p>
-        </div>
-      )}
-
-      {isMusicLyricsReview && scenes.length > 0 && (
-        <div className="mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
-          <p className="text-sm text-violet-300">
-            Edit the lyrics and section details below. When you&apos;re happy, click &quot;Generate Song&quot; to create the music.
           </p>
         </div>
       )}
@@ -2045,16 +2007,7 @@ export default function ReviewPage() {
       {/* Bottom action */}
       {scenes.length > 0 && !generatingMotion && (
         <div className="mt-8 flex justify-center gap-3">
-          {isMusicLyricsReview ? (
-            <Button
-              variant="primary"
-              size="lg"
-              loading={generatingSong}
-              onClick={handleGenerateSong}
-            >
-              Generate Song ({scenes.length} sections)
-            </Button>
-          ) : isMotionReview ? (
+          {isMotionReview ? (
             <>
               <Button
                 variant="outline"

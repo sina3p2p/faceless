@@ -43,11 +43,7 @@ export async function POST(
     columns: { videoType: true },
   });
 
-  const jobName = seriesRecord?.videoType === "music_video"
-    ? "render-music-video"
-    : "render-from-scenes";
-
-  await renderQueue.add(jobName, {
+  await renderQueue.add("render-from-scenes", {
     videoProjectId: id,
     seriesId: video.series.id,
     userId: user.id,

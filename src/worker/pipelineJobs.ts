@@ -29,6 +29,11 @@ import {
 } from "@/server/services/ai-video";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile, composeVideo, type ComposerScene } from "@/server/services/composer";
+import {
+  generateSong,
+  transcribeSong,
+  alignLyricsToTranscription,
+} from "@/server/services/music";
 import { renderQueue } from "@/lib/queue";
 import { type AspectRatio } from "@/server/services/media";
 import type { RenderJobData } from "@/lib/queue";
@@ -117,7 +122,8 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       topicIdea,
       seriesRecord.language || "en",
       agents.storyModel,
-      previousTopics
+      previousTopics,
+      seriesRecord.videoType || undefined
     );
 
     const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
@@ -165,7 +171,8 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
       videoProject.script,
       seriesRecord.style,
       seriesRecord.language || "en",
-      agents.directorModel
+      agents.directorModel,
+      seriesRecord.videoType || undefined
     );
 
     // Delete any existing scenes before inserting new ones
@@ -191,7 +198,7 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
   }
 }
 
-// ── Generate TTS ──
+// ── Generate TTS (or Song for music_video) ──
 
 export async function generateTTSJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
@@ -211,44 +218,115 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    if (existingScenes.length === 0) throw new Error("No scenes for TTS");
+    if (existingScenes.length === 0) throw new Error("No scenes for audio generation");
 
-    const sceneTexts = existingScenes.map((s) => s.text);
+    const isMusic = seriesRecord.videoType === "music_video";
 
-    console.log(`[generate-tts] Generating TTS for ${sceneTexts.length} scenes`);
+    if (isMusic) {
+      // ── Music: generate song via Suno + Whisper alignment ──
+      const videoProject = await db.query.videoProjects.findFirst({
+        where: eq(schema.videoProjects.id, videoProjectId),
+        columns: { script: true, title: true },
+      });
+      const scriptMd = videoProject?.script || "";
 
-    const { audioPaths, ttsResults } = await generateTTSParallel(
-      sceneTexts,
-      seriesRecord.defaultVoiceId ?? undefined,
-      workDir
-    );
+      const genreMatch = scriptMd.match(/^Genre:\s*(.+)$/m);
+      const genre = genreMatch ? genreMatch[1].trim() : "pop, catchy";
+      const title = videoProject?.title || "Untitled";
 
-    for (let i = 0; i < existingScenes.length; i++) {
-      const audioBuffer = await fs.readFile(audioPaths[i]);
-      const audioKey = `scenes/${videoProjectId}/audio_${existingScenes[i].id}_${Date.now()}.mp3`;
-      await uploadFile(audioKey, audioBuffer, "audio/mpeg");
+      const songSections = existingScenes.map((s) => ({
+        sectionName: s.sceneTitle || `Section ${s.sceneOrder + 1}`,
+        lyrics: s.text.split("\n").filter((l: string) => l.trim()),
+        durationMs: (s.duration ?? 10) * 1000,
+      }));
 
-      let durationSec = 5;
-      try {
-        const { stdout } = await execAsync(
-          `ffprobe -v error -show_entries format=duration -of csv=p=0 "${audioPaths[i]}"`
-        );
-        durationSec = Math.ceil(parseFloat(stdout.trim()) || 5);
-      } catch { /* fallback to 5s */ }
+      console.log(`[generate-tts] Music mode: generating song "${title}" (${genre}), ${songSections.length} sections`);
+
+      const songResult = await generateSong(title, genre, songSections);
+
+      // Download and upload song
+      const songPath = path.join(workDir, "song.mp3");
+      await downloadFile(songResult.audioUrl, songPath);
+      const songBuffer = await fs.readFile(songPath);
+      const songKey = `scenes/${videoProjectId}/song_${Date.now()}.mp3`;
+      await uploadFile(songKey, songBuffer, "audio/mpeg");
+
+      // Transcribe + align
+      const whisperWords = await transcribeSong(songResult.audioUrl);
+      const totalDurationMs = Math.round(songResult.duration * 1000);
+      const alignedSections = alignLyricsToTranscription(songSections, whisperWords, totalDurationMs);
+
+      // Store song URL + alignment in project config
+      const existingConfig = ((await db.query.videoProjects.findFirst({
+        where: eq(schema.videoProjects.id, videoProjectId),
+        columns: { config: true },
+      }))?.config ?? {}) as Record<string, unknown>;
 
       await db
-        .update(schema.videoScenes)
+        .update(schema.videoProjects)
         .set({
-          audioUrl: audioKey,
-          captionData: ttsResults[i].wordTimestamps,
-          duration: durationSec,
+          duration: Math.round(songResult.duration),
+          config: { ...existingConfig, songUrl: songKey, alignedSections },
         })
-        .where(eq(schema.videoScenes.id, existingScenes[i].id));
+        .where(eq(schema.videoProjects.id, videoProjectId));
 
-      console.log(`[generate-tts] Scene ${i}: ${durationSec}s audio uploaded`);
+      // Update each scene with aligned timing
+      for (let i = 0; i < existingScenes.length; i++) {
+        const aligned = alignedSections[i];
+        if (!aligned) continue;
+        const durationSec = Math.ceil((aligned.endMs - aligned.startMs) / 1000);
+
+        await db
+          .update(schema.videoScenes)
+          .set({
+            audioUrl: songKey,
+            captionData: aligned.wordTimestamps,
+            duration: durationSec,
+          })
+          .where(eq(schema.videoScenes.id, existingScenes[i].id));
+
+        console.log(`[generate-tts] Section ${i} (${songSections[i].sectionName}): ${durationSec}s`);
+      }
+
+      console.log(`[generate-tts] Song generated and aligned (${alignedSections.length} sections, ${songResult.duration.toFixed(1)}s total)`);
+    } else {
+      // ── Standard TTS ──
+      const sceneTexts = existingScenes.map((s) => s.text);
+      console.log(`[generate-tts] Generating TTS for ${sceneTexts.length} scenes`);
+
+      const { audioPaths, ttsResults } = await generateTTSParallel(
+        sceneTexts,
+        seriesRecord.defaultVoiceId ?? undefined,
+        workDir
+      );
+
+      for (let i = 0; i < existingScenes.length; i++) {
+        const audioBuffer = await fs.readFile(audioPaths[i]);
+        const audioKey = `scenes/${videoProjectId}/audio_${existingScenes[i].id}_${Date.now()}.mp3`;
+        await uploadFile(audioKey, audioBuffer, "audio/mpeg");
+
+        let durationSec = 5;
+        try {
+          const { stdout } = await execAsync(
+            `ffprobe -v error -show_entries format=duration -of csv=p=0 "${audioPaths[i]}"`
+          );
+          durationSec = Math.ceil(parseFloat(stdout.trim()) || 5);
+        } catch { /* fallback to 5s */ }
+
+        await db
+          .update(schema.videoScenes)
+          .set({
+            audioUrl: audioKey,
+            captionData: ttsResults[i].wordTimestamps,
+            duration: durationSec,
+          })
+          .where(eq(schema.videoScenes.id, existingScenes[i].id));
+
+        console.log(`[generate-tts] Scene ${i}: ${durationSec}s audio uploaded`);
+      }
+
+      console.log(`[generate-tts] All TTS complete`);
     }
-
-    console.log(`[generate-tts] All TTS complete`);
 
     await autoChainOrReview(videoProjectId, seriesId, userId, "TTS_REVIEW", "generate-prompts");
   } catch (error) {
@@ -690,13 +768,30 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
 
     if (composerScenes.length === 0) throw new Error("No scenes to compose");
 
-    console.log(`[compose-final] Composing ${composerScenes.length} scenes`);
+    // For music videos, download the global song and pass as globalAudioPath
+    const isMusic = seriesRecord.videoType === "music_video";
+    let globalAudioPath: string | undefined;
+    if (isMusic) {
+      const projectConfig = ((await db.query.videoProjects.findFirst({
+        where: eq(schema.videoProjects.id, videoProjectId),
+        columns: { config: true },
+      }))?.config ?? {}) as Record<string, unknown>;
+      const songKey = projectConfig.songUrl as string | undefined;
+      if (songKey) {
+        const songSignedUrl = await getSignedDownloadUrl(songKey);
+        globalAudioPath = path.join(workDir, "global_song.mp3");
+        await downloadFile(songSignedUrl, globalAudioPath);
+      }
+    }
+
+    console.log(`[compose-final] Composing ${composerScenes.length} scenes${isMusic ? " (music video, global audio)" : ""}`);
 
     const outputPath = await composeVideo({
       scenes: composerScenes,
       videoWidth: sizeConfig.width,
       videoHeight: sizeConfig.height,
       captionStyle: seriesRecord.captionStyle || "none",
+      globalAudioPath,
     });
 
     const outputBuffer = await fs.readFile(outputPath);

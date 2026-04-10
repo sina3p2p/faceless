@@ -1,9 +1,7 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { generateMusicScriptJob, generateStandaloneMusicScriptJob } from "./scriptJobs";
-import { generateMusicLyricsJob, generateSongJob, generateMusicVisualsJob } from "./musicJobs";
 import { generateImagesJob } from "./mediaJobs";
-import { rerenderVideoJob, renderFromScenesJob, renderMusicVideoJob } from "./renderJobs";
+import { rerenderVideoJob, renderFromScenesJob } from "./renderJobs";
 import {
   generateStoryJob,
   splitScenesJob,
@@ -45,22 +43,10 @@ const worker = new Worker(
       await generateFrameVideosJob(job);
     } else if (job.name === "compose-final") {
       await composeFinalJob(job);
-    } else if (job.name === "generate-music-script") {
-      await generateMusicScriptJob(job);
-    } else if (job.name === "generate-standalone-music-script") {
-      await generateStandaloneMusicScriptJob(job);
-    } else if (job.name === "generate-music-lyrics") {
-      await generateMusicLyricsJob(job);
-    } else if (job.name === "generate-song") {
-      await generateSongJob(job);
-    } else if (job.name === "generate-music-visuals") {
-      await generateMusicVisualsJob(job);
     } else if (job.name === "generate-images") {
       await generateImagesJob(job);
     } else if (job.name === "render-from-scenes") {
       await renderFromScenesJob(job);
-    } else if (job.name === "render-music-video") {
-      await renderMusicVideoJob(job);
     } else if (job.name === "rerender-video") {
       await rerenderVideoJob(job);
     } else {
