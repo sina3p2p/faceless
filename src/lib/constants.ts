@@ -36,9 +36,9 @@ export const LLM = {
   defaultModel: "anthropic/claude-opus-4.6",
   fallbackModel: "openai/gpt-4.1",
   visionModel: "google/gemini-2.5-pro",
-  storyModel: "anthropic/claude-opus-4.6",
-  directorModel: "anthropic/claude-opus-4.6",
-  promptModel: "anthropic/claude-opus-4.6",
+  storyModel: "anthropic/claude-sonnet-4",
+  directorModel: "anthropic/claude-sonnet-4",
+  promptModel: "anthropic/claude-sonnet-4",
   motionModel: "google/gemini-2.5-pro",
 } as const;
 
@@ -90,7 +90,7 @@ export const MUSIC = {
 } as const;
 
 export const VIDEO_MODELS = [
-  { id: "runway-gen4-turbo", label: "Runway Gen-4 Turbo", modelId: "gen4_turbo", provider: "runway" as const, description: "Best quality + value ($0.05/s → ~$0.25/5s)", durations: [5, 10] as number[], endFrame: false },
+  { id: "runway-gen4-turbo", label: "Runway Gen-4 Turbo", modelId: "gen4_turbo", provider: "runway" as const, description: "Best quality + value ($0.05/s → ~$0.25/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false },
   { id: "runway-gen4.5", label: "Runway Gen-4.5", modelId: "gen4.5", provider: "runway" as const, description: "#1 ranked globally, premium ($0.12/s → ~$0.60/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false },
   { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "fal-ai/kling-video/v3/standard/image-to-video", provider: "fal" as const, description: "#2 ranked globally ($0.14/s → ~$0.70/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
   { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "fal-ai/kling-video/v3/pro/image-to-video", provider: "fal" as const, description: "Top-tier cinematic quality (~$0.50/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
