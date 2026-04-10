@@ -1886,7 +1886,7 @@ export default function ReviewPage() {
                   Generate Video
                 </Button>
               </>
-            ) : isImageReview && !isMusicVideo ? (
+            ) : isImageReview ? (
               <>
                 <Button
                   variant="outline"
@@ -1974,7 +1974,7 @@ export default function ReviewPage() {
         </>
       )}
 
-      {isImageReview && !isMusicVideo && scenes.length > 0 && (
+      {isImageReview && scenes.length > 0 && (
         <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
           <p className="text-sm text-amber-300">
             Review preview images below. You can edit prompts and regenerate until you&apos;re happy.
@@ -2105,7 +2105,7 @@ export default function ReviewPage() {
                   Approve Prompts &amp; Generate Images
                 </Button>
               )}
-              {isImageReview && !isMusicVideo && (
+              {isImageReview && (
                 <>
                   <Button
                     variant="outline"
@@ -2201,7 +2201,7 @@ export default function ReviewPage() {
                 Generate Video ({scenes.length} scenes)
               </Button>
             </>
-          ) : isImageReview && !isMusicVideo ? (
+          ) : isImageReview ? (
             <>
               <Button
                 variant="outline"
