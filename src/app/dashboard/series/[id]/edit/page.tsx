@@ -147,7 +147,7 @@ export default function EditSeriesPage() {
     }
   }
 
-  async function handleUpdateAsset(assetId: string, updates: Partial<Pick<StoryAsset, "name" | "description" | "type" | "voiceId">>) {
+  async function handleUpdateAsset(assetId: string, updates: Partial<Pick<StoryAsset, "name" | "description" | "type" | "sheetUrl" | "voiceId">>) {
     const res = await fetch(`/api/series/${id}/story-assets`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
