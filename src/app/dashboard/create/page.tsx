@@ -121,7 +121,7 @@ export default function CreateVideoPage() {
 
       if (res.ok) {
         const data = await res.json();
-        router.push(`/dashboard/videos/${data.videoId}/review`);
+        router.push(`/dashboard/videos/${data.videoId}`);
       } else {
         const err = await res.json().catch(() => ({ error: "Failed to create video" }));
         setError(err.error || "Failed to create video");

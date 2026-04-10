@@ -66,7 +66,10 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
       columns: { script: true },
     }))?.script;
 
-    const script = scriptJson ? JSON.parse(scriptJson) : null;
+    let script: { scenes?: Array<{ visualDescription?: string; searchQuery?: string; imagePrompt?: string }> } | null = null;
+    if (scriptJson) {
+      try { script = JSON.parse(scriptJson); } catch { /* script is markdown, not JSON */ }
+    }
 
     console.log(`Render from scenes starting: type=${videoType}, ${existingScenes.length} scenes, ${storyAssets.length} story assets`);
 

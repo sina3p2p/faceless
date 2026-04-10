@@ -305,7 +305,7 @@ export default function SeriesDetailPage() {
                         variant="primary"
                         onClick={(e) => {
                           e.preventDefault();
-                          router.push(`/dashboard/videos/${video.id}/review`);
+                          router.push(`/dashboard/videos/${video.id}`);
                         }}
                       >
                         {video.status === "REVIEW_SCRIPT" ? "Review Script" : video.status === "IMAGE_GENERATION" ? "View Progress" : "Review Images"}
