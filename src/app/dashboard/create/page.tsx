@@ -29,6 +29,8 @@ interface PendingAsset {
   description: string;
   type: AssetType;
   generatedUrl?: string;
+  sheetUrl?: string;
+  sheetPreview?: string;
   voiceId?: string;
 }
 
@@ -45,6 +47,7 @@ export default function CreateVideoPage() {
   const [pendingAssets, setPendingAssets] = useState<PendingAsset[]>([]);
   const [newAssetType, setNewAssetType] = useState<AssetType>("character");
   const [describingIdx, setDescribingIdx] = useState<number | null>(null);
+  const [generatingSheetIdx, setGeneratingSheetIdx] = useState<number | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showCharGenModal, setShowCharGenModal] = useState(false);
 
@@ -80,7 +83,7 @@ export default function CreateVideoPage() {
     setError("");
 
     try {
-      const storyAssets: Array<{ id: string; type: AssetType; imageUrl: string; name: string; description: string; voiceId?: string }> = [];
+      const storyAssets: Array<{ id: string; type: AssetType; imageUrl: string; name: string; description: string; sheetUrl?: string; voiceId?: string }> = [];
 
       for (const asset of pendingAssets) {
         let imageUrl = asset.generatedUrl;
@@ -94,6 +97,7 @@ export default function CreateVideoPage() {
             imageUrl,
             name: asset.name || `${asset.type} ${storyAssets.length + 1}`,
             description: asset.description,
+            sheetUrl: asset.sheetUrl || undefined,
             voiceId: asset.voiceId || undefined,
           });
         }
@@ -328,6 +332,90 @@ export default function CreateVideoPage() {
                           )}
                         </button>
                       )}
+                      {/* Reference Sheet */}
+                      <div className="mt-2 p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Reference Sheet</span>
+                          {generatingSheetIdx === idx && (
+                            <div className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
+                              <div className="animate-spin w-2.5 h-2.5 border border-emerald-400 border-t-transparent rounded-full" />
+                              Generating...
+                            </div>
+                          )}
+                        </div>
+                        {asset.sheetPreview && (
+                          <div className="space-y-1.5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={asset.sheetPreview} alt="Reference sheet" className="w-full max-w-[160px] rounded-lg border border-emerald-500/30" />
+                            <button
+                              type="button"
+                              disabled={generatingSheetIdx === idx}
+                              onClick={async () => {
+                                setGeneratingSheetIdx(idx);
+                                try {
+                                  const imgUrl = asset.generatedUrl || (asset.file ? URL.createObjectURL(asset.file) : "");
+                                  let uploadedUrl = asset.generatedUrl;
+                                  if (!uploadedUrl && asset.file) {
+                                    const fd = new FormData();
+                                    fd.append("file", asset.file);
+                                    const upRes = await fetch("/api/upload-temp", { method: "POST", body: fd });
+                                    if (upRes.ok) uploadedUrl = (await upRes.json()).url;
+                                  }
+                                  if (!uploadedUrl) return;
+                                  const res = await fetch("/api/generate-sheet", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ imageUrl: uploadedUrl, description: asset.description, name: asset.name, type: asset.type }),
+                                  });
+                                  if (res.ok) {
+                                    const data = await res.json();
+                                    setPendingAssets((prev) => prev.map((a, i) => i === idx ? { ...a, sheetUrl: data.sheetUrl, sheetPreview: data.previewUrl } : a));
+                                  }
+                                } finally {
+                                  setGeneratingSheetIdx(null);
+                                }
+                              }}
+                              className="text-[10px] text-emerald-500/60 hover:text-emerald-400 transition-colors inline-flex items-center gap-0.5"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                              Regenerate Sheet
+                            </button>
+                          </div>
+                        )}
+                        {!asset.sheetPreview && generatingSheetIdx !== idx && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setGeneratingSheetIdx(idx);
+                              try {
+                                let uploadedUrl = asset.generatedUrl;
+                                if (!uploadedUrl && asset.file) {
+                                  const fd = new FormData();
+                                  fd.append("file", asset.file);
+                                  const upRes = await fetch("/api/upload-temp", { method: "POST", body: fd });
+                                  if (upRes.ok) uploadedUrl = (await upRes.json()).url;
+                                }
+                                if (!uploadedUrl) return;
+                                const res = await fetch("/api/generate-sheet", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ imageUrl: uploadedUrl, description: asset.description, name: asset.name, type: asset.type }),
+                                });
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  setPendingAssets((prev) => prev.map((a, i) => i === idx ? { ...a, sheetUrl: data.sheetUrl, sheetPreview: data.previewUrl } : a));
+                                }
+                              } finally {
+                                setGeneratingSheetIdx(null);
+                              }
+                            }}
+                            className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                          >
+                            Generate Reference Sheet
+                          </button>
+                        )}
+                      </div>
+
                       {asset.type === "character" && (
                         <div className="mt-2">
                           <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-medium mb-1">

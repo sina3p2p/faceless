@@ -88,10 +88,11 @@ export interface StoryAssetRef {
   name: string;
   description: string;
   url: string;
+  sheetUrl?: string;
 }
 
 export async function resolveStoryAssets(
-  storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null | undefined,
+  storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> | null | undefined,
   characterImages?: Array<{ url: string; description: string }> | null
 ): Promise<StoryAssetRef[]> {
   if (storyAssets && storyAssets.length > 0) {
@@ -99,6 +100,9 @@ export async function resolveStoryAssets(
       storyAssets.map(async (a) => ({
         ...a,
         url: a.url.startsWith("http") ? a.url : await getSignedDownloadUrl(a.url),
+        sheetUrl: a.sheetUrl
+          ? (a.sheetUrl.startsWith("http") ? a.sheetUrl : await getSignedDownloadUrl(a.sheetUrl))
+          : undefined,
       }))
     );
   }

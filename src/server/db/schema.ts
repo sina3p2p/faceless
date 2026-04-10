@@ -131,7 +131,7 @@ export const series = pgTable("series", {
   language: text("language").default("en").notNull(),
   captionStyle: text("caption_style").default("none").notNull(),
   characterImages: json("character_images").$type<Array<{ url: string; description: string }>>().default([]),
-  storyAssets: json("story_assets").$type<Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }>>().default([]),
+  storyAssets: json("story_assets").$type<Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }>>().default([]),
   sceneContinuity: integer("scene_continuity").default(1).notNull(),
   videoSize: text("video_size").default("9:16").notNull(),
   videoType: text("video_type").default("standalone").notNull(),

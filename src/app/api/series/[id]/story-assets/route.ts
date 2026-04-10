@@ -12,6 +12,7 @@ type StoryAsset = {
   name: string;
   description: string;
   url: string;
+  sheetUrl?: string;
   voiceId?: string;
 };
 
@@ -110,6 +111,7 @@ const updateAssetSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   type: z.enum(["character", "location", "prop"]).optional(),
+  sheetUrl: z.string().nullable().optional(),
   voiceId: z.string().nullable().optional(),
 });
 
@@ -139,6 +141,7 @@ export async function PATCH(
   if (parsed.data.name !== undefined) assets[idx].name = parsed.data.name;
   if (parsed.data.description !== undefined) assets[idx].description = parsed.data.description;
   if (parsed.data.type !== undefined) assets[idx].type = parsed.data.type;
+  if (parsed.data.sheetUrl !== undefined) assets[idx].sheetUrl = parsed.data.sheetUrl ?? undefined;
   if (parsed.data.voiceId !== undefined) assets[idx].voiceId = parsed.data.voiceId ?? undefined;
 
   await db

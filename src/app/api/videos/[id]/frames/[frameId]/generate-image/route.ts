@@ -56,7 +56,7 @@ export async function POST(
   const prompt = parsed.data.imagePrompt || frame.imagePrompt || "scene image";
 
   // Resolve story assets filtered by frame's assetRefs
-  const rawAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string }>;
+  const rawAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string; sheetUrl?: string }>;
   const rawChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
   const frameAssetRefs = (frame.assetRefs as string[] | null) ?? [];
 
@@ -70,8 +70,10 @@ export async function POST(
       ? rawAssets.filter((a) => refSet.has(a.name.toLowerCase()))
       : rawAssets;
     for (const a of matched) {
-      const url = a.url.startsWith("http") ? a.url : await getSignedDownloadUrl(a.url);
-      characterRefs.push({ url, description: `${a.name}: ${a.description}` });
+      // Prefer sheetUrl (character sheet) over original url
+      const assetUrl = a.sheetUrl || a.url;
+      const url = assetUrl.startsWith("http") ? assetUrl : await getSignedDownloadUrl(assetUrl);
+      characterRefs.push({ url, description: `${a.name}: ${a.description}`, name: a.name, type: a.type as "character" | "location" | "prop" });
     }
   } else if (rawChars.length > 0) {
     for (const c of rawChars) {

@@ -517,7 +517,13 @@ function buildAssetBlock(assets: StoryAsset[]): string {
     block += "\n  Props:";
     props.forEach((p) => { block += `\n    - ${p.name}: ${p.description}`; });
   }
-  block += "\n\nASSET RULES:\n- Every scene's imagePrompt MUST describe the assigned assets using their provided descriptions above. If a scene takes place at a location asset, describe that location exactly as defined. If a character asset appears, describe their appearance as defined.\n- The assetRefs array for each scene MUST list the exact names of all assets visible in that scene.\n- Characters: include when the character is visible in the scene.\n- Locations: include when the scene takes place at that location.\n- Props: include when the prop is visible in the scene.\n";
+  block += `\n\nASSET RULES:
+- DO NOT describe character/location/prop physical appearance in imagePrompt. The AI image model receives reference images for each asset — describing appearance wastes prompt space and can conflict with the reference.
+- Reference characters by NAME only in imagePrompt (e.g. "Elena stands at the cliff edge" NOT "Elena, a young woman with long dark hair and green eyes, stands at the cliff edge").
+- imagePrompt should focus on: ACTION, POSE, CAMERA ANGLE, COMPOSITION, LIGHTING, and SETTING details.
+- The assetRefs array for each scene MUST list the exact names of all assets visible in that scene.
+- Characters: include when visible. Locations: include when the scene takes place there. Props: include when visible.
+`;
   return block;
 }
 
@@ -925,7 +931,7 @@ LANGUAGE RULE:
 // ── Image Prompt Agent (generateObject → N frames per scene) ──
 
 const framePromptSchema = z.object({
-  imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). Cover: SUBJECT, ACTION, ENVIRONMENT, LIGHTING, CAMERA angle, MOOD, STYLE. Single detailed paragraph."),
+  imagePrompt: z.string().describe("Highly detailed prompt for AI image generation (50-100+ words). For characters with reference images, use their name only — do NOT describe their appearance. Focus on: ACTION, POSE, ENVIRONMENT, LIGHTING, CAMERA angle, COMPOSITION, STYLE. Single detailed paragraph."),
   assetRefs: z.array(z.string()).default([]).describe("Asset names from story assets that appear in this frame"),
   clipDuration: z.number().describe("Duration in seconds for this video clip. Must be one of the supported clip durations."),
 });
@@ -967,8 +973,10 @@ FRAME CALCULATION:
 IMAGE PROMPT QUALITY (CRITICAL):
 - Each imagePrompt must be 50-100+ words. Be EXTREMELY specific.
 - Describe ONE clear subject doing ONE clear action in ONE clear environment.
-- Always include the art style: ${style}.
-- For people: describe age, ethnicity, clothing, facial expression, body language, hair.
+- Always include the art style: ${style}.${assets.length > 0 ? `
+- For characters/locations/props with reference images: reference by NAME only (e.g. "Luca stands at the window"). Do NOT re-describe their physical appearance — the image model receives reference images and will copy the appearance from them. Describing appearance wastes tokens and can conflict with the reference.
+- Focus imagePrompt on: ACTION, POSE, FACIAL EXPRESSION, CAMERA ANGLE, COMPOSITION, LIGHTING, ENVIRONMENT CONTEXT.` : `
+- For people: describe age, ethnicity, clothing, facial expression, body language, hair.`}
 - For places: describe architecture, textures, weather, time of day, materials.
 - Include composition cues: camera angle, framing, depth of field, lighting direction.
 - EACH frame must be visually DIFFERENT. Vary angles, palettes, compositions.

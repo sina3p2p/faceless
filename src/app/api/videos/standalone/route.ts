@@ -37,6 +37,7 @@ const standaloneSchema = z.object({
         imageUrl: z.string(),
         name: z.string(),
         description: z.string(),
+        sheetUrl: z.string().optional(),
         voiceId: z.string().optional(),
       })
     )
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
     : data.prompt;
 
   // Build storyAssets from the new format, or auto-migrate from legacy characters
-  let storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> = [];
+  let storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> = [];
 
   if (data.storyAssets && data.storyAssets.length > 0) {
     storyAssets = data.storyAssets.map((a) => ({
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
       name: a.name,
       description: a.description,
       url: a.imageUrl,
+      sheetUrl: a.sheetUrl,
     }));
   } else if (data.characters && data.characters.length > 0) {
     // Legacy path: auto-migrate characters to storyAssets

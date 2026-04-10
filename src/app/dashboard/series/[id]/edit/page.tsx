@@ -19,6 +19,7 @@ interface StoryAsset {
   name: string;
   description: string;
   url: string;
+  sheetUrl?: string;
   voiceId?: string;
 }
 
@@ -55,6 +56,8 @@ export default function EditSeriesPage() {
   const [uploadingAsset, setUploadingAsset] = useState(false);
   const [newAssetType, setNewAssetType] = useState<AssetType>("character");
   const [describingIdx, setDescribingIdx] = useState<number | null>(null);
+  const [generatingSheetId, setGeneratingSheetId] = useState<string | null>(null);
+  const [pendingSheet, setPendingSheet] = useState<{ assetId: string; sheetUrl: string; previewUrl: string } | null>(null);
   const [showCharGenModal, setShowCharGenModal] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -318,6 +321,123 @@ export default function EditSeriesPage() {
                       >
                         {describingIdx === idx ? (<><span className="w-3 h-3 border border-violet-300 border-t-transparent rounded-full animate-spin" />Analyzing...</>) : (<><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>AI Describe</>)}
                       </button>
+                      {/* Reference Sheet */}
+                      <div className="mt-2 p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Reference Sheet</span>
+                          {generatingSheetId === asset.id && (
+                            <div className="inline-flex items-center gap-1 text-[10px] text-emerald-400">
+                              <div className="animate-spin w-2.5 h-2.5 border border-emerald-400 border-t-transparent rounded-full" />
+                              Generating...
+                            </div>
+                          )}
+                        </div>
+                        {/* Show pending sheet preview (not yet saved) */}
+                        {pendingSheet?.assetId === asset.id && (
+                          <div className="space-y-2">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={pendingSheet.previewUrl} alt="Reference sheet preview" className="w-full max-w-[160px] rounded-lg border border-emerald-500/30" />
+                            <div className="flex gap-1.5">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await handleUpdateAsset(asset.id, { sheetUrl: pendingSheet.sheetUrl });
+                                  setAssets((prev) => prev.map((a) => a.id === asset.id ? { ...a, sheetUrl: pendingSheet.sheetUrl } : a));
+                                  setPendingSheet(null);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-medium hover:bg-emerald-500 transition-colors"
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                disabled={generatingSheetId === asset.id}
+                                onClick={async () => {
+                                  setPendingSheet(null);
+                                  setGeneratingSheetId(asset.id);
+                                  try {
+                                    const res = await fetch(`/api/series/${id}/story-assets/generate-sheet`, {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({ assetId: asset.id }),
+                                    });
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      setPendingSheet({ assetId: asset.id, sheetUrl: data.sheetUrl, previewUrl: data.previewUrl });
+                                    }
+                                  } finally {
+                                    setGeneratingSheetId(null);
+                                  }
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 text-[10px] font-medium hover:text-white transition-colors"
+                              >
+                                Regenerate
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {/* Show saved sheet */}
+                        {pendingSheet?.assetId !== asset.id && asset.sheetUrl && (
+                          <div className="space-y-1.5">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={asset.sheetUrl.startsWith("http") ? asset.sheetUrl : `/api/media/${asset.sheetUrl}`}
+                              alt="Reference sheet"
+                              className="w-full max-w-[160px] rounded-lg border border-white/10"
+                            />
+                            <button
+                              type="button"
+                              disabled={generatingSheetId === asset.id}
+                              onClick={async () => {
+                                setGeneratingSheetId(asset.id);
+                                try {
+                                  const res = await fetch(`/api/series/${id}/story-assets/generate-sheet`, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ assetId: asset.id }),
+                                  });
+                                  if (res.ok) {
+                                    const data = await res.json();
+                                    setPendingSheet({ assetId: asset.id, sheetUrl: data.sheetUrl, previewUrl: data.previewUrl });
+                                  }
+                                } finally {
+                                  setGeneratingSheetId(null);
+                                }
+                              }}
+                              className="text-[10px] text-emerald-500/60 hover:text-emerald-400 transition-colors inline-flex items-center gap-0.5"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                              Regenerate Sheet
+                            </button>
+                          </div>
+                        )}
+                        {/* No sheet yet */}
+                        {pendingSheet?.assetId !== asset.id && !asset.sheetUrl && generatingSheetId !== asset.id && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setGeneratingSheetId(asset.id);
+                              try {
+                                const res = await fetch(`/api/series/${id}/story-assets/generate-sheet`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ assetId: asset.id }),
+                                });
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  setPendingSheet({ assetId: asset.id, sheetUrl: data.sheetUrl, previewUrl: data.previewUrl });
+                                }
+                              } finally {
+                                setGeneratingSheetId(null);
+                              }
+                            }}
+                            className="text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                          >
+                            Generate Reference Sheet
+                          </button>
+                        )}
+                      </div>
+
                       {asset.type === "character" && (
                         <div className="mt-2">
                           <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-medium mb-1">Voice</label>

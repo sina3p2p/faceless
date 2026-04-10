@@ -435,7 +435,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     const ar = sizeConfig.id as AspectRatio;
 
     const allAssets = await resolveStoryAssets(
-      seriesRecord.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null,
+      seriesRecord.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> | null,
       seriesRecord.characterImages as Array<{ url: string; description: string }> | null
     );
 
@@ -463,41 +463,69 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       return;
     }
 
-    console.log(`[generate-frame-images] Generating ${targets.length} images with ${imageModel}, ${allAssets.length} story assets`);
+    console.log(`[generate-frame-images] Generating ${targets.length} images sequentially with chain-referencing, ${imageModel}, ${allAssets.length} story assets`);
 
-    const BATCH_SIZE = WORKER.parallelImages;
-    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
-      const batch = targets.slice(i, i + BATCH_SIZE);
+    // Sequential generation with chain-referencing:
+    // Each frame gets character sheet refs + previous frame's output as extra reference
+    let previousFrameSignedUrl: string | null = null;
 
-      await Promise.all(
-        batch.map(async ({ frame, sceneIdx }) => {
-          const prompt = frame.imagePrompt || `Scene ${sceneIdx + 1}`;
-          const frameAssetRefs = frame.assetRefs as string[] | null;
-          const sceneRefs = filterAssetsByRefs(allAssets, frameAssetRefs);
-          try {
-            const result = await generateSceneImage(prompt, imageModel, sceneIdx, sceneRefs, ar);
+    // If there are already-generated frames before our first target, use the last one as starting ref
+    const firstTargetIdx = allFrames.findIndex(({ frame }) => frame.id === targets[0].frame.id);
+    if (firstTargetIdx > 0) {
+      const prevFrame = allFrames[firstTargetIdx - 1].frame;
+      if (prevFrame.imageUrl) {
+        try { previousFrameSignedUrl = await getSignedDownloadUrl(prevFrame.imageUrl); } catch { /* skip */ }
+      }
+    }
 
-            const imgResp = await fetch(result.url);
-            if (!imgResp.ok) throw new Error("Failed to download generated image");
-            const buffer = Buffer.from(await imgResp.arrayBuffer());
+    for (let i = 0; i < targets.length; i++) {
+      const { frame, sceneIdx } = targets[i];
+      const prompt = frame.imagePrompt || `Scene ${sceneIdx + 1}`;
+      const frameAssetRefs = frame.assetRefs as string[] | null;
+      const matchedAssets = filterAssetsByRefs(allAssets, frameAssetRefs);
 
-            const key = `frames/${videoProjectId}/frame_${frame.id}_${Date.now()}.jpg`;
-            await uploadFile(key, buffer, "image/jpeg");
+      // Build refs: prefer sheetUrl (character sheet) over original url
+      const sceneRefs = matchedAssets.map((a) => ({
+        ...a,
+        url: a.sheetUrl || a.url,
+      }));
 
-            await db
-              .update(schema.sceneFrames)
-              .set({ imageUrl: key, modelUsed: imageModel })
-              .where(eq(schema.sceneFrames.id, frame.id));
+      // Add previous frame as chain reference for consistency
+      if (previousFrameSignedUrl) {
+        sceneRefs.push({
+          id: "prev-frame",
+          type: "character" as const,
+          name: "previous_frame",
+          description: "Previous frame — maintain visual consistency, same characters and style",
+          url: previousFrameSignedUrl,
+        });
+      }
 
-            console.log(`[generate-frame-images] Frame ${frame.id} (scene ${sceneIdx}) done`);
-          } catch (err) {
-            console.error(`[generate-frame-images] Frame ${frame.id} failed:`, err);
-            throw err;
-          }
-        })
-      );
+      try {
+        const result = await generateSceneImage(prompt, imageModel, sceneIdx, sceneRefs, ar);
 
-      const progress = Math.round(((i + batch.length) / targets.length) * 100);
+        const imgResp = await fetch(result.url);
+        if (!imgResp.ok) throw new Error("Failed to download generated image");
+        const buffer = Buffer.from(await imgResp.arrayBuffer());
+
+        const key = `frames/${videoProjectId}/frame_${frame.id}_${Date.now()}.jpg`;
+        await uploadFile(key, buffer, "image/jpeg");
+
+        await db
+          .update(schema.sceneFrames)
+          .set({ imageUrl: key, modelUsed: imageModel })
+          .where(eq(schema.sceneFrames.id, frame.id));
+
+        // Use this frame's image as reference for the next frame
+        previousFrameSignedUrl = await getSignedDownloadUrl(key);
+
+        console.log(`[generate-frame-images] Frame ${i + 1}/${targets.length} (scene ${sceneIdx}) done`);
+      } catch (err) {
+        console.error(`[generate-frame-images] Frame ${frame.id} failed:`, err);
+        // Don't update previousFrameSignedUrl — next frame will use the last successful one
+      }
+
+      const progress = Math.round(((i + 1) / targets.length) * 100);
       await job.updateProgress(progress);
     }
 

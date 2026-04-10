@@ -20,6 +20,8 @@ interface PendingAsset {
   description: string;
   type: AssetType;
   generatedUrl?: string;
+  sheetUrl?: string;
+  sheetPreview?: string;
   voiceId?: string;
 }
 
