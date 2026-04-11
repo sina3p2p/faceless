@@ -7,7 +7,7 @@ import type { MotionDirectorInput } from "@/lib/types";
 // ── Motion Agent Schema ──
 
 const singleFrameMotionSchema = z.object({
-  visualDescription: z.string().describe("Detailed motion instructions for an AI video model. Describe exactly what every visible subject physically does — body movement, facial expressions, hand gestures, object interactions — plus environment motion and camera direction."),
+  visualDescription: z.string().describe("Motion instructions for an AI video model. Describe ONE rich primary action with precise body mechanics, natural secondary motion, and camera movement. Must be achievable in a single short clip — quality over quantity."),
 });
 
 export type SingleFrameMotionOutput = z.infer<typeof singleFrameMotionSchema>;
@@ -23,11 +23,11 @@ export async function generateSingleFrameMotion(
   const primaryModel = model || LLM.motionModel;
 
   const motionIntensity: Record<string, string> = {
-    static: "Subtle environmental motion ONLY (wind, particles, light shifts). NO subject movement. The subject holds their pose completely still. Camera is locked or moves imperceptibly.",
-    subtle: "Small gestures only — breathing, weight shifts, blinking, gentle hand movements. Camera may drift slightly. No travel, no large actions.",
-    moderate: "ONE clear primary action with natural body mechanics. Camera may track or pan slowly. Secondary micro-movements allowed (hair, cloth).",
-    dynamic: "Multiple sequential actions permitted. Camera can dolly, pan, or arc. Full body movement, interactions with objects. Clear kinetic energy.",
-    frenetic: "Rapid, intense motion. Multiple simultaneous actions. Dramatic camera work — whip pans, push-ins. High urgency and physical intensity.",
+    static: "Environmental motion ONLY (wind, particles, light shifts). NO subject movement. Camera locked or imperceptible drift. Describe the environmental detail richly.",
+    subtle: "ONE small gesture with precise body mechanics — breathing, weight shift, blink, gentle hand movement. Natural secondary physics (hair sway, cloth settle). Camera may drift.",
+    moderate: "ONE clear primary action described with full body mechanics and physical detail. Natural secondary physics (hair, cloth, object reactions). Camera may track or pan slowly.",
+    dynamic: "ONE strong primary action with rich body mechanics — describe the muscle engagement, weight transfer, follow-through. Natural secondary physics. Camera can dolly, pan, or arc.",
+    frenetic: "ONE fast, intense primary action with explosive body mechanics — snap, thrust, whip. Natural reactive physics from the force. Dramatic camera move.",
   };
 
   const cameraConstraint = input.cameraPhysics
@@ -38,42 +38,40 @@ export async function generateSingleFrameMotion(
     ? `\nMATERIAL LANGUAGE: Describe motion using this material's physics: "${input.materialLanguage}". Example: "sculpted clay arm extends" not "arm reaches forward".`
     : "";
 
-  const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and your text instructions. It only renders visible physical motion.
+  const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and your text instructions. It renders visible physical motion for a ${input.clipDuration}s clip.
+
+CORE PRINCIPLE: AI video models execute ONE action well. Asking for many actions produces garbled, morphing artifacts. Focus all your descriptive power on making ONE action look incredible — rich body mechanics, precise physics, purposeful camera work.
 
 MOTION POLICY: ${input.motionPolicy.toUpperCase()}
 ${motionIntensity[input.motionPolicy]}
 ${cameraConstraint}${materialConstraint}
 
-TIMING (${input.clipDuration}s clip):
-- First ~40%: initiation — action begins, builds momentum
-- Middle ~40%: peak — action reaches fullest expression
-- Final ~20%: resolution — motion settles or completes
+WHAT TO DESCRIBE:
+1. PRIMARY ACTION — ONE dominant action. Describe it with precision and physical detail: body mechanics, weight, momentum, follow-through. Use specific directions, speeds, and body part positions. Make it vivid.
+2. NATURAL PHYSICS — Secondary motions that would physically result from the primary action (hair reacting to a head turn, cloth settling after a step, an object wobbling after being set down). These make the motion feel real.
+3. CAMERA — One clear camera instruction with direction and speed.
 
-PRIORITIES — describe in this order:
-1. SUBJECT ACTIONS — ONE dominant action per subject with body mechanics. Up to 2 subtle secondary movements.
-2. OBJECT INTERACTIONS — how objects move, react to forces
-3. ENVIRONMENT MOTION — max 1-2 effects (wind, particles, light)
-4. CAMERA — direction, speed, type. Precise: "slow steady dolly forward" not "push in"
-
-RULES:
-- SPECIFIC BODY MECHANICS: "lifts left hand to forehead, fingers spread" not "raises hand"
-- DIRECTIONAL MOVEMENT: "slides left-to-right" not "moves across"
+QUALITY RULES:
+- SPECIFIC BODY MECHANICS: "lifts left hand to forehead, fingers spread, elbow rising to shoulder height" not "raises hand"
+- DIRECTIONAL: "slides left-to-right" not "moves across"
 - SPEED CUES: "snaps head right suddenly" vs "slowly rotates head to the right"
-- SEQUENTIAL: "reaches for handle, pulls door open, steps through"
+- PHYSICAL DETAIL matters — describe how weight shifts, how fabric drapes, how light catches a surface during movement
+- Let secondary motions flow naturally from the primary action — don't choreograph them separately
 
-BANNED:
-- Emotional/abstract language: "feeling of wonder", "sense of peace"
-- Passive voice: "is seen walking" → "walks forward"
-- The words "scene", "frame", "clip", "shot"
-- Describing what subjects look like — the model sees the image${nextImageUrl ? `
+WHAT TO AVOID:
+- Multiple unrelated primary actions (walk + pick up + talk + turn = garbled output)
+- Step-by-step choreography listing every micro-movement in sequence
+- Describing appearance — the model already sees the image
+- Abstract/emotional language ("feeling of wonder")
+- Passive voice ("is seen walking" → "walks forward")
+- The words "scene", "frame", "clip", "shot"${nextImageUrl ? `
 
-TRANSITION:
-Compare the current image and the next image. If they show a continuous action from a similar angle, end the motion moving toward the next image's state. If significantly different (a visual cut), complete the current action naturally and let it settle.` : `
+TRANSITION: End the motion moving toward the next image's state if angles are similar. If significantly different, settle the current action naturally.` : `
 
-ENDING:
-This is the final clip. The main subject completes their current action with a finishing gesture. Motion decelerates naturally. No new actions.`}
+ENDING: Complete the action with natural deceleration. No new actions start.`}
 
-Motion must fill the entire ${input.clipDuration}s duration — not finish early, not feel rushed.`;
+Aim for 40-80 words. Every word should serve the motion — dense and precise, not padded or sparse.`;
+
 
   const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: URL }> = [];
 
