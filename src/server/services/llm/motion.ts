@@ -21,20 +21,29 @@ export async function generateSingleFrameMotion(
     directorNote: string;
     sceneTitle: string;
   },
-  style: string,
   currentImageUrl: string,
   nextImageUrl: string | null,
   model?: string
 ): Promise<SingleFrameMotionOutput> {
-  const primaryModel = model || LLM.motionModel;
+  const primaryModel = LLM.motionModel; // model || LLM.motionModel;
 
   const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and your text instructions. It cannot read, think, or understand story — it only renders visible physical motion. Your job: describe exactly what moves and how.
 
+COMPLEXITY RULE:
+Describe 1 primary action and at most 2 supporting actions per subject. Do not stack more than 3 simultaneous movements across the entire description. If less is happening, less is fine — not every clip needs busy motion.
+
 PRIORITIES — describe in this order:
-1. SUBJECT ACTIONS: What does each person/character/animal physically do? Be specific about body parts — arms, hands, fingers, eyes, mouth, head, legs, torso. Name subjects by appearance ("the curly-haired boy", "the woman in red"), not by role.
+1. SUBJECT ACTIONS — pick ONE dominant action per subject. This is the main thing they do. Describe it with full body mechanics. Then add up to 2 secondary movements that naturally accompany the primary (e.g., weight shift while reaching, breathing while standing). Secondary motion must be subtle — lower intensity, smaller range. Name subjects by appearance ("the curly-haired boy", "the woman in red"), not by role.
 2. OBJECT INTERACTIONS: How objects move, get used, react to forces — gravity, wind, contact.
-3. ENVIRONMENT MOTION: Wind, rain, particles, light shifts, liquid, fire, cloth, hair.
+3. ENVIRONMENT MOTION: Pick at most 1–2 environmental effects (wind, rain, particles, light shifts, liquid, fire, cloth, hair). Do not combine more than 2.
 4. CAMERA: Direction, speed, type of move. Be precise — "slow steady dolly forward over the full duration" not just "push in".
+
+TIMING:
+Divide the clip duration into phases and assign actions to each. For a ${frame.clipDuration}s clip:
+- First ~40%: initiation — the primary action begins, builds momentum
+- Middle ~40%: peak — the action reaches its fullest expression
+- Final ~20%: resolution — motion settles, decelerates, or completes
+Adjust these proportions to fit the action, but always define a clear beginning, peak, and wind-down. Never leave dead time with no motion.
 
 WHAT MAKES A GOOD MOTION PROMPT:
 - SPECIFIC BODY MECHANICS: "lifts left hand to forehead, fingers spread, palm facing out" not "raises hand"
@@ -50,12 +59,12 @@ BANNED:
 - Describing what subjects look like — the model already sees the image${nextImageUrl ? `
 
 TRANSITION:
-The motion must end moving toward what the NEXT frame shows. Look at the next image — if it shows a different angle, location, or subject state, design the motion to bridge there. End with movement in that direction.` : `
+Compare the current image and the next image. If they show a continuous action from a similar angle, end the motion moving toward the next image's state. If the next image shows a significantly different angle, location, or composition (a visual cut), do NOT force unnatural movement to bridge them — instead, complete the current action naturally and let it settle. Only bridge when the transition is physically plausible from the starting pose.` : `
 
 ENDING:
 This is the final clip. The main subject completes their current action — a finishing gesture, a settling pose. Motion decelerates naturally. Do not add new actions.`}
 
-Clip duration: ${frame.clipDuration}s. The motion must fill this entire duration — not finish early, not feel rushed. Pace the actions accordingly.`;
+Clip duration: ${frame.clipDuration}s. The motion must fill this entire duration — not finish early, not feel rushed. Use the timing phases above to pace the actions.`;
 
   const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: URL }> = [];
 

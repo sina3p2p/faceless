@@ -81,7 +81,6 @@ export async function POST(
         directorNote: scene.directorNote || "",
         sceneTitle: scene.sceneTitle || "",
       },
-      video.series.style,
       currentImageUrl,
       nextImageUrl,
       undefined // uses default motionModel from constants

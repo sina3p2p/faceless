@@ -634,7 +634,6 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
                 directorNote: frameData.directorNote,
                 sceneTitle: frameData.sceneTitle,
               },
-              seriesRecord.style,
               currentImageUrl,
               nextImageUrl,
               agents.motionModel
