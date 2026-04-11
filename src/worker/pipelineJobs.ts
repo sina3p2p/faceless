@@ -404,7 +404,7 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       // ── Music: generate song via Suno + Whisper alignment ──
       const videoProject = await db.query.videoProjects.findFirst({
         where: eq(schema.videoProjects.id, videoProjectId),
-        columns: { script: true, title: true },
+        columns: { script: true, title: true, config: true },
       });
       const scriptMd = videoProject?.script || "";
 
@@ -418,9 +418,12 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
         durationMs: (s.duration ?? 10) * 1000,
       }));
 
-      console.log(`[generate-tts] Music mode: generating song "${title}" (${genre}), ${songSections.length} sections`);
+      const projectConfig = getProjectConfig(videoProject?.config);
+      const targetDurationSec = projectConfig.duration?.preferred;
 
-      const songResult = await generateSong(title, genre, songSections);
+      console.log(`[generate-tts] Music mode: generating song "${title}" (${genre}), ${songSections.length} sections${targetDurationSec ? `, target ~${targetDurationSec}s` : ""}`);
+
+      const songResult = await generateSong(title, genre, songSections, targetDurationSec);
 
       // Download and upload song
       const songPath = path.join(workDir, "song.mp3");
