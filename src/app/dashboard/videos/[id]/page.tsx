@@ -77,8 +77,9 @@ interface VideoDetail {
   status: string;
   duration: number | null;
   script: string | null;
+  outputUrl: string | null;
   config: { pipelineMode?: "manual" | "auto" } | null;
-  series: { name: string; niche: string; imageModel: string | null; videoModel: string | null; videoType: string; storyAssets?: StoryAssetItem[] };
+  series: { name: string; niche: string; imageModel: string | null; videoModel: string | null; videoSize: string | null; videoType: string; storyAssets?: StoryAssetItem[] };
 }
 
 function AssetRefPills({
@@ -1588,6 +1589,8 @@ export default function ReviewPage() {
   const [generatingFrameMotionIds, setGeneratingFrameMotionIds] = useState<Set<string>>(new Set());
   const [generatingAllFrames, setGeneratingAllFrames] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -1859,6 +1862,27 @@ export default function ReviewPage() {
         return next;
       });
     }
+  }
+
+  // Fetch download URL when completed
+  useEffect(() => {
+    if (video?.status === "COMPLETED" && !downloadUrl) {
+      fetch(`/api/videos/${id}/download`)
+        .then((r) => r.json())
+        .then((data) => { if (data.url) setDownloadUrl(data.url); })
+        .catch(() => {});
+    }
+  }, [video?.status, downloadUrl, id]);
+
+  async function handleDownload() {
+    setDownloading(true);
+    const res = await fetch(`/api/videos/${id}/download`);
+    const data = await res.json();
+    if (data.url) {
+      setDownloadUrl(data.url);
+      window.open(data.url, "_blank");
+    }
+    setDownloading(false);
   }
 
   const isMusicVideo = video?.series?.videoType === "music_video";
@@ -2320,6 +2344,37 @@ export default function ReviewPage() {
             </Button>
           </div>
         </div>
+      )}
+
+      {/* Completed video player */}
+      {video?.status === "COMPLETED" && (
+        <Card className="mb-6">
+          <CardContent className="py-6">
+            {(() => {
+              const vs = video.series?.videoSize || "9:16";
+              const arCss = vs === "16:9" ? "16/9" : vs === "1:1" ? "1/1" : "9/16";
+              const maxW = vs === "16:9" ? "max-w-2xl" : vs === "1:1" ? "max-w-md" : "max-w-xs";
+              return downloadUrl ? (
+                <div className={`${maxW} mx-auto rounded-xl overflow-hidden bg-black mb-4`} style={{ aspectRatio: arCss }}>
+                  <video
+                    src={downloadUrl}
+                    controls
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ) : (
+                <div className={`${maxW} mx-auto rounded-xl bg-white/5 flex items-center justify-center mb-4 h-48`}>
+                  <div className="animate-spin w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full" />
+                </div>
+              );
+            })()}
+            <div className="flex justify-center gap-3">
+              <Button loading={downloading} onClick={handleDownload}>
+                Download MP4
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* REVIEW_SCENES banner */}
