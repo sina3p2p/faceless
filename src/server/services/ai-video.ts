@@ -112,6 +112,9 @@ async function generateVideoViaFal(
   } else if (modelId.includes("wan-")) {
     input.image_url = imageUrl;
     if (useEndImage) input.end_image_url = endImageUrl;
+  } else if (modelId.includes("grok-imagine")) {
+    input.image_url = imageUrl;
+    input.resolution = "720p";
   } else {
     input.image_url = imageUrl;
   }
