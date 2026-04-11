@@ -117,6 +117,9 @@ async function generateVideoViaFal(
   } else if (modelId.includes("grok-imagine")) {
     input.image_url = imageUrl;
     input.resolution = "720p";
+  } else if (modelId.includes("veo3.1")) {
+    input.image_url = imageUrl;
+    input.generate_audio = false;
   } else {
     input.image_url = imageUrl;
   }
