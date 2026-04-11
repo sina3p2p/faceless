@@ -25,6 +25,7 @@ function resolveModel(videoModelKey?: string) {
     provider: entry?.provider ?? ("fal" as const),
     durations: entry?.durations ?? [5, 10],
     endFrame: entry?.endFrame ?? false,
+    durationFormat: entry?.durationFormat ?? ("string" as const),
   };
 }
 
@@ -91,12 +92,13 @@ async function generateVideoViaFal(
   modelId: string,
   endFrame: boolean,
   endImageUrl?: string,
+  durationFormat: "string" | "number" = "string",
 ): Promise<VideoResult> {
   const useEndImage = endFrame && !!endImageUrl;
 
   const input: Record<string, unknown> = {
     prompt,
-    duration: String(apiDuration),
+    duration: durationFormat === "string" ? String(apiDuration) : apiDuration,
   };
 
   if (modelId.includes("kling-video/v3") || modelId.includes("kling-video/o3")) {
@@ -150,14 +152,14 @@ export async function generateVideoFromImage(
   endImageUrl?: string,
   aspectRatio: string = "9:16",
 ): Promise<VideoResult> {
-  const { modelId, provider, durations, endFrame } = resolveModel(videoModelKey);
+  const { modelId, provider, durations, endFrame, durationFormat } = resolveModel(videoModelKey);
   const apiDuration = pickBestDuration(desiredDuration, durations);
 
   if (provider === "runway") {
     return generateVideoViaRunway(imageUrl, prompt, apiDuration, modelId, aspectRatio);
   }
 
-  return generateVideoViaFal(imageUrl, prompt, apiDuration, modelId, endFrame, endImageUrl);
+  return generateVideoViaFal(imageUrl, prompt, apiDuration, modelId, endFrame, endImageUrl, durationFormat);
 }
 
 export async function generateVideoFromText(
