@@ -1925,6 +1925,7 @@ export default function ReviewPage() {
   // 3-phase pipeline review gates
   const isStoryReview = video?.status === "REVIEW_STORY";
   const isPreProductionReview = video?.status === "REVIEW_PRE_PRODUCTION";
+  const isImagesReview = video?.status === "REVIEW_IMAGES";
   const isProductionReview = video?.status === "REVIEW_PRODUCTION";
   // Legacy review statuses
   const isScenesReview = video?.status === "REVIEW_SCENES";
@@ -2115,6 +2116,7 @@ export default function ReviewPage() {
           {video?.title ?? (
             isStoryReview ? "Review Story" :
               isPreProductionReview ? "Review Pre-Production" :
+                isImagesReview ? "Review Images" :
                 isProductionReview ? "Review Production" :
                   isScenesReview ? "Review Scenes" :
                     isTTSReview ? "Review Audio" :
@@ -2132,8 +2134,10 @@ export default function ReviewPage() {
             ? "Review creative brief, story, scenes, and continuity. Then approve to generate audio."
             : isPreProductionReview
               ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images."
+              : isImagesReview
+                ? "Review the generated images below. Regenerate any you don't like, then approve to generate video clips."
               : isProductionReview
-                ? "Review generated images and video clips. Then approve to compose the final video."
+                ? "Review the generated video clips below. Then approve to compose the final video."
                 : isScenesReview
                   ? "Review the scene breakdown and director's notes, then generate audio."
                   : isTTSReview
@@ -2626,12 +2630,31 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* Production Review (Phase 3) */}
+      {/* Image Review */}
+      {isImagesReview && scenes.length > 0 && !isProcessing && (
+        <div className="mb-6">
+          <div className="mb-4 rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+            <p className="text-sm text-cyan-300">
+              Review the generated images below. Regenerate any you don&apos;t like,
+              then approve to generate video clips.
+            </p>
+          </div>
+          <Card>
+            <CardContent className="py-3 flex items-center justify-end gap-2">
+              <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-images")}>
+                Approve Images &amp; Generate Video
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Production Review (Phase 4) */}
       {isProductionReview && scenes.length > 0 && !isProcessing && (
         <div className="mb-6">
           <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
             <p className="text-sm text-amber-300">
-              Review the generated images and video clips below.
+              Review the generated video clips below.
               When you&apos;re happy, approve to compose the final video.
             </p>
           </div>
@@ -2736,7 +2759,7 @@ export default function ReviewPage() {
                 generatingFrameIds={generatingFrameIds}
                 generatingFrameVideoIds={generatingFrameVideoIds}
                 generatingFrameMotionIds={generatingFrameMotionIds}
-                showFrameActions={isPromptsReview || isImageReview || isNewMotionReview || isVideoReview}
+                showFrameActions={isImagesReview || isPromptsReview || isImageReview || isNewMotionReview || isVideoReview}
                 showFrameMotion={isNewMotionReview || isImageReview || isVideoReview}
                 showFrameVideo={isNewMotionReview || isVideoReview || video?.status === "COMPLETED" || video?.status === "VIDEO_GENERATION"}
                 defaultVideoModel={video?.series?.videoModel || undefined}

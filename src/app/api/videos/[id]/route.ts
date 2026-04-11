@@ -43,9 +43,10 @@ export async function GET(
 }
 
 const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
-  // 3-phase review gates
+  // Pipeline review gates
   REVIEW_STORY: ["TTS_GENERATION"],
   REVIEW_PRE_PRODUCTION: ["PROMPT_GENERATION"],
+  REVIEW_IMAGES: ["MOTION_GENERATION"],
   REVIEW_PRODUCTION: ["RENDERING"],
   // Legacy transitions (for existing data)
   REVIEW_SCENES: ["TTS_GENERATION", "SCENE_SPLIT"],
@@ -64,9 +65,10 @@ const patchSchema = z.object({
   script: z.string().optional(),
   pipelineMode: z.enum(["manual", "auto"]).optional(),
   status: z.enum([
-    // 3-phase pipeline
+    // Pipeline review gates
     "REVIEW_STORY", "TTS_GENERATION",
     "REVIEW_PRE_PRODUCTION", "PROMPT_GENERATION",
+    "REVIEW_IMAGES", "MOTION_GENERATION",
     "REVIEW_PRODUCTION", "RENDERING",
     // Legacy
     "SCENE_SPLIT", "REVIEW_SCENES",

@@ -748,7 +748,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
-      await renderQueue.add("generate-pipeline-motion", { videoProjectId, seriesId, userId });
+      await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
       return;
     }
 
@@ -820,7 +820,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-images] All ${targets.length} images generated`);
 
-    await renderQueue.add("generate-pipeline-motion", { videoProjectId, seriesId, userId });
+    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, errorMessage);

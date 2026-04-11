@@ -31,6 +31,7 @@ export const videoStatusEnum = pgEnum("video_status", [
   // Phase 3: Production
   "PROMPT_GENERATION",
   "IMAGE_GENERATION",
+  "REVIEW_IMAGES",
   "MOTION_GENERATION",
   "VIDEO_GENERATION",
   "REVIEW_PRODUCTION",
