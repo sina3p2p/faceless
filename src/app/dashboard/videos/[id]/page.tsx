@@ -385,8 +385,8 @@ function FrameCard({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setSelectedVideoModel(m.id); }}
                     className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${selectedVideoModel === m.id
-                        ? "bg-violet-600 text-white"
-                        : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+                      ? "bg-violet-600 text-white"
+                      : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
                       }`}
                     title={m.description}
                   >
@@ -438,8 +438,8 @@ function FrameCard({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setSelectedVideoModel(m.id); }}
                     className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${selectedVideoModel === m.id
-                        ? "bg-violet-600 text-white"
-                        : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+                      ? "bg-violet-600 text-white"
+                      : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
                       }`}
                     title={m.description}
                   >
@@ -1901,7 +1901,7 @@ export default function ReviewPage() {
       fetch(`/api/videos/${id}/download`)
         .then((r) => r.json())
         .then((data) => { if (data.url) setDownloadUrl(data.url); })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [video?.status, downloadUrl, id]);
 
@@ -2117,16 +2117,16 @@ export default function ReviewPage() {
             isStoryReview ? "Review Story" :
               isPreProductionReview ? "Review Pre-Production" :
                 isImagesReview ? "Review Images" :
-                isProductionReview ? "Review Production" :
-                  isScenesReview ? "Review Scenes" :
-                    isTTSReview ? "Review Audio" :
-                      isPromptsReview ? "Review Image Prompts" :
-                        isNewMotionReview ? "Review Motion" :
-                          isVideoReview ? "Review Video Clips" :
-                            isMotionReview ? "Review Motion" :
-                            isVisualReview ? "Review Visuals" :
-                              isProcessing ? "Processing..." :
-                                "Review"
+                  isProductionReview ? "Review Production" :
+                    isScenesReview ? "Review Scenes" :
+                      isTTSReview ? "Review Audio" :
+                        isPromptsReview ? "Review Image Prompts" :
+                          isNewMotionReview ? "Review Motion" :
+                            isVideoReview ? "Review Video Clips" :
+                              isMotionReview ? "Review Motion" :
+                                isVisualReview ? "Review Visuals" :
+                                  isProcessing ? "Processing..." :
+                                    "Review"
           )}
         </h1>
         <p className="text-gray-400 text-sm">
@@ -2136,23 +2136,23 @@ export default function ReviewPage() {
               ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images."
               : isImagesReview
                 ? "Review the generated images below. Regenerate any you don't like, then approve to generate video clips."
-              : isProductionReview
-                ? "Review the generated video clips below. Then approve to compose the final video."
-                : isScenesReview
-                  ? "Review the scene breakdown and director's notes, then generate audio."
-                  : isTTSReview
-                    ? "Listen to the generated audio for each scene, then generate image prompts."
-                    : isPromptsReview
-                      ? "Review the image prompts before generating images."
-                      : isNewMotionReview
-                        ? "Review the motion descriptions for each frame, then generate video clips."
-                        : isVideoReview
-                          ? "Review the generated video clips. Regenerate any you don't like, then approve to compose the final video."
-                      : isProcessing
-                      ? "Your video is being processed..."
-                      : isImageReview
-                        ? "Review generated images, then approve to generate motion."
-                        : "Review your content and approve to continue."}
+                : isProductionReview
+                  ? "Review the generated video clips below. Then approve to compose the final video."
+                  : isScenesReview
+                    ? "Review the scene breakdown and director's notes, then generate audio."
+                    : isTTSReview
+                      ? "Listen to the generated audio for each scene, then generate image prompts."
+                      : isPromptsReview
+                        ? "Review the image prompts before generating images."
+                        : isNewMotionReview
+                          ? "Review the motion descriptions for each frame, then generate video clips."
+                          : isVideoReview
+                            ? "Review the generated video clips. Regenerate any you don't like, then approve to compose the final video."
+                            : isProcessing
+                              ? "Your video is being processed..."
+                              : isImageReview
+                                ? "Review generated images, then approve to generate motion."
+                                : "Review your content and approve to continue."}
         </p>
         {/* Auto-approve toggle */}
         <div className="mt-3 flex items-center gap-3">
@@ -2747,7 +2747,7 @@ export default function ReviewPage() {
                 isMusicVideo={isMusicVideo}
                 isDialogue={video?.series?.videoType === "dialogue"}
                 storyAssets={video?.series?.storyAssets ?? []}
-                showMotionEdit={isMotionReview || isNewMotionReview}
+                showMotionEdit={isMotionReview || isNewMotionReview || isVideoReview || video?.status === "COMPLETED"}
                 showDirectorNote={true}
                 showAudioPlayer={isTTSReview || isPromptsReview || isNewMotionReview}
                 showDuration={hasTTSRun}
