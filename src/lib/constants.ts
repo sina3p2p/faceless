@@ -38,7 +38,7 @@ export const LLM = {
   visionModel: "google/gemini-2.5-pro",
   storyModel: "anthropic/claude-opus-4.6",
   directorModel: "anthropic/claude-opus-4.6",
-  promptModel: "anthropic/claude-opus-4.6",
+  promptModel: "openai/gpt-5.4",
   motionModel: "google/gemini-2.5-pro",
 } as const;
 

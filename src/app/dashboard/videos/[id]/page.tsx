@@ -352,11 +352,10 @@ function FrameCard({
                     key={m.id}
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setSelectedVideoModel(m.id); }}
-                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                      selectedVideoModel === m.id
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${selectedVideoModel === m.id
                         ? "bg-violet-600 text-white"
                         : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-                    }`}
+                      }`}
                     title={m.description}
                   >
                     {m.label}
@@ -406,11 +405,10 @@ function FrameCard({
                     key={m.id}
                     type="button"
                     onClick={(e) => { e.stopPropagation(); setSelectedVideoModel(m.id); }}
-                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                      selectedVideoModel === m.id
+                    className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${selectedVideoModel === m.id
                         ? "bg-violet-600 text-white"
                         : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-                    }`}
+                      }`}
                     title={m.description}
                   >
                     {m.label}
@@ -584,8 +582,8 @@ function SortableSceneCard({
       style={style}
       onClick={onSelect}
       className={`rounded-xl border transition-all ${isSelected
-          ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/20"
-          : "border-white/5 bg-white/2 hover:border-white/10"
+        ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/20"
+        : "border-white/5 bg-white/2 hover:border-white/10"
         }`}
     >
       <div className="flex gap-3 p-4">
@@ -623,8 +621,8 @@ function SortableSceneCard({
           {isDialogue && scene.speaker && (
             <div className="mb-1.5">
               <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${scene.speaker.toLowerCase() === "narrator"
-                  ? "bg-gray-500/20 text-gray-400"
-                  : "bg-violet-500/20 text-violet-400"
+                ? "bg-gray-500/20 text-gray-400"
+                : "bg-violet-500/20 text-violet-400"
                 }`}>
                 {scene.speaker}
               </span>
@@ -1113,8 +1111,8 @@ function PromptEditModal({
                         if (!isCurrent) onSelectMedia(scene.id, m.id);
                       }}
                       className={`relative shrink-0 rounded-lg overflow-hidden border-2 transition-all hover:opacity-100 ${isCurrent
-                          ? "border-violet-500 ring-1 ring-violet-500/30 opacity-100"
-                          : "border-white/10 opacity-60 hover:border-white/30"
+                        ? "border-violet-500 ring-1 ring-violet-500/30 opacity-100"
+                        : "border-white/10 opacity-60 hover:border-white/30"
                         }`}
                       title={`${m.modelUsed || "Unknown model"} — ${new Date(m.createdAt).toLocaleTimeString()}`}
                     >
@@ -1144,8 +1142,8 @@ function PromptEditModal({
               <button
                 onClick={() => setMode("regenerate")}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === "regenerate"
-                    ? "bg-violet-600 text-white"
-                    : "text-gray-400 hover:text-white"
+                  ? "bg-violet-600 text-white"
+                  : "text-gray-400 hover:text-white"
                   }`}
               >
                 Regenerate
@@ -1153,8 +1151,8 @@ function PromptEditModal({
               <button
                 onClick={() => setMode("edit")}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === "edit"
-                    ? "bg-violet-600 text-white"
-                    : "text-gray-400 hover:text-white"
+                  ? "bg-violet-600 text-white"
+                  : "text-gray-400 hover:text-white"
                   }`}
               >
                 Edit
@@ -1175,8 +1173,8 @@ function PromptEditModal({
                     if (mode === "edit" && !scene.assetUrl) setMode("regenerate");
                   }}
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${selectedModel === m.id
-                      ? "bg-violet-600 text-white"
-                      : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+                    ? "bg-violet-600 text-white"
+                    : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
                     }`}
                 >
                   {m.label}
@@ -1450,8 +1448,8 @@ function ScriptChatPanel({
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${msg.role === "user"
-                ? "bg-violet-600 text-white"
-                : "bg-white/5 border border-white/10 text-gray-300"
+              ? "bg-violet-600 text-white"
+              : "bg-white/5 border border-white/10 text-gray-300"
               }`}>
               {msg.content}
             </div>
@@ -2081,8 +2079,8 @@ export default function ReviewPage() {
                     : isProcessing
                       ? "Your video is being processed..."
                       : isImageReview
-                          ? "Review generated images, then approve to generate motion."
-                          : "Review your content and approve to continue."}
+                        ? "Review generated images, then approve to generate motion."
+                        : "Review your content and approve to continue."}
         </p>
         {/* Auto-approve toggle */}
         <div className="mt-3 flex items-center gap-3">
