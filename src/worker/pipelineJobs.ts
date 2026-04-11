@@ -27,7 +27,6 @@ import {
 } from "@/server/services/llm";
 import {
   getAIVideoForScene,
-  downloadAIVideo,
 } from "@/server/services/ai-video";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile, composeVideo, type ComposerScene } from "@/server/services/composer";
@@ -336,7 +335,7 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
     console.error(`[generate-tts] Failed for ${videoProjectId}:`, msg);
     throw error;
   } finally {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
   }
 }
 
@@ -885,6 +884,6 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
     console.error(`[compose-final] Failed for ${videoProjectId}:`, msg);
     throw error;
   } finally {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
   }
 }

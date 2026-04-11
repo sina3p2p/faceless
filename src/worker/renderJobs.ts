@@ -21,7 +21,13 @@ import {
   fetchAIVideoMediaParallel,
 } from "./mediaJobs";
 import { getVideoSize } from "@/lib/constants";
-import { type MusicScript } from "@/server/services/llm";
+interface StoredMusicScript {
+  sections: Array<{
+    sectionName?: string;
+    imagePrompt?: string;
+    visualDescription?: string;
+  }>;
+}
 import { type AlignedSection } from "@/server/services/music";
 import {
   type AspectRatio,
@@ -346,7 +352,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
       columns: { script: true, config: true },
     });
 
-    const musicScript: MusicScript | null = videoProject?.script ? JSON.parse(videoProject.script) : null;
+    const musicScript: StoredMusicScript | null = videoProject?.script ? JSON.parse(videoProject.script) : null;
     if (!musicScript) throw new Error("No music script found");
 
     const videoConfig = (videoProject?.config ?? {}) as Record<string, unknown>;

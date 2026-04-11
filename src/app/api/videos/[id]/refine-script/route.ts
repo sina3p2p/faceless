@@ -6,10 +6,10 @@ import { eq, and, asc } from "drizzle-orm";
 import {
   refineNarrationScript,
   refineStory,
-  refineMusicScript,
+  refineMusicLyrics,
   type ChatMessage,
   type NarrationScript,
-  type MusicScript,
+  type MusicLyrics,
 } from "@/server/services/llm";
 import { z } from "zod";
 
@@ -70,26 +70,31 @@ export async function POST(
     }
 
     if (isMusic) {
-      const currentScript: MusicScript = {
+      const currentLyrics: MusicLyrics = {
         title: video.title || "Untitled",
         genre: "",
-        totalDuration: video.duration || 60,
         sections: video.scenes.map((s) => ({
           sectionName: "Section",
           lyrics: s.text.split("\n"),
           durationMs: (s.duration ?? 10) * 1000,
-          imagePrompt: s.imagePrompt || "",
-          visualDescription: s.visualDescription || "",
           positiveStyles: [],
           negativeStyles: [],
         })),
       };
 
       const scriptJson = video.script ? JSON.parse(video.script) : null;
-      if (scriptJson?.genre) currentScript.genre = scriptJson.genre;
+      if (scriptJson?.genre) currentLyrics.genre = scriptJson.genre;
+      if (scriptJson?.sections) {
+        for (let i = 0; i < currentLyrics.sections.length && i < scriptJson.sections.length; i++) {
+          const src = scriptJson.sections[i];
+          if (src.sectionName) currentLyrics.sections[i].sectionName = src.sectionName;
+          if (src.positiveStyles) currentLyrics.sections[i].positiveStyles = src.positiveStyles;
+          if (src.negativeStyles) currentLyrics.sections[i].negativeStyles = src.negativeStyles;
+        }
+      }
 
-      const refined = await refineMusicScript(
-        currentScript,
+      const refined = await refineMusicLyrics(
+        currentLyrics,
         message,
         chatHistory as ChatMessage[],
         video.series.llmModel || undefined,
@@ -101,15 +106,11 @@ export async function POST(
         scenes: refined.sections.map((s, i) => ({
           sceneOrder: i,
           text: s.lyrics.join("\n"),
-          imagePrompt: s.imagePrompt,
-          visualDescription: s.visualDescription,
           duration: s.durationMs / 1000,
         })),
         title: refined.title,
         changes: buildChanges(video.scenes, refined.sections.map((s) => ({
           text: s.lyrics.join("\n"),
-          imagePrompt: s.imagePrompt,
-          visualDescription: s.visualDescription,
           duration: s.durationMs / 1000,
         }))),
       });
