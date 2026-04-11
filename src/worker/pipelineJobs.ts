@@ -24,7 +24,16 @@ import {
   splitStoryIntoScenes,
   generateFramePrompts,
   generateSingleFrameMotion,
+  generateCreativeBrief,
+  superviseScript,
+  generateVisualStyleGuide,
+  generateFrameBreakdown,
 } from "@/server/services/llm";
+import {
+  resolveDuration,
+  type DurationPreference,
+  type PipelineConfig,
+} from "@/lib/types";
 import {
   getAIVideoForScene,
 } from "@/server/services/ai-video";
@@ -52,19 +61,49 @@ function getModelDurationsArray(videoModel?: string | null): number[] {
 }
 
 interface AgentModels {
+  producerModel?: string;
   storyModel?: string;
   directorModel?: string;
+  supervisorModel?: string;
+  cinematographerModel?: string;
+  storyboardModel?: string;
   promptModel?: string;
   motionModel?: string;
 }
 
 function getAgentModels(seriesRecord: { llmModel?: string | null }): AgentModels {
+  const override = seriesRecord.llmModel || undefined;
   return {
-    storyModel: seriesRecord.llmModel || undefined,
-    directorModel: seriesRecord.llmModel || undefined,
-    promptModel: seriesRecord.llmModel || undefined,
-    motionModel: seriesRecord.llmModel || undefined,
+    producerModel: override,
+    storyModel: override,
+    directorModel: override,
+    supervisorModel: override,
+    cinematographerModel: override,
+    storyboardModel: override,
+    promptModel: override,
+    motionModel: override,
   };
+}
+
+function getProjectConfig(config: unknown): PipelineConfig {
+  if (config && typeof config === "object") return config as PipelineConfig;
+  return {};
+}
+
+async function loadProjectConfig(videoProjectId: string): Promise<PipelineConfig> {
+  const project = await db.query.videoProjects.findFirst({
+    where: eq(schema.videoProjects.id, videoProjectId),
+    columns: { config: true },
+  });
+  return getProjectConfig(project?.config);
+}
+
+async function mergeProjectConfig(videoProjectId: string, patch: Partial<PipelineConfig>) {
+  const existing = await loadProjectConfig(videoProjectId);
+  await db
+    .update(schema.videoProjects)
+    .set({ config: { ...existing, ...patch } })
+    .where(eq(schema.videoProjects.id, videoProjectId));
 }
 
 async function autoChainOrReview(
@@ -84,6 +123,70 @@ async function autoChainOrReview(
     await renderQueue.add(nextJobName, { videoProjectId, seriesId, userId });
   } else {
     await updateVideoStatus(videoProjectId, reviewStatus);
+  }
+}
+
+// ── Executive Produce ──
+
+export async function executiveProduceJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId, userId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    await updateVideoStatus(videoProjectId, "PRODUCING");
+
+    const config = await loadProjectConfig(videoProjectId);
+
+    const duration: DurationPreference = config.duration
+      ? config.duration
+      : resolveDuration({ preferred: 30 });
+
+    const topicIdeas = seriesRecord.topicIdeas as string[];
+    const topicIdea = topicIdeas.length > 0
+      ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
+      : undefined;
+
+    const previousProjects = await db.query.videoProjects.findMany({
+      where: eq(schema.videoProjects.seriesId, seriesId),
+      columns: { title: true },
+      orderBy: (vp, { desc }) => [desc(vp.createdAt)],
+      limit: 50,
+    });
+    const previousTopics = previousProjects.map((v) => v.title).filter((t): t is string => !!t);
+
+    const storyAssets = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
+    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+    const assets = parseStoryAssets(storyAssets, charImages);
+
+    const agents = getAgentModels(seriesRecord);
+
+    console.log(`[executive-produce] Generating creative brief for series=${seriesId}`);
+
+    const brief = await generateCreativeBrief(
+      seriesRecord.niche,
+      seriesRecord.style,
+      seriesRecord.videoType || "standalone",
+      seriesRecord.language || "en",
+      duration,
+      previousTopics,
+      topicIdea,
+      assets,
+      agents.producerModel
+    );
+
+    await mergeProjectConfig(videoProjectId, { duration, creativeBrief: brief });
+
+    console.log(`[executive-produce] Brief ready: "${brief.concept}" (${brief.durationGuidance.wordBudgetTarget} target words)`);
+
+    await renderQueue.add("generate-story", { videoProjectId, seriesId, userId });
+  } catch (error) {
+    const msg = await failJob(videoProjectId, error);
+    console.error(`[executive-produce] Failed for ${videoProjectId}:`, msg);
+    throw error;
   }
 }
 
@@ -113,6 +216,8 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
     });
     const previousTopics = previousProjects.map((v) => v.title).filter((t): t is string => !!t);
 
+    const config = await loadProjectConfig(videoProjectId);
+
     console.log(`[generate-story] Starting story generation for series=${seriesId}`);
 
     const agents = getAgentModels(seriesRecord);
@@ -124,7 +229,8 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       seriesRecord.language || "en",
       agents.storyModel,
       previousTopics,
-      seriesRecord.videoType || undefined
+      seriesRecord.videoType || undefined,
+      config.creativeBrief
     );
 
     const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
@@ -137,7 +243,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-story] Story ready: "${title}" (${storyMarkdown.length} chars)`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_STORY", "split-scenes");
+    await renderQueue.add("split-scenes", { videoProjectId, seriesId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-story] Failed for ${videoProjectId}:`, msg);
@@ -164,6 +270,8 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "SCENE_SPLIT");
 
+    const config = await loadProjectConfig(videoProjectId);
+
     console.log(`[split-scenes] Splitting story into scenes for ${videoProjectId}`);
 
     const agents = getAgentModels(seriesRecord);
@@ -173,7 +281,8 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
       seriesRecord.style,
       seriesRecord.language || "en",
       agents.directorModel,
-      seriesRecord.videoType || undefined
+      seriesRecord.videoType || undefined,
+      config.creativeBrief
     );
 
     // Delete any existing scenes before inserting new ones
@@ -191,10 +300,78 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     console.log(`[split-scenes] Created ${result.scenes.length} scenes`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_SCENES", "generate-tts");
+    await renderQueue.add("supervise-script", { videoProjectId, seriesId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[split-scenes] Failed for ${videoProjectId}:`, msg);
+    throw error;
+  }
+}
+
+// ── Supervise Script ──
+
+export async function superviseScriptJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId, userId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    await updateVideoStatus(videoProjectId, "SCRIPT_SUPERVISION");
+
+    const config = await loadProjectConfig(videoProjectId);
+    if (!config.creativeBrief) throw new Error("No creative brief found — run executive-produce first");
+
+    const existingScenes = await db.query.videoScenes.findMany({
+      where: eq(schema.videoScenes.videoProjectId, videoProjectId),
+      orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
+    });
+    if (existingScenes.length === 0) throw new Error("No scenes to supervise");
+
+    const storyAssets = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
+    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+    const assets = parseStoryAssets(storyAssets, charImages);
+
+    const scenesInput = existingScenes.map((s) => ({
+      sceneTitle: s.sceneTitle || "",
+      text: s.text,
+      directorNote: s.directorNote || "",
+    }));
+
+    const agents = getAgentModels(seriesRecord);
+
+    console.log(`[supervise-script] Supervising ${scenesInput.length} scenes for ${videoProjectId}`);
+
+    const result = await superviseScript(
+      scenesInput,
+      config.creativeBrief,
+      assets,
+      agents.supervisorModel
+    );
+
+    // Overwrite scenes with corrected versions
+    await db.delete(schema.videoScenes).where(eq(schema.videoScenes.videoProjectId, videoProjectId));
+
+    for (let i = 0; i < result.scenes.length; i++) {
+      await db.insert(schema.videoScenes).values({
+        videoProjectId,
+        sceneOrder: i,
+        sceneTitle: result.scenes[i].sceneTitle,
+        directorNote: result.scenes[i].directorNote,
+        text: result.scenes[i].text,
+      });
+    }
+
+    await mergeProjectConfig(videoProjectId, { continuityNotes: result.continuityNotes });
+
+    console.log(`[supervise-script] Supervised: ${result.scenes.length} scenes, ${result.continuityNotes.characterRegistry.length} characters, ${result.continuityNotes.locationRegistry.length} locations`);
+
+    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_STORY", "generate-tts");
+  } catch (error) {
+    const msg = await failJob(videoProjectId, error);
+    console.error(`[supervise-script] Failed for ${videoProjectId}:`, msg);
     throw error;
   }
 }
@@ -329,13 +506,122 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       console.log(`[generate-tts] All TTS complete`);
     }
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "TTS_REVIEW", "generate-prompts");
+    await renderQueue.add("cinematography", { videoProjectId, seriesId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-tts] Failed for ${videoProjectId}:`, msg);
     throw error;
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
+  }
+}
+
+// ── Cinematography ──
+
+export async function cinematographyJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId, userId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    await updateVideoStatus(videoProjectId, "CINEMATOGRAPHY");
+
+    const config = await loadProjectConfig(videoProjectId);
+    if (!config.creativeBrief) throw new Error("No creative brief found");
+
+    const existingScenes = await db.query.videoScenes.findMany({
+      where: eq(schema.videoScenes.videoProjectId, videoProjectId),
+      orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
+    });
+
+    const scenesInput = existingScenes.map((s) => ({
+      sceneTitle: s.sceneTitle || "",
+      text: s.text,
+      directorNote: s.directorNote || "",
+    }));
+
+    const agents = getAgentModels(seriesRecord);
+
+    console.log(`[cinematography] Generating visual style guide for ${videoProjectId}`);
+
+    const styleGuide = await generateVisualStyleGuide(
+      scenesInput,
+      config.creativeBrief,
+      seriesRecord.style,
+      seriesRecord.videoType || "standalone",
+      agents.cinematographerModel
+    );
+
+    await mergeProjectConfig(videoProjectId, { visualStyleGuide: styleGuide });
+
+    console.log(`[cinematography] Style guide ready: medium="${styleGuide.global.medium}", ${styleGuide.perScene.length} scene overrides`);
+
+    await renderQueue.add("storyboard", { videoProjectId, seriesId, userId });
+  } catch (error) {
+    const msg = await failJob(videoProjectId, error);
+    console.error(`[cinematography] Failed for ${videoProjectId}:`, msg);
+    throw error;
+  }
+}
+
+// ── Storyboard ──
+
+export async function storyboardJob(job: Job<RenderJobData>) {
+  const { videoProjectId, seriesId, userId } = job.data;
+
+  try {
+    const seriesRecord = await db.query.series.findFirst({
+      where: eq(schema.series.id, seriesId),
+    });
+    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+
+    await updateVideoStatus(videoProjectId, "STORYBOARD");
+
+    const config = await loadProjectConfig(videoProjectId);
+    if (!config.creativeBrief) throw new Error("No creative brief found");
+    if (!config.continuityNotes) throw new Error("No continuity notes found");
+
+    const duration: DurationPreference = config.duration ?? resolveDuration({ preferred: 30 });
+    const supportedDurations = getModelDurationsArray(seriesRecord.videoModel);
+
+    const existingScenes = await db.query.videoScenes.findMany({
+      where: eq(schema.videoScenes.videoProjectId, videoProjectId),
+      orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
+    });
+
+    const scenesInput = existingScenes.map((s) => ({
+      sceneTitle: s.sceneTitle || "",
+      text: s.text,
+      directorNote: s.directorNote || "",
+      ttsDuration: s.duration ?? 5,
+    }));
+
+    const agents = getAgentModels(seriesRecord);
+
+    console.log(`[storyboard] Generating frame breakdown for ${videoProjectId} (${scenesInput.length} scenes, durations: ${JSON.stringify(supportedDurations)})`);
+
+    const breakdown = await generateFrameBreakdown(
+      scenesInput,
+      supportedDurations,
+      config.creativeBrief,
+      duration,
+      config.continuityNotes,
+      agents.storyboardModel
+    );
+
+    await mergeProjectConfig(videoProjectId, { frameBreakdown: breakdown });
+
+    const totalFrames = breakdown.scenes.reduce((sum, s) => sum + s.frames.length, 0);
+    console.log(`[storyboard] Frame breakdown ready: ${totalFrames} frames across ${breakdown.scenes.length} scenes`);
+
+    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_PRE_PRODUCTION", "generate-prompts");
+  } catch (error) {
+    const msg = await failJob(videoProjectId, error);
+    console.error(`[storyboard] Failed for ${videoProjectId}:`, msg);
+    throw error;
   }
 }
 
@@ -359,7 +645,10 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
 
     if (existingScenes.length === 0) throw new Error("No scenes for prompt generation");
 
-    const supportedDurations = getModelDurationsArray(seriesRecord.videoModel);
+    const config = await loadProjectConfig(videoProjectId);
+    if (!config.visualStyleGuide) throw new Error("No visual style guide found — run cinematography first");
+    if (!config.frameBreakdown) throw new Error("No frame breakdown found — run storyboard first");
+    if (!config.continuityNotes) throw new Error("No continuity notes found — run supervise-script first");
 
     const storyAssets = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
     const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
@@ -369,20 +658,18 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
       text: s.text,
       directorNote: s.directorNote || "",
       sceneTitle: s.sceneTitle || "",
-      ttsDuration: s.duration ?? 5,
     }));
 
     const agents = getAgentModels(seriesRecord);
 
-    console.log(`[generate-prompts] Generating frame prompts for ${scenesInput.length} scenes, supported durations: ${JSON.stringify(supportedDurations)}`);
+    console.log(`[generate-prompts] Generating frame prompts for ${scenesInput.length} scenes`);
 
     const result = await generateFramePrompts(
       scenesInput,
-      seriesRecord.style,
-      seriesRecord.niche,
       assets,
-      !!seriesRecord.sceneContinuity,
-      supportedDurations,
+      config.visualStyleGuide,
+      config.frameBreakdown,
+      config.continuityNotes,
       agents.promptModel
     );
 
@@ -408,7 +695,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-prompts] Created ${totalFrames} frames across ${existingScenes.length} scenes`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_PROMPTS", "generate-frame-images");
+    await renderQueue.add("generate-frame-images", { videoProjectId, seriesId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-prompts] Failed for ${videoProjectId}:`, msg);
@@ -458,7 +745,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
-      await autoChainOrReview(videoProjectId, seriesId, userId, "IMAGE_REVIEW", "generate-pipeline-motion");
+      await renderQueue.add("generate-pipeline-motion", { videoProjectId, seriesId, userId });
       return;
     }
 
@@ -530,7 +817,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-images] All ${targets.length} images generated`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "IMAGE_REVIEW", "generate-pipeline-motion");
+    await renderQueue.add("generate-pipeline-motion", { videoProjectId, seriesId, userId });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, errorMessage);
@@ -557,14 +844,10 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    // Build the complete ordered sequence of frames across all scenes
     const allFrameData: Array<{
       frameId: string;
-      imagePrompt: string;
       clipDuration: number;
       sceneText: string;
-      directorNote: string;
-      sceneTitle: string;
       imageUrl: string;
     }> = [];
 
@@ -585,11 +868,8 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
         allFrameData.push({
           frameId: frame.id,
-          imagePrompt: frame.imagePrompt || "",
           clipDuration: frame.clipDuration ?? 5,
           sceneText: scene.text,
-          directorNote: scene.directorNote || "",
-          sceneTitle: scene.sceneTitle || "",
           imageUrl: signedUrl,
         });
       }
@@ -597,17 +877,35 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
     if (allFrameData.length === 0) {
       console.log(`[generate-motion] No frames found, skipping`);
-      await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_MOTION", "generate-frame-videos");
+      await renderQueue.add("generate-frame-videos", { videoProjectId, seriesId, userId });
       return;
     }
 
-    // All frames get motion — last frame gets null nextImageUrl so the model writes an ending
+    const config = await loadProjectConfig(videoProjectId);
+    const styleGuide = config.visualStyleGuide;
+    const frameBreakdown = config.frameBreakdown;
+
+    const cameraPhysics = styleGuide?.global?.cameraPhysics ?? "";
+    const materialLanguage = styleGuide?.global?.materialLanguage ?? "";
+
     const framesToProcess = allFrameData;
 
     console.log(`[generate-motion] Generating motion for ${framesToProcess.length} frames across ${existingScenes.length} scenes`);
 
     const agents = getAgentModels(seriesRecord);
-    const BATCH_SIZE = WORKER.parallelImages; // reuse concurrency setting
+    const BATCH_SIZE = WORKER.parallelImages;
+
+    // Build a global frame index to scene/frame mapping for looking up frame specs
+    let globalFrameIdx = 0;
+    const frameSpecMap: Map<number, { sceneIdx: number; frameIdx: number }> = new Map();
+    for (let si = 0; si < existingScenes.length; si++) {
+      const sceneFrameCount = (await db.query.sceneFrames.findMany({
+        where: eq(schema.sceneFrames.sceneId, existingScenes[si].id),
+      })).length;
+      for (let fi = 0; fi < sceneFrameCount; fi++) {
+        frameSpecMap.set(globalFrameIdx++, { sceneIdx: si, frameIdx: fi });
+      }
+    }
 
     for (let i = 0; i < framesToProcess.length; i += BATCH_SIZE) {
       const batch = framesToProcess.slice(i, i + BATCH_SIZE);
@@ -625,14 +923,22 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
             return;
           }
 
+          // Extract narrow contract fields from frame breakdown
+          const mapping = frameSpecMap.get(globalIdx);
+          const frameSpec = mapping
+            ? frameBreakdown?.scenes?.[mapping.sceneIdx]?.frames?.[mapping.frameIdx]
+            : undefined;
+
           try {
             const result = await generateSingleFrameMotion(
               {
-                imagePrompt: frameData.imagePrompt,
                 clipDuration: frameData.clipDuration,
+                motionPolicy: frameSpec?.motionPolicy ?? "moderate",
+                transitionIn: frameSpec?.transitionIn ?? "cut",
+                isLastFrame: globalIdx === allFrameData.length - 1,
                 sceneText: frameData.sceneText,
-                directorNote: frameData.directorNote,
-                sceneTitle: frameData.sceneTitle,
+                cameraPhysics,
+                materialLanguage,
               },
               currentImageUrl,
               nextImageUrl,
@@ -655,9 +961,9 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       await job.updateProgress(progress);
     }
 
-    console.log(`[generate-motion] Motion descriptions ready for review`);
+    console.log(`[generate-motion] Motion descriptions ready`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_MOTION", "generate-frame-videos");
+    await renderQueue.add("generate-frame-videos", { videoProjectId, seriesId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-motion] Failed for ${videoProjectId}:`, msg);
@@ -750,7 +1056,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-videos] ${succeeded}/${targets.length} clips generated${failed > 0 ? ` (${failed} failed — content moderation or other error)` : ""}`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_VIDEO", "compose-final");
+    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_PRODUCTION", "compose-final");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-videos] Failed for ${videoProjectId}:`, msg);

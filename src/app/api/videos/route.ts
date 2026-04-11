@@ -7,9 +7,16 @@ import { checkUsageLimit } from "@/lib/usage";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod/v4";
 
+const durationSchema = z.object({
+  preferred: z.number().min(10).max(180),
+  min: z.number().min(5).max(180).optional(),
+  max: z.number().min(10).max(300).optional(),
+  priority: z.enum(["quality", "duration"]).default("quality"),
+});
+
 const createVideoSchema = z.object({
   seriesId: z.string().min(1),
-  targetDuration: z.number().min(10).max(180).optional(),
+  duration: durationSchema.optional(),
   pipelineMode: z.enum(["manual", "auto"]).optional(),
 });
 
@@ -73,7 +80,15 @@ export async function POST(req: NextRequest) {
   }
 
   const config: Record<string, unknown> = {};
-  if (parsed.data.targetDuration) config.targetDuration = parsed.data.targetDuration;
+  if (parsed.data.duration) {
+    const d = parsed.data.duration;
+    config.duration = {
+      min: d.min ?? Math.round(d.preferred * 0.7),
+      preferred: d.preferred,
+      max: d.max ?? Math.round(d.preferred * 1.33),
+      priority: d.priority,
+    };
+  }
   if (parsed.data.pipelineMode) config.pipelineMode = parsed.data.pipelineMode;
 
   const [videoProject] = await db
@@ -83,7 +98,7 @@ export async function POST(req: NextRequest) {
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
-  await renderQueue.add("generate-story", {
+  await renderQueue.add("executive-produce", {
     videoProjectId: videoProject.id,
     seriesId: seriesRecord.id,
     userId: user.id,

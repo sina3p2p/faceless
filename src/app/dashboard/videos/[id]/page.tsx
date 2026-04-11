@@ -1891,14 +1891,17 @@ export default function ReviewPage() {
   const isImageReview = video?.status === "IMAGE_REVIEW";
   const isNarrationReview = video?.status === "REVIEW_SCRIPT" && !isMusicVideo;
 
-  // New pipeline statuses
+  // 3-phase pipeline review gates
   const isStoryReview = video?.status === "REVIEW_STORY";
+  const isPreProductionReview = video?.status === "REVIEW_PRE_PRODUCTION";
+  const isProductionReview = video?.status === "REVIEW_PRODUCTION";
+  // Legacy review statuses
   const isScenesReview = video?.status === "REVIEW_SCENES";
   const isTTSReview = video?.status === "TTS_REVIEW";
   const isPromptsReview = video?.status === "REVIEW_PROMPTS";
   const isNewMotionReview = video?.status === "REVIEW_MOTION";
   const isVideoReview = video?.status === "REVIEW_VIDEO";
-  const isProcessing = ["STORY", "SCENE_SPLIT", "TTS_GENERATION", "PROMPT_GENERATION", "MOTION_GENERATION", "IMAGE_GENERATION", "VIDEO_GENERATION", "RENDERING"].includes(video?.status || "");
+  const isProcessing = ["PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION", "TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD", "PROMPT_GENERATION", "MOTION_GENERATION", "IMAGE_GENERATION", "VIDEO_GENERATION", "RENDERING"].includes(video?.status || "");
   const hasTTSRun = !isStoryReview && !isScenesReview && !isNarrationReview;
 
   // Poll for any processing status
@@ -2080,30 +2083,36 @@ export default function ReviewPage() {
         <h1 className="text-2xl font-bold mb-2">
           {video?.title ?? (
             isStoryReview ? "Review Story" :
-              isScenesReview ? "Review Scenes" :
-                isTTSReview ? "Review Audio" :
-                  isPromptsReview ? "Review Image Prompts" :
-                    isNewMotionReview ? "Review Motion" :
-                      isVideoReview ? "Review Video Clips" :
-                        isMotionReview ? "Review Motion" :
-                        isVisualReview ? "Review Visuals" :
-                          isProcessing ? "Processing..." :
-                            "Review"
+              isPreProductionReview ? "Review Pre-Production" :
+                isProductionReview ? "Review Production" :
+                  isScenesReview ? "Review Scenes" :
+                    isTTSReview ? "Review Audio" :
+                      isPromptsReview ? "Review Image Prompts" :
+                        isNewMotionReview ? "Review Motion" :
+                          isVideoReview ? "Review Video Clips" :
+                            isMotionReview ? "Review Motion" :
+                            isVisualReview ? "Review Visuals" :
+                              isProcessing ? "Processing..." :
+                                "Review"
           )}
         </h1>
         <p className="text-gray-400 text-sm">
           {isStoryReview
-            ? "Review and edit your story, then approve to split into scenes."
-            : isScenesReview
-              ? "Review the scene breakdown and director's notes, then generate audio."
-              : isTTSReview
-                ? "Listen to the generated audio for each scene, then generate image prompts."
-                : isPromptsReview
-                  ? "Review the image prompts before generating images. Edit any prompts to refine the visuals."
-                  : isNewMotionReview
-                    ? "Review the motion descriptions for each frame, then generate video clips."
-                    : isVideoReview
-                      ? "Review the generated video clips. Regenerate any you don't like, then approve to compose the final video."
+            ? "Review creative brief, story, scenes, and continuity. Then approve to generate audio."
+            : isPreProductionReview
+              ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images."
+              : isProductionReview
+                ? "Review generated images and video clips. Then approve to compose the final video."
+                : isScenesReview
+                  ? "Review the scene breakdown and director's notes, then generate audio."
+                  : isTTSReview
+                    ? "Listen to the generated audio for each scene, then generate image prompts."
+                    : isPromptsReview
+                      ? "Review the image prompts before generating images."
+                      : isNewMotionReview
+                        ? "Review the motion descriptions for each frame, then generate video clips."
+                        : isVideoReview
+                          ? "Review the generated video clips. Regenerate any you don't like, then approve to compose the final video."
                       : isProcessing
                       ? "Your video is being processed..."
                       : isImageReview
@@ -2199,10 +2208,10 @@ export default function ReviewPage() {
                   variant="primary"
                   size="sm"
                   loading={approving}
-                  onClick={() => handleApprove("approve-images")}
+                  onClick={() => handleApprove("approve-production")}
                   disabled={scenes.length === 0}
                 >
-                  Approve Images &amp; Generate Motion
+                  Approve &amp; Continue
                 </Button>
               </>
             ) : (
@@ -2295,11 +2304,15 @@ export default function ReviewPage() {
         <div className="mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-8 flex flex-col items-center gap-3">
           <div className="animate-spin w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full" />
           <p className="text-sm text-violet-300">
-            {video?.status === "STORY" && "Writing your story..."}
-            {video?.status === "SCENE_SPLIT" && "Splitting story into scenes..."}
+            {video?.status === "PRODUCING" && "Executive Producer is crafting the creative brief..."}
+            {video?.status === "STORY" && "Head Writer is writing your story..."}
+            {video?.status === "SCENE_SPLIT" && "Director is splitting story into scenes..."}
+            {video?.status === "SCRIPT_SUPERVISION" && "Script Supervisor is enforcing continuity..."}
             {video?.status === "TTS_GENERATION" && "Generating audio narration..."}
-            {video?.status === "PROMPT_GENERATION" && "Creating image prompts for each frame..."}
-            {video?.status === "MOTION_GENERATION" && "Designing motion for each frame..."}
+            {video?.status === "CINEMATOGRAPHY" && "Cinematographer is designing the visual style..."}
+            {video?.status === "STORYBOARD" && "Storyboard Agent is planning frame breakdown..."}
+            {video?.status === "PROMPT_GENERATION" && "Prompt Architect is creating image prompts..."}
+            {video?.status === "MOTION_GENERATION" && "Motion Director is designing motion for each frame..."}
             {video?.status === "IMAGE_GENERATION" && "Generating images..."}
             {video?.status === "VIDEO_GENERATION" && "Generating video clips..."}
             {video?.status === "RENDERING" && "Composing final video..."}
@@ -2312,8 +2325,8 @@ export default function ReviewPage() {
         <div className="mb-6">
           <div className="mb-4 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
             <p className="text-sm text-violet-300">
-              Read your story below. Edit it directly, or use the AI chat to refine it.
-              When you&apos;re happy, approve to split into scenes.
+              Review the creative brief, story, scenes, and continuity notes below.
+              Edit the story directly if needed. When you&apos;re happy, approve to generate audio.
             </p>
           </div>
           <Card>
@@ -2340,7 +2353,7 @@ export default function ReviewPage() {
               loading={approving}
               onClick={() => handleApprove("approve-story")}
             >
-              Approve Story &amp; Split into Scenes
+              Approve Story &amp; Generate Audio
             </Button>
           </div>
         </div>
@@ -2422,23 +2435,61 @@ export default function ReviewPage() {
         </div>
       )}
 
-      {/* New pipeline bottom actions */}
+      {/* Pre-Production Review (Phase 2) */}
+      {isPreProductionReview && scenes.length > 0 && !isProcessing && (
+        <div className="mb-6">
+          <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
+            <p className="text-sm text-emerald-300">
+              Review the audio durations, visual style, and frame breakdown below.
+              When you&apos;re happy, approve to start image generation.
+            </p>
+          </div>
+          <Card>
+            <CardContent className="py-3 flex items-center justify-end gap-2">
+              <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-pre-production")}>
+                Approve Pre-Production &amp; Generate Images
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Production Review (Phase 3) */}
+      {isProductionReview && scenes.length > 0 && !isProcessing && (
+        <div className="mb-6">
+          <div className="mb-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+            <p className="text-sm text-amber-300">
+              Review the generated images and video clips below.
+              When you&apos;re happy, approve to compose the final video.
+            </p>
+          </div>
+          <Card>
+            <CardContent className="py-3 flex items-center justify-end gap-2">
+              <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-production")}>
+                Approve &amp; Compose Final Video
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Legacy pipeline bottom actions */}
       {(isScenesReview || isTTSReview || isPromptsReview || isImageReview || isNewMotionReview || isVideoReview) && scenes.length > 0 && !isProcessing && (
         <div className="mb-6">
           <Card>
             <CardContent className="py-3 flex items-center justify-end gap-2">
               {isScenesReview && (
-                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-scenes")}>
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-story")}>
                   Approve Scenes &amp; Generate Audio
                 </Button>
               )}
               {isTTSReview && (
-                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-tts")}>
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-pre-production")}>
                   Approve Audio &amp; Generate Prompts
                 </Button>
               )}
               {isPromptsReview && (
-                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-prompts")}>
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-pre-production")}>
                   Approve Prompts &amp; Generate Images
                 </Button>
               )}
@@ -2452,18 +2503,18 @@ export default function ReviewPage() {
                   >
                     Regenerate All Images
                   </Button>
-                  <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-images")}>
+                  <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-production")}>
                     Approve Images &amp; Generate Motion
                   </Button>
                 </>
               )}
               {isNewMotionReview && (
-                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-motion")}>
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-production")}>
                   Approve Motion &amp; Generate Video
                 </Button>
               )}
               {isVideoReview && (
-                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-video")}>
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-production")}>
                   Approve &amp; Compose Final Video
                 </Button>
               )}
@@ -2565,9 +2616,9 @@ export default function ReviewPage() {
                 variant="primary"
                 size="lg"
                 loading={approving}
-                onClick={() => handleApprove("approve-images")}
+                onClick={() => handleApprove("approve-production")}
               >
-                Approve Images &amp; Generate Motion
+                Approve &amp; Continue
               </Button>
             </>
           ) : (

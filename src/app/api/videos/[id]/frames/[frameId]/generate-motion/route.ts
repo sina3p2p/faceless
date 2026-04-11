@@ -5,6 +5,7 @@ import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { generateSingleFrameMotion } from "@/server/services/llm";
+import type { PipelineConfig } from "@/lib/types";
 
 export async function POST(
   _req: NextRequest,
@@ -17,6 +18,7 @@ export async function POST(
 
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoId),
+    columns: { id: true, config: true },
     with: {
       series: { columns: { userId: true, style: true } },
     },
@@ -73,17 +75,34 @@ export async function POST(
       } catch { /* skip */ }
     }
 
+    const config = (video.config as PipelineConfig) ?? {};
+    const styleGuide = config.visualStyleGuide;
+    const frameBreakdown = config.frameBreakdown;
+
+    // Find the scene/frame index for the breakdown lookup
+    const sceneIdx = allScenes.findIndex((s) => s.id === scene.id);
+    const sceneFramesList = await db.query.sceneFrames.findMany({
+      where: eq(sceneFrames.sceneId, scene.id),
+      orderBy: asc(sceneFrames.frameOrder),
+      columns: { id: true },
+    });
+    const frameIdx = sceneFramesList.findIndex((f) => f.id === frameId);
+    const frameSpec = frameBreakdown?.scenes?.[sceneIdx]?.frames?.[frameIdx];
+
+    const isLastFrame = currentIdx === allFrames.length - 1;
+
     const result = await generateSingleFrameMotion(
       {
-        imagePrompt: frame.imagePrompt || "",
         clipDuration: frame.clipDuration ?? 5,
+        motionPolicy: frameSpec?.motionPolicy ?? "moderate",
+        transitionIn: frameSpec?.transitionIn ?? "cut",
+        isLastFrame,
         sceneText: scene.text,
-        directorNote: scene.directorNote || "",
-        sceneTitle: scene.sceneTitle || "",
+        cameraPhysics: styleGuide?.global?.cameraPhysics ?? "",
+        materialLanguage: styleGuide?.global?.materialLanguage ?? "",
       },
       currentImageUrl,
       nextImageUrl,
-      undefined // uses default motionModel from constants
     );
 
     await db

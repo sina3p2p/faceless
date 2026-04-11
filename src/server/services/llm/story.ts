@@ -1,6 +1,7 @@
 import { generateText as aiGenerateText } from "ai";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter, type ChatMessage } from "./index";
+import type { CreativeBrief } from "@/lib/types";
 
 // ── Generic text generation (for non-structured calls) ──
 
@@ -32,7 +33,8 @@ export async function generateStory(
   language = "en",
   model?: string,
   previousTopics: string[] = [],
-  videoType?: string
+  videoType?: string,
+  brief?: CreativeBrief
 ): Promise<string> {
   const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
@@ -91,6 +93,17 @@ KIDS CONTENT RULES:
 - Target age: 4-10 years old. Simple, cheerful language.
 - NO scary, violent, dark, or mature content.
 - Fun and educational. Use excitement and wonder.
+` : ""}${brief ? `
+CREATIVE BRIEF (follow these constraints):
+- Concept: ${brief.concept}
+- Tone: ${brief.tone}
+- Narrative arc: ${brief.narrativeArc}
+- Target audience: ${brief.targetAudience}
+- Word budget: aim for approximately ${brief.durationGuidance.wordBudgetTarget} words (range: ${brief.durationGuidance.wordBudgetMin}–${brief.durationGuidance.wordBudgetMax})
+- Narration style: ${brief.formatConstraints.narrationStyle === "voiceover" ? "Write as voiceover narration — a narrator tells the story" : brief.formatConstraints.narrationStyle === "dialogue" ? "Write dialogue between characters — no narrator" : "Mix narration with occasional dialogue"}
+- Opening hook: ${brief.formatConstraints.openingHook === "question" ? "Open with a provocative question" : brief.formatConstraints.openingHook === "claim" ? "Open with a bold, surprising claim" : brief.formatConstraints.openingHook === "mystery" ? "Open by withholding key information — create mystery" : "Open mid-action — drop the reader into the middle of something happening"}
+- Dialogue density: ${brief.formatConstraints.dialogueDensity}
+- Resolution: ${brief.formatConstraints.resolutionType === "closed" ? "Complete, satisfying ending" : brief.formatConstraints.resolutionType === "open" ? "Ambiguous, thought-provoking ending" : "Unresolved tension — leave them wanting more"}
 ` : ""}`;
 
   const userPrompt = isMusic

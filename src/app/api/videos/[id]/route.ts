@@ -43,14 +43,16 @@ export async function GET(
 }
 
 const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
-  // Story-first pipeline
-  REVIEW_STORY: ["SCENE_SPLIT"],
+  // 3-phase review gates
+  REVIEW_STORY: ["TTS_GENERATION"],
+  REVIEW_PRE_PRODUCTION: ["PROMPT_GENERATION"],
+  REVIEW_PRODUCTION: ["RENDERING"],
+  // Legacy transitions (for existing data)
   REVIEW_SCENES: ["TTS_GENERATION", "SCENE_SPLIT"],
   TTS_REVIEW: ["PROMPT_GENERATION", "TTS_GENERATION"],
   REVIEW_PROMPTS: ["IMAGE_GENERATION", "PROMPT_GENERATION"],
   IMAGE_REVIEW: ["IMAGE_GENERATION", "MOTION_GENERATION"],
   REVIEW_MOTION: ["MOTION_GENERATION", "VIDEO_GENERATION"],
-  // Legacy pipeline
   REVIEW_SCRIPT: ["IMAGE_GENERATION"],
   REVIEW_VISUAL: ["VIDEO_SCRIPT", "VIDEO_GENERATION"],
   REVIEW_MUSIC_SCRIPT: ["MUSIC_GENERATION"],
@@ -62,14 +64,16 @@ const patchSchema = z.object({
   script: z.string().optional(),
   pipelineMode: z.enum(["manual", "auto"]).optional(),
   status: z.enum([
-    // Story-first pipeline
-    "REVIEW_STORY", "SCENE_SPLIT", "REVIEW_SCENES",
-    "TTS_GENERATION", "TTS_REVIEW",
-    "PROMPT_GENERATION", "REVIEW_PROMPTS",
+    // 3-phase pipeline
+    "REVIEW_STORY", "TTS_GENERATION",
+    "REVIEW_PRE_PRODUCTION", "PROMPT_GENERATION",
+    "REVIEW_PRODUCTION", "RENDERING",
+    // Legacy
+    "SCENE_SPLIT", "REVIEW_SCENES",
+    "TTS_REVIEW", "REVIEW_PROMPTS",
     "IMAGE_GENERATION", "IMAGE_REVIEW",
     "MOTION_GENERATION", "REVIEW_MOTION",
     "VIDEO_GENERATION",
-    // Legacy
     "REVIEW_VISUAL", "MUSIC_GENERATION", "REVIEW_MUSIC_SCRIPT",
   ]).optional(),
 });

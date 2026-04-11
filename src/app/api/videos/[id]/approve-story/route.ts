@@ -21,7 +21,7 @@ export async function POST(
 
   if (!video || video.series.userId !== user.id) return notFound("Video not found");
 
-  await renderQueue.add("split-scenes", {
+  await renderQueue.add("generate-tts", {
     videoProjectId: id,
     seriesId: video.series.id,
     userId: user.id,

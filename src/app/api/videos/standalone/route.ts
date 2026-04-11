@@ -18,7 +18,12 @@ const standaloneSchema = z.object({
   language: z.string().default("en"),
   captionStyle: z.string().default("none"),
   sceneContinuity: z.boolean().default(true),
-  targetDuration: z.number().min(10).max(180).optional(),
+  duration: z.object({
+    preferred: z.number().min(10).max(180),
+    min: z.number().min(5).max(180).optional(),
+    max: z.number().min(10).max(300).optional(),
+    priority: z.enum(["quality", "duration"]).default("quality"),
+  }).optional(),
   characters: z
     .array(
       z.object({
@@ -113,8 +118,15 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  const config = data.targetDuration
-    ? { targetDuration: data.targetDuration }
+  const config: Record<string, unknown> | undefined = data.duration
+    ? {
+        duration: {
+          min: data.duration.min ?? Math.round(data.duration.preferred * 0.7),
+          preferred: data.duration.preferred,
+          max: data.duration.max ?? Math.round(data.duration.preferred * 1.33),
+          priority: data.duration.priority,
+        },
+      }
     : undefined;
 
   const [videoProject] = await db
@@ -124,7 +136,7 @@ export async function POST(req: NextRequest) {
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
-  await renderQueue.add("generate-story", {
+  await renderQueue.add("executive-produce", {
     videoProjectId: videoProject.id,
     seriesId: internalSeries.id,
     userId: user.id,

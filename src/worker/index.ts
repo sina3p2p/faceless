@@ -3,9 +3,13 @@ import IORedis from "ioredis";
 import { generateImagesJob } from "./mediaJobs";
 import { rerenderVideoJob, renderFromScenesJob } from "./renderJobs";
 import {
+  executiveProduceJob,
   generateStoryJob,
   splitScenesJob,
+  superviseScriptJob,
   generateTTSJob,
+  cinematographyJob,
+  storyboardJob,
   generatePromptsJob,
   generateFrameImagesJob,
   generateMotionJob as pipelineGenerateMotionJob,
@@ -27,12 +31,20 @@ const worker = new Worker(
   async (job) => {
     const startTime = Date.now();
     logger.info("Job started", { jobId: job.id, jobName: job.name, data: job.data });
-    if (job.name === "generate-story") {
+    if (job.name === "executive-produce") {
+      await executiveProduceJob(job);
+    } else if (job.name === "generate-story") {
       await generateStoryJob(job);
     } else if (job.name === "split-scenes") {
       await splitScenesJob(job);
+    } else if (job.name === "supervise-script") {
+      await superviseScriptJob(job);
     } else if (job.name === "generate-tts") {
       await generateTTSJob(job);
+    } else if (job.name === "cinematography") {
+      await cinematographyJob(job);
+    } else if (job.name === "storyboard") {
+      await storyboardJob(job);
     } else if (job.name === "generate-prompts") {
       await generatePromptsJob(job);
     } else if (job.name === "generate-frame-images") {

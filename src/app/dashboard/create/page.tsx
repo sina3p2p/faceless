@@ -63,7 +63,8 @@ export default function CreateVideoPage() {
     language: DEFAULT_LANGUAGE as string,
     sceneContinuity: true,
     voiceId: "",
-    targetDuration: 45,
+    durationPreferred: 30,
+    durationPriority: "quality" as "quality" | "duration",
   });
 
   async function uploadCharacterImage(file: File): Promise<string | null> {
@@ -118,7 +119,10 @@ export default function CreateVideoPage() {
           language: form.language,
           sceneContinuity: form.sceneContinuity,
           voiceId: form.voiceId || undefined,
-          targetDuration: form.targetDuration,
+          duration: {
+            preferred: form.durationPreferred,
+            priority: form.durationPriority,
+          },
           storyAssets: storyAssets.length > 0 ? storyAssets : undefined,
         }),
       });
@@ -184,7 +188,7 @@ export default function CreateVideoPage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Duration
+                Target Duration
               </label>
               <div className="flex items-center gap-3">
                 <input
@@ -192,11 +196,38 @@ export default function CreateVideoPage() {
                   min={10}
                   max={120}
                   step={5}
-                  value={form.targetDuration}
-                  onChange={(e) => setForm({ ...form, targetDuration: Number(e.target.value) })}
+                  value={form.durationPreferred}
+                  onChange={(e) => setForm({ ...form, durationPreferred: Number(e.target.value) })}
                   className="flex-1 accent-violet-500"
                 />
-                <span className="text-sm text-white font-medium w-12 text-right">{form.targetDuration}s</span>
+                <span className="text-sm text-white font-medium w-12 text-right">{form.durationPreferred}s</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                <span>Acceptable range: ~{Math.round(form.durationPreferred * 0.7)}s – ~{Math.round(form.durationPreferred * 1.33)}s</span>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, durationPriority: "quality" })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    form.durationPriority === "quality"
+                      ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+                      : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+                  }`}
+                >
+                  Prioritize Quality
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, durationPriority: "duration" })}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    form.durationPriority === "duration"
+                      ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+                      : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+                  }`}
+                >
+                  Prioritize Exact Duration
+                </button>
               </div>
             </div>
 

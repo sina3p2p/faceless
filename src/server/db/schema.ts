@@ -17,27 +17,35 @@ export const planTierEnum = pgEnum("plan_tier", ["FREE", "STARTER", "PRO"]);
 
 export const videoStatusEnum = pgEnum("video_status", [
   "PENDING",
-  // New story-first pipeline
+  // Phase 1: Story
+  "PRODUCING",
   "STORY",
-  "REVIEW_STORY",
   "SCENE_SPLIT",
-  "REVIEW_SCENES",
+  "SCRIPT_SUPERVISION",
+  "REVIEW_STORY",
+  // Phase 2: Pre-production
   "TTS_GENERATION",
-  "TTS_REVIEW",
+  "CINEMATOGRAPHY",
+  "STORYBOARD",
+  "REVIEW_PRE_PRODUCTION",
+  // Phase 3: Production
   "PROMPT_GENERATION",
-  "REVIEW_PROMPTS",
-  "MOTION_GENERATION",
-  "REVIEW_MOTION",
-  // Shared statuses
   "IMAGE_GENERATION",
-  "IMAGE_REVIEW",
+  "MOTION_GENERATION",
   "VIDEO_GENERATION",
-  "REVIEW_VIDEO",
+  "REVIEW_PRODUCTION",
+  // Final
   "RENDERING",
   "COMPLETED",
   "FAILED",
   "CANCELLED",
-  // Legacy statuses (kept for backward compat with in-progress projects)
+  // Legacy statuses (kept for existing data)
+  "REVIEW_SCENES",
+  "TTS_REVIEW",
+  "REVIEW_PROMPTS",
+  "REVIEW_MOTION",
+  "IMAGE_REVIEW",
+  "REVIEW_VIDEO",
   "SCRIPT",
   "REVIEW_SCRIPT",
   "MUSIC_SCRIPT",
@@ -46,6 +54,7 @@ export const videoStatusEnum = pgEnum("video_status", [
   "MUSIC_REVIEW",
   "VIDEO_SCRIPT",
   "REVIEW_VISUAL",
+  "REVIEW_STORY_LEGACY",
 ]);
 
 export const renderStepEnum = pgEnum("render_step", [

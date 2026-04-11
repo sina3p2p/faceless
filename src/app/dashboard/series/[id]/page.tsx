@@ -48,7 +48,7 @@ export default function SeriesDetailPage() {
   const [retryingId, setRetryingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
-  const [targetDuration, setTargetDuration] = useState(45);
+  const [targetDuration, setTargetDuration] = useState(30);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   const loadSeries = useCallback(() => {
@@ -92,7 +92,7 @@ export default function SeriesDetailPage() {
     const res = await fetch("/api/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seriesId: id, targetDuration }),
+      body: JSON.stringify({ seriesId: id, duration: { preferred: targetDuration } }),
     });
 
     if (res.ok) {

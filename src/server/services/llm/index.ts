@@ -107,3 +107,7 @@ export * from "./prompts";
 export * from "./motion";
 export * from "./music";
 export * from "./narration";
+export * from "./executive-producer";
+export * from "./script-supervisor";
+export * from "./cinematographer";
+export * from "./storyboard";
