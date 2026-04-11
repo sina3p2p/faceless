@@ -78,7 +78,38 @@ interface VideoDetail {
   duration: number | null;
   script: string | null;
   outputUrl: string | null;
-  config: { pipelineMode?: "manual" | "auto" } | null;
+  config: {
+    pipelineMode?: "manual" | "auto";
+    visualStyleGuide?: {
+      global: { medium: string; materialLanguage: string; colorPalette: string[]; cameraPhysics: string; defaultLighting: string };
+      promptRegions: { subjectPrefix: string; cameraPrefix: string; lightingPrefix: string; backgroundPrefix: string };
+      perScene: Array<{ sceneIndex: number; lightingOverride: string | null; paletteOverride: string[] | null; environmentMood: string }>;
+    };
+    frameBreakdown?: {
+      scenes: Array<{
+        frames: Array<{
+          clipDuration: number;
+          shotType: string;
+          narrativeIntent: string;
+          motionPolicy: string;
+          transitionIn: string;
+          subjectFocus: string;
+          pacingNote: string;
+        }>;
+      }>;
+    };
+    continuityNotes?: {
+      characterRegistry: Array<{ canonicalName: string; aliases: string[]; appearance: { clothing: string; hair: string; distinguishingFeatures: string }; firstScene: number; presentInScenes: number[] }>;
+      locationRegistry: Array<{ canonicalName: string; description: string; timeOfDay: string; lighting: string; presentInScenes: number[] }>;
+    };
+    creativeBrief?: {
+      concept: string;
+      tone: string;
+      targetAudience: string;
+      visualMood: string;
+      narrativeArc: string;
+    };
+  } | null;
   series: { name: string; niche: string; imageModel: string | null; videoModel: string | null; videoSize: string | null; videoType: string; storyAssets?: StoryAssetItem[] };
 }
 
@@ -2444,6 +2475,147 @@ export default function ReviewPage() {
               When you&apos;re happy, approve to start image generation.
             </p>
           </div>
+
+          {/* Visual Style Guide */}
+          {video?.config?.visualStyleGuide && (() => {
+            const sg = video.config.visualStyleGuide;
+            return (
+              <Card className="mb-4">
+                <CardContent className="p-5">
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                    Visual Style Guide
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-gray-500">Medium</span>
+                      <p className="text-gray-200 mt-0.5">{sg.global.medium}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Camera</span>
+                      <p className="text-gray-200 mt-0.5">{sg.global.cameraPhysics}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Lighting</span>
+                      <p className="text-gray-200 mt-0.5">{sg.global.defaultLighting}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">Material</span>
+                      <p className="text-gray-200 mt-0.5">{sg.global.materialLanguage}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500">Color Palette</span>
+                      <div className="flex gap-1.5 mt-1 flex-wrap">
+                        {sg.global.colorPalette.map((c, i) => (
+                          <div key={i} className="flex items-center gap-1">
+                            <span className="w-3 h-3 rounded-sm border border-white/10 inline-block" style={{ backgroundColor: c }} />
+                            <span className="text-gray-400">{c}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  {sg.promptRegions && (
+                    <div className="mt-3 pt-3 border-t border-white/5">
+                      <span className="text-gray-500 text-xs">Prompt Regions</span>
+                      <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+                        {sg.promptRegions.subjectPrefix && <div><span className="text-gray-500">Subject: </span><span className="text-gray-300">{sg.promptRegions.subjectPrefix}</span></div>}
+                        {sg.promptRegions.cameraPrefix && <div><span className="text-gray-500">Camera: </span><span className="text-gray-300">{sg.promptRegions.cameraPrefix}</span></div>}
+                        {sg.promptRegions.lightingPrefix && <div><span className="text-gray-500">Lighting: </span><span className="text-gray-300">{sg.promptRegions.lightingPrefix}</span></div>}
+                        {sg.promptRegions.backgroundPrefix && <div><span className="text-gray-500">Background: </span><span className="text-gray-300">{sg.promptRegions.backgroundPrefix}</span></div>}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* Continuity Notes */}
+          {video?.config?.continuityNotes && (() => {
+            const cn = video.config.continuityNotes;
+            const hasChars = cn.characterRegistry && cn.characterRegistry.length > 0;
+            const hasLocs = cn.locationRegistry && cn.locationRegistry.length > 0;
+            if (!hasChars && !hasLocs) return null;
+            return (
+              <Card className="mb-4">
+                <CardContent className="p-5">
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-violet-400 inline-block" />
+                    Continuity Notes
+                  </h3>
+                  {hasChars && (
+                    <div className="mb-3">
+                      <span className="text-gray-500 text-xs uppercase tracking-wider">Characters</span>
+                      <div className="mt-1 space-y-2">
+                        {cn.characterRegistry.map((ch, i) => (
+                          <div key={i} className="text-xs bg-white/5 rounded-lg p-2.5">
+                            <span className="text-white font-medium">{ch.canonicalName}</span>
+                            {ch.aliases.length > 0 && <span className="text-gray-500 ml-1.5">({ch.aliases.join(", ")})</span>}
+                            <div className="text-gray-400 mt-1">
+                              {ch.appearance.clothing && <span>{ch.appearance.clothing}</span>}
+                              {ch.appearance.hair && <span> · {ch.appearance.hair}</span>}
+                              {ch.appearance.distinguishingFeatures && <span> · {ch.appearance.distinguishingFeatures}</span>}
+                            </div>
+                            <div className="text-gray-600 mt-0.5">Scenes: {ch.presentInScenes.map(s => s + 1).join(", ")}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {hasLocs && (
+                    <div>
+                      <span className="text-gray-500 text-xs uppercase tracking-wider">Locations</span>
+                      <div className="mt-1 space-y-2">
+                        {cn.locationRegistry.map((loc, i) => (
+                          <div key={i} className="text-xs bg-white/5 rounded-lg p-2.5">
+                            <span className="text-white font-medium">{loc.canonicalName}</span>
+                            <div className="text-gray-400 mt-1">{loc.description} · {loc.timeOfDay} · {loc.lighting}</div>
+                            <div className="text-gray-600 mt-0.5">Scenes: {loc.presentInScenes.map(s => s + 1).join(", ")}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* Frame Breakdown per scene */}
+          {video?.config?.frameBreakdown && (() => {
+            const fb = video.config.frameBreakdown;
+            return (
+              <Card className="mb-4">
+                <CardContent className="p-5">
+                  <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                    Frame Breakdown
+                  </h3>
+                  <div className="space-y-3">
+                    {fb.scenes.map((s, si) => (
+                      <div key={si}>
+                        <span className="text-xs text-gray-500 uppercase tracking-wider">Scene {si + 1} — {s.frames.length} frame{s.frames.length !== 1 ? "s" : ""}</span>
+                        <div className="mt-1 grid gap-1.5">
+                          {s.frames.map((f, fi) => (
+                            <div key={fi} className="flex items-center gap-3 text-xs bg-white/5 rounded-lg px-3 py-2">
+                              <span className="text-gray-500 w-4 text-right shrink-0">{fi + 1}</span>
+                              <span className="text-gray-200 font-medium w-16 shrink-0">{f.clipDuration}s</span>
+                              <span className="text-emerald-400/80 w-24 shrink-0 capitalize">{f.shotType.replace("-", " ")}</span>
+                              <span className="text-violet-400/80 w-20 shrink-0 capitalize">{f.motionPolicy}</span>
+                              <span className="text-amber-400/80 w-20 shrink-0 capitalize">{f.transitionIn.replace("-", " ")}</span>
+                              <span className="text-gray-400 truncate" title={f.subjectFocus}>{f.subjectFocus}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
           <Card>
             <CardContent className="py-3 flex items-center justify-end gap-2">
               <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-pre-production")}>
