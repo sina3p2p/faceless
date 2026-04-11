@@ -303,7 +303,7 @@ function FrameCard({
       )}
 
       {/* Motion description */}
-      {showMotion && (
+      {(showMotion || frame.visualDescription) && (
         <div className="mt-1.5">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Motion</span>
