@@ -1873,6 +1873,7 @@ export default function ReviewPage() {
   const isTTSReview = video?.status === "TTS_REVIEW";
   const isPromptsReview = video?.status === "REVIEW_PROMPTS";
   const isNewMotionReview = video?.status === "REVIEW_MOTION";
+  const isVideoReview = video?.status === "REVIEW_VIDEO";
   const isProcessing = ["STORY", "SCENE_SPLIT", "TTS_GENERATION", "PROMPT_GENERATION", "MOTION_GENERATION", "IMAGE_GENERATION", "VIDEO_GENERATION", "RENDERING"].includes(video?.status || "");
   const hasTTSRun = !isStoryReview && !isScenesReview && !isNarrationReview;
 
@@ -2059,7 +2060,8 @@ export default function ReviewPage() {
                 isTTSReview ? "Review Audio" :
                   isPromptsReview ? "Review Image Prompts" :
                     isNewMotionReview ? "Review Motion" :
-                      isMotionReview ? "Review Motion" :
+                      isVideoReview ? "Review Video Clips" :
+                        isMotionReview ? "Review Motion" :
                         isVisualReview ? "Review Visuals" :
                           isProcessing ? "Processing..." :
                             "Review"
@@ -2075,8 +2077,10 @@ export default function ReviewPage() {
                 : isPromptsReview
                   ? "Review the image prompts before generating images. Edit any prompts to refine the visuals."
                   : isNewMotionReview
-                    ? "Review the motion descriptions for each frame, then generate the final video."
-                    : isProcessing
+                    ? "Review the motion descriptions for each frame, then generate video clips."
+                    : isVideoReview
+                      ? "Review the generated video clips. Regenerate any you don't like, then approve to compose the final video."
+                      : isProcessing
                       ? "Your video is being processed..."
                       : isImageReview
                         ? "Review generated images, then approve to generate motion."
@@ -2355,8 +2359,16 @@ export default function ReviewPage() {
         </div>
       )}
 
+      {isVideoReview && (
+        <div className="mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-4">
+          <p className="text-sm text-violet-300">
+            Review the generated video clips below. Hover to preview, regenerate any clip you don&apos;t like, then approve to compose the final video.
+          </p>
+        </div>
+      )}
+
       {/* New pipeline bottom actions */}
-      {(isScenesReview || isTTSReview || isPromptsReview || isImageReview || isNewMotionReview) && scenes.length > 0 && !isProcessing && (
+      {(isScenesReview || isTTSReview || isPromptsReview || isImageReview || isNewMotionReview || isVideoReview) && scenes.length > 0 && !isProcessing && (
         <div className="mb-6">
           <Card>
             <CardContent className="py-3 flex items-center justify-end gap-2">
@@ -2393,6 +2405,11 @@ export default function ReviewPage() {
               {isNewMotionReview && (
                 <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-motion")}>
                   Approve Motion &amp; Generate Video
+                </Button>
+              )}
+              {isVideoReview && (
+                <Button variant="primary" size="sm" loading={approving} onClick={() => handleApprove("approve-video")}>
+                  Approve &amp; Compose Final Video
                 </Button>
               )}
             </CardContent>
@@ -2441,9 +2458,9 @@ export default function ReviewPage() {
                 generatingFrameIds={generatingFrameIds}
                 generatingFrameVideoIds={generatingFrameVideoIds}
                 generatingFrameMotionIds={generatingFrameMotionIds}
-                showFrameActions={isPromptsReview || isImageReview || isNewMotionReview}
-                showFrameMotion={isNewMotionReview || isImageReview}
-                showFrameVideo={isNewMotionReview || video?.status === "COMPLETED" || video?.status === "VIDEO_GENERATION"}
+                showFrameActions={isPromptsReview || isImageReview || isNewMotionReview || isVideoReview}
+                showFrameMotion={isNewMotionReview || isImageReview || isVideoReview}
+                showFrameVideo={isNewMotionReview || isVideoReview || video?.status === "COMPLETED" || video?.status === "VIDEO_GENERATION"}
                 defaultVideoModel={video?.series?.videoModel || undefined}
               />
             ))}

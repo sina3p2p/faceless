@@ -102,6 +102,7 @@ export const VIDEO_MODELS = [
   { id: "pixverse-v6", label: "PixVerse V6", modelId: "fal-ai/pixverse/v6/image-to-video", provider: "fal" as const, description: "Lifelike physics (~$0.45/5s)", durations: [5, 10] as number[], endFrame: false },
   { id: "kling-25-turbo", label: "Kling 2.5 Turbo Pro", modelId: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video", provider: "fal" as const, description: "Fast & cheap legacy model (~$0.35/5s)", durations: [5, 10] as number[], endFrame: true },
   { id: "ltx-2-pro", label: "LTX 2.0 Pro", modelId: "fal-ai/ltx-2/image-to-video", provider: "fal" as const, description: "Best bang-for-buck (~$0.30/5s)", durations: [6, 8, 10] as number[], endFrame: false },
+  { id: "wan-27", label: "Wan 2.7", modelId: "fal-ai/wan/v2.7/image-to-video", provider: "fal" as const, description: "Native 1080p, scene consistency ($0.10/s → ~$0.50/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true },
   { id: "wan-25", label: "Wan 2.5", modelId: "fal-ai/wan-25-preview/image-to-video", provider: "fal" as const, description: "Cheapest option (~$0.25/5s)", durations: [5, 10] as number[], endFrame: true },
 ] as const;
 

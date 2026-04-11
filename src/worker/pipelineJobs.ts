@@ -749,9 +749,9 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
     const succeeded = updatedFrames.filter(Boolean).length;
     const failed = targets.length - succeeded;
 
-    console.log(`[generate-frame-videos] ${succeeded}/${targets.length} clips generated${failed > 0 ? ` (${failed} failed — content moderation or other error)` : ""}, triggering compose`);
+    console.log(`[generate-frame-videos] ${succeeded}/${targets.length} clips generated${failed > 0 ? ` (${failed} failed — content moderation or other error)` : ""}`);
 
-    await renderQueue.add("compose-final", { videoProjectId, seriesId, userId });
+    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_VIDEO", "compose-final");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-videos] Failed for ${videoProjectId}:`, msg);

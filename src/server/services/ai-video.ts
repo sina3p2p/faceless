@@ -109,7 +109,7 @@ async function generateVideoViaFal(
   } else if (modelId.includes("hailuo") || modelId.includes("minimax")) {
     input.image_url = imageUrl;
     if (useEndImage) input.end_image_url = endImageUrl;
-  } else if (modelId.includes("wan-")) {
+  } else if (modelId.includes("wan-") || modelId.includes("/wan/")) {
     input.image_url = imageUrl;
     if (useEndImage) input.end_image_url = endImageUrl;
   } else if (modelId.includes("grok-imagine")) {
