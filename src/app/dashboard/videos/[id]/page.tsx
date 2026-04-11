@@ -2759,9 +2759,9 @@ export default function ReviewPage() {
                 generatingFrameIds={generatingFrameIds}
                 generatingFrameVideoIds={generatingFrameVideoIds}
                 generatingFrameMotionIds={generatingFrameMotionIds}
-                showFrameActions={isImagesReview || isPromptsReview || isImageReview || isNewMotionReview || isVideoReview}
-                showFrameMotion={isNewMotionReview || isImageReview || isVideoReview}
-                showFrameVideo={isNewMotionReview || isVideoReview || video?.status === "COMPLETED" || video?.status === "VIDEO_GENERATION"}
+                showFrameActions={isImagesReview || isProductionReview || isPromptsReview || isImageReview || isNewMotionReview || isVideoReview}
+                showFrameMotion={isProductionReview || isNewMotionReview || isImageReview || isVideoReview}
+                showFrameVideo={isProductionReview || isNewMotionReview || isVideoReview || video?.status === "COMPLETED" || video?.status === "VIDEO_GENERATION"}
                 defaultVideoModel={video?.series?.videoModel || undefined}
               />
             ))}
