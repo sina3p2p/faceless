@@ -27,6 +27,9 @@ export interface SceneFrame {
   modelUsed?: string | null;
   imageVariants?: FrameVariant[];
   videoVariants?: FrameVariant[];
+  imageGeneratedAt?: string | null;
+  videoGeneratedAt?: string | null;
+  motionGeneratedAt?: string | null;
 }
 
 export interface Scene {

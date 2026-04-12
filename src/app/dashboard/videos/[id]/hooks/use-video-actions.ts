@@ -334,6 +334,18 @@ export function useVideoActions(id: string) {
     await loadData();
   }
 
+  async function handleRecompose() {
+    setRendering(true);
+    try {
+      const res = await fetch(`/api/videos/${id}/recompose`, { method: "POST" });
+      if (res.ok) {
+        setVideo((prev) => prev ? { ...prev, status: "RENDERING" } : prev);
+        setDownloadUrl(null);
+      }
+    } catch {}
+    setRendering(false);
+  }
+
   async function handleSelectFrameVariant(frameId: string, variantId: string, type: "image" | "video") {
     try {
       const res = await fetch(`/api/videos/${id}/frames/${frameId}/select-variant`, {
@@ -383,6 +395,7 @@ export function useVideoActions(id: string) {
     handleStartRendering,
     handleSelectMedia,
     handleSelectFrameVariant,
+    handleRecompose,
     handleDownload,
     handleTogglePipelineMode,
     handleApplyRefinedScript,

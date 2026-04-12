@@ -35,6 +35,7 @@ export interface VideoPhase {
   isNarrationReview: boolean;
   // Processing
   isProcessing: boolean;
+  isCompleted: boolean;
   hasTTSRun: boolean;
   // Status text
   processingMessage: string;
@@ -167,16 +168,17 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
     isMotionReview,
     isNarrationReview,
     isProcessing,
+    isCompleted: status === "COMPLETED",
     hasTTSRun,
     processingMessage: processingMessages[status] || "",
     headerTitle,
     headerDescription,
     showMotionEdit: isMotionReview || isNewMotionReview || isVideoReview || status === "COMPLETED",
     showDirectorNote: true,
-    showAudioPlayer: isTTSReview || isPromptsReview || isNewMotionReview,
+    showAudioPlayer: isTTSReview || isPromptsReview || isNewMotionReview || status === "COMPLETED",
     showDuration: hasTTSRun,
-    showFrameActions: isImagesReview || isProductionReview || isPromptsReview || isImageReview || isNewMotionReview || isVideoReview,
-    showFrameMotion: isProductionReview || isNewMotionReview || isImageReview || isVideoReview,
+    showFrameActions: isImagesReview || isProductionReview || isPromptsReview || isImageReview || isNewMotionReview || isVideoReview || status === "COMPLETED",
+    showFrameMotion: isProductionReview || isNewMotionReview || isImageReview || isVideoReview || status === "COMPLETED",
     showFrameVideo: isProductionReview || isNewMotionReview || isVideoReview || status === "COMPLETED" || status === "VIDEO_GENERATION",
   };
 }

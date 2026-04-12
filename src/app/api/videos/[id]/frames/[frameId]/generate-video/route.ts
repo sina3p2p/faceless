@@ -82,7 +82,7 @@ export async function POST(
 
     await db
       .update(sceneFrames)
-      .set({ videoUrl: key, videoVariants: existingVariants })
+      .set({ videoUrl: key, videoVariants: existingVariants, videoGeneratedAt: new Date() })
       .where(eq(sceneFrames.id, frameId));
 
     const signedUrl = await getSignedDownloadUrl(key);

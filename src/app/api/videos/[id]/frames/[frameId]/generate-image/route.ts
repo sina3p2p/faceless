@@ -120,6 +120,7 @@ export async function POST(
       imageUrl: key,
       modelUsed: imageModel,
       imageVariants: existingVariants,
+      imageGeneratedAt: new Date(),
     };
     if (parsed.data.imagePrompt) {
       updates.imagePrompt = parsed.data.imagePrompt;

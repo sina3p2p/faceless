@@ -43,7 +43,7 @@ export default function ReviewPage() {
     handleGenerateAllFrameImages, handleUpdateFramePrompt, handleUpdateFrameMotion,
     handleRegenerateFrameVideo, handleRegenerateFrameMotion, handleGenerateMotion,
     handleApprove, handleSaveStory, handleStartRendering, handleSelectMedia,
-    handleSelectFrameVariant, handleDownload, handleTogglePipelineMode, handleApplyRefinedScript,
+    handleSelectFrameVariant, handleRecompose, handleDownload, handleTogglePipelineMode, handleApplyRefinedScript,
   } = actions;
 
   const phase = useVideoPhase(video);
@@ -207,6 +207,7 @@ export default function ReviewPage() {
               onApprove={handleApprove}
               onSaveStory={handleSaveStory}
               onStartRendering={handleStartRendering}
+              onRecompose={handleRecompose}
               onDownload={handleDownload}
             />
           </div>
@@ -266,7 +267,7 @@ function CenterPanel({
   onDragEnd, onUpdateScene, onUpdateAssetRefs, onDeleteScene, onUploadImage,
   onGenerateAllImages, onGenerateAllFrameImages, onGenerateFrameImage,
   onUpdateFramePrompt, onUpdateFrameMotion, onRegenerateFrameVideo, onRegenerateFrameMotion,
-  onSelectFrameVariant, onGenerateMotion, onApprove, onSaveStory, onStartRendering, onDownload,
+  onSelectFrameVariant, onGenerateMotion, onApprove, onSaveStory, onStartRendering, onRecompose, onDownload,
 }: {
   selectedPhaseId: StudioPhaseId;
   phase: VideoPhase;
@@ -311,6 +312,7 @@ function CenterPanel({
   onApprove: (endpoint: string) => void;
   onSaveStory: (markdown: string) => void;
   onStartRendering: () => void;
+  onRecompose: () => void;
   onDownload: () => void;
 }) {
   // Story Phase
@@ -510,47 +512,61 @@ function CenterPanel({
       )}
 
       {video?.status === "COMPLETED" && (
-        <Card className="mb-6">
-          <CardContent className="py-6">
-            {(() => {
-              const vs = video.series?.videoSize || "9:16";
-              const arCss = vs === "16:9" ? "16/9" : vs === "1:1" ? "1/1" : "9/16";
-              const maxW = vs === "16:9" ? "max-w-2xl" : vs === "1:1" ? "max-w-md" : "max-w-xs";
-              return downloadUrl ? (
-                <div className={`${maxW} mx-auto rounded-xl overflow-hidden bg-black mb-4`} style={{ aspectRatio: arCss }}>
-                  <video src={downloadUrl} controls className="w-full h-full object-contain" />
-                </div>
-              ) : (
-                <div className={`${maxW} mx-auto rounded-xl bg-white/5 flex items-center justify-center mb-4 h-48`}>
-                  <div className="animate-spin w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full" />
-                </div>
-              );
-            })()}
-            <div className="flex justify-center gap-3">
-              <Button loading={downloading} onClick={onDownload}>Download MP4</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Show scenes for completed videos (post-completion editing) */}
-      {video?.status === "COMPLETED" && scenes.length > 0 && (
         <>
-          <div className="mb-4">
-            <span className="text-[10px] uppercase tracking-widest text-gray-600 font-semibold">Scenes</span>
-          </div>
-          <SceneList
-            scenes={scenes} sensors={sensors} selectedSceneId={selectedSceneId}
-            setSelectedSceneId={setSelectedSceneId} setEditingScene={setEditingScene}
-            isMusicVideo={isMusicVideo} video={video} phase={phase}
-            generatingSceneIds={generatingSceneIds} generatingFrameIds={generatingFrameIds}
-            generatingFrameVideoIds={generatingFrameVideoIds} generatingFrameMotionIds={generatingFrameMotionIds}
-            onDragEnd={onDragEnd} onUpdateScene={onUpdateScene} onUpdateAssetRefs={onUpdateAssetRefs}
-            onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
-            onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
-            onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
-            onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
-          />
+          <Card className="mb-6">
+            <CardContent className="py-6">
+              {(() => {
+                const vs = video.series?.videoSize || "9:16";
+                const arCss = vs === "16:9" ? "16/9" : vs === "1:1" ? "1/1" : "9/16";
+                const maxW = vs === "16:9" ? "max-w-2xl" : vs === "1:1" ? "max-w-md" : "max-w-xs";
+                return downloadUrl ? (
+                  <div className={`${maxW} mx-auto rounded-xl overflow-hidden bg-black mb-4`} style={{ aspectRatio: arCss }}>
+                    <video src={downloadUrl} controls className="w-full h-full object-contain" />
+                  </div>
+                ) : (
+                  <div className={`${maxW} mx-auto rounded-xl bg-white/5 flex items-center justify-center mb-4 h-48`}>
+                    <div className="animate-spin w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full" />
+                  </div>
+                );
+              })()}
+              <div className="flex justify-center gap-3">
+                <Button loading={downloading} onClick={onDownload}>Download MP4</Button>
+                <Button variant="outline" loading={rendering} onClick={onRecompose}>
+                  Recompose Video
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Full editing workspace — same as production review */}
+          {scenes.length > 0 && (
+            <>
+              <StatusBanner color="emerald">
+                Your video is complete. You can still edit scenes, regenerate images or video clips below.
+                Use &quot;Recompose Video&quot; to rebuild the final video with your changes.
+              </StatusBanner>
+              <SceneList
+                scenes={scenes} sensors={sensors} selectedSceneId={selectedSceneId}
+                setSelectedSceneId={setSelectedSceneId} setEditingScene={setEditingScene}
+                isMusicVideo={isMusicVideo} video={video} phase={phase}
+                generatingSceneIds={generatingSceneIds} generatingFrameIds={generatingFrameIds}
+                generatingFrameVideoIds={generatingFrameVideoIds} generatingFrameMotionIds={generatingFrameMotionIds}
+                onDragEnd={onDragEnd} onUpdateScene={onUpdateScene} onUpdateAssetRefs={onUpdateAssetRefs}
+                onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
+                onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
+                onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
+                onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
+              />
+              <div className="mt-6 flex justify-center gap-3">
+                <Button variant="outline" loading={generatingAllFrames || generatingAll} onClick={() => hasFrames ? onGenerateAllFrameImages(true) : onGenerateAllImages(true)}>
+                  Regenerate All Images
+                </Button>
+                <Button variant="primary" loading={rendering} onClick={onRecompose}>
+                  Recompose Video
+                </Button>
+              </div>
+            </>
+          )}
         </>
       )}
     </>

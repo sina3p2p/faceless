@@ -77,6 +77,8 @@ export async function GET(
             modelUsed: frame.modelUsed,
             imageVariants,
             videoVariants,
+            imageGeneratedAt: frame.imageGeneratedAt?.toISOString() ?? null,
+            videoGeneratedAt: frame.videoGeneratedAt?.toISOString() ?? null,
           };
         })
       ),

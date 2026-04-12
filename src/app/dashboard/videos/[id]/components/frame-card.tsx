@@ -57,6 +57,16 @@ export function FrameCard({
   const hasImageVariants = imageVariants.length > 0;
   const hasVideoVariants = videoVariants.length > 0;
 
+  // Chain validity: if image was regenerated after video was generated,
+  // the video is based on a previous image and is stale.
+  const isVideoStale = !!(
+    frame.videoUrl &&
+    frame.imageGeneratedAt &&
+    frame.videoGeneratedAt &&
+    frame.imageGeneratedAt > frame.videoGeneratedAt
+  );
+  const isMotionStale = isVideoStale;
+
   return (
     <div className="rounded-lg bg-white/2 border border-white/5 px-3 py-2 relative before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-linear-to-b before:from-violet-500/40 before:via-violet-500/20 before:to-violet-500/40">
       <div className="flex items-center gap-2 mb-1 pl-1.5">
@@ -147,6 +157,11 @@ export function FrameCard({
         <div className="mt-1.5">
           <div className="flex items-center gap-2">
             <span className="text-[10px] uppercase tracking-wider text-emerald-600 font-medium">Motion</span>
+            {isMotionStale && (
+              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[9px] font-bold uppercase" title="Image was updated — motion may no longer match">
+                Stale
+              </span>
+            )}
             {onRegenerateMotion && !generatingMotionProp && frame.imageUrl && (
               <button
                 onClick={(e) => { e.stopPropagation(); onRegenerateMotion(frame.id); }}
@@ -194,7 +209,7 @@ export function FrameCard({
       {/* Video preview + variant strip */}
       {showVideo && frame.videoUrl && (
         <div className="mt-1.5">
-          <div className="relative group">
+          <div className={`relative group ${isVideoStale ? "ring-1 ring-amber-500/40 rounded" : ""}`}>
             <video
               src={frame.videoUrl}
               className="rounded w-full max-h-40 object-cover bg-black"
@@ -204,8 +219,8 @@ export function FrameCard({
               onMouseEnter={(e) => e.currentTarget.play()}
               onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
             />
-            <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-green-500/80 text-white text-[9px] font-bold uppercase">
-              Video Ready
+            <div className={`absolute top-1 left-1 px-1.5 py-0.5 rounded text-white text-[9px] font-bold uppercase ${isVideoStale ? "bg-amber-500/80" : "bg-green-500/80"}`}>
+              {isVideoStale ? "Stale — Regenerate" : "Video Ready"}
             </div>
             {onRegenerateVideo && !generatingVideo && (
               <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
