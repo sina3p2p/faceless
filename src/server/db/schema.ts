@@ -190,18 +190,6 @@ export const videoScenes = pgTable("video_scenes", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-export const media = pgTable("media", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  sceneId: text("scene_id").references(() => videoScenes.id, { onDelete: "cascade" }),
-  frameId: text("frame_id").references(() => sceneFrames.id, { onDelete: "cascade" }),
-  type: text("type").notNull(),
-  url: text("url").notNull(),
-  prompt: text("prompt"),
-  modelUsed: text("model_used"),
-  metadata: json("metadata"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
-
 export const sceneFrames = pgTable("scene_frames", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   sceneId: text("scene_id").notNull().references(() => videoScenes.id, { onDelete: "cascade" }),
@@ -215,6 +203,18 @@ export const sceneFrames = pgTable("scene_frames", {
   assetRefs: json("asset_refs").$type<string[]>(),
   imageGeneratedAt: timestamp("image_generated_at", { mode: "date" }),
   videoGeneratedAt: timestamp("video_generated_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const media = pgTable("media", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sceneId: text("scene_id").references(() => videoScenes.id, { onDelete: "cascade" }),
+  frameId: text("frame_id").references(() => sceneFrames.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  url: text("url").notNull(),
+  prompt: text("prompt"),
+  modelUsed: text("model_used"),
+  metadata: json("metadata"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
