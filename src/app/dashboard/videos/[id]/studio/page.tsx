@@ -8,12 +8,13 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import { useVideoActions } from "../hooks/use-video-actions";
 import { useVideoPhase, type StudioPhaseId } from "../hooks/use-video-phase";
 import { InspectorPanel, ScriptChatPanel } from "../components";
-import type { Scene } from "../types";
+import type { Scene, SceneFrame } from "../types";
 
 import { PhaseRail } from "./components/phase-rail";
 import { StudioCanvas } from "./components/studio-canvas";
 import { BottomDock } from "./components/bottom-dock";
 import { CanvasOverlay } from "./components/canvas-overlay";
+import { CompareWall } from "./components/compare-wall";
 
 export default function StudioPage() {
   const { id } = useParams<{ id: string }>();
@@ -41,6 +42,7 @@ export default function StudioPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [comparingFrame, setComparingFrame] = useState<{ frame: SceneFrame; frameIndex: number; type: "image" | "video" } | null>(null);
 
   // Follow active phase
   useEffect(() => {
@@ -124,6 +126,12 @@ export default function StudioPage() {
   const currentPhase = phase.phases.find((p) => p.id === phase.activePhaseId);
   const imageModel = video?.series?.imageModel || "dall-e-3";
   const videoModel = video?.series?.videoModel || "—";
+
+  // Find first frame with variants for compare action
+  const comparableFrame = selectedScene?.frames?.find(
+    (f) => (f.imageVariants && f.imageVariants.length > 0) || (f.videoVariants && f.videoVariants.length > 0)
+  );
+  const canCompare = !!comparableFrame;
 
   if (loading) {
     return (
@@ -257,6 +265,14 @@ export default function StudioPage() {
             onStartRendering={handleStartRendering}
             onRecompose={handleRecompose}
             onDownload={handleDownload}
+            canCompare={canCompare}
+            onCompare={() => {
+              if (comparableFrame) {
+                const frameIndex = selectedScene?.frames?.indexOf(comparableFrame) ?? 0;
+                const type = (comparableFrame.imageVariants?.length ?? 0) > 0 ? "image" as const : "video" as const;
+                setComparingFrame({ frame: comparableFrame, frameIndex, type });
+              }
+            }}
             onEditScene={() => {
               if (selectedScene) setEditingScene(selectedScene);
             }}
@@ -268,6 +284,24 @@ export default function StudioPage() {
               }
             }}
           />
+
+          {/* Compare Wall overlay */}
+          {comparingFrame && (
+            <CompareWall
+              frame={comparingFrame.frame}
+              frameIndex={comparingFrame.frameIndex}
+              type={comparingFrame.type}
+              onSelect={(frameId, variantId, type) => {
+                handleSelectFrameVariant(frameId, variantId, type);
+                setComparingFrame(null);
+              }}
+              onRegenerate={(frameId) => {
+                handleGenerateFrameImage(frameId);
+                setComparingFrame(null);
+              }}
+              onClose={() => setComparingFrame(null)}
+            />
+          )}
         </div>
 
         {/* Inspector */}
