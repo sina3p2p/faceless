@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { VIDEO_MODELS } from "@/lib/constants";
-import type { SceneFrame } from "../types";
+import type { SceneFrame, FrameVariant } from "../types";
 
 export function FrameCard({
   frame,
@@ -18,6 +18,7 @@ export function FrameCard({
   onUpdateMotion,
   onRegenerateMotion,
   onRegenerateVideo,
+  onSelectVariant,
   defaultVideoModel,
 }: {
   frame: SceneFrame;
@@ -33,6 +34,7 @@ export function FrameCard({
   onUpdateMotion?: (frameId: string, motion: string) => void;
   onRegenerateMotion?: (frameId: string) => void;
   onRegenerateVideo?: (frameId: string, videoModel?: string) => void;
+  onSelectVariant?: (frameId: string, variantId: string, type: "image" | "video") => void;
   defaultVideoModel?: string;
 }) {
   const [editingPrompt, setEditingPrompt] = useState(false);
@@ -50,6 +52,11 @@ export function FrameCard({
     setMotionText(frame.visualDescription || "");
   }, [frame.visualDescription]);
 
+  const imageVariants = frame.imageVariants ?? [];
+  const videoVariants = frame.videoVariants ?? [];
+  const hasImageVariants = imageVariants.length > 0;
+  const hasVideoVariants = videoVariants.length > 0;
+
   return (
     <div className="rounded-lg bg-white/2 border border-white/5 px-3 py-2 relative before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-linear-to-b before:from-violet-500/40 before:via-violet-500/20 before:to-violet-500/40">
       <div className="flex items-center gap-2 mb-1 pl-1.5">
@@ -57,11 +64,15 @@ export function FrameCard({
         {frame.clipDuration && (
           <span className="text-[10px] text-gray-600 font-mono">{frame.clipDuration}s</span>
         )}
+        {frame.modelUsed && (
+          <span className="text-[9px] text-gray-700 ml-auto">{frame.modelUsed}</span>
+        )}
         {generating && (
           <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full ml-auto" />
         )}
       </div>
 
+      {/* Image prompt */}
       {editingPrompt ? (
         <textarea
           value={promptText}
@@ -88,21 +99,50 @@ export function FrameCard({
         </p>
       ) : null}
 
+      {/* Current image + variant carousel */}
       {frame.imageUrl && (
-        <div className="mt-1.5 relative group">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={frame.imageUrl} alt={`Frame ${frameIndex + 1}`} className="rounded w-full max-h-40 object-cover" />
-          {showActions && !generating && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onGenerateImage?.(frame.id); }}
-              className="absolute top-1 right-1 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-600"
-            >
-              Regenerate
-            </button>
+        <div className="mt-1.5">
+          <div className="relative group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={frame.imageUrl} alt={`Frame ${frameIndex + 1}`} className="rounded w-full max-h-40 object-cover" />
+            {showActions && !generating && (
+              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onGenerateImage?.(frame.id); }}
+                  className="px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] hover:bg-violet-600"
+                  title="Generate a new variant (keeps current)"
+                >
+                  + Variant
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onGenerateImage?.(frame.id); }}
+                  className="px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] hover:bg-violet-600"
+                >
+                  Regenerate
+                </button>
+              </div>
+            )}
+            {hasImageVariants && (
+              <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-[9px] text-white/80 font-medium">
+                {imageVariants.length + 1} takes
+              </div>
+            )}
+          </div>
+
+          {/* Image variant strip */}
+          {hasImageVariants && (
+            <VariantStrip
+              variants={imageVariants}
+              currentUrl={frame.imageUrl}
+              type="image"
+              frameId={frame.id}
+              onSelect={onSelectVariant}
+            />
           )}
         </div>
       )}
 
+      {/* Motion description */}
       {(showMotion || frame.visualDescription) && (
         <div className="mt-1.5">
           <div className="flex items-center gap-2">
@@ -151,6 +191,7 @@ export function FrameCard({
         </div>
       )}
 
+      {/* Video preview + variant strip */}
       {showVideo && frame.videoUrl && (
         <div className="mt-1.5">
           <div className="relative group">
@@ -167,14 +208,33 @@ export function FrameCard({
               Video Ready
             </div>
             {onRegenerateVideo && !generatingVideo && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowVideoRegen(!showVideoRegen); }}
-                className="absolute top-1 right-1 px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-violet-600"
-              >
-                Regenerate Video
-              </button>
+              <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowVideoRegen(!showVideoRegen); }}
+                  className="px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] hover:bg-violet-600"
+                >
+                  + Video Variant
+                </button>
+              </div>
+            )}
+            {hasVideoVariants && (
+              <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-[9px] text-white/80 font-medium">
+                {videoVariants.length + 1} takes
+              </div>
             )}
           </div>
+
+          {/* Video variant strip */}
+          {hasVideoVariants && (
+            <VariantStrip
+              variants={videoVariants}
+              currentUrl={frame.videoUrl}
+              type="video"
+              frameId={frame.id}
+              onSelect={onSelectVariant}
+            />
+          )}
+
           {showVideoRegen && !generatingVideo && (
             <VideoModelSelector
               selectedModel={selectedVideoModel}
@@ -247,6 +307,63 @@ export function FrameCard({
     </div>
   );
 }
+
+// ── Variant thumbnail strip ──
+
+function VariantStrip({
+  variants,
+  currentUrl,
+  type,
+  frameId,
+  onSelect,
+}: {
+  variants: FrameVariant[];
+  currentUrl: string;
+  type: "image" | "video";
+  frameId: string;
+  onSelect?: (frameId: string, variantId: string, type: "image" | "video") => void;
+}) {
+  return (
+    <div className="flex gap-1 mt-1.5 overflow-x-auto pb-1 scrollbar-thin">
+      {/* Current (active) */}
+      <div className="relative shrink-0 rounded border-2 border-violet-500 ring-1 ring-violet-500/30 overflow-hidden">
+        {type === "image" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={currentUrl} alt="Current" className="w-10 h-10 object-cover" />
+        ) : (
+          <video src={currentUrl} className="w-10 h-10 object-cover" muted />
+        )}
+        <div className="absolute inset-0 flex items-center justify-center bg-violet-500/20">
+          <svg className="w-3 h-3 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      </div>
+
+      {/* Previous variants */}
+      {variants.map((v) => (
+        <button
+          key={v.id}
+          onClick={(e) => { e.stopPropagation(); onSelect?.(frameId, v.id, type); }}
+          className="relative shrink-0 rounded border-2 border-white/10 overflow-hidden opacity-60 hover:opacity-100 hover:border-white/30 transition-all group/variant"
+          title={`${v.modelUsed || "Unknown"} — ${new Date(v.createdAt).toLocaleTimeString()} — Click to use`}
+        >
+          {type === "image" ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={v.url} alt="" className="w-10 h-10 object-cover" />
+          ) : (
+            <video src={v.url} className="w-10 h-10 object-cover" muted />
+          )}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover/variant:opacity-100 transition-opacity">
+            <span className="text-[8px] text-white font-semibold">Use</span>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Video model selector ──
 
 function VideoModelSelector({
   selectedModel,

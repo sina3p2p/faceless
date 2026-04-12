@@ -43,7 +43,7 @@ export default function ReviewPage() {
     handleGenerateAllFrameImages, handleUpdateFramePrompt, handleUpdateFrameMotion,
     handleRegenerateFrameVideo, handleRegenerateFrameMotion, handleGenerateMotion,
     handleApprove, handleSaveStory, handleStartRendering, handleSelectMedia,
-    handleDownload, handleTogglePipelineMode, handleApplyRefinedScript,
+    handleSelectFrameVariant, handleDownload, handleTogglePipelineMode, handleApplyRefinedScript,
   } = actions;
 
   const phase = useVideoPhase(video);
@@ -202,6 +202,7 @@ export default function ReviewPage() {
               onUpdateFrameMotion={handleUpdateFrameMotion}
               onRegenerateFrameVideo={handleRegenerateFrameVideo}
               onRegenerateFrameMotion={handleRegenerateFrameMotion}
+              onSelectFrameVariant={handleSelectFrameVariant}
               onGenerateMotion={handleGenerateMotion}
               onApprove={handleApprove}
               onSaveStory={handleSaveStory}
@@ -265,7 +266,7 @@ function CenterPanel({
   onDragEnd, onUpdateScene, onUpdateAssetRefs, onDeleteScene, onUploadImage,
   onGenerateAllImages, onGenerateAllFrameImages, onGenerateFrameImage,
   onUpdateFramePrompt, onUpdateFrameMotion, onRegenerateFrameVideo, onRegenerateFrameMotion,
-  onGenerateMotion, onApprove, onSaveStory, onStartRendering, onDownload,
+  onSelectFrameVariant, onGenerateMotion, onApprove, onSaveStory, onStartRendering, onDownload,
 }: {
   selectedPhaseId: StudioPhaseId;
   phase: VideoPhase;
@@ -305,6 +306,7 @@ function CenterPanel({
   onUpdateFrameMotion: (frameId: string, motion: string) => void;
   onRegenerateFrameVideo: (frameId: string, videoModel?: string) => void;
   onRegenerateFrameMotion: (frameId: string) => void;
+  onSelectFrameVariant: (frameId: string, variantId: string, type: "image" | "video") => void;
   onGenerateMotion: () => void;
   onApprove: (endpoint: string) => void;
   onSaveStory: (markdown: string) => void;
@@ -366,7 +368,7 @@ function CenterPanel({
             onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
             onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
             onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
-            onRegenerateFrameMotion={onRegenerateFrameMotion}
+            onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
           />
         )}
 
@@ -408,7 +410,7 @@ function CenterPanel({
               onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
               onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
               onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
-              onRegenerateFrameMotion={onRegenerateFrameMotion}
+              onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
             />
             <div className="mt-4 flex justify-center">
               <Button variant="primary" loading={approving} onClick={() => onApprove("approve-pre-production")}>
@@ -460,7 +462,7 @@ function CenterPanel({
             onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
             onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
             onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
-            onRegenerateFrameMotion={onRegenerateFrameMotion}
+            onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
           />
         )}
 
@@ -547,7 +549,7 @@ function CenterPanel({
             onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
             onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
             onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
-            onRegenerateFrameMotion={onRegenerateFrameMotion}
+            onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
           />
         </>
       )}
@@ -581,7 +583,7 @@ function ProcessingIndicator({ message }: { message: string }) {
   );
 }
 
-function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEditingScene, isMusicVideo, video, phase, generatingSceneIds, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds, onDragEnd, onUpdateScene, onUpdateAssetRefs, onDeleteScene, onUploadImage, onGenerateFrameImage, onUpdateFramePrompt, onUpdateFrameMotion, onRegenerateFrameVideo, onRegenerateFrameMotion }: {
+function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEditingScene, isMusicVideo, video, phase, generatingSceneIds, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds, onDragEnd, onUpdateScene, onUpdateAssetRefs, onDeleteScene, onUploadImage, onGenerateFrameImage, onUpdateFramePrompt, onUpdateFrameMotion, onRegenerateFrameVideo, onRegenerateFrameMotion, onSelectFrameVariant }: {
   scenes: Scene[];
   sensors: ReturnType<typeof useSensors>;
   selectedSceneId: string | null;
@@ -604,6 +606,7 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
   onUpdateFrameMotion: (frameId: string, motion: string) => void;
   onRegenerateFrameVideo: (frameId: string, videoModel?: string) => void;
   onRegenerateFrameMotion: (frameId: string) => void;
+  onSelectFrameVariant?: (frameId: string, variantId: string, type: "image" | "video") => void;
 }) {
   return (
     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -634,6 +637,7 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
               onUpdateFrameMotion={onUpdateFrameMotion}
               onRegenerateFrameVideo={onRegenerateFrameVideo}
               onRegenerateFrameMotion={onRegenerateFrameMotion}
+              onSelectFrameVariant={onSelectFrameVariant}
               generatingFrameIds={generatingFrameIds}
               generatingFrameVideoIds={generatingFrameVideoIds}
               generatingFrameMotionIds={generatingFrameMotionIds}

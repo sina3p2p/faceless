@@ -104,9 +104,22 @@ export async function POST(
     const key = `frames/${videoId}/frame_${frameId}_${Date.now()}.jpg`;
     await uploadFile(key, buffer, "image/jpeg");
 
+    // Preserve current image as a variant before overwriting
+    const existingVariants = (frame.imageVariants as Array<{ id: string; url: string; prompt: string | null; modelUsed: string | null; createdAt: string }>) ?? [];
+    if (frame.imageUrl) {
+      existingVariants.push({
+        id: crypto.randomUUID(),
+        url: frame.imageUrl,
+        prompt: frame.imagePrompt,
+        modelUsed: frame.modelUsed,
+        createdAt: frame.createdAt.toISOString(),
+      });
+    }
+
     const updates: Record<string, unknown> = {
       imageUrl: key,
       modelUsed: imageModel,
+      imageVariants: existingVariants,
     };
     if (parsed.data.imagePrompt) {
       updates.imagePrompt = parsed.data.imagePrompt;

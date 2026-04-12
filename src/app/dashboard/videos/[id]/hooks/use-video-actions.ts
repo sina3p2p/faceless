@@ -334,6 +334,19 @@ export function useVideoActions(id: string) {
     await loadData();
   }
 
+  async function handleSelectFrameVariant(frameId: string, variantId: string, type: "image" | "video") {
+    try {
+      const res = await fetch(`/api/videos/${id}/frames/${frameId}/select-variant`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ variantId, type }),
+      });
+      if (res.ok) await loadData();
+    } catch {
+      console.error("Failed to select frame variant");
+    }
+  }
+
   return {
     scenes,
     setScenes,
@@ -369,6 +382,7 @@ export function useVideoActions(id: string) {
     handleSaveStory,
     handleStartRendering,
     handleSelectMedia,
+    handleSelectFrameVariant,
     handleDownload,
     handleTogglePipelineMode,
     handleApplyRefinedScript,

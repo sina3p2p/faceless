@@ -46,6 +46,23 @@ export async function GET(
             try { videoUrl = await getSignedDownloadUrl(frame.videoUrl); } catch { /* skip */ }
           }
 
+          // Sign variant URLs
+          const rawImgVariants = (frame.imageVariants as Array<{ id: string; url: string; prompt: string | null; modelUsed: string | null; createdAt: string }>) ?? [];
+          const rawVidVariants = (frame.videoVariants as Array<{ id: string; url: string; modelUsed: string | null; createdAt: string }>) ?? [];
+
+          const imageVariants = await Promise.all(
+            rawImgVariants.map(async (v) => ({
+              ...v,
+              url: v.url.startsWith("http") ? v.url : await getSignedDownloadUrl(v.url).catch(() => v.url),
+            }))
+          );
+          const videoVariants = await Promise.all(
+            rawVidVariants.map(async (v) => ({
+              ...v,
+              url: v.url.startsWith("http") ? v.url : await getSignedDownloadUrl(v.url).catch(() => v.url),
+            }))
+          );
+
           return {
             id: frame.id,
             frameOrder: frame.frameOrder,
@@ -58,6 +75,8 @@ export async function GET(
             imageKey: frame.imageUrl,
             videoKey: frame.videoUrl,
             modelUsed: frame.modelUsed,
+            imageVariants,
+            videoVariants,
           };
         })
       ),

@@ -69,9 +69,20 @@ export async function POST(
     const key = `frames/${videoId}/video_${frameId}_${Date.now()}.mp4`;
     await uploadFile(key, buffer, "video/mp4");
 
+    // Preserve current video as a variant before overwriting
+    const existingVariants = (frame.videoVariants as Array<{ id: string; url: string; modelUsed: string | null; createdAt: string }>) ?? [];
+    if (frame.videoUrl) {
+      existingVariants.push({
+        id: crypto.randomUUID(),
+        url: frame.videoUrl,
+        modelUsed: frame.modelUsed,
+        createdAt: frame.createdAt.toISOString(),
+      });
+    }
+
     await db
       .update(sceneFrames)
-      .set({ videoUrl: key })
+      .set({ videoUrl: key, videoVariants: existingVariants })
       .where(eq(sceneFrames.id, frameId));
 
     const signedUrl = await getSignedDownloadUrl(key);

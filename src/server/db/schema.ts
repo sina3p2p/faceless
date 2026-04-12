@@ -212,6 +212,8 @@ export const sceneFrames = pgTable("scene_frames", {
   videoUrl: text("video_url"),
   modelUsed: text("model_used"),
   assetRefs: json("asset_refs").$type<string[]>(),
+  imageVariants: json("image_variants").$type<Array<{ id: string; url: string; prompt: string | null; modelUsed: string | null; createdAt: string }>>(),
+  videoVariants: json("video_variants").$type<Array<{ id: string; url: string; modelUsed: string | null; createdAt: string }>>(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

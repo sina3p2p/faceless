@@ -8,6 +8,14 @@ export interface MediaVersion {
   createdAt: string;
 }
 
+export interface FrameVariant {
+  id: string;
+  url: string;
+  prompt: string | null;
+  modelUsed: string | null;
+  createdAt: string;
+}
+
 export interface SceneFrame {
   id: string;
   frameOrder: number;
@@ -16,6 +24,9 @@ export interface SceneFrame {
   visualDescription: string | null;
   imageUrl: string | null;
   videoUrl: string | null;
+  modelUsed?: string | null;
+  imageVariants?: FrameVariant[];
+  videoVariants?: FrameVariant[];
 }
 
 export interface Scene {
