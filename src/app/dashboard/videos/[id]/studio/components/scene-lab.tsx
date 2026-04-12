@@ -1,8 +1,10 @@
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { Scene, SceneFrame, FrameVariant, VideoDetail } from "../../types";
 import type { VideoPhase } from "../../hooks/use-video-phase";
+import { useCanvasTransform } from "../hooks/use-canvas-transform";
+import { ZoomControls } from "./zoom-controls";
 
 // ── Variant thumbnail strip (reused pattern from frame-card.tsx) ──
 
@@ -410,10 +412,24 @@ export function SceneLab({
 
   const frames = scene.frames ?? [];
 
+  const {
+    zoom, isPanning, containerRef, contentStyle,
+    onWheel, onPointerDown, onPointerMove, onPointerUp,
+    zoomIn, zoomOut, fitView, resetView,
+  } = useCanvasTransform();
+
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  function handleFitView() {
+    const el = contentRef.current;
+    if (!el) return;
+    fitView(el.scrollWidth, el.scrollHeight);
+  }
+
   return (
     <div className="flex-1 bg-grid relative overflow-hidden flex flex-col">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-3 px-6 pt-4 pb-2 shrink-0">
+      <div className="flex items-center gap-3 px-6 pt-4 pb-2 shrink-0 z-10">
         <button
           onClick={onBack}
           className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-white transition-colors"
@@ -431,9 +447,21 @@ export function SceneLab({
         <span className="ml-auto text-[10px] text-gray-600 font-mono">{scene.duration?.toFixed(1)}s</span>
       </div>
 
-      {/* Horizontal frame flow */}
-      <div className="flex-1 flex items-center overflow-hidden">
-        <div className="flex gap-0 px-6 overflow-x-auto scroll-smooth scrollbar-none w-full py-6 items-start">
+      {/* Pannable/zoomable frame flow */}
+      <div
+        ref={containerRef}
+        className="flex-1 relative overflow-hidden"
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        style={{ cursor: isPanning ? "grabbing" : undefined }}
+      >
+        <div
+          ref={contentRef}
+          style={contentStyle}
+          className="flex gap-0 px-6 py-6 items-start h-full"
+        >
           {/* Scene Brief */}
           <SceneBrief scene={scene} sceneIndex={sceneIndex} />
 
@@ -485,6 +513,15 @@ export function SceneLab({
             </>
           )}
         </div>
+
+        {/* Zoom controls */}
+        <ZoomControls
+          zoom={zoom}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onFitView={handleFitView}
+          onResetView={resetView}
+        />
       </div>
     </div>
   );

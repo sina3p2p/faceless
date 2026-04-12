@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useRef } from "react";
 import {
   DndContext,
   closestCenter,
@@ -16,6 +16,8 @@ import {
   horizontalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SceneBlock } from "./scene-block";
+import { ZoomControls } from "./zoom-controls";
+import { useCanvasTransform } from "../hooks/use-canvas-transform";
 import type { Scene, VideoDetail } from "../../types";
 
 export function StudioCanvas({
@@ -42,7 +44,21 @@ export function StudioCanvas({
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
+  const {
+    zoom, isPanning, containerRef, contentStyle,
+    onWheel, onPointerDown, onPointerMove, onPointerUp,
+    zoomIn, zoomOut, fitView, resetView, zoomModifier,
+  } = useCanvasTransform();
+
+  const contentRef = useRef<HTMLDivElement>(null);
+
   const videoSize = video?.series?.videoSize || "9:16";
+
+  function handleFitView() {
+    const el = contentRef.current;
+    if (!el) return;
+    fitView(el.scrollWidth, el.scrollHeight);
+  }
 
   if (scenes.length === 0) {
     return (
@@ -61,9 +77,27 @@ export function StudioCanvas({
   }
 
   return (
-    <div className="flex-1 bg-grid relative overflow-hidden flex items-center">
-      <div className="flex gap-0 px-10 overflow-x-auto scroll-smooth scrollbar-none w-full py-8 items-center">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+    <div
+      ref={containerRef}
+      className="flex-1 bg-grid relative overflow-hidden"
+      onWheel={onWheel}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      style={{ cursor: isPanning ? "grabbing" : undefined }}
+    >
+      {/* Transformed content layer */}
+      <div
+        ref={contentRef}
+        style={contentStyle}
+        className="flex gap-0 px-10 py-8 items-center h-full"
+      >
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={onDragEnd}
+          modifiers={[zoomModifier]}
+        >
           <SortableContext items={scenes.map((s) => s.id)} strategy={horizontalListSortingStrategy}>
             {scenes.map((scene, i) => {
               const isAdjacent =
@@ -99,6 +133,15 @@ export function StudioCanvas({
           </SortableContext>
         </DndContext>
       </div>
+
+      {/* Zoom controls (outside transform layer) */}
+      <ZoomControls
+        zoom={zoom}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onFitView={handleFitView}
+        onResetView={resetView}
+      />
     </div>
   );
 }
