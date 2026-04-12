@@ -48,7 +48,7 @@ export async function POST(
     await db
       .update(sceneFrames)
       .set({
-        imageUrl: selected.url,
+        imageMediaId: selected.id,
         imagePrompt: selected.prompt ?? frame.imagePrompt,
         modelUsed: selected.modelUsed,
       })
@@ -56,7 +56,7 @@ export async function POST(
   } else {
     await db
       .update(sceneFrames)
-      .set({ videoUrl: selected.url })
+      .set({ videoMediaId: selected.id })
       .where(eq(sceneFrames.id, frameId));
   }
 

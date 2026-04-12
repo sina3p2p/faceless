@@ -733,18 +733,19 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    const allFrames: Array<{ frame: typeof schema.sceneFrames.$inferSelect; sceneIdx: number }> = [];
+    const allFrames: Array<{ frame: typeof schema.sceneFrames.$inferSelect & { imageMedia: typeof schema.media.$inferSelect | null }; sceneIdx: number }> = [];
     for (let i = 0; i < existingScenes.length; i++) {
       const frames = await db.query.sceneFrames.findMany({
         where: eq(schema.sceneFrames.sceneId, existingScenes[i].id),
         orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
+        with: { imageMedia: true },
       });
       for (const frame of frames) {
         allFrames.push({ frame, sceneIdx: i });
       }
     }
 
-    const targets = allFrames.filter(({ frame }) => !frame.imageUrl);
+    const targets = allFrames.filter(({ frame }) => !frame.imageMediaId);
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
@@ -754,16 +755,13 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-images] Generating ${targets.length} images sequentially with chain-referencing, ${imageModel}, ${allAssets.length} story assets`);
 
-    // Sequential generation with chain-referencing:
-    // Each frame gets character sheet refs + previous frame's output as extra reference
     let previousFrameSignedUrl: string | null = null;
 
-    // If there are already-generated frames before our first target, use the last one as starting ref
     const firstTargetIdx = allFrames.findIndex(({ frame }) => frame.id === targets[0].frame.id);
     if (firstTargetIdx > 0) {
       const prevFrame = allFrames[firstTargetIdx - 1].frame;
-      if (prevFrame.imageUrl) {
-        try { previousFrameSignedUrl = await getSignedDownloadUrl(prevFrame.imageUrl); } catch { /* skip */ }
+      if (prevFrame.imageMedia?.url) {
+        try { previousFrameSignedUrl = await getSignedDownloadUrl(prevFrame.imageMedia.url); } catch { /* skip */ }
       }
     }
 
@@ -800,12 +798,19 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
         const key = `frames/${videoProjectId}/frame_${frame.id}_${Date.now()}.jpg`;
         await uploadFile(key, buffer, "image/jpeg");
 
+        const [newMedia] = await db.insert(schema.media).values({
+          frameId: frame.id,
+          type: "image",
+          url: key,
+          prompt,
+          modelUsed: imageModel,
+        }).returning();
+
         await db
           .update(schema.sceneFrames)
-          .set({ imageUrl: key, modelUsed: imageModel })
+          .set({ imageMediaId: newMedia.id, modelUsed: imageModel })
           .where(eq(schema.sceneFrames.id, frame.id));
 
-        // Use this frame's image as reference for the next frame
         previousFrameSignedUrl = await getSignedDownloadUrl(key);
 
         console.log(`[generate-frame-images] Frame ${i + 1}/${targets.length} (scene ${sceneIdx}) done`);
@@ -859,13 +864,14 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       const frames = await db.query.sceneFrames.findMany({
         where: eq(schema.sceneFrames.sceneId, scene.id),
         orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
+        with: { imageMedia: true },
       });
 
       for (const frame of frames) {
         let signedUrl = "";
-        if (frame.imageUrl) {
+        if (frame.imageMedia?.url) {
           try {
-            signedUrl = await getSignedDownloadUrl(frame.imageUrl);
+            signedUrl = await getSignedDownloadUrl(frame.imageMedia.url);
           } catch { /* skip */ }
         }
 
@@ -992,18 +998,20 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    const allFrames: Array<{ frame: typeof schema.sceneFrames.$inferSelect; sceneIdx: number }> = [];
+    type FrameWithMedia = typeof schema.sceneFrames.$inferSelect & { imageMedia: typeof schema.media.$inferSelect | null };
+    const allFrames: Array<{ frame: FrameWithMedia; sceneIdx: number }> = [];
     for (let i = 0; i < existingScenes.length; i++) {
       const frames = await db.query.sceneFrames.findMany({
         where: eq(schema.sceneFrames.sceneId, existingScenes[i].id),
         orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
+        with: { imageMedia: true },
       });
       for (const frame of frames) {
         allFrames.push({ frame, sceneIdx: i });
       }
     }
 
-    const targets = allFrames.filter(({ frame }) => !frame.videoUrl && frame.imageUrl);
+    const targets = allFrames.filter(({ frame }) => !frame.videoMediaId && frame.imageMediaId);
 
     console.log(`[generate-frame-videos] Generating ${targets.length} video clips`);
 
@@ -1016,7 +1024,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
       await Promise.all(
         batch.map(async ({ frame, sceneIdx }) => {
           try {
-            const imageSignedUrl = await getSignedDownloadUrl(frame.imageUrl!);
+            const imageSignedUrl = await getSignedDownloadUrl(frame.imageMedia!.url);
             const videoPrompt = frame.visualDescription
               || `Cinematic motion, smooth camera movement.`;
             const desiredDuration = Math.max(3, Math.round(frame.clipDuration ?? 5));
@@ -1032,13 +1040,20 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
             const key = `frames/${videoProjectId}/video_${frame.id}_${Date.now()}.mp4`;
             await uploadFile(key, videoBuffer, "video/mp4");
 
+            const [newMedia] = await db.insert(schema.media).values({
+              frameId: frame.id,
+              type: "video",
+              url: key,
+              prompt: videoPrompt,
+              modelUsed: videoModelKey || "kling-3-standard",
+            }).returning();
+
             await db
               .update(schema.sceneFrames)
-              .set({ videoUrl: key })
+              .set({ videoMediaId: newMedia.id })
               .where(eq(schema.sceneFrames.id, frame.id));
           } catch (err) {
             console.error(`[generate-frame-videos] Frame ${frame.id} (scene ${sceneIdx}) failed:`, err instanceof Error ? err.message : err);
-            // Continue with other frames — don't break the whole job
           }
         })
       );
@@ -1047,11 +1062,10 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
       await job.updateProgress(progress);
     }
 
-    // Check how many succeeded
     const updatedFrames = await Promise.all(
       targets.map(async ({ frame }) => {
-        const f = await db.query.sceneFrames.findFirst({ where: eq(schema.sceneFrames.id, frame.id), columns: { videoUrl: true } });
-        return !!f?.videoUrl;
+        const f = await db.query.sceneFrames.findFirst({ where: eq(schema.sceneFrames.id, frame.id), columns: { videoMediaId: true } });
+        return !!f?.videoMediaId;
       })
     );
     const succeeded = updatedFrames.filter(Boolean).length;
@@ -1102,20 +1116,19 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
         await downloadFile(audioSignedUrl, audioPath);
       }
 
-      // Get frames for this scene
       const frames = await db.query.sceneFrames.findMany({
         where: eq(schema.sceneFrames.sceneId, scene.id),
         orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
+        with: { videoMedia: true },
       });
 
-      // Download frame videos and build sub-clips
       const frameMediaPaths: string[] = [];
       const frameDurations: number[] = [];
 
       for (let j = 0; j < frames.length; j++) {
         const frame = frames[j];
-        if (frame.videoUrl) {
-          const videoSignedUrl = await getSignedDownloadUrl(frame.videoUrl);
+        if (frame.videoMedia?.url) {
+          const videoSignedUrl = await getSignedDownloadUrl(frame.videoMedia.url);
           const videoPath = path.join(workDir, `scene_${i}_frame_${j}.mp4`);
           await downloadFile(videoSignedUrl, videoPath);
           frameMediaPaths.push(videoPath);

@@ -39,14 +39,13 @@ export async function POST(
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
-  // If regenerateExisting, clear all frame imageUrls so the worker regenerates them
   if (parsed.data.regenerateExisting) {
     for (const scene of video.scenes) {
       for (const frame of scene.frames) {
-        if (frame.imageUrl) {
+        if (frame.imageMediaId) {
           await db
             .update(sceneFrames)
-            .set({ imageUrl: null, modelUsed: null })
+            .set({ imageMediaId: null, modelUsed: null })
             .where(eq(sceneFrames.id, frame.id));
         }
       }

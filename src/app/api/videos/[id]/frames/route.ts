@@ -22,7 +22,11 @@ export async function GET(
         with: {
           frames: {
             orderBy: asc(sceneFrames.frameOrder),
-            with: { media: { orderBy: desc(media.createdAt) } },
+            with: {
+              imageMedia: true,
+              videoMedia: true,
+              media: { orderBy: desc(media.createdAt) },
+            },
           },
         },
       },
@@ -39,14 +43,17 @@ export async function GET(
       sceneTitle: scene.sceneTitle,
       frames: await Promise.all(
         scene.frames.map(async (frame) => {
+          const imageKey = frame.imageMedia?.url ?? null;
+          const videoKey = frame.videoMedia?.url ?? null;
+
           let imageUrl: string | null = null;
           let videoUrl: string | null = null;
 
-          if (frame.imageUrl) {
-            try { imageUrl = await getSignedDownloadUrl(frame.imageUrl); } catch { /* skip */ }
+          if (imageKey) {
+            try { imageUrl = await getSignedDownloadUrl(imageKey); } catch { /* skip */ }
           }
-          if (frame.videoUrl) {
-            try { videoUrl = await getSignedDownloadUrl(frame.videoUrl); } catch { /* skip */ }
+          if (videoKey) {
+            try { videoUrl = await getSignedDownloadUrl(videoKey); } catch { /* skip */ }
           }
 
           const signedMedia = await Promise.all(
@@ -69,8 +76,8 @@ export async function GET(
             assetRefs: frame.assetRefs,
             imageUrl,
             videoUrl,
-            imageKey: frame.imageUrl,
-            videoKey: frame.videoUrl,
+            imageKey,
+            videoKey,
             modelUsed: frame.modelUsed,
             media: signedMedia,
             imageGeneratedAt: frame.imageGeneratedAt?.toISOString() ?? null,

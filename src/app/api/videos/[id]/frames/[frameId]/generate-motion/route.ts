@@ -28,10 +28,11 @@ export async function POST(
 
   const frame = await db.query.sceneFrames.findFirst({
     where: eq(sceneFrames.id, frameId),
+    with: { imageMedia: true },
   });
 
   if (!frame) return notFound("Frame not found");
-  if (!frame.imageUrl) {
+  if (!frame.imageMedia) {
     return NextResponse.json(
       { error: "Frame has no image. Generate an image first." },
       { status: 422 }
@@ -51,14 +52,19 @@ export async function POST(
   if (!scene) return notFound("Parent scene not found");
 
   // Build the full ordered frame list to find the next frame
-  const allFrames: Array<{ id: string; imageUrl: string | null; sceneId: string }> = [];
+  const allFrames: Array<{ id: string; imageMediaUrl: string | null; sceneId: string }> = [];
   for (const s of allScenes) {
     const frames = await db.query.sceneFrames.findMany({
       where: eq(sceneFrames.sceneId, s.id),
       orderBy: asc(sceneFrames.frameOrder),
-      columns: { id: true, imageUrl: true, sceneId: true },
+      columns: { id: true, sceneId: true },
+      with: { imageMedia: { columns: { url: true } } },
     });
-    allFrames.push(...frames);
+    allFrames.push(...frames.map(f => ({
+      id: f.id,
+      imageMediaUrl: f.imageMedia?.url ?? null,
+      sceneId: f.sceneId,
+    })));
   }
 
   const currentIdx = allFrames.findIndex((f) => f.id === frameId);
@@ -67,11 +73,11 @@ export async function POST(
     : null;
 
   try {
-    const currentImageUrl = await getSignedDownloadUrl(frame.imageUrl);
+    const currentImageUrl = await getSignedDownloadUrl(frame.imageMedia.url);
     let nextImageUrl: string | null = null;
-    if (nextFrame?.imageUrl) {
+    if (nextFrame?.imageMediaUrl) {
       try {
-        nextImageUrl = await getSignedDownloadUrl(nextFrame.imageUrl);
+        nextImageUrl = await getSignedDownloadUrl(nextFrame.imageMediaUrl);
       } catch { /* skip */ }
     }
 

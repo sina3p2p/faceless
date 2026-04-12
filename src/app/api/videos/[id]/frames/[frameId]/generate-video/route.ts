@@ -35,11 +35,12 @@ export async function POST(
 
   const frame = await db.query.sceneFrames.findFirst({
     where: eq(sceneFrames.id, frameId),
+    with: { imageMedia: true },
   });
 
   if (!frame) return notFound("Frame not found");
 
-  if (!frame.imageUrl) {
+  if (!frame.imageMedia) {
     return NextResponse.json(
       { error: "Frame has no image. Generate an image first." },
       { status: 422 }
@@ -56,9 +57,10 @@ export async function POST(
   const prompt = motionPrompt;
 
   try {
-    const signedImageUrl = frame.imageUrl.startsWith("http")
-      ? frame.imageUrl
-      : await getSignedDownloadUrl(frame.imageUrl);
+    const imageKey = frame.imageMedia.url;
+    const signedImageUrl = imageKey.startsWith("http")
+      ? imageKey
+      : await getSignedDownloadUrl(imageKey);
 
     const result = await getAIVideoForScene(signedImageUrl, prompt, duration, videoModel);
 
@@ -69,29 +71,19 @@ export async function POST(
     const key = `frames/${videoId}/video_${frameId}_${Date.now()}.mp4`;
     await uploadFile(key, buffer, "video/mp4");
 
-    // Save previous active video as a media variant before overwriting
-    if (frame.videoUrl) {
-      await db.insert(media).values({
-        frameId,
-        type: "video",
-        url: frame.videoUrl,
-        modelUsed: frame.modelUsed,
-      });
-    }
-
-    await db
-      .update(sceneFrames)
-      .set({ videoUrl: key, videoGeneratedAt: new Date() })
-      .where(eq(sceneFrames.id, frameId));
-
-    await db.insert(media).values({
+    const [newMedia] = await db.insert(media).values({
       frameId,
       type: "video",
       url: key,
       prompt,
       modelUsed: videoModel || "kling-3-standard",
       metadata: { duration: result.durationSeconds },
-    });
+    }).returning();
+
+    await db
+      .update(sceneFrames)
+      .set({ videoMediaId: newMedia.id, videoGeneratedAt: new Date() })
+      .where(eq(sceneFrames.id, frameId));
 
     const signedUrl = await getSignedDownloadUrl(key);
 

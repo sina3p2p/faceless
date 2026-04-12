@@ -197,8 +197,8 @@ export const sceneFrames = pgTable("scene_frames", {
   clipDuration: real("clip_duration"),
   imagePrompt: text("image_prompt"),
   visualDescription: text("visual_description"),
-  imageUrl: text("image_url"),
-  videoUrl: text("video_url"),
+  imageMediaId: text("image_media_id"),
+  videoMediaId: text("video_media_id"),
   modelUsed: text("model_used"),
   assetRefs: json("asset_refs").$type<string[]>(),
   imageGeneratedAt: timestamp("image_generated_at", { mode: "date" }),
@@ -299,6 +299,8 @@ export const mediaRelations = relations(media, ({ one }) => ({
 
 export const sceneFramesRelations = relations(sceneFrames, ({ one, many }) => ({
   scene: one(videoScenes, { fields: [sceneFrames.sceneId], references: [videoScenes.id] }),
+  imageMedia: one(media, { fields: [sceneFrames.imageMediaId], references: [media.id], relationName: "frameImageMedia" }),
+  videoMedia: one(media, { fields: [sceneFrames.videoMediaId], references: [media.id], relationName: "frameVideoMedia" }),
   media: many(media, { relationName: "frameMedia" }),
 }));
 

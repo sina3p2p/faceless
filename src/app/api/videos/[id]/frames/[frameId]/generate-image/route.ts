@@ -41,6 +41,7 @@ export async function POST(
 
   const frame = await db.query.sceneFrames.findFirst({
     where: eq(sceneFrames.id, frameId),
+    with: { imageMedia: true },
   });
 
   if (!frame) return notFound("Frame not found");
@@ -104,19 +105,16 @@ export async function POST(
     const key = `frames/${videoId}/frame_${frameId}_${Date.now()}.jpg`;
     await uploadFile(key, buffer, "image/jpeg");
 
-    // Save previous active image as a media variant before overwriting
-    if (frame.imageUrl) {
-      await db.insert(media).values({
-        frameId,
-        type: "image",
-        url: frame.imageUrl,
-        prompt: frame.imagePrompt,
-        modelUsed: frame.modelUsed,
-      });
-    }
+    const [newMedia] = await db.insert(media).values({
+      frameId,
+      type: "image",
+      url: key,
+      prompt: parsed.data.imagePrompt || frame.imagePrompt,
+      modelUsed: imageModel,
+    }).returning();
 
     const updates: Record<string, unknown> = {
-      imageUrl: key,
+      imageMediaId: newMedia.id,
       modelUsed: imageModel,
       imageGeneratedAt: new Date(),
     };
@@ -128,14 +126,6 @@ export async function POST(
       .update(sceneFrames)
       .set(updates)
       .where(eq(sceneFrames.id, frameId));
-
-    await db.insert(media).values({
-      frameId,
-      type: "image",
-      url: key,
-      prompt: parsed.data.imagePrompt || frame.imagePrompt,
-      modelUsed: imageModel,
-    });
 
     const signedUrl = await getSignedDownloadUrl(key);
 
