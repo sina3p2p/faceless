@@ -51,8 +51,8 @@ export function FrameCard({
   }, [frame.visualDescription]);
 
   return (
-    <div className="rounded-lg bg-white/2 border border-white/5 px-3 py-2">
-      <div className="flex items-center gap-2 mb-1">
+    <div className="rounded-lg bg-white/2 border border-white/5 px-3 py-2 relative before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-full before:bg-linear-to-b before:from-violet-500/40 before:via-violet-500/20 before:to-violet-500/40">
+      <div className="flex items-center gap-2 mb-1 pl-1.5">
         <span className="text-[10px] uppercase tracking-wider text-violet-500 font-medium">Frame {frameIndex + 1}</span>
         {frame.clipDuration && (
           <span className="text-[10px] text-gray-600 font-mono">{frame.clipDuration}s</span>

@@ -7,7 +7,17 @@ const PROCESSING_STATUSES = [
   "VIDEO_GENERATION", "RENDERING",
 ];
 
+export type StudioPhaseId = "story" | "pre-production" | "production" | "final";
+
+export interface PhaseInfo {
+  id: StudioPhaseId;
+  label: string;
+  status: "locked" | "processing" | "review" | "done";
+}
+
 export interface VideoPhase {
+  activePhaseId: StudioPhaseId;
+  phases: PhaseInfo[];
   // New pipeline review gates
   isStoryReview: boolean;
   isPreProductionReview: boolean;
@@ -108,7 +118,41 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
     isImageReview ? "Review generated images, then approve to generate motion." :
     "Review your content and approve to continue.";
 
+  // Phase categorization for sidebar
+  const STORY_STATUSES = ["PENDING", "PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION", "REVIEW_STORY", "REVIEW_SCENES", "REVIEW_SCRIPT"];
+  const PREPROD_STATUSES = ["TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD", "REVIEW_PRE_PRODUCTION", "TTS_REVIEW", "REVIEW_PROMPTS"];
+  const PRODUCTION_STATUSES = ["PROMPT_GENERATION", "IMAGE_GENERATION", "REVIEW_IMAGES", "MOTION_GENERATION", "VIDEO_GENERATION", "REVIEW_PRODUCTION", "IMAGE_REVIEW", "REVIEW_VISUAL", "REVIEW_MOTION", "REVIEW_VIDEO"];
+  const FINAL_STATUSES = ["RENDERING", "COMPLETED"];
+
+  function phaseStatus(phaseStatuses: string[]): "locked" | "processing" | "review" | "done" {
+    if (phaseStatuses.includes(status)) {
+      if (status.startsWith("REVIEW_") || status === "TTS_REVIEW" || status === "IMAGE_REVIEW") return "review";
+      if (status === "COMPLETED") return "done";
+      return "processing";
+    }
+    const allPhases = [STORY_STATUSES, PREPROD_STATUSES, PRODUCTION_STATUSES, FINAL_STATUSES];
+    const currentIdx = allPhases.findIndex((p) => p.includes(status));
+    const thisIdx = allPhases.indexOf(phaseStatuses);
+    if (currentIdx > thisIdx) return "done";
+    return "locked";
+  }
+
+  const activePhaseId: StudioPhaseId =
+    FINAL_STATUSES.includes(status) ? "final" :
+    PRODUCTION_STATUSES.includes(status) ? "production" :
+    PREPROD_STATUSES.includes(status) ? "pre-production" :
+    "story";
+
+  const phases: PhaseInfo[] = [
+    { id: "story", label: "Story", status: phaseStatus(STORY_STATUSES) },
+    { id: "pre-production", label: "Pre-Production", status: phaseStatus(PREPROD_STATUSES) },
+    { id: "production", label: "Production", status: phaseStatus(PRODUCTION_STATUSES) },
+    { id: "final", label: "Final", status: phaseStatus(FINAL_STATUSES) },
+  ];
+
   return {
+    activePhaseId,
+    phases,
     isStoryReview,
     isPreProductionReview,
     isImagesReview,
