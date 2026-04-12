@@ -1,0 +1,138 @@
+import type { VideoDetail } from "../types";
+
+const PROCESSING_STATUSES = [
+  "PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION",
+  "TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD",
+  "PROMPT_GENERATION", "MOTION_GENERATION", "IMAGE_GENERATION",
+  "VIDEO_GENERATION", "RENDERING",
+];
+
+export interface VideoPhase {
+  // New pipeline review gates
+  isStoryReview: boolean;
+  isPreProductionReview: boolean;
+  isImagesReview: boolean;
+  isProductionReview: boolean;
+  // Legacy review statuses
+  isScenesReview: boolean;
+  isTTSReview: boolean;
+  isPromptsReview: boolean;
+  isNewMotionReview: boolean;
+  isVideoReview: boolean;
+  isImageReview: boolean;
+  isVisualReview: boolean;
+  isMotionReview: boolean;
+  isNarrationReview: boolean;
+  // Processing
+  isProcessing: boolean;
+  hasTTSRun: boolean;
+  // Status text
+  processingMessage: string;
+  headerTitle: string;
+  headerDescription: string;
+  // Scene card visibility flags
+  showMotionEdit: boolean;
+  showDirectorNote: boolean;
+  showAudioPlayer: boolean;
+  showDuration: boolean;
+  showFrameActions: boolean;
+  showFrameMotion: boolean;
+  showFrameVideo: boolean;
+}
+
+export function useVideoPhase(video: VideoDetail | null): VideoPhase {
+  const status = video?.status || "";
+  const isMusicVideo = video?.series?.videoType === "music_video";
+
+  const isVisualReview = status === "REVIEW_VISUAL";
+  const isMotionReview = isVisualReview && !isMusicVideo;
+  const isImageReview = status === "IMAGE_REVIEW";
+  const isNarrationReview = status === "REVIEW_SCRIPT" && !isMusicVideo;
+
+  const isStoryReview = status === "REVIEW_STORY";
+  const isPreProductionReview = status === "REVIEW_PRE_PRODUCTION";
+  const isImagesReview = status === "REVIEW_IMAGES";
+  const isProductionReview = status === "REVIEW_PRODUCTION";
+
+  const isScenesReview = status === "REVIEW_SCENES";
+  const isTTSReview = status === "TTS_REVIEW";
+  const isPromptsReview = status === "REVIEW_PROMPTS";
+  const isNewMotionReview = status === "REVIEW_MOTION";
+  const isVideoReview = status === "REVIEW_VIDEO";
+
+  const isProcessing = PROCESSING_STATUSES.includes(status);
+  const hasTTSRun = !isStoryReview && !isScenesReview && !isNarrationReview;
+
+  const processingMessages: Record<string, string> = {
+    PRODUCING: "Executive Producer is crafting the creative brief...",
+    STORY: "Head Writer is writing your story...",
+    SCENE_SPLIT: "Director is splitting story into scenes...",
+    SCRIPT_SUPERVISION: "Script Supervisor is enforcing continuity...",
+    TTS_GENERATION: "Generating audio narration...",
+    CINEMATOGRAPHY: "Cinematographer is designing the visual style...",
+    STORYBOARD: "Storyboard Agent is planning frame breakdown...",
+    PROMPT_GENERATION: "Prompt Architect is creating image prompts...",
+    MOTION_GENERATION: "Motion Director is designing motion for each frame...",
+    IMAGE_GENERATION: "Generating images...",
+    VIDEO_GENERATION: "Generating video clips...",
+    RENDERING: "Composing final video...",
+  };
+
+  const headerTitle = video?.title ?? (
+    isStoryReview ? "Review Story" :
+    isPreProductionReview ? "Review Pre-Production" :
+    isImagesReview ? "Review Images" :
+    isProductionReview ? "Review Production" :
+    isScenesReview ? "Review Scenes" :
+    isTTSReview ? "Review Audio" :
+    isPromptsReview ? "Review Image Prompts" :
+    isNewMotionReview ? "Review Motion" :
+    isVideoReview ? "Review Video Clips" :
+    isMotionReview ? "Review Motion" :
+    isVisualReview ? "Review Visuals" :
+    isProcessing ? "Processing..." :
+    "Review"
+  );
+
+  const headerDescription =
+    isStoryReview ? "Review creative brief, story, scenes, and continuity. Then approve to generate audio." :
+    isPreProductionReview ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images." :
+    isImagesReview ? "Review the generated images below. Regenerate any you don't like, then approve to generate video clips." :
+    isProductionReview ? "Review the generated video clips below. Then approve to compose the final video." :
+    isScenesReview ? "Review the scene breakdown and director's notes, then generate audio." :
+    isTTSReview ? "Listen to the generated audio for each scene, then generate image prompts." :
+    isPromptsReview ? "Review the image prompts before generating images." :
+    isNewMotionReview ? "Review the motion descriptions for each frame, then generate video clips." :
+    isVideoReview ? "Review the generated video clips. Regenerate any you don't like, then approve to compose the final video." :
+    isProcessing ? "Your video is being processed..." :
+    isImageReview ? "Review generated images, then approve to generate motion." :
+    "Review your content and approve to continue.";
+
+  return {
+    isStoryReview,
+    isPreProductionReview,
+    isImagesReview,
+    isProductionReview,
+    isScenesReview,
+    isTTSReview,
+    isPromptsReview,
+    isNewMotionReview,
+    isVideoReview,
+    isImageReview,
+    isVisualReview,
+    isMotionReview,
+    isNarrationReview,
+    isProcessing,
+    hasTTSRun,
+    processingMessage: processingMessages[status] || "",
+    headerTitle,
+    headerDescription,
+    showMotionEdit: isMotionReview || isNewMotionReview || isVideoReview || status === "COMPLETED",
+    showDirectorNote: true,
+    showAudioPlayer: isTTSReview || isPromptsReview || isNewMotionReview,
+    showDuration: hasTTSRun,
+    showFrameActions: isImagesReview || isProductionReview || isPromptsReview || isImageReview || isNewMotionReview || isVideoReview,
+    showFrameMotion: isProductionReview || isNewMotionReview || isImageReview || isVideoReview,
+    showFrameVideo: isProductionReview || isNewMotionReview || isVideoReview || status === "COMPLETED" || status === "VIDEO_GENERATION",
+  };
+}
