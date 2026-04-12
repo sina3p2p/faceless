@@ -6,7 +6,7 @@ import {
   db,
   schema,
   eq,
-  insertSceneMedia,
+  insertMedia,
   updateVideoStatus,
   resolveStoryAssets,
   filterAssetsByRefs,
@@ -214,7 +214,7 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
               .set({ assetUrl: key, assetType: "image", imageUrl: key, modelUsed: imageModel })
               .where(eq(schema.videoScenes.id, scene.id));
 
-            await insertSceneMedia(scene.id, "image", key, prompt, imageModel);
+            await insertMedia({ sceneId: scene.id }, "image", key, prompt, imageModel);
             console.log(`[generate-images] Scene ${sceneIdx} done`);
           } catch (err) {
             console.error(`[generate-images] Scene ${sceneIdx} failed:`, err);

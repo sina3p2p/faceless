@@ -190,9 +190,10 @@ export const videoScenes = pgTable("video_scenes", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-export const sceneMedia = pgTable("scene_media", {
+export const media = pgTable("media", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  sceneId: text("scene_id").notNull().references(() => videoScenes.id, { onDelete: "cascade" }),
+  sceneId: text("scene_id").references(() => videoScenes.id, { onDelete: "cascade" }),
+  frameId: text("frame_id").references(() => sceneFrames.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   url: text("url").notNull(),
   prompt: text("prompt"),
@@ -212,8 +213,6 @@ export const sceneFrames = pgTable("scene_frames", {
   videoUrl: text("video_url"),
   modelUsed: text("model_used"),
   assetRefs: json("asset_refs").$type<string[]>(),
-  imageVariants: json("image_variants").$type<Array<{ id: string; url: string; prompt: string | null; modelUsed: string | null; createdAt: string }>>(),
-  videoVariants: json("video_variants").$type<Array<{ id: string; url: string; modelUsed: string | null; createdAt: string }>>(),
   imageGeneratedAt: timestamp("image_generated_at", { mode: "date" }),
   videoGeneratedAt: timestamp("video_generated_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -289,16 +288,18 @@ export const videoProjectsRelations = relations(videoProjects, ({ one, many }) =
 
 export const videoScenesRelations = relations(videoScenes, ({ one, many }) => ({
   videoProject: one(videoProjects, { fields: [videoScenes.videoProjectId], references: [videoProjects.id] }),
-  mediaVersions: many(sceneMedia),
+  media: many(media, { relationName: "sceneMedia" }),
   frames: many(sceneFrames),
 }));
 
-export const sceneMediaRelations = relations(sceneMedia, ({ one }) => ({
-  scene: one(videoScenes, { fields: [sceneMedia.sceneId], references: [videoScenes.id] }),
+export const mediaRelations = relations(media, ({ one }) => ({
+  scene: one(videoScenes, { fields: [media.sceneId], references: [videoScenes.id], relationName: "sceneMedia" }),
+  frame: one(sceneFrames, { fields: [media.frameId], references: [sceneFrames.id], relationName: "frameMedia" }),
 }));
 
-export const sceneFramesRelations = relations(sceneFrames, ({ one }) => ({
+export const sceneFramesRelations = relations(sceneFrames, ({ one, many }) => ({
   scene: one(videoScenes, { fields: [sceneFrames.sceneId], references: [videoScenes.id] }),
+  media: many(media, { relationName: "frameMedia" }),
 }));
 
 export const renderJobsRelations = relations(renderJobs, ({ one }) => ({

@@ -49,7 +49,8 @@ export function CompareWall({
 
   // Build unified list: active + variants
   const activeUrl = type === "image" ? frame.imageUrl : frame.videoUrl;
-  const variants = type === "image" ? (frame.imageVariants ?? []) : (frame.videoVariants ?? []);
+  const allMedia = frame.media ?? [];
+  const variants = allMedia.filter(m => m.type === type);
   const generatedAt = type === "image" ? frame.imageGeneratedAt : frame.videoGeneratedAt;
 
   if (!activeUrl) return null;

@@ -52,8 +52,9 @@ export function FrameCard({
     setMotionText(frame.visualDescription || "");
   }, [frame.visualDescription]);
 
-  const imageVariants = frame.imageVariants ?? [];
-  const videoVariants = frame.videoVariants ?? [];
+  const allMedia = frame.media ?? [];
+  const imageVariants = allMedia.filter(m => m.type === "image");
+  const videoVariants = allMedia.filter(m => m.type === "video");
   const hasImageVariants = imageVariants.length > 0;
   const hasVideoVariants = videoVariants.length > 0;
 

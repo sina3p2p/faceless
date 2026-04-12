@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, sceneFrames } from "@/server/db/schema";
+import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -38,53 +38,25 @@ export async function POST(
 
   const { variantId, type } = parsed.data;
 
+  const selected = await db.query.media.findFirst({
+    where: and(eq(media.id, variantId), eq(media.frameId, frameId)),
+  });
+
+  if (!selected) return notFound("Variant not found");
+
   if (type === "image") {
-    const variants = (frame.imageVariants as Array<{ id: string; url: string; prompt: string | null; modelUsed: string | null; createdAt: string }>) ?? [];
-    const selected = variants.find((v) => v.id === variantId);
-    if (!selected) return notFound("Variant not found");
-
-    // Swap: push current to variants, remove selected from variants, set selected as active
-    const updatedVariants = variants.filter((v) => v.id !== variantId);
-    if (frame.imageUrl) {
-      updatedVariants.push({
-        id: crypto.randomUUID(),
-        url: frame.imageUrl,
-        prompt: frame.imagePrompt,
-        modelUsed: frame.modelUsed,
-        createdAt: frame.createdAt.toISOString(),
-      });
-    }
-
     await db
       .update(sceneFrames)
       .set({
         imageUrl: selected.url,
         imagePrompt: selected.prompt ?? frame.imagePrompt,
         modelUsed: selected.modelUsed,
-        imageVariants: updatedVariants,
       })
       .where(eq(sceneFrames.id, frameId));
   } else {
-    const variants = (frame.videoVariants as Array<{ id: string; url: string; modelUsed: string | null; createdAt: string }>) ?? [];
-    const selected = variants.find((v) => v.id === variantId);
-    if (!selected) return notFound("Variant not found");
-
-    const updatedVariants = variants.filter((v) => v.id !== variantId);
-    if (frame.videoUrl) {
-      updatedVariants.push({
-        id: crypto.randomUUID(),
-        url: frame.videoUrl,
-        modelUsed: frame.modelUsed,
-        createdAt: frame.createdAt.toISOString(),
-      });
-    }
-
     await db
       .update(sceneFrames)
-      .set({
-        videoUrl: selected.url,
-        videoVariants: updatedVariants,
-      })
+      .set({ videoUrl: selected.url })
       .where(eq(sceneFrames.id, frameId));
   }
 

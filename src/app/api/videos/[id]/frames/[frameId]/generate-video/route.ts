@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, sceneFrames } from "@/server/db/schema";
+import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { getAIVideoForScene } from "@/server/services/ai-video";
@@ -69,21 +69,29 @@ export async function POST(
     const key = `frames/${videoId}/video_${frameId}_${Date.now()}.mp4`;
     await uploadFile(key, buffer, "video/mp4");
 
-    // Preserve current video as a variant before overwriting
-    const existingVariants = (frame.videoVariants as Array<{ id: string; url: string; modelUsed: string | null; createdAt: string }>) ?? [];
+    // Save previous active video as a media variant before overwriting
     if (frame.videoUrl) {
-      existingVariants.push({
-        id: crypto.randomUUID(),
+      await db.insert(media).values({
+        frameId,
+        type: "video",
         url: frame.videoUrl,
         modelUsed: frame.modelUsed,
-        createdAt: frame.createdAt.toISOString(),
       });
     }
 
     await db
       .update(sceneFrames)
-      .set({ videoUrl: key, videoVariants: existingVariants, videoGeneratedAt: new Date() })
+      .set({ videoUrl: key, videoGeneratedAt: new Date() })
       .where(eq(sceneFrames.id, frameId));
+
+    await db.insert(media).values({
+      frameId,
+      type: "video",
+      url: key,
+      prompt,
+      modelUsed: videoModel || "kling-3-standard",
+      metadata: { duration: result.durationSeconds },
+    });
 
     const signedUrl = await getSignedDownloadUrl(key);
 

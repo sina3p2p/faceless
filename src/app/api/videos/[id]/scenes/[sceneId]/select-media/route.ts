@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, sceneMedia } from "@/server/db/schema";
+import { videoProjects, videoScenes, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
@@ -29,23 +29,23 @@ export async function POST(
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
-  const media = await db.query.sceneMedia.findFirst({
+  const mediaItem = await db.query.media.findFirst({
     where: and(
-      eq(sceneMedia.id, parsed.data.mediaId),
-      eq(sceneMedia.sceneId, sceneId)
+      eq(media.id, parsed.data.mediaId),
+      eq(media.sceneId, sceneId)
     ),
   });
 
-  if (!media) return notFound("Media version not found");
+  if (!mediaItem) return notFound("Media version not found");
 
   const updates: Record<string, unknown> = {};
-  if (media.type === "image") {
-    updates.imageUrl = media.url;
-    updates.assetUrl = media.url;
+  if (mediaItem.type === "image") {
+    updates.imageUrl = mediaItem.url;
+    updates.assetUrl = mediaItem.url;
     updates.assetType = "image";
   } else {
-    updates.videoUrl = media.url;
-    updates.assetUrl = media.url;
+    updates.videoUrl = mediaItem.url;
+    updates.assetUrl = mediaItem.url;
     updates.assetType = "video";
   }
 
@@ -54,5 +54,5 @@ export async function POST(
     .set(updates)
     .where(and(eq(videoScenes.id, sceneId), eq(videoScenes.videoProjectId, videoId)));
 
-  return NextResponse.json({ success: true, type: media.type, url: media.url });
+  return NextResponse.json({ success: true, type: mediaItem.type, url: mediaItem.url });
 }

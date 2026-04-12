@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, series, sceneMedia } from "@/server/db/schema";
+import { videoProjects, videoScenes, series, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq, asc, desc } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
@@ -19,7 +19,7 @@ export async function GET(
     with: {
       scenes: {
         orderBy: asc(videoScenes.sceneOrder),
-        with: { mediaVersions: { orderBy: desc(sceneMedia.createdAt) } },
+        with: { media: { orderBy: desc(media.createdAt) } },
       },
       series: { columns: { userId: true } },
     },
@@ -38,8 +38,8 @@ export async function GET(
         vidKey ? getSignedDownloadUrl(vidKey) : null,
       ]);
 
-      const media = await Promise.all(
-        (scene.mediaVersions || []).map(async (m) => ({
+      const mediaItems = await Promise.all(
+        (scene.media || []).map(async (m) => ({
           id: m.id,
           type: m.type,
           url: await getSignedDownloadUrl(m.url),
@@ -66,7 +66,7 @@ export async function GET(
         videoUrl,
         imageKey: imgKey,
         videoKey: vidKey,
-        media,
+        media: mediaItems,
       };
     })
   );

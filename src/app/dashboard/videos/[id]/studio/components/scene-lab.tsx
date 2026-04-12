@@ -2,10 +2,11 @@
 
 import { Fragment, useEffect, useRef, useState } from "react";
 import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/constants";
-import type { Scene, SceneFrame, FrameVariant, VideoDetail } from "../../types";
+import type { Scene, SceneFrame, VideoDetail } from "../../types";
 import type { VideoPhase } from "../../hooks/use-video-phase";
 import { useCanvasTransform } from "../hooks/use-canvas-transform";
 import { ZoomControls } from "./zoom-controls";
+import { VariantNode, Frame } from "./scene-lab/index";
 
 // ── Model Selector (inline popover) ──
 
@@ -31,11 +32,10 @@ function ModelSelector({
             key={m.id}
             type="button"
             onClick={(e) => { e.stopPropagation(); setSelected(m.id); }}
-            className={`px-2 py-0.5 rounded text-[9px] font-medium transition-colors ${
-              selected === m.id
-                ? "bg-violet-600 text-white"
-                : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-            }`}
+            className={`px-2 py-0.5 rounded text-[9px] font-medium transition-colors ${selected === m.id
+              ? "bg-violet-600 text-white"
+              : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
+              }`}
             title={m.description}
           >
             {m.label}
@@ -62,57 +62,7 @@ function ModelSelector({
 
 // ── Variant Node (single take thumbnail in tree) ──
 
-function VariantNode({
-  url,
-  type,
-  modelUsed,
-  isActive,
-  onClick,
-}: {
-  url: string;
-  type: "image" | "video";
-  modelUsed: string | null;
-  isActive: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onClick?.(); }}
-      disabled={isActive}
-      className={`shrink-0 flex flex-col items-center gap-1 group/vnode transition-all ${
-        isActive ? "" : "opacity-50 hover:opacity-100"
-      }`}
-    >
-      <div className={`w-14 h-14 rounded-lg overflow-hidden border-2 transition-colors relative ${
-        isActive
-          ? "border-violet-500 ring-1 ring-violet-500/30"
-          : "border-white/10 group-hover/vnode:border-white/30"
-      }`}>
-        {type === "image" ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="w-full h-full object-cover" />
-        ) : (
-          <video src={url} className="w-full h-full object-cover" muted />
-        )}
-        {isActive && (
-          <div className="absolute inset-0 flex items-center justify-center bg-violet-500/20">
-            <svg className="w-3 h-3 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-        )}
-        {!isActive && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/vnode:opacity-100 transition-opacity">
-            <span className="text-[8px] text-white font-semibold">Use</span>
-          </div>
-        )}
-      </div>
-      <span className="text-[7px] text-gray-600 truncate max-w-14 leading-none">
-        {modelUsed || "—"}
-      </span>
-    </button>
-  );
-}
+
 
 // ── Scene Brief Card ──
 
@@ -201,8 +151,9 @@ function FrameColumn({
   useEffect(() => { setPromptText(frame.imagePrompt || ""); }, [frame.imagePrompt]);
   useEffect(() => { setMotionText(frame.visualDescription || ""); }, [frame.visualDescription]);
 
-  const imageVariants = frame.imageVariants ?? [];
-  const videoVariants = frame.videoVariants ?? [];
+  const allMedia = frame.media ?? [];
+  const imageVariants = allMedia.filter(m => m.type === "image");
+  const videoVariants = allMedia.filter(m => m.type === "video");
   const hasImageVariants = imageVariants.length > 0;
   const hasVideoVariants = videoVariants.length > 0;
 
@@ -376,7 +327,7 @@ function FrameColumn({
           <div className="w-px h-3 bg-violet-500/30" />
           <div className="flex gap-1.5 items-start">
             {/* Active take */}
-            <VariantNode url={frame.imageUrl} type="image" modelUsed={frame.modelUsed ?? null} isActive onClick={() => {}} />
+            <VariantNode url={frame.imageUrl} type="image" modelUsed={frame.modelUsed ?? null} isActive onClick={() => { }} />
             {/* Previous variants */}
             {imageVariants.map((v) => (
               <VariantNode key={v.id} url={v.url} type="image" modelUsed={v.modelUsed} isActive={false} onClick={() => onSelectVariant(frame.id, v.id, "image")} />
@@ -390,7 +341,7 @@ function FrameColumn({
         <div className="flex flex-col items-center mt-1">
           <div className="w-px h-3 bg-emerald-500/30" />
           <div className="flex gap-1.5 items-start">
-            <VariantNode url={frame.videoUrl} type="video" modelUsed={frame.modelUsed ?? null} isActive onClick={() => {}} />
+            <VariantNode url={frame.videoUrl} type="video" modelUsed={frame.modelUsed ?? null} isActive onClick={() => { }} />
             {videoVariants.map((v) => (
               <VariantNode key={v.id} url={v.url} type="video" modelUsed={v.modelUsed} isActive={false} onClick={() => onSelectVariant(frame.id, v.id, "video")} />
             ))}
@@ -534,10 +485,7 @@ export function SceneLab({
               />
               {i < frames.length - 1 && (
                 <FrameConnector
-                  hasVariants={
-                    (frame.imageVariants?.length ?? 0) > 0 ||
-                    (frame.videoVariants?.length ?? 0) > 0
-                  }
+                  hasVariants={(frame.media?.length ?? 0) > 0}
                 />
               )}
             </Fragment>

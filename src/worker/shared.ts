@@ -18,16 +18,20 @@ const client = postgres(DATABASE.url);
 export const db = drizzle(client, { schema });
 export { schema, eq, and, ne, desc };
 
-export async function insertSceneMedia(
-  sceneId: string,
+export async function insertMedia(
+  {
+    sceneId,
+    frameId,
+  }: { sceneId?: string; frameId?: string },
   type: "image" | "video",
   url: string,
   prompt?: string | null,
   modelUsed?: string | null,
   metadata?: Record<string, unknown> | null
 ) {
-  await db.insert(schema.sceneMedia).values({
-    sceneId,
+  await db.insert(schema.media).values({
+    sceneId: sceneId ?? undefined,
+    frameId: frameId ?? undefined,
     type,
     url,
     prompt: prompt ?? undefined,

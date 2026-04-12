@@ -9,7 +9,7 @@ import {
   schema,
   eq,
   execAsync,
-  insertSceneMedia,
+  insertMedia,
   updateJobStep,
   updateVideoStatus,
   resolveStoryAssets,
@@ -182,7 +182,7 @@ export async function renderFromScenesJob(job: Job<RenderJobData>) {
           .set(sceneUpdates)
           .where(eq(schema.videoScenes.id, existingScenes[i].id));
 
-        await insertSceneMedia(existingScenes[i].id, isVideo ? "video" : "image", mediaKey, existingScenes[i].imagePrompt, model);
+        await insertMedia({ sceneId: existingScenes[i].id }, isVideo ? "video" : "image", mediaKey, existingScenes[i].imagePrompt, model);
       })
     );
 
@@ -423,7 +423,7 @@ export async function renderMusicVideoJob(job: Job<RenderJobData>) {
           })
           .where(eq(schema.videoScenes.id, scene.id));
 
-        await insertSceneMedia(scene.id, isVideo ? "video" : "image", mediaKey, scene.imagePrompt, model);
+        await insertMedia({ sceneId: scene.id }, isVideo ? "video" : "image", mediaKey, scene.imagePrompt, model);
       })
     );
 

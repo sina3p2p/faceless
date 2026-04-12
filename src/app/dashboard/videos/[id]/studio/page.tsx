@@ -131,7 +131,7 @@ export default function StudioPage() {
 
   // Find first frame with variants for compare action
   const comparableFrame = selectedScene?.frames?.find(
-    (f) => (f.imageVariants && f.imageVariants.length > 0) || (f.videoVariants && f.videoVariants.length > 0)
+    (f) => f.media && f.media.length > 0
   );
   const canCompare = !!comparableFrame;
 
@@ -301,7 +301,7 @@ export default function StudioPage() {
             onCompare={() => {
               if (comparableFrame) {
                 const frameIndex = selectedScene?.frames?.indexOf(comparableFrame) ?? 0;
-                const type = (comparableFrame.imageVariants?.length ?? 0) > 0 ? "image" as const : "video" as const;
+                const type = comparableFrame.media?.some(m => m.type === "image") ? "image" as const : "video" as const;
                 setComparingFrame({ frame: comparableFrame, frameIndex, type });
               }
             }}

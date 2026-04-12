@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, sceneFrames } from "@/server/db/schema";
+import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { generateImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
@@ -104,22 +104,20 @@ export async function POST(
     const key = `frames/${videoId}/frame_${frameId}_${Date.now()}.jpg`;
     await uploadFile(key, buffer, "image/jpeg");
 
-    // Preserve current image as a variant before overwriting
-    const existingVariants = (frame.imageVariants as Array<{ id: string; url: string; prompt: string | null; modelUsed: string | null; createdAt: string }>) ?? [];
+    // Save previous active image as a media variant before overwriting
     if (frame.imageUrl) {
-      existingVariants.push({
-        id: crypto.randomUUID(),
+      await db.insert(media).values({
+        frameId,
+        type: "image",
         url: frame.imageUrl,
         prompt: frame.imagePrompt,
         modelUsed: frame.modelUsed,
-        createdAt: frame.createdAt.toISOString(),
       });
     }
 
     const updates: Record<string, unknown> = {
       imageUrl: key,
       modelUsed: imageModel,
-      imageVariants: existingVariants,
       imageGeneratedAt: new Date(),
     };
     if (parsed.data.imagePrompt) {
@@ -130,6 +128,14 @@ export async function POST(
       .update(sceneFrames)
       .set(updates)
       .where(eq(sceneFrames.id, frameId));
+
+    await db.insert(media).values({
+      frameId,
+      type: "image",
+      url: key,
+      prompt: parsed.data.imagePrompt || frame.imagePrompt,
+      modelUsed: imageModel,
+    });
 
     const signedUrl = await getSignedDownloadUrl(key);
 

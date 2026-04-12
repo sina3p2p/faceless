@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, sceneFrames } from "@/server/db/schema";
+import { videoProjects, videoScenes, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
 
 export async function GET(
@@ -20,7 +20,10 @@ export async function GET(
       scenes: {
         orderBy: asc(videoScenes.sceneOrder),
         with: {
-          frames: { orderBy: asc(sceneFrames.frameOrder) },
+          frames: {
+            orderBy: asc(sceneFrames.frameOrder),
+            with: { media: { orderBy: desc(media.createdAt) } },
+          },
         },
       },
       series: { columns: { userId: true } },
@@ -46,20 +49,14 @@ export async function GET(
             try { videoUrl = await getSignedDownloadUrl(frame.videoUrl); } catch { /* skip */ }
           }
 
-          // Sign variant URLs
-          const rawImgVariants = (frame.imageVariants as Array<{ id: string; url: string; prompt: string | null; modelUsed: string | null; createdAt: string }>) ?? [];
-          const rawVidVariants = (frame.videoVariants as Array<{ id: string; url: string; modelUsed: string | null; createdAt: string }>) ?? [];
-
-          const imageVariants = await Promise.all(
-            rawImgVariants.map(async (v) => ({
-              ...v,
-              url: v.url.startsWith("http") ? v.url : await getSignedDownloadUrl(v.url).catch(() => v.url),
-            }))
-          );
-          const videoVariants = await Promise.all(
-            rawVidVariants.map(async (v) => ({
-              ...v,
-              url: v.url.startsWith("http") ? v.url : await getSignedDownloadUrl(v.url).catch(() => v.url),
+          const signedMedia = await Promise.all(
+            (frame.media ?? []).map(async (m) => ({
+              id: m.id,
+              type: m.type,
+              url: m.url.startsWith("http") ? m.url : await getSignedDownloadUrl(m.url).catch(() => m.url),
+              prompt: m.prompt,
+              modelUsed: m.modelUsed,
+              createdAt: m.createdAt.toISOString(),
             }))
           );
 
@@ -75,8 +72,7 @@ export async function GET(
             imageKey: frame.imageUrl,
             videoKey: frame.videoUrl,
             modelUsed: frame.modelUsed,
-            imageVariants,
-            videoVariants,
+            media: signedMedia,
             imageGeneratedAt: frame.imageGeneratedAt?.toISOString() ?? null,
             videoGeneratedAt: frame.videoGeneratedAt?.toISOString() ?? null,
           };

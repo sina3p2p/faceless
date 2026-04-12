@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, sceneMedia } from "@/server/db/schema";
+import { videoProjects, videoScenes, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
 import { getAIVideoForScene } from "@/server/services/ai-video";
@@ -95,7 +95,7 @@ export async function POST(
       })
       .where(and(eq(videoScenes.id, sceneId), eq(videoScenes.videoProjectId, videoId)));
 
-    await db.insert(sceneMedia).values({
+    await db.insert(media).values({
       sceneId,
       type: "video",
       url: key,
