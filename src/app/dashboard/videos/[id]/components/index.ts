@@ -3,7 +3,6 @@ export { FrameCard } from "./frame-card";
 export { FullStoryView } from "./full-story-view";
 export { InspectorPanel } from "./inspector-panel";
 export { PhaseSidebar } from "./phase-sidebar";
-export { PromptEditModal } from "./prompt-edit-modal";
 export { SceneRefTextarea } from "./scene-ref-textarea";
 export { ScriptChatPanel } from "./script-chat-panel";
 export { SortableSceneCard } from "./sortable-scene-card";

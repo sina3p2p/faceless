@@ -23,7 +23,7 @@ import {
 import { useVideoActions } from "./hooks/use-video-actions";
 import { useVideoPhase, type StudioPhaseId, type VideoPhase } from "./hooks/use-video-phase";
 import {
-  SortableSceneCard, PromptEditModal, ScriptChatPanel, FullStoryView,
+  SortableSceneCard, ScriptChatPanel, FullStoryView,
   PhaseSidebar, StudioTopBar, InspectorPanel,
 } from "./components";
 import type { Scene, VideoDetail, SceneUpdates } from "./types";
@@ -212,25 +212,23 @@ export default function ReviewPage() {
         </div>
 
         {/* Inspector panel */}
-        <InspectorPanel video={video} phase={phase} />
-      </div>
-
-      {/* Prompt edit modal */}
-      {editingScene && (
-        <PromptEditModal
-          scene={editingScene}
+        <InspectorPanel
+          video={video}
+          phase={phase}
+          editingScene={editingScene}
           scenes={scenes}
-          imageModel={video?.series?.imageModel || "dall-e-3"}
-          videoId={id}
-          onClose={() => { setEditingScene(null); setPreviousAssetUrl(null); }}
-          onSubmit={handleGenerateImage}
+          onCloseScene={() => { setEditingScene(null); setPreviousAssetUrl(null); }}
+          onSubmitPrompt={handleGenerateImage}
           onUndo={previousAssetUrl ? handleUndo : null}
-          onUploadImage={(file) => handleUploadImage(editingScene.id, file)}
+          onUploadImage={(file) => editingScene && handleUploadImage(editingScene.id, file)}
           onSelectMedia={handleSelectMedia}
           regenerating={regenerating}
           undoing={undoing}
+          downloadUrl={downloadUrl}
+          downloading={downloading}
+          onDownload={handleDownload}
         />
-      )}
+      </div>
 
       {/* Floating chat */}
       {!chatOpen && scenes.length > 0 && (
