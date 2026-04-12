@@ -466,7 +466,7 @@ export function SceneLab({
           {/* Frame columns with connectors */}
           {frames.map((frame, i) => (
             <Fragment key={frame.id}>
-              <FrameColumn
+              <Frame
                 frame={frame}
                 frameIndex={i}
                 phase={phase}
