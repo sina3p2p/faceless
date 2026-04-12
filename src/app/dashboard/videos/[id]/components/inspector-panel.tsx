@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { IMAGE_MODELS } from "@/lib/constants";
 import { SceneRefTextarea } from "./scene-ref-textarea";
+import { ActivityFeedCompact } from "./activity-feed";
 import type { VideoDetail, Scene } from "../types";
 import type { VideoPhase, StudioPhaseId } from "../hooks/use-video-phase";
 
@@ -95,6 +96,7 @@ export function InspectorPanel({
           <DefaultInspectorBody
             video={video}
             phase={phase}
+            scenes={scenes}
             currentPhase={currentPhase ?? null}
             downloadUrl={downloadUrl}
             downloading={downloading}
@@ -363,6 +365,7 @@ function SceneEditor({
 function DefaultInspectorBody({
   video,
   phase,
+  scenes,
   currentPhase,
   downloadUrl,
   downloading,
@@ -370,6 +373,7 @@ function DefaultInspectorBody({
 }: {
   video: VideoDetail | null;
   phase: VideoPhase;
+  scenes: Scene[];
   currentPhase: { id: StudioPhaseId; label: string; status: string } | null;
   downloadUrl: string | null;
   downloading: boolean;
@@ -377,15 +381,9 @@ function DefaultInspectorBody({
 }) {
   return (
     <div className="p-4 space-y-4">
-      {/* Processing activity */}
+      {/* Processing activity feed */}
       {phase.isProcessing && (
-        <div className="space-y-2">
-          <span className="text-[10px] uppercase tracking-widest text-gray-600 font-semibold">Activity</span>
-          <div className="flex items-center gap-2 text-xs text-violet-400">
-            <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full shrink-0" />
-            <span>{phase.processingMessage}</span>
-          </div>
-        </div>
+        <ActivityFeedCompact currentStatus={video?.status || ""} scenes={scenes} />
       )}
 
       {/* Completed — download */}

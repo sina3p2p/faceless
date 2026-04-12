@@ -24,7 +24,7 @@ import { useVideoActions } from "./hooks/use-video-actions";
 import { useVideoPhase, type StudioPhaseId, type VideoPhase } from "./hooks/use-video-phase";
 import {
   SortableSceneCard, ScriptChatPanel, FullStoryView,
-  PhaseSidebar, StudioTopBar, InspectorPanel,
+  PhaseSidebar, StudioTopBar, InspectorPanel, ActivityFeed,
 } from "./components";
 import type { Scene, VideoDetail, SceneUpdates } from "./types";
 
@@ -318,7 +318,7 @@ function CenterPanel({
     return (
       <>
         {phase.isProcessing && ["PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION"].includes(video?.status || "") && (
-          <ProcessingIndicator message={phase.processingMessage} />
+          <ActivityFeed currentStatus={video?.status || ""} scenes={scenes} />
         )}
 
         {phase.isStoryReview && video?.script && (
@@ -386,7 +386,7 @@ function CenterPanel({
     return (
       <>
         {phase.isProcessing && ["TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD"].includes(video?.status || "") && (
-          <ProcessingIndicator message={phase.processingMessage} />
+          <ActivityFeed currentStatus={video?.status || ""} scenes={scenes} />
         )}
 
         {phase.isPreProductionReview && video && (
@@ -428,7 +428,7 @@ function CenterPanel({
     return (
       <>
         {phase.isProcessing && ["PROMPT_GENERATION", "IMAGE_GENERATION", "MOTION_GENERATION", "VIDEO_GENERATION"].includes(video?.status || "") && (
-          <ProcessingIndicator message={phase.processingMessage} />
+          <ActivityFeed currentStatus={video?.status || ""} scenes={scenes} />
         )}
 
         {(phase.isImagesReview || phase.isImageReview) && (
@@ -506,7 +506,7 @@ function CenterPanel({
   return (
     <>
       {phase.isProcessing && video?.status === "RENDERING" && (
-        <ProcessingIndicator message={phase.processingMessage} />
+        <ActivityFeed currentStatus={video?.status || ""} scenes={scenes} />
       )}
 
       {video?.status === "COMPLETED" && (
@@ -570,15 +570,6 @@ function StatusBanner({ color, icon, children }: { color: string; icon?: "spinne
     <div className={`mb-4 rounded-xl border p-4 ${colors[color] || colors.violet} ${icon === "spinner" ? "flex items-center gap-3" : ""}`}>
       {icon === "spinner" && <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full shrink-0" />}
       <p className="text-sm">{children}</p>
-    </div>
-  );
-}
-
-function ProcessingIndicator({ message }: { message: string }) {
-  return (
-    <div className="mb-6 rounded-xl border border-violet-500/20 bg-violet-500/5 p-8 flex flex-col items-center gap-3">
-      <div className="animate-spin w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full" />
-      <p className="text-sm text-violet-300">{message}</p>
     </div>
   );
 }

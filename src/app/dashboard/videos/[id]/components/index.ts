@@ -1,3 +1,4 @@
+export { ActivityFeed, ActivityFeedCompact } from "./activity-feed";
 export { AssetRefPills } from "./asset-ref-pills";
 export { FrameCard } from "./frame-card";
 export { FullStoryView } from "./full-story-view";
