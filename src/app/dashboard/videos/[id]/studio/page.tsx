@@ -15,6 +15,7 @@ import { StudioCanvas } from "./components/studio-canvas";
 import { BottomDock } from "./components/bottom-dock";
 import { CanvasOverlay } from "./components/canvas-overlay";
 import { CompareWall } from "./components/compare-wall";
+import { SceneLab } from "./components/scene-lab";
 
 export default function StudioPage() {
   const { id } = useParams<{ id: string }>();
@@ -43,6 +44,7 @@ export default function StudioPage() {
   const [undoing, setUndoing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [comparingFrame, setComparingFrame] = useState<{ frame: SceneFrame; frameIndex: number; type: "image" | "video" } | null>(null);
+  const [labSceneId, setLabSceneId] = useState<string | null>(null);
 
   // Follow active phase
   useEffect(() => {
@@ -133,6 +135,11 @@ export default function StudioPage() {
   );
   const canCompare = !!comparableFrame;
 
+  // Scene Lab mode
+  const labScene = labSceneId ? scenes.find((s) => s.id === labSceneId) ?? null : null;
+  const labSceneIndex = labSceneId ? scenes.findIndex((s) => s.id === labSceneId) : -1;
+  const isLabMode = !!labScene;
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
@@ -211,35 +218,60 @@ export default function StudioPage() {
 
         {/* Canvas wrapper */}
         <div className="flex-1 relative flex flex-col overflow-hidden">
-          <StudioCanvas
-            scenes={scenes}
-            video={video}
-            selectedSceneId={selectedSceneId}
-            generatingSceneIds={generatingSceneIds}
-            generatingFrameIds={generatingFrameIds}
-            onSelectScene={(id) => {
-              setSelectedSceneId(id);
-              if (!id) {
-                setEditingScene(null);
-                setPreviousAssetUrl(null);
-              }
-            }}
-            onDragEnd={handleDragEnd}
-          />
+          {isLabMode && labScene ? (
+            <SceneLab
+              scene={labScene}
+              sceneIndex={labSceneIndex}
+              video={video}
+              phase={phase}
+              generatingFrameIds={generatingFrameIds}
+              generatingFrameVideoIds={generatingFrameVideoIds}
+              generatingFrameMotionIds={generatingFrameMotionIds}
+              onGenerateFrameImage={handleGenerateFrameImage}
+              onUpdateFramePrompt={handleUpdateFramePrompt}
+              onUpdateFrameMotion={handleUpdateFrameMotion}
+              onRegenerateFrameVideo={handleRegenerateFrameVideo}
+              onRegenerateFrameMotion={handleRegenerateFrameMotion}
+              onSelectFrameVariant={handleSelectFrameVariant}
+              onBack={() => setLabSceneId(null)}
+              onCompareFrame={(frame, frameIndex, type) => {
+                setComparingFrame({ frame, frameIndex, type });
+              }}
+            />
+          ) : (
+            <>
+              <StudioCanvas
+                scenes={scenes}
+                video={video}
+                selectedSceneId={selectedSceneId}
+                generatingSceneIds={generatingSceneIds}
+                generatingFrameIds={generatingFrameIds}
+                onSelectScene={(id) => {
+                  setSelectedSceneId(id);
+                  if (!id) {
+                    setEditingScene(null);
+                    setPreviousAssetUrl(null);
+                  }
+                }}
+                onOpenLab={(sceneId) => setLabSceneId(sceneId)}
+                onDragEnd={handleDragEnd}
+              />
 
-          <CanvasOverlay
-            selectedPhaseId={selectedPhaseId}
-            phase={phase}
-            video={video}
-            scenes={scenes}
-            setVideo={setVideo}
-            onSaveStory={handleSaveStory}
-            downloadUrl={downloadUrl}
-            downloading={downloading}
-            onDownload={handleDownload}
-            rendering={rendering}
-            onRecompose={handleRecompose}
-          />
+              <CanvasOverlay
+                selectedPhaseId={selectedPhaseId}
+                phase={phase}
+                video={video}
+                scenes={scenes}
+                setVideo={setVideo}
+                onSaveStory={handleSaveStory}
+                downloadUrl={downloadUrl}
+                downloading={downloading}
+                onDownload={handleDownload}
+                rendering={rendering}
+                onRecompose={handleRecompose}
+              />
+            </>
+          )}
 
           <BottomDock
             phase={phase}
@@ -272,6 +304,12 @@ export default function StudioPage() {
                 const type = (comparableFrame.imageVariants?.length ?? 0) > 0 ? "image" as const : "video" as const;
                 setComparingFrame({ frame: comparableFrame, frameIndex, type });
               }
+            }}
+            isLabMode={isLabMode}
+            onExitLab={() => setLabSceneId(null)}
+            hasLabFrames={!!(selectedScene?.frames && selectedScene.frames.length > 0)}
+            onOpenLab={() => {
+              if (selectedSceneId) setLabSceneId(selectedSceneId);
             }}
             onEditScene={() => {
               if (selectedScene) setEditingScene(selectedScene);

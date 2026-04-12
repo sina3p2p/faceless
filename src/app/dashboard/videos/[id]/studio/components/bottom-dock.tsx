@@ -97,6 +97,16 @@ const icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 4.5v15m6-15v15m-10.875 0h15.75c.621 0 1.125-.504 1.125-1.125V5.625c0-.621-.504-1.125-1.125-1.125H4.125C3.504 4.5 3 5.004 3 5.625v12.75c0 .621.504 1.125 1.125 1.125z" />
     </svg>
   ),
+  lab: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+    </svg>
+  ),
+  back: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+    </svg>
+  ),
 };
 
 export function BottomDock({
@@ -125,6 +135,10 @@ export function BottomDock({
   onDownload,
   canCompare,
   onCompare,
+  isLabMode,
+  onExitLab,
+  hasLabFrames,
+  onOpenLab,
   onEditScene,
   onDeleteScene,
 }: {
@@ -153,6 +167,10 @@ export function BottomDock({
   onDownload: () => void;
   canCompare: boolean;
   onCompare: () => void;
+  isLabMode: boolean;
+  onExitLab: () => void;
+  hasLabFrames: boolean;
+  onOpenLab: () => void;
   onEditScene: () => void;
   onDeleteScene: () => void;
 }) {
@@ -259,7 +277,25 @@ export function BottomDock({
 
   // Scene-context tools
   const sceneTools: DockTool[] = [];
-  if (selectedScene) {
+
+  if (isLabMode) {
+    // In lab mode: show "Back" as first tool
+    sceneTools.push({
+      id: "exit-lab",
+      icon: icons.back,
+      label: "Back to Storyboard",
+      onClick: onExitLab,
+    });
+  } else if (selectedScene) {
+    // Storyboard mode with scene selected
+    if (hasLabFrames) {
+      sceneTools.push({
+        id: "open-lab",
+        icon: icons.lab,
+        label: "Open Scene Lab",
+        onClick: onOpenLab,
+      });
+    }
     if (canCompare) {
       sceneTools.push({
         id: "compare",
@@ -283,21 +319,19 @@ export function BottomDock({
     });
   }
 
-  const allTools = [...phaseTools];
-  if (sceneTools.length > 0 && phaseTools.length > 0) {
-    // We'll render a separator between groups
-  }
+  // In lab mode, hide storyboard-level phase tools
+  const visiblePhaseTools = isLabMode ? [] : phaseTools;
 
-  if (allTools.length === 0 && sceneTools.length === 0) return null;
+  if (visiblePhaseTools.length === 0 && sceneTools.length === 0) return null;
 
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
       <div className="flex items-center gap-0.5 px-2 py-1.5 rounded-2xl bg-black/80 border border-white/10 backdrop-blur-sm shadow-2xl shadow-black/50">
-        {phaseTools.map((tool) => (
+        {visiblePhaseTools.map((tool) => (
           <DockButton key={tool.id} tool={tool} />
         ))}
 
-        {phaseTools.length > 0 && sceneTools.length > 0 && <Separator />}
+        {visiblePhaseTools.length > 0 && sceneTools.length > 0 && <Separator />}
 
         {sceneTools.map((tool) => (
           <DockButton key={tool.id} tool={tool} />

@@ -25,6 +25,7 @@ export function StudioCanvas({
   generatingSceneIds,
   generatingFrameIds,
   onSelectScene,
+  onOpenLab,
   onDragEnd,
 }: {
   scenes: Scene[];
@@ -33,6 +34,7 @@ export function StudioCanvas({
   generatingSceneIds: Set<string>;
   generatingFrameIds: Set<string>;
   onSelectScene: (id: string | null) => void;
+  onOpenLab: (sceneId: string) => void;
   onDragEnd: (event: DragEndEvent) => void;
 }) {
   const sensors = useSensors(
@@ -82,6 +84,7 @@ export function StudioCanvas({
                     onSelect={() =>
                       onSelectScene(scene.id === selectedSceneId ? null : scene.id)
                     }
+                    onDoubleClick={() => onOpenLab(scene.id)}
                   />
                   {i < scenes.length - 1 && (
                     <div

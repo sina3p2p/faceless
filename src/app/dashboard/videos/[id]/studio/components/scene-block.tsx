@@ -30,6 +30,7 @@ export function SceneBlock({
   videoSize,
   isGenerating,
   onSelect,
+  onDoubleClick,
 }: {
   scene: Scene;
   index: number;
@@ -37,6 +38,7 @@ export function SceneBlock({
   videoSize: string;
   isGenerating: boolean;
   onSelect: () => void;
+  onDoubleClick?: () => void;
 }) {
   const {
     attributes,
@@ -65,6 +67,7 @@ export function SceneBlock({
       ref={setNodeRef}
       style={style}
       onClick={onSelect}
+      onDoubleClick={onDoubleClick}
       className={`${sizeClass} shrink-0 rounded-xl border transition-all cursor-pointer select-none ${
         isSelected
           ? "border-violet-500 ring-1 ring-violet-500/30 glow"
