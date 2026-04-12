@@ -206,7 +206,7 @@ export const sceneFrames = pgTable("scene_frames", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-export const media = pgTable("scene_media", {
+export const media = pgTable("media", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   sceneId: text("scene_id").references(() => videoScenes.id, { onDelete: "cascade" }),
   frameId: text("frame_id").references(() => sceneFrames.id, { onDelete: "cascade" }),
