@@ -188,6 +188,7 @@ export default function StudioPage() {
                 onRegenerateFrameVideo={handleRegenerateFrameVideo}
                 onRegenerateFrameMotion={handleRegenerateFrameMotion}
                 onSelectFrameVariant={handleSelectFrameVariant}
+                onRefreshData={loadData}
                 onBack={() => setLabSceneId(null)}
               />
             ) : (

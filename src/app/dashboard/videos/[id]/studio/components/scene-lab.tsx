@@ -46,6 +46,7 @@ function buildGraph(
     onRegenerateFrameVideo: (frameId: string, videoModel?: string) => void;
     onRegenerateFrameMotion: (frameId: string) => void;
     onSelectFrameVariant: (frameId: string, variantId: string, type: "image" | "video") => void;
+    onRefreshData: () => void;
   },
 ): { nodes: Node[]; edges: Edge[] } {
   const nodes: Node[] = [];
@@ -126,6 +127,7 @@ function buildGraph(
           onRegenerateVideo: callbacks.onRegenerateFrameVideo,
           onRegenerateMotion: callbacks.onRegenerateFrameMotion,
           onSelectVariant: callbacks.onSelectFrameVariant,
+          onRefreshData: callbacks.onRefreshData,
         },
         draggable: false,
         selectable: true,
@@ -206,6 +208,7 @@ export function SceneLab({
   onRegenerateFrameVideo,
   onRegenerateFrameMotion,
   onSelectFrameVariant,
+  onRefreshData,
   onBack,
 }: {
   scene: Scene;
@@ -221,6 +224,7 @@ export function SceneLab({
   onRegenerateFrameVideo: (frameId: string, videoModel?: string) => void;
   onRegenerateFrameMotion: (frameId: string) => void;
   onSelectFrameVariant: (frameId: string, variantId: string, type: "image" | "video") => void;
+  onRefreshData: () => void;
   onBack: () => void;
 }) {
   const { selectedMedia, setSelectedMedia } = useStudioContext();
@@ -268,9 +272,11 @@ export function SceneLab({
     onRegenerateFrameVideo,
     onRegenerateFrameMotion,
     onSelectFrameVariant,
+    onRefreshData,
   }), [
     onGenerateFrameImage, onUpdateFramePrompt, onUpdateFrameMotion,
     onRegenerateFrameVideo, onRegenerateFrameMotion, onSelectFrameVariant,
+    onRefreshData,
   ]);
 
   const { nodes: initialNodes, edges: initialEdges } = useMemo(

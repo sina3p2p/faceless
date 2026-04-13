@@ -6,6 +6,7 @@ import { IMAGE_MODELS } from "@/lib/constants";
 import type { Media, SceneFrame } from "../../../types";
 import type { VideoPhase } from "../../../hooks/use-video-phase";
 import { useStudioContext } from "../../context/StudioContext";
+import { ImageEditorModal } from "./image-editor-modal";
 
 type ImageNodeData = {
   frame: SceneFrame;
@@ -17,6 +18,7 @@ type ImageNodeData = {
   generatingMotion: boolean;
   videoSize: string | null;
   onGenerateImage: (frameId: string, prompt?: string, model?: string) => void;
+  onRefreshData: () => void;
 };
 
 function ImageIcon({ className }: { className?: string }) {
@@ -34,12 +36,14 @@ export function ImageNode({ data }: NodeProps) {
     defaultImageModel, videoSize,
     generatingImage,
     onGenerateImage,
+    onRefreshData,
   } = data as ImageNodeData;
 
-  const { selectedMedia } = useStudioContext();
+  const { selectedMedia, video } = useStudioContext();
   const isSelected = selectedMedia?.mediaId === media.id;
 
   const [promptText, setPromptText] = useState(media.prompt || "");
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const aspectRatio = videoSize?.includes("9:16") ? "9:16" : "16:9";
 
@@ -121,6 +125,15 @@ export function ImageNode({ data }: NodeProps) {
             {media.url && (
               <>
                 <div className="flex-1" />
+                <button
+                  onClick={(e) => { e.stopPropagation(); setEditorOpen(true); }}
+                  className="text-gray-500 hover:text-violet-400 transition-colors"
+                  title="Edit image"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+                  </svg>
+                </button>
                 <a href={media.url} download target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-white transition-colors" title="Download image">
                   <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -132,6 +145,29 @@ export function ImageNode({ data }: NodeProps) {
         </div>
       </div>
 
+      {/* Image editor modal */}
+      {editorOpen && media.url && (
+        <ImageEditorModal
+          imageUrl={media.url}
+          aspectRatio={aspectRatio}
+          onClose={() => setEditorOpen(false)}
+          onSave={async (newImageUrl) => {
+            try {
+              const videoId = video?.id;
+              if (!videoId) return;
+              await fetch(`/api/videos/${videoId}/frames/${frame.id}/save-edit`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ imageUrl: newImageUrl }),
+              });
+            } catch {
+              /* best effort */
+            } finally {
+              onRefreshData();
+            }
+          }}
+        />
+      )}
 
       <Handle type="target" position={Position.Top} className="w-2! h-2! bg-violet-500/50! border-0!" />
       <Handle type="source" position={Position.Bottom} className="w-2! h-2! bg-violet-500/50! border-0!" />
