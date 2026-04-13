@@ -8,6 +8,7 @@ import { z } from "zod";
 const bodySchema = z.object({
   sourceImageUrl: z.string().min(1),
   annotatedImageUrl: z.string().optional(),
+  referenceImageUrls: z.array(z.string()).optional(),
   editPrompt: z.string().min(1),
   model: z.enum(["nano-banana-2", "nano-banana-pro"]).default("nano-banana-2"),
   aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("9:16"),
@@ -54,8 +55,14 @@ export async function POST(req: NextRequest) {
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
-  const { sourceImageUrl, annotatedImageUrl, editPrompt, model, aspectRatio } =
-    parsed.data;
+  const {
+    sourceImageUrl,
+    annotatedImageUrl,
+    referenceImageUrls,
+    editPrompt,
+    model,
+    aspectRatio,
+  } = parsed.data;
 
   try {
     const resolvedUrl = await resolveUrl(sourceImageUrl);
@@ -75,14 +82,47 @@ export async function POST(req: NextRequest) {
       annotatedImg = await fetchImageAsBase64(resolvedAnnotated);
     }
 
+    // Fetch reference images (from @mentions)
+    const refImages: Array<{ base64: string; mimeType: string }> = [];
+    if (referenceImageUrls?.length) {
+      const results = await Promise.all(
+        referenceImageUrls.slice(0, 4).map(async (url) => {
+          const resolved = await resolveUrl(url);
+          return fetchImageAsBase64(resolved);
+        }),
+      );
+      for (const r of results) {
+        if (r) refImages.push(r);
+      }
+    }
+
     const contentParts: Array<
       | { type: "image_url"; image_url: { url: string } }
       | { type: "text"; text: string }
     > = [];
 
+    // Add reference images first so the model has visual context
+    if (refImages.length > 0) {
+      contentParts.push({
+        type: "text",
+        text: `Here ${refImages.length === 1 ? "is a reference image" : `are ${refImages.length} reference images`} from other frames for visual context:`,
+      });
+      for (const ref of refImages) {
+        contentParts.push({
+          type: "image_url",
+          image_url: {
+            url: `data:${ref.mimeType};base64,${ref.base64}`,
+          },
+        });
+      }
+    }
+
     if (annotatedImg) {
-      // Two-image approach: annotated image shows WHERE to edit, clean image is WHAT to edit
       contentParts.push(
+        {
+          type: "text",
+          text: "The following image has colored highlights/markers showing exactly which areas to edit:",
+        },
         {
           type: "image_url",
           image_url: {
@@ -91,7 +131,7 @@ export async function POST(req: NextRequest) {
         },
         {
           type: "text",
-          text: "The image above has colored highlights/markers showing exactly which areas to edit. Now here is the clean original image:",
+          text: "Now here is the clean original image to edit:",
         },
         {
           type: "image_url",

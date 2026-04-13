@@ -5,9 +5,11 @@ import {
   useRef,
   useCallback,
   useEffect,
+  useMemo,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
+import { useStudioContext } from "../../context/StudioContext";
 
 // ── Types ──
 
@@ -25,6 +27,20 @@ interface CropRegion {
   y: number;
   w: number;
   h: number;
+}
+
+interface FrameRef {
+  id: string;
+  label: string;
+  imageUrl: string | null;
+}
+
+interface RefImage {
+  id: string;
+  label: string;
+  url: string;
+  previewUrl?: string;
+  type: "frame" | "upload";
 }
 
 interface ImageEditorModalProps {
@@ -90,7 +106,7 @@ export function ImageEditorModal({
   // Image state
   const [currentImage, setCurrentImage] = useState(imageUrl);
   const [proxiedUrl, setProxiedUrl] = useState<string | null>(null);
-  const [editPrompt, setEditPrompt] = useState("");
+  const [hasPromptText, setHasPromptText] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>("nano-banana-2");
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(true);
@@ -98,6 +114,215 @@ export function ImageEditorModal({
   const [history, setHistory] = useState<HistoryEntry[]>([
     { url: imageUrl, prompt: "Original", timestamp: Date.now() },
   ]);
+
+  // Reference images + prompt state
+  const { scenes } = useStudioContext();
+  const promptRef = useRef<HTMLDivElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const savedRangeRef = useRef<Range | null>(null);
+  const [refImages, setRefImages] = useState<RefImage[]>([]);
+  const [showFramePicker, setShowFramePicker] = useState(false);
+  const [framePickerQuery, setFramePickerQuery] = useState("");
+
+  const allFrameRefs = useMemo<FrameRef[]>(() => {
+    const refs: FrameRef[] = [];
+    for (const scene of scenes) {
+      for (const frame of scene.frames ?? []) {
+        const activeMedia = frame.media?.find(
+          (m) => m.id === frame.imageMediaId,
+        );
+        refs.push({
+          id: frame.id,
+          label: `Scene ${scene.sceneOrder + 1} Frame ${frame.frameOrder + 1}`,
+          imageUrl: activeMedia?.url ?? null,
+        });
+      }
+    }
+    return refs;
+  }, [scenes]);
+
+  const filteredFrames = useMemo(() => {
+    const available = allFrameRefs.filter(
+      (f) => f.imageUrl && !refImages.some((r) => r.id === f.id),
+    );
+    if (!framePickerQuery) return available;
+    const q = framePickerQuery.toLowerCase();
+    return available.filter((f) => f.label.toLowerCase().includes(q));
+  }, [framePickerQuery, allFrameRefs, refImages]);
+
+  function addFrameRef(frame: FrameRef) {
+    if (!frame.imageUrl || refImages.some((r) => r.id === frame.id)) return;
+    setRefImages((prev) => [
+      ...prev,
+      { id: frame.id, label: frame.label, url: frame.imageUrl!, type: "frame" },
+    ]);
+    insertChipAtCursor(frame);
+    setShowFramePicker(false);
+    setFramePickerQuery("");
+  }
+
+  // ── contentEditable helpers ──
+
+  function getPromptText(): string {
+    if (!promptRef.current) return "";
+    const clone = promptRef.current.cloneNode(true) as HTMLDivElement;
+    clone.querySelectorAll("[data-ref-label]").forEach((chip) => {
+      const label = chip.getAttribute("data-ref-label") || "";
+      chip.replaceWith(`@${label}`);
+    });
+    return clone.textContent?.trim() || "";
+  }
+
+  function getChipRefUrls(): string[] {
+    if (!promptRef.current) return [];
+    const chips = promptRef.current.querySelectorAll("[data-ref-url]");
+    return Array.from(chips)
+      .map((c) => c.getAttribute("data-ref-url") || "")
+      .filter(Boolean);
+  }
+
+  function insertChipAtCursor(frame: FrameRef) {
+    const el = promptRef.current;
+    if (!el || !frame.imageUrl) return;
+
+    el.focus();
+    const sel = window.getSelection();
+    if (!sel) return;
+
+    // Restore the saved range from when @ was typed
+    const range = savedRangeRef.current;
+    if (range) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+      savedRangeRef.current = null;
+    } else if (sel.rangeCount === 0) {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      r.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(r);
+    }
+
+    const activeRange = sel.getRangeAt(0);
+
+    // Remove the @ trigger character before cursor
+    const container = activeRange.startContainer;
+    if (container.nodeType === Node.TEXT_NODE) {
+      const text = container.textContent || "";
+      const before = text.slice(0, activeRange.startOffset);
+      const atIdx = before.lastIndexOf("@");
+      if (atIdx >= 0) {
+        activeRange.setStart(container, atIdx);
+        activeRange.deleteContents();
+      }
+    }
+
+    // Create chip
+    const chip = document.createElement("span");
+    chip.contentEditable = "false";
+    chip.setAttribute("data-ref-id", frame.id);
+    chip.setAttribute("data-ref-label", frame.label);
+    chip.setAttribute("data-ref-url", frame.imageUrl);
+    chip.className =
+      "inline-flex items-center gap-1 px-1.5 py-0.5 mx-0.5 rounded-md bg-violet-500/20 text-violet-300 text-[13px] align-baseline cursor-default";
+    chip.textContent = `@${frame.label}`;
+
+    activeRange.insertNode(chip);
+
+    // Space after chip for continued typing
+    const spacer = document.createTextNode("\u00A0");
+    chip.parentNode?.insertBefore(spacer, chip.nextSibling);
+    activeRange.setStartAfter(spacer);
+    activeRange.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(activeRange);
+
+    setHasPromptText(true);
+  }
+
+  function clearPrompt() {
+    if (promptRef.current) {
+      promptRef.current.innerHTML = "";
+      setHasPromptText(false);
+    }
+  }
+
+  function handlePromptInput() {
+    if (!promptRef.current) return;
+    const text = promptRef.current.textContent?.trim() || "";
+    setHasPromptText(text.length > 0);
+
+    // Detect @ at cursor and save the range
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      const container = range.startContainer;
+      if (container.nodeType === Node.TEXT_NODE) {
+        const before = (container.textContent || "").slice(
+          0,
+          range.startOffset,
+        );
+        if (before.endsWith("@")) {
+          savedRangeRef.current = range.cloneRange();
+          setShowFramePicker(true);
+          setFramePickerQuery("");
+          return;
+        }
+      }
+    }
+
+    // Sync refImages: remove any frame refs whose chips were deleted
+    const chipIds = new Set(
+      Array.from(
+        promptRef.current.querySelectorAll("[data-ref-id]"),
+      ).map((c) => c.getAttribute("data-ref-id")),
+    );
+    setRefImages((prev) =>
+      prev.filter((r) => r.type === "upload" || chipIds.has(r.id)),
+    );
+  }
+
+  function removeRef(id: string) {
+    // Remove chip from contentEditable if it's a frame ref
+    if (promptRef.current) {
+      const chip = promptRef.current.querySelector(`[data-ref-id="${id}"]`);
+      if (chip) chip.remove();
+    }
+    setRefImages((prev) => {
+      const removed = prev.find((r) => r.id === id);
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter((r) => r.id !== id);
+    });
+  }
+
+  async function handleUploadRef(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const previewUrl = URL.createObjectURL(file);
+    const fd = new FormData();
+    fd.append("file", file, file.name);
+    try {
+      const res = await fetch("/api/upload-temp", { method: "POST", body: fd });
+      if (!res.ok) {
+        URL.revokeObjectURL(previewUrl);
+        return;
+      }
+      const { url } = await res.json();
+      setRefImages((prev) => [
+        ...prev,
+        {
+          id: `upload-${Date.now()}`,
+          label: file.name.replace(/\.[^.]+$/, ""),
+          url,
+          previewUrl,
+          type: "upload",
+        },
+      ]);
+    } catch {
+      URL.revokeObjectURL(previewUrl);
+    }
+    e.target.value = "";
+  }
 
   // Canvas / layout refs
   const containerRef = useRef<HTMLDivElement>(null);
@@ -412,7 +637,8 @@ export function ImageEditorModal({
   // ── AI Edit handler ──
 
   async function handleSubmitEdit() {
-    if (!editPrompt.trim() || loading) return;
+    const promptText = getPromptText();
+    if (!promptText || loading) return;
     setLoading(true);
 
     try {
@@ -421,7 +647,6 @@ export function ImageEditorModal({
 
       let annotatedImageUrl: string | undefined;
 
-      // Build an annotated image showing highlights/selection as a visual guide
       if (hasAnnotations && imageRef.current && imgDims) {
         const composite = document.createElement("canvas");
         composite.width = imageRef.current.naturalWidth;
@@ -451,7 +676,6 @@ export function ImageEditorModal({
             selection.w * scaleX,
             selection.h * scaleY,
           );
-          // Semi-transparent fill so the region stands out
           ctx.fillStyle = "rgba(255, 0, 0, 0.12)";
           ctx.fillRect(
             selection.x * scaleX,
@@ -477,13 +701,22 @@ export function ImageEditorModal({
         }
       }
 
+      // Collect ref URLs from inline chips + uploaded refs
+      const chipUrls = getChipRefUrls();
+      const uploadedUrls = refImages
+        .filter((r) => r.type === "upload")
+        .map((r) => r.url);
+      const referenceImageUrls = [...chipUrls, ...uploadedUrls];
+
       const res = await fetch("/api/edit-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sourceImageUrl: currentImage,
           annotatedImageUrl,
-          editPrompt: editPrompt.trim(),
+          referenceImageUrls:
+            referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
+          editPrompt: promptText,
           model: selectedModel,
           aspectRatio: defaultAR || "9:16",
         }),
@@ -498,9 +731,10 @@ export function ImageEditorModal({
       setCurrentImage(newUrl);
       setHistory((prev) => [
         ...prev,
-        { url: newUrl, prompt: editPrompt.trim(), timestamp: Date.now() },
+        { url: newUrl, prompt: promptText, timestamp: Date.now() },
       ]);
-      setEditPrompt("");
+      clearPrompt();
+      setRefImages((prev) => prev.filter((r) => r.type === "upload"));
       clearDrawing();
       clearSelection();
     } catch (err) {
@@ -1049,105 +1283,234 @@ export function ImageEditorModal({
 
       {/* ── Bottom bar ── */}
       <div className="px-5 py-4 border-t border-white/5 shrink-0">
-        <div className="max-w-3xl mx-auto flex items-end gap-3">
-          <div className="flex-1 relative bg-[#2a2a2a] rounded-2xl border border-white/10 focus-within:border-white/20 transition-colors">
-            <textarea
-              value={editPrompt}
-              onChange={(e) => setEditPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmitEdit();
-                }
-              }}
-              rows={1}
-              placeholder="What do you want to change?"
-              className="w-full bg-transparent text-[14px] text-white placeholder:text-gray-500 resize-none outline-none px-4 pt-3 pb-10"
-            />
-            <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                {/* Model picker */}
-                <div className="relative">
+        <div className="max-w-3xl mx-auto flex flex-col gap-2">
+          {/* Reference image thumbnails */}
+          {refImages.length > 0 && (
+            <div className="flex items-center gap-2 overflow-x-auto pb-1">
+              {refImages.map((ref) => (
+                <div
+                  key={ref.id}
+                  className="relative shrink-0 group/ref"
+                >
+                  <div className="w-16 h-16 rounded-xl overflow-hidden border border-white/10 bg-white/5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={
+                        ref.previewUrl ??
+                        `/api/proxy-image?url=${encodeURIComponent(ref.url)}`
+                      }
+                      alt={ref.label}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <span className="absolute bottom-0 inset-x-0 bg-black/70 text-[9px] text-white text-center py-0.5 truncate px-1 rounded-b-xl">
+                    {ref.label}
+                  </span>
                   <button
-                    onClick={() => setShowModelMenu((v) => !v)}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-[12px] text-gray-300"
+                    onClick={() => removeRef(ref.id)}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500/90 text-white flex items-center justify-center opacity-0 group-hover/ref:opacity-100 transition-opacity text-[10px] leading-none"
                   >
-                    <span>🍌</span>
-                    <span>{currentModel?.label || selectedModel}</span>
-                    <svg
-                      className={`w-3 h-3 text-gray-500 transition-transform ${showModelMenu ? "rotate-180" : ""}`}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Prompt input area */}
+          <div className="flex items-end gap-3">
+            <div className="flex-1 relative bg-[#2a2a2a] rounded-2xl border border-white/10 focus-within:border-white/20 transition-colors">
+              {/* Frame picker dropdown */}
+              {showFramePicker && (
+                <div
+                  className="absolute bottom-full mb-2 left-0 right-0 rounded-xl bg-[#2a2a2a] border border-white/10 shadow-2xl z-50 overflow-hidden"
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  <div className="max-h-64 overflow-y-auto">
+                    {filteredFrames.length === 0 ? (
+                      <p className="text-[12px] text-gray-500 text-center py-4">
+                        No frames available
+                      </p>
+                    ) : (
+                      filteredFrames.map((frame) => (
+                        <button
+                          key={frame.id}
+                          onClick={() => addFrameRef(frame)}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-left text-gray-300 hover:bg-white/5 transition-colors"
+                        >
+                          {frame.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={`/api/proxy-image?url=${encodeURIComponent(frame.imageUrl)}`}
+                              alt=""
+                              className="w-10 h-10 rounded-lg object-cover shrink-0 border border-white/10"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-white/5 shrink-0 border border-white/10" />
+                          )}
+                          <span className="text-[13px] font-medium truncate">
+                            {frame.label}
+                          </span>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* contentEditable prompt with inline @ chips */}
+              <div
+                ref={promptRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handlePromptInput}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && showFramePicker) {
+                    e.preventDefault();
+                    setShowFramePicker(false);
+                    return;
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmitEdit();
+                  }
+                }}
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData("text/plain");
+                  document.execCommand("insertText", false, text);
+                }}
+                data-placeholder="What do you want to change? Use @ to add refs"
+                className="w-full bg-transparent text-[14px] text-white outline-none px-4 pt-3 pb-10 min-h-10 max-h-32 overflow-y-auto empty:before:content-[attr(data-placeholder)] empty:before:text-gray-500 empty:before:pointer-events-none"
+              />
+
+              <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {/* Model picker */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowModelMenu((v) => !v)}
+                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-[12px] text-gray-300"
                     >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="m19.5 8.25-7.5 7.5-7.5-7.5"
-                      />
+                      <span>🍌</span>
+                      <span>{currentModel?.label || selectedModel}</span>
+                      <svg
+                        className={`w-3 h-3 text-gray-500 transition-transform ${showModelMenu ? "rotate-180" : ""}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="m19.5 8.25-7.5 7.5-7.5-7.5"
+                        />
+                      </svg>
+                    </button>
+
+                    {showModelMenu && (
+                      <div className="absolute bottom-full mb-2 left-0 w-48 rounded-xl bg-[#2a2a2a] border border-white/10 shadow-2xl overflow-hidden z-50">
+                        {EDIT_MODELS.map((m) => (
+                          <button
+                            key={m.id}
+                            onClick={() => {
+                              setSelectedModel(m.id);
+                              setShowModelMenu(false);
+                            }}
+                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-left transition-colors ${
+                              selectedModel === m.id
+                                ? "bg-violet-500/20 text-violet-300"
+                                : "text-gray-300 hover:bg-white/5"
+                            }`}
+                          >
+                            <span>🍌</span>
+                            {m.label}
+                            {selectedModel === m.id && (
+                              <svg
+                                className="w-3.5 h-3.5 ml-auto text-violet-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                strokeWidth={2.5}
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  d="M5 13l4 4L19 7"
+                                />
+                              </svg>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Add frame reference */}
+                  <button
+                    onClick={() => {
+                      setShowFramePicker((v) => !v);
+                      setFramePickerQuery("");
+                    }}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors text-[12px] ${
+                      showFramePicker
+                        ? "bg-violet-500/20 text-violet-300"
+                        : "bg-white/5 hover:bg-white/10 text-gray-300"
+                    }`}
+                    title="Reference a frame"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0 0 22.5 18.75V5.25A2.25 2.25 0 0 0 20.25 3H3.75A2.25 2.25 0 0 0 1.5 5.25v13.5A2.25 2.25 0 0 0 3.75 21Z" />
                     </svg>
+                    <span>Refs</span>
+                    {refImages.length > 0 && (
+                      <span className="bg-violet-500/30 text-violet-300 text-[10px] px-1.5 py-0.5 rounded-full leading-none">
+                        {refImages.length}
+                      </span>
+                    )}
                   </button>
 
-                  {showModelMenu && (
-                    <div className="absolute bottom-full mb-2 left-0 w-48 rounded-xl bg-[#2a2a2a] border border-white/10 shadow-2xl overflow-hidden z-50">
-                      {EDIT_MODELS.map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => {
-                            setSelectedModel(m.id);
-                            setShowModelMenu(false);
-                          }}
-                          className={`w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-left transition-colors ${
-                            selectedModel === m.id
-                              ? "bg-violet-500/20 text-violet-300"
-                              : "text-gray-300 hover:bg-white/5"
-                          }`}
-                        >
-                          <span>🍌</span>
-                          {m.label}
-                          {selectedModel === m.id && (
-                            <svg
-                              className="w-3.5 h-3.5 ml-auto text-violet-400"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              strokeWidth={2.5}
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                d="M5 13l4 4L19 7"
-                              />
-                            </svg>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Submit */}
-              <button
-                onClick={handleSubmitEdit}
-                disabled={!editPrompt.trim() || loading}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center transition-colors"
-              >
-                <svg
-                  className="w-4 h-4 text-white"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+                  {/* Upload reference */}
+                  <button
+                    onClick={() => uploadRef.current?.click()}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-[12px] text-gray-300"
+                    title="Upload reference image"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+                    </svg>
+                  </button>
+                  <input
+                    ref={uploadRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleUploadRef}
                   />
-                </svg>
-              </button>
+                </div>
+
+                {/* Submit */}
+                <button
+                  onClick={handleSubmitEdit}
+                  disabled={!hasPromptText || loading}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-white/10 flex items-center justify-center transition-colors"
+                >
+                  <svg
+                    className="w-4 h-4 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
