@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { series } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
-import { generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
+import { generateViaOpenRouter, type CharacterRef } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod/v4";
 
@@ -66,7 +66,7 @@ export async function POST(
       type: asset.type,
     };
 
-    const result = await generateNanoBananaImage(sheetPrompt, [ref], "1:1");
+    const result = await generateViaOpenRouter(sheetPrompt, 'google/gemini-3.1-flash-image-preview', [ref], "1:1");
 
     if (!result) {
       return NextResponse.json(

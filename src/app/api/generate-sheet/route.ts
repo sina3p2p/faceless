@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
-import { generateNanoBananaImage, type CharacterRef } from "@/server/services/media";
+import { generateViaOpenRouter, type CharacterRef } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod/v4";
 
@@ -42,8 +42,9 @@ export async function POST(req: NextRequest) {
       type,
     };
 
-    const result = await generateNanoBananaImage(
+    const result = await generateViaOpenRouter(
       SHEET_PROMPTS[type] || SHEET_PROMPTS.character,
+      'google/gemini-3.1-flash-image-preview',
       [ref],
       "1:1"
     );

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { generateText, tool, stepCountIs } from "ai";
 import { openrouter } from "@/server/services/llm";
-import { generateNanoBananaImage } from "@/server/services/media";
+import { generateViaOpenRouter } from "@/server/services/media";
 import { editImageViaGemini } from "@/server/services/media";
 import { uploadFile } from "@/lib/storage";
 import { z } from "zod";
@@ -116,7 +116,7 @@ async function generateAndUpload(
   userId: string,
   assetType = "character"
 ): Promise<{ r2Key: string; previewUrl: string } | null> {
-  const result = await generateNanoBananaImage(prompt, undefined, "1:1");
+  const result = await generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', undefined, "1:1");
   if (!result) return null;
 
   const imgResp = await fetch(result.url);

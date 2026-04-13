@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, inArray } from "drizzle-orm";
-import { generateImage, generateKlingImage, generateNanoBananaImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
+import { generateImage, generateKlingImage, generateViaOpenRouter, type CharacterRef, type AspectRatio } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { getVideoSize } from "@/lib/constants";
 import { z } from "zod";
@@ -124,11 +124,11 @@ export async function POST(
         ...charRefs,
       ];
 
-      const result = await generateNanoBananaImage(editPrompt, allRefs, aspectRatio);
+      const result = await generateViaOpenRouter(editPrompt, 'google/gemini-3.1-flash-image-preview', allRefs, aspectRatio);
       imageUrl = result?.url ?? null;
     } else if (imageModel === "nano-banana-2") {
       const allRefs = [...sceneRefs, ...charRefs];
-      const result = await generateNanoBananaImage(cleanedPrompt, allRefs.length > 0 ? allRefs : undefined, aspectRatio);
+      const result = await generateViaOpenRouter(cleanedPrompt, 'google/gemini-3.1-flash-image-preview', allRefs.length > 0 ? allRefs : undefined, aspectRatio);
       imageUrl = result?.url ?? null;
     } else if (imageModel === "kling-image-v3") {
       const refUrl = sceneRefs[0]?.url;

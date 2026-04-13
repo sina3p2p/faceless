@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { generateImage, generateKlingImage, generateNanoBananaImage } from "@/server/services/media";
+import { generateImage, generateKlingImage, generateViaOpenRouter } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod/v4";
 
@@ -106,7 +106,7 @@ export async function POST(
     let imageUrl: string | null = null;
 
     if (imageModel === "nano-banana-2") {
-      const result = await generateNanoBananaImage(prompt, charRefs);
+      const result = await generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', charRefs);
       imageUrl = result?.url ?? null;
     } else if (imageModel === "kling-image-v3") {
       const result = await generateKlingImage(prompt);
