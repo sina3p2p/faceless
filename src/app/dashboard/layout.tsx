@@ -10,7 +10,7 @@ export default function DashboardLayout({
     <Providers>
       <div className="min-h-screen flex">
         <DashboardNav />
-        <main className="flex-1 ml-64 p-8">{children}</main>
+        <main className="flex-1 ml-64">{children}</main>
       </div>
     </Providers>
   );

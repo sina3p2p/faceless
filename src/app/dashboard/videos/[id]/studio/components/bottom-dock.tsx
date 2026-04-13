@@ -2,6 +2,7 @@
 
 import type { VideoPhase, StudioPhaseId } from "../../hooks/use-video-phase";
 import type { Scene } from "../../types";
+import type { SelectedMedia } from "../context/StudioContext";
 
 interface DockTool {
   id: string;
@@ -19,13 +20,12 @@ function DockButton({ tool }: { tool: DockTool }) {
     <button
       onClick={tool.onClick}
       disabled={tool.disabled || tool.loading}
-      className={`w-9 h-9 rounded-xl flex items-center justify-center relative group transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
-        tool.variant === "primary"
+      className={`w-9 h-9 rounded-xl flex items-center justify-center relative group transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${tool.variant === "primary"
           ? "text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
           : tool.variant === "danger"
             ? "text-gray-500 hover:text-red-400 hover:bg-red-500/10"
             : "text-gray-500 hover:text-white hover:bg-white/10"
-      }`}
+        }`}
     >
       {tool.loading ? (
         <div className="animate-spin w-4 h-4 border-[1.5px] border-current border-t-transparent rounded-full" />
@@ -107,6 +107,16 @@ const icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
     </svg>
   ),
+  useForVideo: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  addVariant: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+    </svg>
+  ),
 };
 
 export function BottomDock({
@@ -141,6 +151,10 @@ export function BottomDock({
   onOpenLab,
   onEditScene,
   onDeleteScene,
+  selectedMedia,
+  onUseMediaForVideo,
+  onGenerateVariant,
+  onDeleteMedia,
 }: {
   phase: VideoPhase;
   selectedPhaseId: StudioPhaseId;
@@ -173,6 +187,10 @@ export function BottomDock({
   onOpenLab: () => void;
   onEditScene: () => void;
   onDeleteScene: () => void;
+  selectedMedia: SelectedMedia | null;
+  onUseMediaForVideo: (mediaId: string, frameId: string) => void;
+  onGenerateVariant: (frameId: string) => void;
+  onDeleteMedia: (mediaId: string) => void;
 }) {
   // Determine approve endpoint based on current phase
   function getApproveAction(): { endpoint: string; label: string } | null {
@@ -182,7 +200,7 @@ export function BottomDock({
     if (phase.isPromptsReview) return { endpoint: "approve-pre-production", label: "Approve Prompts" };
     if (phase.isImagesReview || phase.isImageReview) return { endpoint: phase.isImagesReview ? "approve-images" : "approve-production", label: "Approve Images" };
     if (phase.isProductionReview || phase.isVideoReview) return { endpoint: "approve-production", label: "Approve & Compose" };
-    if (phase.isNewMotionReview) return { endpoint: "approve-production", label: "Approve Motion" };
+    if (phase.isNewMotionReview) return { endpoint: "approve-motion", label: "Approve Motion" };
     return null;
   }
 
@@ -319,10 +337,43 @@ export function BottomDock({
     });
   }
 
+  // Media-context tools (when a node is selected in lab)
+  const mediaTools: DockTool[] = [];
+
+  if (isLabMode && selectedMedia) {
+    mediaTools.push({
+      id: "use-for-video",
+      icon: icons.useForVideo,
+      label: "Use for Video",
+      onClick: () => onUseMediaForVideo(selectedMedia.mediaId, selectedMedia.frameId),
+      variant: "primary",
+    });
+    mediaTools.push({
+      id: "add-variant",
+      icon: icons.addVariant,
+      label: "Generate Variant",
+      onClick: () => onGenerateVariant(selectedMedia.frameId),
+    });
+    mediaTools.push({
+      id: "compare-media",
+      icon: icons.compare,
+      label: "Compare Variants",
+      onClick: onCompare,
+    });
+    mediaTools.push({
+      id: "delete-media",
+      icon: icons.delete,
+      label: "Delete",
+      onClick: () => onDeleteMedia(selectedMedia.mediaId),
+      variant: "danger",
+    });
+  }
+
   // In lab mode, hide storyboard-level phase tools
   const visiblePhaseTools = isLabMode ? [] : phaseTools;
 
-  if (visiblePhaseTools.length === 0 && sceneTools.length === 0) return null;
+  const hasAnyTools = visiblePhaseTools.length > 0 || sceneTools.length > 0 || mediaTools.length > 0;
+  if (!hasAnyTools) return null;
 
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30">
@@ -334,6 +385,12 @@ export function BottomDock({
         {visiblePhaseTools.length > 0 && sceneTools.length > 0 && <Separator />}
 
         {sceneTools.map((tool) => (
+          <DockButton key={tool.id} tool={tool} />
+        ))}
+
+        {mediaTools.length > 0 && sceneTools.length > 0 && <Separator />}
+
+        {mediaTools.map((tool) => (
           <DockButton key={tool.id} tool={tool} />
         ))}
       </div>

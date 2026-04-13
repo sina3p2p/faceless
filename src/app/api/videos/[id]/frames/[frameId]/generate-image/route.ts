@@ -5,12 +5,12 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { eq } from "drizzle-orm";
 import { generateImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
-import { getVideoSize } from "@/lib/constants";
+import { getVideoSize, IMAGE_MODELS } from "@/lib/constants";
 import { z } from "zod";
 
 const bodySchema = z.object({
   imagePrompt: z.string().min(1).optional(),
-  imageModel: z.enum(["dall-e-3", "kling-image-v3", "nano-banana-2"]).optional(),
+  imageModel: z.enum(IMAGE_MODELS.map(m => m.id)).optional(),
 });
 
 export async function POST(

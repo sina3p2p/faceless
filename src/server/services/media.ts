@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { fal } from "@fal-ai/client";
 import { MEDIA, AI_VIDEO, LLM } from "@/lib/constants";
+import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
@@ -123,7 +124,6 @@ export interface CharacterRef {
   type?: "character" | "location" | "prop";
 }
 
-const GEMINI_IMAGE_MODEL = "google/gemini-3.1-flash-image-preview";
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 
 async function fetchImageAsBase64(url: string): Promise<{ base64: string; mimeType: string } | null> {
@@ -139,8 +139,9 @@ async function fetchImageAsBase64(url: string): Promise<{ base64: string; mimeTy
   }
 }
 
-export async function generateNanoBananaImage(
+export async function generateViaOpenRouter(
   prompt: string,
+  model: string,
   characterRefs?: CharacterRef[],
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
@@ -187,7 +188,7 @@ export async function generateNanoBananaImage(
     }
 
     const body = {
-      model: GEMINI_IMAGE_MODEL,
+      model,
       messages: [{ role: "user", content: contentParts }],
       modalities: ["image", "text"],
       image_config: { aspect_ratio: aspectRatio },
@@ -240,10 +241,9 @@ export async function generateNanoBananaImage(
       if (!base64Match) return null;
 
       const buffer = Buffer.from(base64Match[2], "base64");
-      const blob = new Blob([buffer], { type: base64Match[1] });
-      const file = new File([blob], `gemini_${Date.now()}.jpg`, { type: base64Match[1] });
-      const hostedUrl = await fal.storage.upload(file);
-      imageDataUrl = hostedUrl;
+      const key = `generated/gemini_${Date.now()}.jpg`;
+      await uploadFile(key, buffer, base64Match[1]);
+      imageDataUrl = await getSignedDownloadUrl(key);
     }
 
     return {
@@ -285,7 +285,7 @@ export async function editImageViaGemini(
     ];
 
     const body = {
-      model: GEMINI_IMAGE_MODEL,
+      model: 'google/gemini-3.1-flash-image-preview',
       messages: [{ role: "user", content: contentParts }],
       modalities: ["image", "text"],
       image_config: { aspect_ratio: aspectRatio },
@@ -331,10 +331,9 @@ export async function editImageViaGemini(
       const base64Match = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
       if (!base64Match) return null;
       const buffer = Buffer.from(base64Match[2], "base64");
-      const blob = new Blob([buffer], { type: base64Match[1] });
-      const file = new File([blob], `gemini_edit_${Date.now()}.jpg`, { type: base64Match[1] });
-      const hostedUrl = await fal.storage.upload(file);
-      imageDataUrl = hostedUrl;
+      const key = `generated/gemini_edit_${Date.now()}.jpg`;
+      await uploadFile(key, buffer, base64Match[1]);
+      imageDataUrl = await getSignedDownloadUrl(key);
     }
 
     return {
@@ -357,7 +356,10 @@ export async function generateImage(
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   if (imageModel === "nano-banana-2") {
-    return generateNanoBananaImage(prompt, characterRefs, aspectRatio);
+    return generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', characterRefs, aspectRatio);
+  }
+  if (imageModel === "nano-banana-pro") {
+    return generateViaOpenRouter(prompt, 'google/gemini-3-pro-image-preview', characterRefs, aspectRatio);
   }
   if (imageModel === "kling-image-v3") {
     return generateKlingImage(prompt, undefined, characterRefs, aspectRatio);

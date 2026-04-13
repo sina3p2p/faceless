@@ -20,8 +20,6 @@ export function StudioTopBar({
   onTogglePipelineMode: () => void;
 }) {
   const currentPhase = phase.phases.find((p) => p.id === phase.activePhaseId);
-  const imageModel = video?.series?.imageModel || "dall-e-3";
-  const videoModel = video?.series?.videoModel || "—";
 
   return (
     <div className="h-12 border-b border-white/5 bg-black/40 backdrop-blur-sm flex items-center px-4 gap-4 shrink-0">
@@ -43,16 +41,15 @@ export function StudioTopBar({
           {video?.title || "Untitled Project"}
         </h1>
         {currentPhase && (
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider shrink-0 ${
-            currentPhase.status === "processing" ? "bg-violet-500/20 text-violet-400" :
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wider shrink-0 ${currentPhase.status === "processing" ? "bg-violet-500/20 text-violet-400" :
             currentPhase.status === "review" ? "bg-amber-500/20 text-amber-400" :
-            currentPhase.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
-            "bg-white/5 text-gray-500"
-          }`}>
+              currentPhase.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
+                "bg-white/5 text-gray-500"
+            }`}>
             {currentPhase.status === "processing" ? "Processing" :
-             currentPhase.status === "review" ? "Review" :
-             currentPhase.status === "done" ? "Complete" :
-             currentPhase.label}
+              currentPhase.status === "review" ? "Review" :
+                currentPhase.status === "done" ? "Complete" :
+                  currentPhase.label}
           </span>
         )}
       </div>
@@ -65,14 +62,6 @@ export function StudioTopBar({
         </div>
       )}
       {!phase.isProcessing && <div className="flex-1" />}
-
-      {/* Stats */}
-      <div className="flex items-center gap-4 text-[11px] text-gray-500 shrink-0">
-        <span>{scenesCount} scenes</span>
-        {phase.hasTTSRun && <span className="font-mono">{totalDuration.toFixed(1)}s</span>}
-        <span className="text-gray-600" title="Image model">{imageModel}</span>
-        <span className="text-gray-600" title="Video model">{videoModel}</span>
-      </div>
 
       {/* Pipeline mode toggle */}
       <div

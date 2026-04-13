@@ -43,19 +43,6 @@ export async function GET(
       sceneTitle: scene.sceneTitle,
       frames: await Promise.all(
         scene.frames.map(async (frame) => {
-          const imageKey = frame.imageMedia?.url ?? null;
-          const videoKey = frame.videoMedia?.url ?? null;
-
-          let imageUrl: string | null = null;
-          let videoUrl: string | null = null;
-
-          if (imageKey) {
-            try { imageUrl = await getSignedDownloadUrl(imageKey); } catch { /* skip */ }
-          }
-          if (videoKey) {
-            try { videoUrl = await getSignedDownloadUrl(videoKey); } catch { /* skip */ }
-          }
-
           const signedMedia = await Promise.all(
             (frame.media ?? []).map(async (m) => ({
               id: m.id,
@@ -74,14 +61,12 @@ export async function GET(
             imagePrompt: frame.imagePrompt,
             visualDescription: frame.visualDescription,
             assetRefs: frame.assetRefs,
-            imageUrl,
-            videoUrl,
-            imageKey,
-            videoKey,
             modelUsed: frame.modelUsed,
             media: signedMedia,
             imageGeneratedAt: frame.imageGeneratedAt?.toISOString() ?? null,
             videoGeneratedAt: frame.videoGeneratedAt?.toISOString() ?? null,
+            imageMediaId: frame.imageMediaId,
+            videoMediaId: frame.videoMediaId,
           };
         })
       ),

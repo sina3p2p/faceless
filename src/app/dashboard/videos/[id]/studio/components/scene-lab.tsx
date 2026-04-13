@@ -1,371 +1,196 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
-import { IMAGE_MODELS, VIDEO_MODELS } from "@/lib/constants";
-import type { Scene, SceneFrame, VideoDetail } from "../../types";
+import { useCallback, useEffect, useMemo } from "react";
+import {
+  ReactFlow,
+  Controls,
+  Background,
+  BackgroundVariant,
+  useNodesState,
+  useEdgesState,
+  type Node,
+  type Edge,
+  type NodeTypes,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import type { Scene, VideoDetail } from "../../types";
 import type { VideoPhase } from "../../hooks/use-video-phase";
-import { useCanvasTransform } from "../hooks/use-canvas-transform";
-import { ZoomControls } from "./zoom-controls";
-import { VariantNode, Frame } from "./scene-lab/index";
+import { useStudioContext } from "../context/StudioContext";
+import { BriefNode, VariantNode, SceneImageNode, ImageNode, VideoNode } from "./scene-lab/index";
 
-// ── Model Selector (inline popover) ──
+const nodeTypes: NodeTypes = {
+  brief: BriefNode,
+  image: ImageNode,
+  video: VideoNode,
+  variant: VariantNode,
+  sceneImage: SceneImageNode,
+};
 
-function ModelSelector({
-  type,
-  defaultModel,
-  onGenerate,
-  onCancel,
-}: {
-  type: "image" | "video";
-  defaultModel: string;
-  onGenerate: (model: string) => void;
-  onCancel: () => void;
-}) {
-  const models = type === "image" ? IMAGE_MODELS : VIDEO_MODELS;
-  const [selected, setSelected] = useState(defaultModel || models[0]?.id || "");
+const COLUMN_GAP = 15;
+const ROW_GAP = 400;
+const NODE_WIDTH = 300;
+const NODE_HEIGHT = 200;
+const STROKE_WIDTH = 5;
 
-  return (
-    <div className="mt-1.5 rounded-lg bg-black/60 border border-white/10 p-2 space-y-1.5">
-      <div className="flex flex-wrap gap-1">
-        {models.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={(e) => { e.stopPropagation(); setSelected(m.id); }}
-            className={`px-2 py-0.5 rounded text-[9px] font-medium transition-colors ${selected === m.id
-              ? "bg-violet-600 text-white"
-              : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-              }`}
-            title={m.description}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-      <div className="flex gap-1.5">
-        <button
-          onClick={(e) => { e.stopPropagation(); onGenerate(selected); }}
-          className="px-2.5 py-1 rounded-lg bg-violet-600 text-white text-[9px] font-medium hover:bg-violet-500 transition-colors"
-        >
-          Generate
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onCancel(); }}
-          className="px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 text-[9px] font-medium hover:text-white transition-colors"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
+function buildGraph(
+  scene: Scene,
+  phase: VideoPhase,
+  video: VideoDetail | null,
+  generatingFrameIds: Set<string>,
+  generatingFrameVideoIds: Set<string>,
+  generatingFrameMotionIds: Set<string>,
+  callbacks: {
+    onGenerateFrameImage: (frameId: string, prompt?: string, model?: string) => void;
+    onUpdateFramePrompt: (frameId: string, prompt: string) => void;
+    onUpdateFrameMotion: (frameId: string, motion: string) => void;
+    onRegenerateFrameVideo: (frameId: string, videoModel?: string) => void;
+    onRegenerateFrameMotion: (frameId: string) => void;
+    onSelectFrameVariant: (frameId: string, variantId: string, type: "image" | "video") => void;
+  },
+): { nodes: Node[]; edges: Edge[] } {
+  const nodes: Node[] = [];
+  const edges: Edge[] = [];
+
+  const frames = scene.frames ?? [];
+  const defaultImageModel = video?.series?.imageModel || "dall-e-3";
+  const defaultVideoModel = video?.series?.videoModel || "";
+
+  let x = 0;
+
+  // Brief node
+  const briefId = `brief-${scene.id}`;
+  // nodes.push({
+  //   id: briefId,
+  //   type: "brief",
+  //   position: { x, y: 0 },
+  //   data: { scene, sceneIndex },
+  //   draggable: false,
+  //   selectable: false,
+  // });
+
+  x += COLUMN_GAP;
+
+  if (frames.length === 0 && scene.assetUrl) {
+    const sceneImgId = `scene-img-${scene.id}`;
+    nodes.push({
+      id: sceneImgId,
+      type: "sceneImage",
+      position: { x, y: 0 },
+      data: { assetUrl: scene.assetUrl, imagePrompt: scene.imagePrompt },
+      draggable: false,
+      selectable: false,
+    });
+    edges.push({
+      id: `e-${briefId}-${sceneImgId}`,
+      source: briefId,
+      target: sceneImgId,
+      style: { stroke: "rgba(139,92,246,0.3)", strokeWidth: 1 },
+    });
+    return { nodes, edges };
+  }
+
+  let frameX = 0;
+  frames.forEach((frame, frameIndex) => {
+    const images = frame.media?.filter(m => m.type === "image") ?? [];
+    const videos = frame.media?.filter(m => m.type === "video") ?? [];
+
+    nodes.push({
+      id: frame.id,
+      type: "brief",
+      position: { x: Math.max(frameX, 150), y: 0 },
+      data: { scene, frame, frameIndex },
+      draggable: false,
+      selectable: false,
+    });
+
+    for (const [mediaIndex, media] of images.entries()) {
+      const frameMediaX = frameX + (NODE_WIDTH * mediaIndex) + (mediaIndex * COLUMN_GAP) - ((images.length - 1) * COLUMN_GAP);
+      nodes.push({
+        id: media.id,
+        type: media.type,
+        position: { x: frameMediaX, y: ROW_GAP },
+        data: {
+          frame,
+          media,
+          frameIndex,
+          phase,
+          defaultImageModel,
+          defaultVideoModel,
+          videoSize: video?.series?.videoSize ?? null,
+          generatingImage: generatingFrameIds.has(frame.id),
+          generatingVideo: generatingFrameVideoIds.has(frame.id),
+          generatingMotion: generatingFrameMotionIds.has(frame.id),
+          onGenerateImage: callbacks.onGenerateFrameImage,
+          onUpdatePrompt: callbacks.onUpdateFramePrompt,
+          onUpdateMotion: callbacks.onUpdateFrameMotion,
+          onRegenerateVideo: callbacks.onRegenerateFrameVideo,
+          onRegenerateMotion: callbacks.onRegenerateFrameMotion,
+          onSelectVariant: callbacks.onSelectFrameVariant,
+        },
+        draggable: false,
+        selectable: true,
+      });
+      edges.push({
+        id: `e-${frame.id}-${media.id}`,
+        source: frame.id,
+        target: media.id,
+        style: {
+          stroke: (frame.imageMediaId === media.id)
+            ? "rgba(139,92,246,0.6)"
+            : "rgba(255,255,255,0.1)",
+          ...(frame.imageMediaId !== media.id ? { strokeDasharray: "4 4" } : {}),
+          strokeWidth: STROKE_WIDTH,
+        },
+      });
+    }
+
+    for (const [mediaIndex, media] of videos.entries()) {
+      const frameMediaX = frameX + (NODE_WIDTH * mediaIndex) + (mediaIndex * COLUMN_GAP) - ((images.length - 1) * COLUMN_GAP);
+      nodes.push({
+        id: media.id,
+        type: media.type,
+        position: { x: frameMediaX, y: 2 * ROW_GAP },
+        data: {
+          frame,
+          media,
+          frameIndex,
+          phase,
+          defaultImageModel,
+          defaultVideoModel,
+          videoSize: video?.series?.videoSize ?? null,
+          generatingImage: generatingFrameIds.has(frame.id),
+          generatingVideo: generatingFrameVideoIds.has(frame.id),
+          generatingMotion: generatingFrameMotionIds.has(frame.id),
+          onGenerateImage: callbacks.onGenerateFrameImage,
+          onUpdatePrompt: callbacks.onUpdateFramePrompt,
+          onUpdateMotion: callbacks.onUpdateFrameMotion,
+          onRegenerateVideo: callbacks.onRegenerateFrameVideo,
+          onRegenerateMotion: callbacks.onRegenerateFrameMotion,
+          onSelectVariant: callbacks.onSelectFrameVariant,
+        },
+        draggable: false,
+        selectable: true,
+      });
+
+      edges.push({
+        id: `e-${frame.videoMediaId}-${media.id}`,
+        source: frame.imageMediaId!,
+        target: media.id,
+        style: {
+          stroke: (frame.videoMediaId === media.id)
+            ? "rgba(139,92,246,0.6)"
+            : "rgba(255,255,255,0.1)",
+          ...(frame.videoMediaId !== media.id ? { strokeDasharray: "4 4" } : {}),
+          strokeWidth: STROKE_WIDTH,
+        },
+      });
+    }
+
+    frameX += NODE_WIDTH * Math.max(images.length, videos.length) + COLUMN_GAP;
+  });
+
+  return { nodes, edges };
 }
-
-// ── Variant Node (single take thumbnail in tree) ──
-
-
-
-// ── Scene Brief Card ──
-
-function SceneBrief({ scene, sceneIndex }: { scene: Scene; sceneIndex: number }) {
-  return (
-    <div className="w-52 shrink-0 rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden self-start">
-      <div className="px-3 py-2 border-b border-white/5">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-violet-500 font-semibold">Brief</span>
-          <span className="text-[11px] font-semibold text-white">Scene {sceneIndex + 1}</span>
-        </div>
-        {scene.sceneTitle && (
-          <p className="text-[11px] text-gray-300 font-medium mt-0.5 truncate">{scene.sceneTitle}</p>
-        )}
-      </div>
-
-      <div className="p-3 space-y-2">
-        {scene.speaker && (
-          <span className="inline-block text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400 font-medium uppercase">
-            {scene.speaker}
-          </span>
-        )}
-        <p className="text-[10px] text-gray-400 leading-relaxed line-clamp-6">{scene.text}</p>
-        {scene.audioUrl && (
-          <audio src={scene.audioUrl} controls className="w-full h-7 [&::-webkit-media-controls-panel]:bg-white/5" />
-        )}
-        <div className="flex items-center gap-2 pt-1 border-t border-white/5">
-          <span className="text-[10px] font-mono text-gray-600">{scene.duration?.toFixed(1)}s</span>
-          {scene.frames && scene.frames.length > 0 && (
-            <span className="text-[9px] text-gray-700">{scene.frames.length} frames</span>
-          )}
-        </div>
-        {scene.directorNote && (
-          <div className="pt-1 border-t border-white/5">
-            <span className="text-[9px] uppercase tracking-wider text-amber-600 font-medium">Director</span>
-            <p className="text-[9px] text-gray-500 leading-relaxed mt-0.5 line-clamp-3">{scene.directorNote}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Frame Column: FrameNode card + variant branches below ──
-
-function FrameColumn({
-  frame,
-  frameIndex,
-  phase,
-  defaultImageModel,
-  defaultVideoModel,
-  generatingImage,
-  generatingVideo,
-  generatingMotion,
-  onGenerateImage,
-  onUpdatePrompt,
-  onUpdateMotion,
-  onRegenerateVideo,
-  onRegenerateMotion,
-  onSelectVariant,
-  onCompare,
-}: {
-  frame: SceneFrame;
-  frameIndex: number;
-  phase: VideoPhase;
-  defaultImageModel: string;
-  defaultVideoModel: string;
-  generatingImage: boolean;
-  generatingVideo: boolean;
-  generatingMotion: boolean;
-  onGenerateImage: (frameId: string, prompt?: string, model?: string) => void;
-  onUpdatePrompt: (frameId: string, prompt: string) => void;
-  onUpdateMotion: (frameId: string, motion: string) => void;
-  onRegenerateVideo: (frameId: string, videoModel?: string) => void;
-  onRegenerateMotion: (frameId: string) => void;
-  onSelectVariant: (frameId: string, variantId: string, type: "image" | "video") => void;
-  onCompare: (frame: SceneFrame, frameIndex: number, type: "image" | "video") => void;
-}) {
-  const [editingPrompt, setEditingPrompt] = useState(false);
-  const [promptText, setPromptText] = useState(frame.imagePrompt || "");
-  const [editingMotion, setEditingMotion] = useState(false);
-  const [motionText, setMotionText] = useState(frame.visualDescription || "");
-  const [showImageModelPicker, setShowImageModelPicker] = useState(false);
-  const [showVideoModelPicker, setShowVideoModelPicker] = useState(false);
-
-  useEffect(() => { setPromptText(frame.imagePrompt || ""); }, [frame.imagePrompt]);
-  useEffect(() => { setMotionText(frame.visualDescription || ""); }, [frame.visualDescription]);
-
-  const allMedia = frame.media ?? [];
-  const imageVariants = allMedia.filter(m => m.type === "image");
-  const videoVariants = allMedia.filter(m => m.type === "video");
-  const hasImageVariants = imageVariants.length > 0;
-  const hasVideoVariants = videoVariants.length > 0;
-
-  const isVideoStale = !!(
-    frame.videoUrl && frame.imageGeneratedAt && frame.videoGeneratedAt &&
-    frame.imageGeneratedAt > frame.videoGeneratedAt
-  );
-
-  return (
-    <div className="flex flex-col items-center shrink-0">
-      {/* ── Frame Card ── */}
-      <div className="w-56 rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden">
-        {/* Header */}
-        <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-wider text-violet-500 font-medium">Frame {frameIndex + 1}</span>
-          {frame.clipDuration && <span className="text-[10px] text-gray-600 font-mono">{frame.clipDuration}s</span>}
-          {frame.modelUsed && <span className="text-[9px] text-gray-700 ml-auto">{frame.modelUsed}</span>}
-          {generatingImage && <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full ml-auto" />}
-        </div>
-
-        <div className="p-3 space-y-2">
-          {/* Image */}
-          {frame.imageUrl ? (
-            <div className="relative group">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={frame.imageUrl} alt={`Frame ${frameIndex + 1}`} className="rounded-lg w-full max-h-40 object-cover" />
-              {phase.showFrameActions && !generatingImage && (
-                <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => setShowImageModelPicker(true)}
-                    className="px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] hover:bg-violet-600 transition-colors"
-                  >
-                    + Variant
-                  </button>
-                  {hasImageVariants && (
-                    <button
-                      onClick={() => onCompare(frame, frameIndex, "image")}
-                      className="px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] hover:bg-violet-600 transition-colors"
-                    >
-                      Compare
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : !generatingImage && phase.showFrameActions ? (
-            <button
-              onClick={() => setShowImageModelPicker(true)}
-              className="w-full py-4 rounded-lg border border-dashed border-white/10 text-[10px] text-gray-500 hover:text-violet-400 hover:border-violet-500/30 transition-colors"
-            >
-              Generate Image
-            </button>
-          ) : generatingImage ? (
-            <div className="w-full py-4 rounded-lg bg-white/[0.02] flex items-center justify-center gap-1.5">
-              <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full" />
-              <span className="text-[10px] text-violet-400">Generating...</span>
-            </div>
-          ) : null}
-
-          {/* Image model selector */}
-          {showImageModelPicker && (
-            <ModelSelector
-              type="image"
-              defaultModel={defaultImageModel}
-              onGenerate={(model) => { onGenerateImage(frame.id, undefined, model); setShowImageModelPicker(false); }}
-              onCancel={() => setShowImageModelPicker(false)}
-            />
-          )}
-
-          {/* Image prompt (editable) */}
-          {editingPrompt ? (
-            <textarea
-              value={promptText}
-              onChange={(e) => setPromptText(e.target.value)}
-              onBlur={() => { setEditingPrompt(false); if (promptText !== (frame.imagePrompt || "")) onUpdatePrompt(frame.id, promptText); }}
-              onKeyDown={(e) => { if (e.key === "Escape") { setPromptText(frame.imagePrompt || ""); setEditingPrompt(false); } }}
-              autoFocus rows={2}
-              className="w-full bg-black/40 border border-violet-500/20 rounded-lg px-2 py-1.5 text-[10px] text-gray-300 resize-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none"
-            />
-          ) : frame.imagePrompt ? (
-            <p className="text-[10px] text-gray-500 leading-relaxed cursor-text hover:text-gray-400 transition-colors line-clamp-2" onClick={() => setEditingPrompt(true)}>
-              {frame.imagePrompt}
-            </p>
-          ) : null}
-
-          {/* Motion */}
-          {(phase.showFrameMotion || frame.visualDescription) && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-0.5">
-                <span className="text-[9px] uppercase tracking-wider text-emerald-600 font-medium">Motion</span>
-                {isVideoStale && <span className="px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[8px] font-bold uppercase">Stale</span>}
-                {!generatingMotion && frame.imageUrl && (
-                  <button onClick={() => onRegenerateMotion(frame.id)} className="text-[9px] text-emerald-500/60 hover:text-emerald-400 transition-colors ml-auto">Regen</button>
-                )}
-                {generatingMotion && (
-                  <div className="inline-flex items-center gap-1 text-[9px] text-emerald-400 ml-auto">
-                    <div className="animate-spin w-2.5 h-2.5 border border-emerald-400 border-t-transparent rounded-full" />
-                  </div>
-                )}
-              </div>
-              {editingMotion ? (
-                <textarea
-                  value={motionText}
-                  onChange={(e) => setMotionText(e.target.value)}
-                  onBlur={() => { setEditingMotion(false); if (motionText !== (frame.visualDescription || "")) onUpdateMotion(frame.id, motionText); }}
-                  onKeyDown={(e) => { if (e.key === "Escape") { setMotionText(frame.visualDescription || ""); setEditingMotion(false); } }}
-                  autoFocus rows={2}
-                  className="w-full bg-black/40 border border-emerald-500/20 rounded-lg px-2 py-1.5 text-[10px] text-emerald-200 resize-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
-                />
-              ) : (
-                <p className="text-[10px] text-emerald-400/70 cursor-text hover:text-emerald-300 transition-colors leading-relaxed line-clamp-2" onClick={() => setEditingMotion(true)}>
-                  {frame.visualDescription || "Click to add motion..."}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Video */}
-          {phase.showFrameVideo && frame.videoUrl && (
-            <div>
-              <div className={`relative group ${isVideoStale ? "ring-1 ring-amber-500/40 rounded-lg" : ""}`}>
-                <video src={frame.videoUrl} className="rounded-lg w-full max-h-28 object-cover bg-black" muted loop playsInline
-                  onMouseEnter={(e) => e.currentTarget.play()}
-                  onMouseLeave={(e) => { e.currentTarget.pause(); e.currentTarget.currentTime = 0; }}
-                />
-                <div className={`absolute top-1 left-1 px-1 py-0.5 rounded text-white text-[8px] font-bold uppercase ${isVideoStale ? "bg-amber-500/80" : "bg-green-500/80"}`}>
-                  {isVideoStale ? "Stale" : "Ready"}
-                </div>
-                {!generatingVideo && (
-                  <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => setShowVideoModelPicker(true)} className="px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] hover:bg-violet-600 transition-colors">+ Video</button>
-                    {hasVideoVariants && (
-                      <button onClick={() => onCompare(frame, frameIndex, "video")} className="px-2 py-0.5 rounded-md bg-black/70 text-white text-[10px] hover:bg-violet-600 transition-colors">Compare</button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {phase.showFrameVideo && !frame.videoUrl && frame.imageUrl && !generatingVideo && (
-            <button onClick={() => setShowVideoModelPicker(true)} className="w-full py-2 rounded-lg border border-dashed border-white/10 text-[10px] text-gray-500 hover:text-violet-400 hover:border-violet-500/30 transition-colors">
-              Generate Video
-            </button>
-          )}
-
-          {/* Video model selector */}
-          {showVideoModelPicker && (
-            <ModelSelector
-              type="video"
-              defaultModel={defaultVideoModel}
-              onGenerate={(model) => { onRegenerateVideo(frame.id, model); setShowVideoModelPicker(false); }}
-              onCancel={() => setShowVideoModelPicker(false)}
-            />
-          )}
-
-          {generatingVideo && (
-            <div className="flex items-center gap-1.5 text-[9px] text-amber-400">
-              <div className="animate-spin w-2.5 h-2.5 border border-amber-400 border-t-transparent rounded-full" />
-              Generating video...
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Variant Tree (branches below card) ── */}
-      {/* Image variant branches */}
-      {hasImageVariants && frame.imageUrl && (
-        <div className="flex flex-col items-center mt-1">
-          {/* Stem line from card to branch row */}
-          <div className="w-px h-3 bg-violet-500/30" />
-          <div className="flex gap-1.5 items-start">
-            {/* Active take */}
-            <VariantNode url={frame.imageUrl} type="image" modelUsed={frame.modelUsed ?? null} isActive onClick={() => { }} />
-            {/* Previous variants */}
-            {imageVariants.map((v) => (
-              <VariantNode key={v.id} url={v.url} type="image" modelUsed={v.modelUsed} isActive={false} onClick={() => onSelectVariant(frame.id, v.id, "image")} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Video variant branches */}
-      {hasVideoVariants && frame.videoUrl && (
-        <div className="flex flex-col items-center mt-1">
-          <div className="w-px h-3 bg-emerald-500/30" />
-          <div className="flex gap-1.5 items-start">
-            <VariantNode url={frame.videoUrl} type="video" modelUsed={frame.modelUsed ?? null} isActive onClick={() => { }} />
-            {videoVariants.map((v) => (
-              <VariantNode key={v.id} url={v.url} type="video" modelUsed={v.modelUsed} isActive={false} onClick={() => onSelectVariant(frame.id, v.id, "video")} />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Horizontal connector between frame columns ──
-// Draws from the active variant of frame N to frame N+1.
-// Active path = violet, inactive = subtle white.
-
-function FrameConnector({ hasVariants }: { hasVariants: boolean }) {
-  return (
-    <div className="flex flex-col items-center shrink-0 self-start" style={{ paddingTop: "5rem" }}>
-      {/* Main horizontal line at frame-card mid-height */}
-      <div className={`w-8 h-px transition-colors ${hasVariants ? "bg-violet-500/40" : "bg-white/10"}`} />
-    </div>
-  );
-}
-
-// ── Scene Lab (main export) ──
 
 export function SceneLab({
   scene,
@@ -382,7 +207,6 @@ export function SceneLab({
   onRegenerateFrameMotion,
   onSelectFrameVariant,
   onBack,
-  onCompareFrame,
 }: {
   scene: Scene;
   sceneIndex: number;
@@ -398,34 +222,78 @@ export function SceneLab({
   onRegenerateFrameMotion: (frameId: string) => void;
   onSelectFrameVariant: (frameId: string, variantId: string, type: "image" | "video") => void;
   onBack: () => void;
-  onCompareFrame: (frame: SceneFrame, frameIndex: number, type: "image" | "video") => void;
 }) {
+  const { selectedMedia, setSelectedMedia } = useStudioContext();
+
   useEffect(() => {
-    function handleKey(e: KeyboardEvent) { if (e.key === "Escape") onBack(); }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (selectedMedia) { setSelectedMedia(null); return; }
+        onBack();
+      }
+    }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [onBack]);
+  }, [onBack, selectedMedia, setSelectedMedia]);
 
-  const frames = scene.frames ?? [];
-  const defaultImageModel = video?.series?.imageModel || "dall-e-3";
-  const defaultVideoModel = video?.series?.videoModel || "";
+  // Clear selection when leaving lab
+  useEffect(() => {
+    return () => setSelectedMedia(null);
+  }, [setSelectedMedia]);
 
-  const {
-    zoom, isPanning, containerRef, contentStyle,
-    onWheel, onPointerDown, onPointerMove, onPointerUp,
-    zoomIn, zoomOut, fitView, resetView,
-  } = useCanvasTransform();
+  const handleNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    if (node.type !== "image" && node.type !== "video") {
+      setSelectedMedia(null);
+      return;
+    }
+    const d = node.data as { media: { id: string; type: string; url: string; modelUsed: string | null }; frame: { id: string }; frameIndex: number };
+    setSelectedMedia({
+      mediaId: d.media.id,
+      frameId: d.frame.id,
+      frameIndex: d.frameIndex,
+      type: d.media.type as "image" | "video",
+      url: d.media.url,
+      modelUsed: d.media.modelUsed,
+    });
+  }, [setSelectedMedia]);
 
-  const contentRef = useRef<HTMLDivElement>(null);
+  const handlePaneClick = useCallback(() => {
+    setSelectedMedia(null);
+  }, [setSelectedMedia]);
 
-  function handleFitView() {
-    const el = contentRef.current;
-    if (!el) return;
-    fitView(el.scrollWidth, el.scrollHeight);
-  }
+  const callbacks = useMemo(() => ({
+    onGenerateFrameImage,
+    onUpdateFramePrompt,
+    onUpdateFrameMotion,
+    onRegenerateFrameVideo,
+    onRegenerateFrameMotion,
+    onSelectFrameVariant,
+  }), [
+    onGenerateFrameImage, onUpdateFramePrompt, onUpdateFrameMotion,
+    onRegenerateFrameVideo, onRegenerateFrameMotion, onSelectFrameVariant,
+  ]);
+
+  const { nodes: initialNodes, edges: initialEdges } = useMemo(
+    () => buildGraph(
+      scene, phase, video,
+      generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds,
+      callbacks,
+    ),
+    [scene, phase, video, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds, callbacks],
+  );
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
+
+  const onNodeDragStop = useCallback(() => { }, []);
 
   return (
-    <div className="flex-1 bg-grid relative overflow-hidden flex flex-col">
+    <div className="flex-1 relative overflow-hidden flex flex-col">
       {/* Breadcrumb */}
       <div className="flex items-center gap-3 px-6 pt-4 pb-2 shrink-0 z-10">
         <button onClick={onBack} className="flex items-center gap-1.5 text-[11px] text-gray-500 hover:text-white transition-colors">
@@ -442,76 +310,41 @@ export function SceneLab({
         <span className="ml-auto text-[10px] text-gray-600 font-mono">{scene.duration?.toFixed(1)}s</span>
       </div>
 
-      {/* Pannable/zoomable canvas */}
-      <div
-        ref={containerRef}
-        className="flex-1 relative overflow-hidden"
-        onWheel={onWheel}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        style={{ cursor: isPanning ? "grabbing" : undefined }}
-      >
-        <div
-          ref={contentRef}
-          style={contentStyle}
-          className="flex gap-0 px-6 py-6 items-start h-full"
+      {/* React Flow canvas */}
+      <div className="flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeDragStop={onNodeDragStop}
+          onNodeClick={handleNodeClick}
+          onPaneClick={handlePaneClick}
+          nodeTypes={nodeTypes}
+          fitView
+          fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }}
+          minZoom={0.15}
+          maxZoom={2}
+          proOptions={{ hideAttribution: true }}
+          panOnScroll={false}
+          selectionOnDrag={false}
+          nodesDraggable={true}
+          nodesConnectable={false}
+          edgesFocusable={true}
+          className="bg-transparent!"
         >
-          {/* Scene Brief */}
-          <SceneBrief scene={scene} sceneIndex={sceneIndex} />
-
-          {/* Brief → first frame connector */}
-          {frames.length > 0 && <FrameConnector hasVariants={false} />}
-
-          {/* Frame columns with connectors */}
-          {frames.map((frame, i) => (
-            <Fragment key={frame.id}>
-              <Frame
-                frame={frame}
-                frameIndex={i}
-                phase={phase}
-                defaultImageModel={defaultImageModel}
-                defaultVideoModel={defaultVideoModel}
-                generatingImage={generatingFrameIds.has(frame.id)}
-                generatingVideo={generatingFrameVideoIds.has(frame.id)}
-                generatingMotion={generatingFrameMotionIds.has(frame.id)}
-                onGenerateImage={onGenerateFrameImage}
-                onUpdatePrompt={onUpdateFramePrompt}
-                onUpdateMotion={onUpdateFrameMotion}
-                onRegenerateVideo={onRegenerateFrameVideo}
-                onRegenerateMotion={onRegenerateFrameMotion}
-                onSelectVariant={onSelectFrameVariant}
-                onCompare={onCompareFrame}
-              />
-              {i < frames.length - 1 && (
-                <FrameConnector
-                  hasVariants={(frame.media?.length ?? 0) > 0}
-                />
-              )}
-            </Fragment>
-          ))}
-
-          {/* No frames fallback */}
-          {frames.length === 0 && scene.assetUrl && (
-            <>
-              <FrameConnector hasVariants={false} />
-              <div className="w-56 shrink-0 rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden self-start">
-                <div className="px-3 py-2 border-b border-white/5">
-                  <span className="text-[10px] uppercase tracking-wider text-cyan-500 font-medium">Scene Image</span>
-                </div>
-                <div className="p-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={scene.assetUrl} alt="" className="rounded-lg w-full object-cover" />
-                  {scene.imagePrompt && (
-                    <p className="text-[10px] text-gray-500 mt-2 line-clamp-3 leading-relaxed">{scene.imagePrompt}</p>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-
-        <ZoomControls zoom={zoom} onZoomIn={zoomIn} onZoomOut={zoomOut} onFitView={handleFitView} onResetView={resetView} />
+          <Background
+            variant={BackgroundVariant.Dots}
+            gap={64}
+            size={1}
+            color="rgba(255,255,255,0.5)"
+          />
+          <Controls
+            showInteractive={false}
+            className="bg-black/80! border-white/10! rounded-xl! shadow-lg! [&>button]:bg-transparent! [&>button]:border-white/5! [&>button]:text-gray-500! [&>button:hover]:text-white! [&>button]:w-8! [&>button]:h-8! [&>button>svg]:fill-current!"
+            position="bottom-left"
+          />
+        </ReactFlow>
       </div>
     </div>
   );

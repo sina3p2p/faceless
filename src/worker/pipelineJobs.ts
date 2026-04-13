@@ -972,7 +972,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-motion] Motion descriptions ready`);
 
-    await renderQueue.add("generate-frame-videos", { videoProjectId, seriesId, userId });
+    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_MOTION", "generate-frame-videos");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-motion] Failed for ${videoProjectId}:`, msg);

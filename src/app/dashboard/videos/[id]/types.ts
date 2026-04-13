@@ -8,6 +8,16 @@ export interface MediaVersion {
   createdAt: string;
 }
 
+export interface Media {
+  id: string;
+  type: string;
+  url: string;
+  key: string;
+  prompt: string | null;
+  modelUsed: string | null;
+  createdAt: string;
+}
+
 export interface FrameVariant {
   id: string;
   type: string;
@@ -30,6 +40,8 @@ export interface SceneFrame {
   imageGeneratedAt?: string | null;
   videoGeneratedAt?: string | null;
   motionGeneratedAt?: string | null;
+  imageMediaId?: string | null;
+  videoMediaId?: string | null;
 }
 
 export interface Scene {

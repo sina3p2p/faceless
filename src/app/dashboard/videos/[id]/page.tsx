@@ -132,14 +132,14 @@ export default function ReviewPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="flex items-center justify-center h-full">
         <div className="animate-spin w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] -m-8 overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
       {/* Top bar */}
       <StudioTopBar
         video={video}
