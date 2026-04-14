@@ -18,13 +18,13 @@ export async function POST(
 
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoId),
-    columns: { id: true, config: true },
+    columns: { id: true, userId: true, config: true },
     with: {
       series: { columns: { userId: true, style: true } },
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   const frame = await db.query.sceneFrames.findFirst({
     where: eq(sceneFrames.id, frameId),

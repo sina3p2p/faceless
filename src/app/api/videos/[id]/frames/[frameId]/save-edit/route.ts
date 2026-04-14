@@ -26,7 +26,7 @@ export async function POST(
     with: { series: { columns: { userId: true } } },
   });
 
-  if (!video || video.series.userId !== user.id)
+  if (!video || video.userId !== user.id)
     return notFound("Video not found");
 
   const frame = await db.query.sceneFrames.findFirst({

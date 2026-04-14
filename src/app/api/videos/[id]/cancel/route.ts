@@ -21,7 +21,7 @@ export async function POST(
     with: { series: { columns: { userId: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   if (!CANCELLABLE_STATUSES.includes(video.status)) {
     return badRequest(`Cannot cancel a video with status "${video.status}"`);

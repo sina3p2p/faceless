@@ -38,7 +38,7 @@ export async function POST(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   const body = await req.json();
   const parsed = bodySchema.safeParse(body);
@@ -49,17 +49,17 @@ export async function POST(
   let prompt = parsed.data.prompt;
   if (!prompt?.trim()) {
     const title = video.title || "Untitled Video";
-    const style = video.series.style || "cinematic";
-    const niche = video.series.niche || "general";
-    const videoType = video.series.videoType || "standalone";
+    const style = video.series?.style || "cinematic";
+    const niche = video.series?.niche || "general";
+    const videoType = video.videoType;
 
     const hook = video.scenes?.[0]?.text?.slice(0, 120) || "";
     const keyVisual = video.scenes?.[0]?.visualDescription?.slice(0, 150)
       || video.scenes?.[0]?.imagePrompt?.slice(0, 150)
       || "";
 
-    const rawAssets = (video.series.storyAssets ?? []) as Array<{ name: string; description: string }>;
-    const rawChars = (video.series.characterImages ?? []) as Array<{ description: string }>;
+    const rawAssets = (video.series?.storyAssets ?? []) as Array<{ name: string; description: string }>;
+    const rawChars = (video.series?.characterImages ?? []) as Array<{ description: string }>;
     const assetDescs = rawAssets.length > 0
       ? rawAssets.filter((a) => a.description).map((a) => `${a.name}: ${a.description}`).join("; ")
       : rawChars.filter((c) => c.description).map((c) => c.description).join("; ");
@@ -78,8 +78,8 @@ export async function POST(
   }
 
   // Resolve asset refs for image models that support them
-  const storyAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }>;
-  const legacyChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
+  const storyAssets = (video.series?.storyAssets ?? []) as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }>;
+  const legacyChars = (video.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
   let charRefs: Array<{ url: string; description: string; name?: string; type?: "character" | "location" | "prop" }> | undefined;
 
   if (imageModel === "nano-banana-2") {

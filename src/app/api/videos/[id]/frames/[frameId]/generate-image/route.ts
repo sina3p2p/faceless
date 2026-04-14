@@ -38,7 +38,7 @@ export async function POST(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   const frame = await db.query.sceneFrames.findFirst({
     where: eq(sceneFrames.id, frameId),
@@ -51,16 +51,16 @@ export async function POST(
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
-  const imageModel = parsed.data.imageModel || video.series.imageModel || "dall-e-3";
-  const sizeConfig = getVideoSize(video.series.videoSize);
+  const imageModel = parsed.data.imageModel || video.imageModel || "dall-e-3";
+  const sizeConfig = getVideoSize(video.videoSize);
   const aspectRatio = sizeConfig.id as AspectRatio;
 
   const canonicalPrompt = parsed.data.imagePrompt || frame.imagePrompt || "scene image";
   const { providerPrompt } = serializeCanonicalForImageProvider(canonicalPrompt);
 
   // Resolve story assets filtered by frame's assetRefs
-  const rawAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string; sheetUrl?: string }>;
-  const rawChars = (video.series.characterImages ?? []) as Array<{ url: string; description: string }>;
+  const rawAssets = (video.series?.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string; sheetUrl?: string }>;
+  const rawChars = (video.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
   const frameAssetRefs = (frame.assetRefs as string[] | null) ?? [];
 
   const characterRefs: CharacterRef[] = [];

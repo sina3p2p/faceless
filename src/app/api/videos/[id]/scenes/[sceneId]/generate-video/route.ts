@@ -31,7 +31,7 @@ export async function POST(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   const scene = await db.query.videoScenes.findFirst({
     where: and(eq(videoScenes.id, sceneId), eq(videoScenes.videoProjectId, videoId)),
@@ -53,7 +53,7 @@ export async function POST(
 
   const { duration } = parsed.data;
   const prompt = parsed.data.visualDescription || scene.visualDescription || scene.text;
-  const videoModel = parsed.data.videoModel || video.series.videoModel || undefined;
+  const videoModel = parsed.data.videoModel || video.series?.videoModel || undefined;
 
   try {
     const signedImageUrl = imgKey.startsWith("http")
@@ -61,7 +61,7 @@ export async function POST(
       : await getSignedDownloadUrl(imgKey);
 
     let endImageUrl: string | undefined;
-    if (video.series.sceneContinuity) {
+    if (video.series?.sceneContinuity) {
       const nextScene = await db.query.videoScenes.findFirst({
         where: and(
           eq(videoScenes.videoProjectId, videoId),

@@ -157,8 +157,11 @@ export const series = pgTable("series", {
 export const videoProjects = pgTable("video_projects", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   seriesId: text("series_id").references(() => series.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   status: videoStatusEnum("status").default("PENDING").notNull(),
   title: text("title"),
+  language: text("language").default("en").notNull(),
+  videoType: text("video_type").default("standalone").notNull(),
   script: text("script"),
   duration: integer("duration"),
   config: json("config"),

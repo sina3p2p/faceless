@@ -16,10 +16,9 @@ export async function POST(
 
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, id),
-    with: { series: { columns: { userId: true, id: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   await db
     .update(videoProjects)
@@ -35,7 +34,6 @@ export async function POST(
 
   await renderQueue.add("rerender-video", {
     videoProjectId: id,
-    seriesId: video.series.id,
     userId: user.id,
   });
 

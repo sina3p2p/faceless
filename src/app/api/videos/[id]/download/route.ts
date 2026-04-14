@@ -19,7 +19,7 @@ export async function GET(
     with: { series: { columns: { userId: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
   if (!video.outputUrl) return badRequest("Video not ready for download");
 
   const url = await getSignedDownloadUrl(video.outputUrl);

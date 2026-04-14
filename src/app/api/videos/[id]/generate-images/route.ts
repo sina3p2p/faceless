@@ -27,7 +27,7 @@ export async function POST(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
   if (video.scenes.length === 0) return badRequest("No scenes found");
 
   const body = await req.json().catch(() => ({}));
@@ -41,7 +41,6 @@ export async function POST(
 
   await renderQueue.add("generate-images", {
     videoProjectId: id,
-    seriesId: video.series.id,
     userId: user.id,
     regenerateExisting: parsed.data.regenerateExisting,
   });

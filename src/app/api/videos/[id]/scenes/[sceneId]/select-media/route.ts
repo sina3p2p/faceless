@@ -23,7 +23,7 @@ export async function POST(
     with: { series: { columns: { userId: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   const body = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(body);

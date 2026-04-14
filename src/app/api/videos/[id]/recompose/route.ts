@@ -17,12 +17,11 @@ export async function POST(
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, id),
     with: {
-      series: { columns: { userId: true, id: true } },
       scenes: { orderBy: asc(videoScenes.sceneOrder) },
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
   if (video.status !== "COMPLETED") return badRequest("Video must be completed to recompose");
   if (video.scenes.length === 0) return badRequest("No scenes to recompose");
 
@@ -33,7 +32,6 @@ export async function POST(
 
   await renderQueue.add("rerender-video", {
     videoProjectId: id,
-    seriesId: video.series.id,
     userId: user.id,
   });
 

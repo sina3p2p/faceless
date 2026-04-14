@@ -19,7 +19,7 @@ export async function POST(
     with: { series: { columns: { id: true, userId: true, videoType: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
   if (video.status !== "FAILED") return badRequest("Only failed videos can be retried");
 
   await db
@@ -39,7 +39,6 @@ export async function POST(
 
   await renderQueue.add("generate-story", {
     videoProjectId: id,
-    seriesId: video.series.id,
     userId: user.id,
   });
 

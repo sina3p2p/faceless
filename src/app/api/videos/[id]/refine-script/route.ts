@@ -37,14 +37,14 @@ export async function POST(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   const body = await req.json().catch(() => ({}));
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
   const { message, chatHistory } = parsed.data;
-  const isMusic = video.series.videoType === "music_video";
+  const isMusic = video.videoType === "music_video";
 
   try {
     if (video.status === "REVIEW_STORY") {
@@ -54,8 +54,8 @@ export async function POST(
         currentStory,
         message,
         chatHistory as ChatMessage[],
-        video.series.language || "en",
-        video.series.llmModel || undefined
+        video.language || "en",
+        video.llmModel || undefined
       );
 
       const titleMatch = refined.match(/^#\s+(.+)$/m);
@@ -97,8 +97,8 @@ export async function POST(
         currentLyrics,
         message,
         chatHistory as ChatMessage[],
-        video.series.llmModel || undefined,
-        video.series.language || "en"
+        video.llmModel || undefined,
+        video.language || "en"
       );
 
       return NextResponse.json({
@@ -136,8 +136,8 @@ export async function POST(
         currentScript,
         message,
         chatHistory as ChatMessage[],
-        video.series.llmModel || undefined,
-        video.series.language || "en"
+        video.llmModel || undefined,
+        video.language || "en"
       );
 
       return NextResponse.json({
@@ -176,8 +176,8 @@ export async function POST(
         currentScript,
         message,
         chatHistory as ChatMessage[],
-        video.series.llmModel || undefined,
-        video.series.language || "en"
+        video.llmModel || undefined,
+        video.language || "en"
       );
 
       return NextResponse.json({

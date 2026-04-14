@@ -30,7 +30,7 @@ export async function POST(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   const totalFrames = video.scenes.reduce((sum, s) => sum + s.frames.length, 0);
   if (totalFrames === 0) return badRequest("No frames found — generate prompts first");
@@ -59,7 +59,6 @@ export async function POST(
 
   await renderQueue.add("generate-frame-images", {
     videoProjectId: id,
-    seriesId: video.series.id,
     userId: user.id,
   });
 

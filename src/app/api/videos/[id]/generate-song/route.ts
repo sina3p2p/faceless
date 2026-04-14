@@ -16,12 +16,9 @@ export async function POST(
 
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, id),
-    with: {
-      series: { columns: { userId: true, id: true, videoType: true } },
-    },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   if (!["REVIEW_MUSIC_SCRIPT", "MUSIC_REVIEW"].includes(video.status)) {
     return badRequest(`Cannot generate song from status "${video.status}"`);
@@ -34,7 +31,6 @@ export async function POST(
 
   await renderQueue.add("generate-song", {
     videoProjectId: id,
-    seriesId: video.series.id,
     userId: user.id,
   });
 

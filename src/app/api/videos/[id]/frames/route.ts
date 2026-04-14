@@ -34,7 +34,7 @@ export async function GET(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.userId !== user.id) return notFound("Video not found");
 
   const scenesWithFrames = await Promise.all(
     video.scenes.map(async (scene) => ({
