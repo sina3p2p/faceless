@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   AbsoluteFill,
   Audio,
@@ -202,36 +203,44 @@ function estimateTimestamps(
 }
 
 export function VideoComposition({ scenes, fps }: VideoCompositionProps) {
-  let frameOffset = 0;
+  const sceneFrameOffsets = useMemo(() => {
+    let frameOffset = 0;
+    const sceneFrameOffsets = [];
+    for (const scene of scenes) {
+      const durationInFrames = Math.round(scene.duration * fps);
+      sceneFrameOffsets.push({
+        ...scene,
+        from: frameOffset,
+        durationInFrames,
+      });
+      frameOffset += durationInFrames;
+
+    }
+    return sceneFrameOffsets;
+  }, [scenes, fps]);
 
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
-      {scenes.map((scene, i) => {
-        const durationInFrames = Math.round(scene.duration * fps);
-        const from = frameOffset;
-        frameOffset += durationInFrames;
-
-        return (
-          <Sequence
-            key={scene.id}
-            from={from}
-            durationInFrames={durationInFrames}
-          >
-            <AbsoluteFill>
-              <SceneMedia
-                scene={scene}
-                durationInFrames={durationInFrames}
-                sceneIndex={i}
-              />
-              {scene.audioUrl && <Audio src={scene.audioUrl} />}
-              <WordCaptions
-                scene={scene}
-                durationInFrames={durationInFrames}
-              />
-            </AbsoluteFill>
-          </Sequence>
-        );
-      })}
+      {sceneFrameOffsets.map((scene, i) => (
+        <Sequence
+          key={scene.id}
+          from={scene.from}
+          durationInFrames={scene.durationInFrames}
+        >
+          <AbsoluteFill>
+            <SceneMedia
+              scene={scene}
+              durationInFrames={scene.durationInFrames}
+              sceneIndex={i}
+            />
+            {scene.audioUrl && <Audio src={scene.audioUrl} />}
+            <WordCaptions
+              scene={scene}
+              durationInFrames={scene.durationInFrames}
+            />
+          </AbsoluteFill>
+        </Sequence>
+      ))}
     </AbsoluteFill>
   );
 }

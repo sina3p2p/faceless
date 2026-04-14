@@ -29,7 +29,7 @@ const nodeTypes: NodeTypes = {
 const COLUMN_GAP = 15;
 const ROW_GAP = 400;
 const NODE_WIDTH = 300;
-const NODE_HEIGHT = 200;
+// const NODE_HEIGHT = 200;
 const STROKE_WIDTH = 5;
 
 export type FrameNodeData = {

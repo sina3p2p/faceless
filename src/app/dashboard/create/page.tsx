@@ -209,22 +209,20 @@ export default function CreateVideoPage() {
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, durationPriority: "quality" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    form.durationPriority === "quality"
-                      ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
-                      : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.durationPriority === "quality"
+                    ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+                    : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+                    }`}
                 >
                   Prioritize Quality
                 </button>
                 <button
                   type="button"
                   onClick={() => setForm({ ...form, durationPriority: "duration" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    form.durationPriority === "duration"
-                      ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
-                      : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
-                  }`}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.durationPriority === "duration"
+                    ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+                    : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+                    }`}
                 >
                   Prioritize Exact Duration
                 </button>
@@ -384,7 +382,6 @@ export default function CreateVideoPage() {
                               onClick={async () => {
                                 setGeneratingSheetIdx(idx);
                                 try {
-                                  const imgUrl = asset.generatedUrl || (asset.file ? URL.createObjectURL(asset.file) : "");
                                   let uploadedUrl = asset.generatedUrl;
                                   if (!uploadedUrl && asset.file) {
                                     const fd = new FormData();

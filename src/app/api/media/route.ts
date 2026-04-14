@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { series, videoProjects, videoScenes } from "@/server/db/schema";
 import { getAuthUser, unauthorized } from "@/lib/api-utils";
-import { eq, asc, desc, lt, or } from "drizzle-orm";
+import { eq, asc, desc, or } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
 
 const PAGE_SIZE = 20;
@@ -44,51 +44,52 @@ export async function GET(req: NextRequest) {
 
   const projectQuery = cursor
     ? db.query.videoProjects.findMany({
-        where: projectWhere,
-        columns: { id: true, seriesId: true, title: true, outputUrl: true, createdAt: true },
-        orderBy: desc(videoProjects.createdAt),
-        with: {
-          scenes: {
-            orderBy: asc(videoScenes.sceneOrder),
-            columns: {
-              id: true,
-              sceneOrder: true,
-              imageUrl: true,
-              videoUrl: true,
-              audioUrl: true,
-              assetUrl: true,
-              assetType: true,
-              imagePrompt: true,
-              visualDescription: true,
-              modelUsed: true,
-              createdAt: true,
-            },
+      where: projectWhere,
+      columns: { id: true, seriesId: true, title: true, outputUrl: true, createdAt: true },
+      orderBy: desc(videoProjects.createdAt),
+      with: {
+        scenes: {
+          orderBy: asc(videoScenes.sceneOrder),
+          columns: {
+            id: true,
+            sceneOrder: true,
+            imageUrl: true,
+            videoUrl: true,
+            audioUrl: true,
+            assetUrl: true,
+            assetType: true,
+            imagePrompt: true,
+            visualDescription: true,
+            modelUsed: true,
+            createdAt: true,
           },
         },
-      })
+      },
+    })
     : db.query.videoProjects.findMany({
-        where: projectWhere,
-        columns: { id: true, seriesId: true, title: true, outputUrl: true, createdAt: true },
-        orderBy: desc(videoProjects.createdAt),
-        with: {
-          scenes: {
-            orderBy: asc(videoScenes.sceneOrder),
-            columns: {
-              id: true,
-              sceneOrder: true,
-              imageUrl: true,
-              videoUrl: true,
-              audioUrl: true,
-              assetUrl: true,
-              assetType: true,
-              imagePrompt: true,
-              visualDescription: true,
-              modelUsed: true,
-              createdAt: true,
-            },
+      where: projectWhere,
+      columns: { id: true, seriesId: true, title: true, outputUrl: true, createdAt: true },
+      orderBy: desc(videoProjects.createdAt),
+      with: {
+        scenes: {
+          orderBy: asc(videoScenes.sceneOrder),
+          columns: {
+            id: true,
+            sceneOrder: true,
+            videoProjectId: true,
+            imageUrl: true,
+            videoUrl: true,
+            audioUrl: true,
+            assetUrl: true,
+            assetType: true,
+            imagePrompt: true,
+            visualDescription: true,
+            modelUsed: true,
+            createdAt: true,
           },
         },
-      });
+      },
+    });
 
   const projects = await projectQuery;
 
@@ -101,7 +102,8 @@ export async function GET(req: NextRequest) {
   const allItems: MediaItem[] = [];
 
   for (const project of projects) {
-    const sName = seriesMap.get(project.seriesId) || "Unknown";
+    let sName = project.seriesId ? seriesMap.get(project.seriesId) : "";
+    sName = sName ?? "Unknown";
 
     if (tab === "videos" && project.outputUrl) {
       const url = await resolveUrl(project.outputUrl);

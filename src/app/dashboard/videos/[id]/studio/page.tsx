@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { DragEndEvent } from "@dnd-kit/core";
@@ -215,10 +215,6 @@ export default function StudioPage() {
                   setVideo={setVideo}
                   onSaveStory={handleSaveStory}
                   downloadUrl={downloadUrl}
-                  downloading={downloading}
-                  onDownload={handleDownload}
-                  rendering={rendering}
-                  onRecompose={handleRecompose}
                 />
               </>
             )}

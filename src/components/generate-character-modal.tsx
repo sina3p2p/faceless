@@ -122,7 +122,7 @@ export function GenerateCharacterModal({
         setLoading(false);
       }
     },
-    [messages, loading]
+    [messages, loading, assetType]
   );
 
   function handleSubmit(e?: React.FormEvent) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { EditorScene } from "./VideoComposition";
+import Image from "next/image";
 
 interface ScenePanelProps {
   scene: EditorScene | null;
@@ -51,7 +52,7 @@ export function ScenePanel({ scene, onUpdate }: ScenePanelProps) {
         {scene.assetUrl && (
           <div className="rounded-lg overflow-hidden mb-4 aspect-[9/16] bg-black">
             {scene.assetType === "image" ? (
-              <img
+              <Image
                 src={scene.assetUrl}
                 alt="Scene media"
                 className="w-full h-full object-cover"

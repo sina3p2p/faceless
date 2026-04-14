@@ -46,7 +46,6 @@ function DiffBlock({ change }: { change: SceneChange }) {
 
 export function ScriptChatPanel({
   videoId,
-  scenes,
   onApply,
   onClose,
 }: {
@@ -158,7 +157,7 @@ export function ScriptChatPanel({
             <div className={`max-w-[85%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${msg.role === "user"
               ? "bg-violet-600 text-white"
               : "bg-white/5 border border-white/10 text-gray-300"
-            }`}>
+              }`}>
               {msg.content}
             </div>
           </div>

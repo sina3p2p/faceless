@@ -19,6 +19,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { EditorScene } from "./VideoComposition";
+import Image from "next/image";
 
 interface TimelineProps {
   scenes: EditorScene[];
@@ -67,16 +68,15 @@ function SortableSceneBlock({
       {...attributes}
       {...listeners}
       onClick={onSelect}
-      className={`relative flex-shrink-0 w-36 h-24 rounded-lg border-2 cursor-pointer transition-all overflow-hidden group ${
-        isSelected
-          ? "border-violet-500 ring-2 ring-violet-500/30"
-          : isPlaying
+      className={`relative flex-shrink-0 w-36 h-24 rounded-lg border-2 cursor-pointer transition-all overflow-hidden group ${isSelected
+        ? "border-violet-500 ring-2 ring-violet-500/30"
+        : isPlaying
           ? "border-violet-400/50"
           : "border-white/10 hover:border-white/20"
-      }`}
+        }`}
     >
       {scene.assetUrl && scene.assetType === "image" ? (
-        <img
+        <Image
           src={scene.assetUrl}
           alt={`Scene ${index + 1}`}
           className="w-full h-full object-cover"

@@ -38,11 +38,6 @@ export async function POST(
     .set({ status: "ACTIVE", step: "TTS", progress: 0 })
     .where(eq(renderJobs.videoProjectId, id));
 
-  const seriesRecord = await db.query.series.findFirst({
-    where: eq(series.id, video.series.id),
-    columns: { videoType: true },
-  });
-
   await renderQueue.add("render-from-scenes", {
     videoProjectId: id,
     seriesId: video.series.id,

@@ -1122,7 +1122,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 // ── Compose Final Video ──
 
 export async function composeFinalJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, seriesId } = job.data;
   const workDir = path.join(os.tmpdir(), `faceless-compose-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
 

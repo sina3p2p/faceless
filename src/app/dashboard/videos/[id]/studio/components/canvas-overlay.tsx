@@ -1,7 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ActivityFeed } from "../../components";
 import type { VideoPhase, StudioPhaseId } from "../../hooks/use-video-phase";
 import type { Scene, VideoDetail } from "../../types";
@@ -29,10 +27,6 @@ export function CanvasOverlay({
   setVideo,
   onSaveStory,
   downloadUrl,
-  downloading,
-  onDownload,
-  rendering,
-  onRecompose,
 }: {
   selectedPhaseId: StudioPhaseId;
   phase: VideoPhase;
@@ -41,10 +35,6 @@ export function CanvasOverlay({
   setVideo: React.Dispatch<React.SetStateAction<VideoDetail>>;
   onSaveStory: (markdown: string) => void;
   downloadUrl: string | null;
-  downloading: boolean;
-  onDownload: () => void;
-  rendering: boolean;
-  onRecompose: () => void;
 }) {
   const status = video?.status || "";
 

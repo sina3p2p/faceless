@@ -20,6 +20,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import Image from "next/image";
 
 interface Scene {
   id: string;
@@ -89,11 +90,10 @@ function SortableSceneCard({
       ref={setNodeRef}
       style={style}
       onClick={onSelect}
-      className={`rounded-xl border transition-all ${
-        isSelected
+      className={`rounded-xl border transition-all ${isSelected
           ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/20"
           : "border-white/5 bg-white/[0.02] hover:border-white/10"
-      }`}
+        }`}
     >
       <div className="flex gap-3 p-3">
         {/* Drag handle */}
@@ -118,7 +118,7 @@ function SortableSceneCard({
             scene.assetType === "video" ? (
               <video src={scene.assetUrl} className="w-full h-full object-cover" muted />
             ) : (
-              <img src={scene.assetUrl} alt="" className="w-full h-full object-cover" />
+              <Image src={scene.assetUrl} alt="" className="w-full h-full object-cover" />
             )
           ) : (
             <div className="w-full h-full bg-gradient-to-br from-violet-900/30 to-black flex items-center justify-center">
@@ -315,7 +315,7 @@ export default function VideoEditorPage() {
       if (res.ok) {
         router.push(`/dashboard/videos/${id}`);
       }
-    } catch {}
+    } catch { }
     setRerendering(false);
   }
 

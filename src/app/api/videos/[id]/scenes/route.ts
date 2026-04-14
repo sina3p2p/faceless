@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, series, media } from "@/server/db/schema";
+import { videoProjects, videoScenes, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq, asc, desc } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";

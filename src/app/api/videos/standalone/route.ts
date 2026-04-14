@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { series, videoProjects, renderJobs } from "@/server/db/schema";
+import { videoProjects, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
@@ -66,10 +66,6 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-
-  const seriesName = data.prompt.length > 50
-    ? data.prompt.slice(0, 47) + "..."
-    : data.prompt;
 
   // Build storyAssets from the new format, or auto-migrate from legacy characters
   let storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> = [];

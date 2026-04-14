@@ -2,7 +2,7 @@ import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter, type StoryAsset } from "./index";
-import type { CreativeBrief, ContinuityNotes } from "@/lib/types";
+import type { CreativeBrief } from "@/lib/types";
 
 const characterEntrySchema = z.object({
   canonicalName: z.string().describe("The ONE correct name for this character, used everywhere downstream. Must match storyAssets name if an asset exists."),

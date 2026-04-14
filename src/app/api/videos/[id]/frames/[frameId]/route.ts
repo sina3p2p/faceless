@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, sceneFrames } from "@/server/db/schema";
+import { videoProjects, sceneFrames } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -26,7 +26,7 @@ export async function PATCH(
     with: { series: { columns: { userId: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video || video.series?.userId !== user.id) return notFound("Video not found");
 
   const body = await req.json().catch(() => ({}));
   const parsed = updateSchema.safeParse(body);

@@ -18,8 +18,6 @@ export function VideoNode({ data }: NodeProps) {
   const {
     frame,
     media,
-    frameIndex,
-    onGenerateImage,
   } = data as FrameNodeData;
 
   const { selectedMedia, video } = useStudioContext();

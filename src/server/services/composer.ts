@@ -8,7 +8,10 @@ import { VIDEO_DEFAULTS } from "@/lib/constants";
 import type { WordTimestamp } from "@/server/services/tts";
 
 const execAsync = promisify(exec);
-
+const VIDEO_ENCODING = {
+  preset: "medium",
+  crf: 18,
+} as const;
 export interface ComposerScene {
   audioPath: string;
   mediaPath: string;
@@ -238,12 +241,12 @@ export async function composeVideo(
 
       if (scene.mediaType === "video") {
         const videoDuration = await getMediaDuration(scene.mediaPath);
-        const speedFactor = videoDuration > 0 && videoDuration < duration
-          ? videoDuration / duration
+        const ptsFactor = videoDuration > 0 && videoDuration < duration
+          ? duration / videoDuration
           : 1;
 
         const videoFilters = [
-          ...(speedFactor < 1 ? [`setpts=PTS/${speedFactor}`] : []),
+          ...(ptsFactor > 1 ? [`setpts=PTS*${ptsFactor.toFixed(6)}`] : []),
           `scale=${W}:${H}:force_original_aspect_ratio=increase`,
           `crop=${W}:${H}`,
           `setsar=1`,
@@ -253,18 +256,18 @@ export async function composeVideo(
         if (useGlobalAudio) {
           await execAsync(
             `ffmpeg -y -i "${scene.mediaPath}" ` +
-              `-vf "${videoFilters}" -an ` +
-              `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-              `-t ${duration} "${sceneOutput}"`
+            `-vf "${videoFilters}" -an ` +
+            `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+            `-t ${duration} "${sceneOutput}"`
           );
         } else {
           await execAsync(
             `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
-              `-filter_complex "[0:v]${videoFilters}[outv];[1:a]aresample=44100[outa]" ` +
-              `-map "[outv]" -map "[outa]" ` +
-              `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-              `-c:a aac -b:a 192k -ar 44100 ` +
-              `-t ${duration} "${sceneOutput}"`
+            `-filter_complex "[0:v]${videoFilters}[outv];[1:a]aresample=44100[outa]" ` +
+            `-map "[outv]" -map "[outa]" ` +
+            `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+            `-c:a aac -b:a 192k -ar 44100 ` +
+            `-t ${duration} "${sceneOutput}"`
           );
         }
       } else {
@@ -287,18 +290,18 @@ export async function composeVideo(
         if (useGlobalAudio) {
           await execAsync(
             `ffmpeg -y -loop 1 -i "${scene.mediaPath}" ` +
-              `-vf "${imageFilter}" -an ` +
-              `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-              `-t ${duration} "${sceneOutput}"`
+            `-vf "${imageFilter}" -an ` +
+            `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+            `-t ${duration} "${sceneOutput}"`
           );
         } else {
           await execAsync(
             `ffmpeg -y -loop 1 -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
-              `-filter_complex "[0:v]${imageFilter}[outv];[1:a]aresample=44100[outa]" ` +
-              `-map "[outv]" -map "[outa]" ` +
-              `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-              `-c:a aac -b:a 192k -ar 44100 ` +
-              `-t ${duration} "${sceneOutput}"`
+            `-filter_complex "[0:v]${imageFilter}[outv];[1:a]aresample=44100[outa]" ` +
+            `-map "[outv]" -map "[outa]" ` +
+            `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+            `-c:a aac -b:a 192k -ar 44100 ` +
+            `-t ${duration} "${sceneOutput}"`
           );
         }
       }
@@ -317,9 +320,9 @@ export async function composeVideo(
 
       await execAsync(
         `ffmpeg -y -f concat -safe 0 -i "${concatList}" ` +
-          `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-          (useGlobalAudio ? `-an ` : `-c:a aac -b:a 192k `) +
-          `"${rawConcat}"`
+        `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+        (useGlobalAudio ? `-an ` : `-c:a aac -b:a 192k `) +
+        `"${rawConcat}"`
       );
     }
 
@@ -335,10 +338,10 @@ export async function composeVideo(
       const assPathEscaped = assPath.replace(/'/g, "'\\''").replace(/:/g, "\\:");
       await execAsync(
         `ffmpeg -y -i "${rawConcat}" ` +
-          `-vf "ass='${assPathEscaped}'" ` +
-          `-c:v libx264 -preset fast -crf 20 -pix_fmt yuv420p ` +
-          (useGlobalAudio ? `-an ` : `-c:a copy `) +
-          `"${withCaptions}"`
+        `-vf "ass='${assPathEscaped}'" ` +
+        `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+        (useGlobalAudio ? `-an ` : `-c:a copy `) +
+        `"${withCaptions}"`
       );
       currentVideo = withCaptions;
     }
@@ -347,8 +350,8 @@ export async function composeVideo(
       const withAudio = path.join(workDir, "with_global_audio.mp4");
       await execAsync(
         `ffmpeg -y -i "${currentVideo}" -i "${globalAudioPath}" ` +
-          `-map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -ar 44100 ` +
-          `-shortest "${withAudio}"`
+        `-map 0:v -map 1:a -c:v copy -c:a aac -b:a 192k -ar 44100 ` +
+        `-shortest "${withAudio}"`
       );
       currentVideo = withAudio;
     }
@@ -357,15 +360,15 @@ export async function composeVideo(
       const finalOutput = path.join(workDir, "final.mp4");
       await execAsync(
         `ffmpeg -y -i "${currentVideo}" -i "${backgroundMusicPath}" ` +
-          `-filter_complex "[1:a]volume=0.10[bg];[0:a][bg]amix=inputs=2:duration=first[outa]" ` +
-          `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${finalOutput}"`
+        `-filter_complex "[1:a]volume=0.10[bg];[0:a][bg]amix=inputs=2:duration=first[outa]" ` +
+        `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${finalOutput}"`
       );
       return finalOutput;
     }
 
     return currentVideo;
   } catch (error) {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
     throw error;
   }
 }

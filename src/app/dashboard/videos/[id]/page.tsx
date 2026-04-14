@@ -122,7 +122,7 @@ export default function ReviewPage() {
     }
   }
 
-  const totalDuration = useMemo(() => scenes.reduce((s, sc) => s + sc.duration, 0), [scenes]);
+  // const totalDuration = useMemo(() => scenes.reduce((s, sc) => s + sc.duration, 0), [scenes]);
   const allImagesGenerated = scenes.length > 0 && scenes.every((s) => s.assetUrl);
   const someImagesGenerated = scenes.some((s) => s.assetUrl);
   const allFrames = scenes.flatMap((s) => s.frames ?? []);
