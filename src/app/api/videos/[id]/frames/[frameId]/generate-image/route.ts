@@ -4,6 +4,7 @@ import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { generateImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
+import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt-contract";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { getVideoSize, IMAGE_MODELS } from "@/lib/constants";
 import { z } from "zod";
@@ -54,7 +55,8 @@ export async function POST(
   const sizeConfig = getVideoSize(video.series.videoSize);
   const aspectRatio = sizeConfig.id as AspectRatio;
 
-  const prompt = parsed.data.imagePrompt || frame.imagePrompt || "scene image";
+  const canonicalPrompt = parsed.data.imagePrompt || frame.imagePrompt || "scene image";
+  const { providerPrompt } = serializeCanonicalForImageProvider(canonicalPrompt);
 
   // Resolve story assets filtered by frame's assetRefs
   const rawAssets = (video.series.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string; sheetUrl?: string }>;
@@ -85,7 +87,7 @@ export async function POST(
 
   try {
     const result = await generateImage(
-      prompt,
+      providerPrompt,
       imageModel,
       characterRefs.length > 0 ? characterRefs : undefined,
       aspectRatio

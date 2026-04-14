@@ -10,6 +10,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import type { ImageSpec } from "@/server/services/llm/image-spec";
+import type { ResultMeta } from "@/server/services/llm/prompt-contract";
 
 // ── Enums ──
 
@@ -200,6 +202,10 @@ export const sceneFrames = pgTable("scene_frames", {
   frameOrder: integer("frame_order").notNull(),
   clipDuration: real("clip_duration"),
   imagePrompt: text("image_prompt"),
+  /** Structured architect output; subject.primary merged with continuity before serialize. */
+  imageSpec: json("image_spec").$type<ImageSpec | null>(),
+  /** Last prompt-contract assessment (deriveFinalStatus, reason codes, flags). */
+  promptContractMeta: json("prompt_contract_meta").$type<ResultMeta | null>(),
   visualDescription: text("visual_description"),
   imageMediaId: text("image_media_id"),
   videoMediaId: text("video_media_id"),

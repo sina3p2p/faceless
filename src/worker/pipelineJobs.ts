@@ -19,10 +19,15 @@ import {
 } from "./shared";
 import { generateSceneImage } from "./mediaJobs";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL, WORKER, getVideoSize } from "@/lib/constants";
+import { generateFramePrompts } from "@/server/services/llm/prompts";
+import {
+  formatPromptContractLogLine,
+  resolveFrameImagePromptWithFallback,
+  serializeCanonicalForImageProvider,
+} from "@/server/services/llm/prompt-contract";
 import {
   generateStory,
   splitStoryIntoScenes,
-  generateFramePrompts,
   generateSingleFrameMotion,
   generateCreativeBrief,
   superviseScript,
@@ -684,12 +689,43 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
     let totalFrames = 0;
     for (let i = 0; i < existingScenes.length; i++) {
       const sceneFrames = result.scenes[i]?.frames ?? [];
+      const frameSpecs = config.frameBreakdown.scenes[i]?.frames ?? [];
       for (let j = 0; j < sceneFrames.length; j++) {
+        const subjectFocus = frameSpecs[j]?.subjectFocus ?? "";
+        const frameSpec = frameSpecs[j];
+        if (!frameSpec) {
+          throw new Error(`Missing frame spec for scene ${i} frame ${j}`);
+        }
+        const { imagePrompt, assessment } = resolveFrameImagePromptWithFallback({
+          primaryImagePrompt: sceneFrames[j].imagePrompt,
+          subjectFocus,
+          characterRegistry: config.continuityNotes.characterRegistry,
+          providerProfile: agents.promptModel ?? "prompt-model",
+          styleGuide: config.visualStyleGuide,
+          sceneIndex: i,
+          frameSpec,
+        });
+        if (
+          assessment.finalStatus === "failed" ||
+          assessment.finalStatus === "degraded" ||
+          assessment.finalStatus === "fallback"
+        ) {
+          console.warn(
+            formatPromptContractLogLine(assessment.resultMeta, {
+              videoProjectId,
+              sceneIndex: i,
+              frameIndex: j,
+            })
+          );
+        }
+
         await db.insert(schema.sceneFrames).values({
           sceneId: existingScenes[i].id,
           frameOrder: j,
           clipDuration: sceneFrames[j].clipDuration,
-          imagePrompt: sceneFrames[j].imagePrompt,
+          imagePrompt,
+          imageSpec: sceneFrames[j].imageSpec,
+          promptContractMeta: assessment.resultMeta,
           assetRefs: sceneFrames[j].assetRefs,
         });
         totalFrames++;
@@ -767,7 +803,8 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     for (let i = 0; i < targets.length; i++) {
       const { frame, sceneIdx } = targets[i];
-      const prompt = frame.imagePrompt || `Scene ${sceneIdx + 1}`;
+      const canonicalPrompt = frame.imagePrompt || `Scene ${sceneIdx + 1}`;
+      const { providerPrompt: prompt } = serializeCanonicalForImageProvider(canonicalPrompt);
       const frameAssetRefs = frame.assetRefs as string[] | null;
       const matchedAssets = filterAssetsByRefs(allAssets, frameAssetRefs);
 

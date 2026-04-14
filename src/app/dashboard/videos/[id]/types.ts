@@ -34,6 +34,10 @@ export interface SceneFrame {
   frameOrder: number;
   clipDuration: number | null;
   imagePrompt: string | null;
+  /** Merged ImageSpec persisted after prompt generation (optional on older rows). */
+  imageSpec?: Record<string, unknown> | null;
+  /** Last contract assessment metadata (optional on older rows). */
+  promptContractMeta?: Record<string, unknown> | null;
   visualDescription: string | null;
   imageUrl: string | null;
   videoUrl: string | null;

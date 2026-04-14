@@ -59,6 +59,8 @@ export async function GET(
             frameOrder: frame.frameOrder,
             clipDuration: frame.clipDuration,
             imagePrompt: frame.imagePrompt,
+            imageSpec: frame.imageSpec,
+            promptContractMeta: frame.promptContractMeta,
             visualDescription: frame.visualDescription,
             assetRefs: frame.assetRefs,
             modelUsed: frame.modelUsed,
