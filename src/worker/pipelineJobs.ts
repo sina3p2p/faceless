@@ -704,6 +704,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
           styleGuide: config.visualStyleGuide,
           sceneIndex: i,
           frameSpec,
+          mergeReasonCodes: sceneFrames[j].mergeReasonCodes,
         });
         if (
           assessment.finalStatus === "failed" ||

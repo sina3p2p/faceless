@@ -23,12 +23,14 @@ import type { CharacterEntry, FrameSpec, VisualStyleGuide } from "@/lib/types";
 import { buildUpstreamFallbackImagePrompt } from "./image-spec";
 
 /** Bump when behavior above changes in a breaking way for fixtures / consumers. */
-export const CONTRACT_VERSION = "1.1.0";
+export const CONTRACT_VERSION = "1.2.0";
 
 /**
  * 1.0.0 — Initial contract: subject assembly + normalization, canonical/provider usability,
  *          deriveFinalStatus, ResultMeta, appearance-injection check when assetRef.
  * 1.1.0 — Upstream-only fallback path, `resolveFrameImagePromptWithFallback`, provider-layer truncate helper.
+ * 1.2.0 — Provider over-length → warning (not hard fail); failureClass refinement; ResultMeta.mergeReasonCodes;
+ *          folded provider warnings into assessment.
  */
 
 // ── Failure taxonomy (keep small; nuance lives in reason codes) ─────────────
@@ -51,7 +53,6 @@ export const DEGRADATION_REASON_CODES = [
   "APPEARANCE_INJECTION_WITH_REF",
   "MEANINGFUL_TOKENS_LOW",
   "STYLE_ONLY_LIKELY",
-  "PROVIDER_PROMPT_TOO_LONG",
   "PROVIDER_PROMPT_EMPTY",
 ] as const;
 
@@ -94,6 +95,8 @@ export interface ResultMeta {
   payloadUsable: boolean;
   fallbackAttempted: boolean;
   fallbackUsed: boolean;
+  /** From `mergeImageSpecWithUpstream` when persisting frame prompts. */
+  mergeReasonCodes?: string[];
 }
 
 // ── Subject path: assembled → normalized → serialized fragment ───────────────
@@ -397,6 +400,8 @@ export function evaluateCanonicalPromptUsability(
 export interface ProviderUsabilityResult {
   providerPayloadUsable: boolean;
   hardReasonCodes: string[];
+  /** e.g. PROVIDER_PROMPT_TRUNCATED when canonical exceeds provider max (truncate at gen time). */
+  warningCodes: string[];
   degradationReasonCodes: string[];
   appliedActions: AppliedAction[];
 }
@@ -408,6 +413,7 @@ export function evaluateProviderPayloadUsability(
   const maxLength = options?.maxLength ?? DEFAULT_PROVIDER_MAX_PROMPT_LENGTH;
   const p = normalizeUnicode(prompt);
   const hardReasonCodes: string[] = [];
+  const warningCodes: string[] = [];
   const appliedActions: AppliedAction[] = [];
 
   if (p.length === 0) {
@@ -415,28 +421,56 @@ export function evaluateProviderPayloadUsability(
     return {
       providerPayloadUsable: false,
       hardReasonCodes,
+      warningCodes,
       degradationReasonCodes: [...hardReasonCodes],
       appliedActions,
     };
   }
   if (p.length > maxLength) {
-    hardReasonCodes.push("PROVIDER_PROMPT_TOO_LONG");
+    warningCodes.push("PROVIDER_PROMPT_TRUNCATED");
     appliedActions.push({
       family: "provider",
       field: "payload",
-      action: "DROP_LOWER",
-      winner: "length_limit",
-      loser: "raw_prompt",
-      reasonCode: "PROVIDER_PROMPT_TOO_LONG",
+      action: "WARN",
+      winner: "truncate_at_generation",
+      loser: "full_canonical",
+      reasonCode: "PROVIDER_PROMPT_TRUNCATED",
     });
   }
 
   return {
     providerPayloadUsable: hardReasonCodes.length === 0,
     hardReasonCodes: [...new Set(hardReasonCodes)],
+    warningCodes,
     degradationReasonCodes: [...new Set(hardReasonCodes)],
     appliedActions: capAppliedActions(appliedActions),
   };
+}
+
+function resolveFailureClassForAssessment(input: {
+  payloadUsable: boolean;
+  isDegraded: boolean;
+  canonicalUsable: boolean;
+  providerUsable: boolean;
+  canonicalHardReasonCodes: string[];
+  providerHardReasonCodes: string[];
+}): FailureClass | undefined {
+  if (input.payloadUsable) {
+    return input.isDegraded ? "CANONICALIZATION_DEGRADED" : undefined;
+  }
+  const ch = input.canonicalHardReasonCodes;
+  const ph = input.providerHardReasonCodes;
+  const continuityConflict = ch.some(
+    (c) => c === "IDENTITY_TOKEN_MISSING" || c === "APPEARANCE_INJECTION_WITH_REF"
+  );
+  if (continuityConflict) return "CONTRACT_CONFLICT";
+  if (ch.includes("CANONICAL_PROMPT_EMPTY") || ph.includes("PROVIDER_PROMPT_EMPTY")) {
+    return "DATA_INVALID";
+  }
+  if (!input.canonicalUsable && !input.providerUsable) return "SERIALIZATION_FAILED";
+  if (!input.providerUsable) return "PROVIDER_UNSUPPORTED";
+  if (!input.canonicalUsable) return "DATA_INVALID";
+  return "SERIALIZATION_FAILED";
 }
 
 function capAppliedActions(actions: AppliedAction[]): AppliedAction[] {
@@ -481,6 +515,7 @@ export interface BuildFramePromptContractInput {
   fallbackAttempted?: boolean;
   /** When true, fallback path produced the winning payload (requires usable payload). */
   fallbackUsed?: boolean;
+  mergeReasonCodes?: string[];
 }
 
 export interface FramePromptContractAssessment {
@@ -519,7 +554,10 @@ export function buildFramePromptContractAssessment(
   /** Shipped prompt has soft quality issues (short, low tokens, style-heavy) but no hard failures. */
   const isDegraded = payloadUsable && !canonical.canonicalStrict;
 
-  const warningCodes = [...new Set(canonical.warningCodes)];
+  const mergeReasonCodes = [...new Set(input.mergeReasonCodes ?? [])];
+  const warningCodes = [
+    ...new Set([...canonical.warningCodes, ...provider.warningCodes]),
+  ];
 
   const mergedActions = [...canonical.appliedActions, ...provider.appliedActions];
   const actionsTruncated = mergedActions.length > MAX_APPLIED_ACTIONS_META;
@@ -533,17 +571,14 @@ export function buildFramePromptContractAssessment(
     warningCodes,
   });
 
-  let failureClass: FailureClass | undefined;
-  if (!payloadUsable) {
-    failureClass =
-      !canonicalUsable && !providerPayloadUsable
-        ? "SERIALIZATION_FAILED"
-        : !canonicalUsable
-          ? "DATA_INVALID"
-          : "PROVIDER_UNSUPPORTED";
-  } else if (isDegraded) {
-    failureClass = "CANONICALIZATION_DEGRADED";
-  }
+  const failureClass = resolveFailureClassForAssessment({
+    payloadUsable,
+    isDegraded,
+    canonicalUsable,
+    providerUsable: providerPayloadUsable,
+    canonicalHardReasonCodes: canonical.hardReasonCodes,
+    providerHardReasonCodes: provider.hardReasonCodes,
+  });
 
   const resultMeta: ResultMeta = {
     contractVersion: CONTRACT_VERSION,
@@ -560,6 +595,7 @@ export function buildFramePromptContractAssessment(
     payloadUsable,
     fallbackAttempted,
     fallbackUsed,
+    mergeReasonCodes: mergeReasonCodes.length > 0 ? mergeReasonCodes : undefined,
   };
 
   return {
@@ -581,6 +617,7 @@ export interface ResolveFrameImagePromptInput {
   styleGuide: VisualStyleGuide;
   sceneIndex: number;
   frameSpec: FrameSpec;
+  mergeReasonCodes?: string[];
 }
 
 /**
@@ -594,6 +631,8 @@ export function resolveFrameImagePromptWithFallback(
   const normalized = normalizeSubjectIdentity(assembled, input.characterRegistry);
   const subjectLine = normalized.subjectPrimary;
 
+  const mergeReasonCodes = input.mergeReasonCodes;
+
   const primaryAssessment = buildFramePromptContractAssessment({
     imagePrompt: input.primaryImagePrompt,
     subjectFocus: input.subjectFocus,
@@ -601,6 +640,7 @@ export function resolveFrameImagePromptWithFallback(
     providerProfile: input.providerProfile,
     fallbackAttempted: false,
     fallbackUsed: false,
+    mergeReasonCodes,
   });
 
   if (primaryAssessment.payloadUsable) {
@@ -621,6 +661,7 @@ export function resolveFrameImagePromptWithFallback(
     providerProfile: input.providerProfile,
     fallbackAttempted: true,
     fallbackUsed: false,
+    mergeReasonCodes,
   });
 
   if (fallbackProbe.payloadUsable) {
@@ -631,6 +672,7 @@ export function resolveFrameImagePromptWithFallback(
       providerProfile: input.providerProfile,
       fallbackAttempted: true,
       fallbackUsed: true,
+      mergeReasonCodes,
     });
     return { imagePrompt: fallbackPrompt, assessment: won };
   }
@@ -642,6 +684,7 @@ export function resolveFrameImagePromptWithFallback(
     providerProfile: input.providerProfile,
     fallbackAttempted: true,
     fallbackUsed: false,
+    mergeReasonCodes,
   });
   return { imagePrompt: input.primaryImagePrompt, assessment: retriedPrimary };
 }

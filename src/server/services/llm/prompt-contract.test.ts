@@ -186,6 +186,17 @@ describe("evaluateCanonicalPromptUsability", () => {
     expect(r.hardReasonCodes).toContain("IDENTITY_TOKEN_MISSING");
   });
 
+  it("buildFrame maps identity failure to CONTRACT_CONFLICT", () => {
+    const a = buildFramePromptContractAssessment({
+      imagePrompt: "cinematic wide establishing shot with dramatic lighting and color palette only",
+      subjectFocus: "Tommy",
+      characterRegistry: registry,
+      providerProfile: "test",
+    });
+    expect(a.payloadUsable).toBe(false);
+    expect(a.resultMeta.failureClass).toBe("CONTRACT_CONFLICT");
+  });
+
   it("soft issues only → usable but not strict (why: MEANINGFUL_TOKENS_LOW but identity preserved)", () => {
     const assembled = assembleSubjectIdentityFromFrame("Tommy", registry);
     const normalized = normalizeSubjectIdentity(assembled, registry);
@@ -263,5 +274,31 @@ describe("buildFramePromptContractAssessment", () => {
     });
     expect(a.resultMeta.contractVersion).toBe(CONTRACT_VERSION);
     expect(a.payloadUsable).toBe(true);
+  });
+
+  it("folds provider length into warningCodes while payload stays usable", () => {
+    const registry: CharacterEntry[] = [mockCharacter({ canonicalName: "Tommy" })];
+    const longBody = "word ".repeat(5000);
+    const prompt = `Tommy ${longBody}`;
+    const a = buildFramePromptContractAssessment({
+      imagePrompt: prompt,
+      subjectFocus: "Tommy",
+      characterRegistry: registry,
+      providerProfile: "test",
+    });
+    expect(a.payloadUsable).toBe(true);
+    expect(a.resultMeta.warningCodes).toContain("PROVIDER_PROMPT_TRUNCATED");
+  });
+
+  it("includes mergeReasonCodes in meta when passed", () => {
+    const registry: CharacterEntry[] = [mockCharacter({ canonicalName: "Tommy" })];
+    const a = buildFramePromptContractAssessment({
+      imagePrompt: "Tommy scene wide shot camera lighting background palette blue.",
+      subjectFocus: "Tommy",
+      characterRegistry: registry,
+      providerProfile: "test",
+      mergeReasonCodes: ["MERGE_SUBJECT_PRIMARY_LOCKED"],
+    });
+    expect(a.resultMeta.mergeReasonCodes).toEqual(["MERGE_SUBJECT_PRIMARY_LOCKED"]);
   });
 });

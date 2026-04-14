@@ -47,20 +47,77 @@ export const imageSpecSchema = z.object({
 
 export type ImageSpec = z.infer<typeof imageSpecSchema>;
 
-/** Force subject.primary to upstream-normalized identity; keep architect focus/secondary only. */
-export function mergeImageSpecWithUpstreamSubject(spec: ImageSpec, upstreamSubjectPrimary: string): ImageSpec {
+/** Machine codes for upstream merge / sanitize (stored on ResultMeta.mergeReasonCodes). */
+export const MERGE_REASON_CODES = [
+  "MERGE_SUBJECT_PRIMARY_LOCKED",
+  "MERGE_SUBJECT_SECONDARY_TRIMMED",
+  "MERGE_SUBJECT_FOCUS_STRIPPED_REF_ASSET",
+  "MERGE_SUBJECT_FOCUS_TRIMMED",
+] as const;
+
+export type MergeReasonCode = (typeof MERGE_REASON_CODES)[number];
+
+export interface MergeImageSpecOptions {
+  /** When set, focus must not pile appearance/role (ref-image constraint). */
+  assetRef: string | null;
+}
+
+export interface MergeImageSpecResult {
+  spec: ImageSpec;
+  mergeReasonCodes: string[];
+}
+
+const FOCUS_APPEARANCE_ROLE = /\b(young|old|elderly|teenage|little)\s+(boy|girl|man|woman|child|kid)\b/i;
+
+const MAX_SECONDARY = 2;
+
+/**
+ * Merge LLM spec with upstream identity: lock primary, cap/sanitize focus & secondary.
+ */
+export function mergeImageSpecWithUpstream(
+  spec: ImageSpec,
+  upstreamSubjectPrimary: string,
+  options?: MergeImageSpecOptions
+): MergeImageSpecResult {
+  const mergeReasonCodes: string[] = [];
   const primary = upstreamSubjectPrimary.trim() || spec.subject.primary.trim();
+  if (primary !== spec.subject.primary.trim()) {
+    mergeReasonCodes.push("MERGE_SUBJECT_PRIMARY_LOCKED");
+  }
+
+  const rawFocus = spec.subject.focus;
+  let focus = rawFocus?.trim() ?? "";
+  if (rawFocus !== undefined && rawFocus !== "" && focus.length === 0) {
+    mergeReasonCodes.push("MERGE_SUBJECT_FOCUS_TRIMMED");
+  }
+  if (focus && options?.assetRef && FOCUS_APPEARANCE_ROLE.test(focus)) {
+    focus = "";
+    mergeReasonCodes.push("MERGE_SUBJECT_FOCUS_STRIPPED_REF_ASSET");
+  }
+
+  let secondary = (spec.subject.secondary ?? []).map((s) => s.trim()).filter(Boolean);
+  if (secondary.length > MAX_SECONDARY) {
+    secondary = secondary.slice(0, MAX_SECONDARY);
+    mergeReasonCodes.push("MERGE_SUBJECT_SECONDARY_TRIMMED");
+  }
+
+  const subject: ImageSpec["subject"] = { primary };
+  if (secondary.length > 0) subject.secondary = secondary;
+  if (focus) subject.focus = focus;
+
   return {
-    ...spec,
-    subject: {
-      ...spec.subject,
-      primary,
-    },
+    spec: { ...spec, subject },
+    mergeReasonCodes,
   };
 }
 
+/** @deprecated Use `mergeImageSpecWithUpstream` for merge audit codes. */
+export function mergeImageSpecWithUpstreamSubject(spec: ImageSpec, upstreamSubjectPrimary: string): ImageSpec {
+  return mergeImageSpecWithUpstream(spec, upstreamSubjectPrimary, { assetRef: null }).spec;
+}
+
 /**
- * Deterministic canonical prompt string (block order stable). Injects Cinematographer prefixes + storyboard shot type.
+ * Deterministic canonical prompt. One MEDIUM line; optional Material line; no duplicate medium prose.
  */
 export function serializeFrameImageSpec(params: {
   spec: ImageSpec;
@@ -103,11 +160,15 @@ export function serializeFrameImageSpec(params: {
   lines.push(`Background: ${pr.backgroundPrefix} ${envParts || "scene-appropriate environment"}.`);
   lines.push(`Color palette: ${paletteText}.`);
 
-  const styleFrag = [spec.style?.medium, spec.style?.material].filter(Boolean).join(" — ");
-  if (styleFrag) {
-    lines.push(`${styleFrag}.`);
+  const globalMed = styleGuide.global.medium.trim();
+  const specMed = spec.style?.medium?.trim();
+  const mediumLine =
+    specMed && specMed.toLowerCase() !== globalMed.toLowerCase() ? specMed : globalMed;
+  lines.push(`MEDIUM: ${mediumLine}.`);
+
+  if (spec.style?.material?.trim()) {
+    lines.push(`Material: ${spec.style.material.trim()}.`);
   }
-  lines.push(`MEDIUM: ${styleGuide.global.medium}.`);
 
   if (spec.constraints?.length) {
     lines.push(`Constraints: ${spec.constraints.join("; ")}.`);
@@ -119,10 +180,6 @@ export function serializeFrameImageSpec(params: {
   return lines.join("\n");
 }
 
-/**
- * Boring predictable prompt when architect output fails contract — no LLM embellishment.
- * Includes: continuity-safe subject line, locked prefixes, storyboard shot type, global/scene style.
- */
 export function buildUpstreamFallbackImagePrompt(params: {
   styleGuide: VisualStyleGuide;
   sceneIndex: number;
