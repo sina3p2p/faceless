@@ -21,9 +21,8 @@ const updateSchema = z.object({
 async function verifyOwnership(videoId: string, userId: string) {
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoId),
-    with: { series: { columns: { userId: true } } },
   });
-  if (!video || video.series.userId !== userId) return null;
+  if (!video || video.userId !== userId) return null;
   return video;
 }
 
