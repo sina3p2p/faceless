@@ -133,6 +133,8 @@ export async function POST(req: NextRequest) {
       imageModel: data.imageModel,
       videoModel: data.videoModel,
       videoSize: data.videoSize,
+      language: data.language,
+      userId: user.id,
       config,
     })
     .returning();
