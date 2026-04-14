@@ -1,3 +1,5 @@
+import { videoStatusEnum } from "@/server/db/schema";
+
 export interface MediaVersion {
   id: string;
   type: string;
@@ -75,10 +77,14 @@ export interface VideoDetail {
   id: string;
   seriesId: string;
   title: string | null;
-  status: string;
+  status: (typeof videoStatusEnum.enumValues)[number];
   duration: number | null;
   script: string | null;
   outputUrl: string | null;
+  llmModel: string | null;
+  videoModel: string | null;
+  imageModel: string | null;
+  videoSize: string | null;
   config: {
     pipelineMode?: "manual" | "auto";
     visualStyleGuide?: {

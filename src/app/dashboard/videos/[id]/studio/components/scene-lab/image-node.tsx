@@ -1,25 +1,10 @@
 "use client";
-
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useState } from "react";
 import { IMAGE_MODELS } from "@/lib/constants";
-import type { Media, SceneFrame } from "../../../types";
-import type { VideoPhase } from "../../../hooks/use-video-phase";
 import { useStudioContext } from "../../context/StudioContext";
 import { ImageEditorModal } from "./image-editor-modal";
-
-type ImageNodeData = {
-  frame: SceneFrame;
-  media: Media;
-  frameIndex: number;
-  phase: VideoPhase;
-  defaultImageModel: string;
-  generatingImage: boolean;
-  generatingMotion: boolean;
-  videoSize: string | null;
-  onGenerateImage: (frameId: string, prompt?: string, model?: string) => void;
-  onRefreshData: () => void;
-};
+import { FrameNodeData } from "../scene-lab";
 
 function ImageIcon({ className }: { className?: string }) {
   return (
@@ -29,30 +14,30 @@ function ImageIcon({ className }: { className?: string }) {
   );
 }
 
-
 export function ImageNode({ data }: NodeProps) {
   const {
-    frame, media, frameIndex,
-    defaultImageModel, videoSize,
+    frame,
+    media,
+    frameIndex,
     generatingImage,
     onGenerateImage,
     onRefreshData,
-  } = data as ImageNodeData;
+  } = data as FrameNodeData;
 
   const { selectedMedia, video } = useStudioContext();
-  const isSelected = selectedMedia?.mediaId === media.id;
+  const isSelected = selectedMedia?.mediaId === media?.id;
 
-  const [promptText, setPromptText] = useState(media.prompt || "");
+  const [promptText, setPromptText] = useState(media?.prompt || "");
   const [editorOpen, setEditorOpen] = useState(false);
 
-  const aspectRatio = videoSize?.includes("9:16") ? "9:16" : "16:9";
+  const aspectRatio = video.videoSize?.includes("9:16") ? "9:16" : "16:9";
 
   return (
     <>
       <div className={`w-72 rounded-2xl bg-white/3 overflow-hidden shadow-lg nopan nodrag nowheel transition-all ${isSelected
         ? "border-2 border-violet-500 ring-2 ring-violet-500/20"
         : "border border-white/10"
-        } ${frame.imageMediaId !== media.id && "opacity-10"}
+        } ${frame.imageMediaId !== media?.id && "opacity-10"}
         }`}>
         {/* ── Image Section ── */}
         <div>
@@ -67,10 +52,10 @@ export function ImageNode({ data }: NodeProps) {
 
           {/* Image preview */}
           <div className="px-3">
-            {media.url ? (
+            {media?.url ? (
               <div className="relative group rounded-xl overflow-hidden border border-white/5">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={media.url} alt={`Frame ${frameIndex + 1}`} className="w-full aspect-video object-cover" />
+                <img src={media?.url} alt={`Frame ${frameIndex + 1}`} className="w-full aspect-video object-cover" />
                 {generatingImage && (
                   <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center">
                     <div className="flex items-center gap-2">
@@ -102,17 +87,12 @@ export function ImageNode({ data }: NodeProps) {
             <textarea
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
-              // onBlur={() => { setEditingPrompt(false); if (promptText !== (frame.imagePrompt || "")) onUpdatePrompt(frame.id, promptText); }}
-              // onKeyDown={(e) => {
-              //   if (e.key === "Escape") { setPromptText(frame.imagePrompt || ""); setEditingPrompt(false); }
-              //   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); setEditingPrompt(false); if (promptText !== (frame.imagePrompt || "")) onUpdatePrompt(frame.id, promptText); }
-              // }}
               rows={2}
               className="w-full bg-transparent text-[12px] text-gray-300 resize-none outline-none placeholder:text-gray-600"
               placeholder="Describe the image..."
             />
             <button
-              onClick={() => onGenerateImage(frame.id, undefined, defaultImageModel)}
+              onClick={() => onGenerateImage(frame.id, undefined, video.imageModel!)}
               className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white text-black text-[11px] font-semibold hover:bg-gray-200 transition-colors"
             >
               Re-generate
@@ -122,7 +102,7 @@ export function ImageNode({ data }: NodeProps) {
           {/* Image toolbar */}
           <div className="flex items-center gap-3 px-4 py-2 border-t border-white/5">
             <span className="text-[10px] text-gray-600 font-mono">{aspectRatio}</span>
-            {media.url && (
+            {media?.url && (
               <>
                 <div className="flex-1" />
                 <button
@@ -146,9 +126,9 @@ export function ImageNode({ data }: NodeProps) {
       </div>
 
       {/* Image editor modal */}
-      {editorOpen && media.url && (
+      {editorOpen && media?.url && (
         <ImageEditorModal
-          imageUrl={media.url}
+          imageUrl={media?.url}
           aspectRatio={aspectRatio}
           onClose={() => setEditorOpen(false)}
           onSave={async (newImageUrl) => {

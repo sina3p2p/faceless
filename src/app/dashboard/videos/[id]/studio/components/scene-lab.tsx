@@ -13,7 +13,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { Scene, VideoDetail } from "../../types";
+import type { Media, Scene, SceneFrame, VideoDetail } from "../../types";
 import type { VideoPhase } from "../../hooks/use-video-phase";
 import { useStudioContext } from "../context/StudioContext";
 import { BriefNode, VariantNode, SceneImageNode, ImageNode, VideoNode } from "./scene-lab/index";
@@ -31,6 +31,17 @@ const ROW_GAP = 400;
 const NODE_WIDTH = 300;
 const NODE_HEIGHT = 200;
 const STROKE_WIDTH = 5;
+
+export type FrameNodeData = {
+  frame: SceneFrame;
+  media?: Media;
+  frameIndex: number;
+  phase: VideoPhase;
+  defaultImageModel: string;
+  generatingImage: boolean;
+  onGenerateImage: (frameId: string, prompt?: string, model?: string) => void;
+  onRefreshData: () => void;
+};
 
 function buildGraph(
   scene: Scene,
@@ -60,15 +71,6 @@ function buildGraph(
 
   // Brief node
   const briefId = `brief-${scene.id}`;
-  // nodes.push({
-  //   id: briefId,
-  //   type: "brief",
-  //   position: { x, y: 0 },
-  //   data: { scene, sceneIndex },
-  //   draggable: false,
-  //   selectable: false,
-  // });
-
   x += COLUMN_GAP;
 
   if (frames.length === 0 && scene.assetUrl) {
@@ -98,11 +100,27 @@ function buildGraph(
     nodes.push({
       id: frame.id,
       type: "brief",
-      position: { x: Math.max(frameX, 150), y: 0 },
+      position: { x: frameX, y: 0 },
       data: { scene, frame, frameIndex },
       draggable: false,
       selectable: false,
     });
+
+    if (images.length === 0) {
+      nodes.push({
+        id: `image-${frame.id}`,
+        type: "image",
+        position: { x: frameX, y: ROW_GAP },
+        data: {
+          frame,
+          frameIndex,
+          video,
+          media: {
+            prompt: frame.imagePrompt,
+          }
+        },
+      });
+    }
 
     for (const [mediaIndex, media] of images.entries()) {
       const frameMediaX = frameX + (NODE_WIDTH * mediaIndex) + (mediaIndex * COLUMN_GAP) - ((images.length - 1) * COLUMN_GAP);
@@ -114,19 +132,8 @@ function buildGraph(
           frame,
           media,
           frameIndex,
-          phase,
-          defaultImageModel,
-          defaultVideoModel,
-          videoSize: video?.series?.videoSize ?? null,
           generatingImage: generatingFrameIds.has(frame.id),
-          generatingVideo: generatingFrameVideoIds.has(frame.id),
-          generatingMotion: generatingFrameMotionIds.has(frame.id),
           onGenerateImage: callbacks.onGenerateFrameImage,
-          onUpdatePrompt: callbacks.onUpdateFramePrompt,
-          onUpdateMotion: callbacks.onUpdateFrameMotion,
-          onRegenerateVideo: callbacks.onRegenerateFrameVideo,
-          onRegenerateMotion: callbacks.onRegenerateFrameMotion,
-          onSelectVariant: callbacks.onSelectFrameVariant,
           onRefreshData: callbacks.onRefreshData,
         },
         draggable: false,
@@ -141,6 +148,34 @@ function buildGraph(
             ? "rgba(139,92,246,0.6)"
             : "rgba(255,255,255,0.1)",
           ...(frame.imageMediaId !== media.id ? { strokeDasharray: "4 4" } : {}),
+          strokeWidth: STROKE_WIDTH,
+        },
+      });
+    }
+
+    if (videos.length === 0) {
+      const videoId = `video-${frame.id}`;
+      nodes.push({
+        id: videoId,
+        type: "video",
+        position: { x: frameX, y: 2 * ROW_GAP },
+        data: {
+          frame,
+          frameIndex,
+          video,
+          media: {
+            prompt: frame.visualDescription,
+          }
+        },
+      });
+
+      edges.push({
+        id: `e-${frame.id}-${videoId}`,
+        source: frame.imageMediaId ? frame.imageMediaId : `image-${frame.id}`,
+        target: videoId,
+        style: {
+          stroke: "rgba(139,92,246,0.6)",
+          strokeDasharray: "4 4",
           strokeWidth: STROKE_WIDTH,
         },
       });

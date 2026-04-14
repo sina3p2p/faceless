@@ -38,7 +38,7 @@ export function CanvasOverlay({
   phase: VideoPhase;
   video: VideoDetail | null;
   scenes: Scene[];
-  setVideo: React.Dispatch<React.SetStateAction<VideoDetail | null>>;
+  setVideo: React.Dispatch<React.SetStateAction<VideoDetail>>;
   onSaveStory: (markdown: string) => void;
   downloadUrl: string | null;
   downloading: boolean;

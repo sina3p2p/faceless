@@ -5,7 +5,7 @@ import type { Scene, SceneFrame, VideoDetail, RefinedScene } from "../types";
 
 export function useVideoActions(id: string) {
   const [scenes, setScenes] = useState<Scene[]>([]);
-  const [video, setVideo] = useState<VideoDetail | null>(null);
+  const [video, setVideo] = useState<VideoDetail>({} as VideoDetail);
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [approving, setApproving] = useState(false);
@@ -66,7 +66,7 @@ export function useVideoActions(id: string) {
       fetch(`/api/videos/${id}/download`)
         .then((r) => r.json())
         .then((data) => { if (data.url) setDownloadUrl(data.url); })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [video?.status, downloadUrl, id]);
 
@@ -263,7 +263,7 @@ export function useVideoActions(id: string) {
     try {
       const res = await fetch(`/api/videos/${id}/render`, { method: "POST" });
       if (res.ok) await loadData();
-    } catch {}
+    } catch { }
     setRendering(false);
   }
 
@@ -342,7 +342,7 @@ export function useVideoActions(id: string) {
         setVideo((prev) => prev ? { ...prev, status: "RENDERING" } : prev);
         setDownloadUrl(null);
       }
-    } catch {}
+    } catch { }
     setRendering(false);
   }
 

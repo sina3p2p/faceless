@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
     limit: 50,
   });
 
-  const filtered = videos.filter((v) => seriesIds.includes(v.seriesId));
+  const filtered = videos.filter((v) => seriesIds.includes(v.seriesId ?? ""));
 
   return NextResponse.json(filtered);
 }

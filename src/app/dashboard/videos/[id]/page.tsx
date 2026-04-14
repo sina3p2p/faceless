@@ -144,8 +144,6 @@ export default function ReviewPage() {
       <StudioTopBar
         video={video}
         phase={phase}
-        totalDuration={totalDuration}
-        scenesCount={scenes.length}
         onBack={() => router.push(video?.seriesId ? `/dashboard/series/${video.seriesId}` : "/dashboard/series")}
         onTogglePipelineMode={handleTogglePipelineMode}
       />
@@ -273,7 +271,7 @@ function CenterPanel({
   phase: VideoPhase;
   video: VideoDetail | null;
   scenes: Scene[];
-  setVideo: React.Dispatch<React.SetStateAction<VideoDetail | null>>;
+  setVideo: React.Dispatch<React.SetStateAction<VideoDetail>>;
   sensors: ReturnType<typeof useSensors>;
   selectedSceneId: string | null;
   setSelectedSceneId: (id: string | null) => void;

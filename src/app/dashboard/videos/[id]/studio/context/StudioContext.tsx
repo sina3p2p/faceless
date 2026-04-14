@@ -13,8 +13,8 @@ export type SelectedMedia = {
 type StudioContextType = {
   scenes: Scene[];
   setScenes: (scenes: Scene[]) => void;
-  video: VideoDetail | null;
-  setVideo: (video: VideoDetail | null) => void;
+  video: VideoDetail;
+  setVideo: (video: VideoDetail) => void;
   selectedSceneId: string | null;
   setSelectedSceneId: (sceneId: string | null) => void;
   editingScene: Scene | null;
@@ -25,15 +25,15 @@ type StudioContextType = {
 
 const StudioContext = createContext<StudioContextType>({
   scenes: [],
-  setScenes: () => {},
-  video: null,
-  setVideo: () => {},
+  setScenes: () => { },
+  video: {} as VideoDetail,
+  setVideo: () => { },
   selectedSceneId: null,
-  setSelectedSceneId: () => {},
+  setSelectedSceneId: () => { },
   editingScene: null,
-  setEditingScene: () => {},
+  setEditingScene: () => { },
   selectedMedia: null,
-  setSelectedMedia: () => {},
+  setSelectedMedia: () => { },
 });
 
 export const useStudioContext = () => useContext(StudioContext);

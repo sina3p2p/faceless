@@ -7,15 +7,11 @@ import type { VideoPhase } from "../hooks/use-video-phase";
 export function StudioTopBar({
   video,
   phase,
-  totalDuration,
-  scenesCount,
   onBack,
   onTogglePipelineMode,
 }: {
   video: VideoDetail | null;
   phase: VideoPhase;
-  totalDuration: number;
-  scenesCount: number;
   onBack: () => void;
   onTogglePipelineMode: () => void;
 }) {

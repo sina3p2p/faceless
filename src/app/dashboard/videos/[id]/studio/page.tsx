@@ -120,7 +120,6 @@ export default function StudioPage() {
     }
   }
 
-  const totalDuration = useMemo(() => scenes.reduce((s, sc) => s + sc.duration, 0), [scenes]);
   const allImagesGenerated = scenes.length > 0 && scenes.every((s) => s.assetUrl);
   const someImagesGenerated = scenes.some((s) => s.assetUrl);
   const allFrames = scenes.flatMap((s) => s.frames ?? []);
@@ -151,13 +150,11 @@ export default function StudioPage() {
 
   return (
     <StudioContext.Provider value={{ scenes, setScenes, video, setVideo, selectedSceneId, setSelectedSceneId, editingScene, setEditingScene, selectedMedia, setSelectedMedia }}>
-      <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex flex-col h-screen overflow-hidden">
         {/* ── Top Bar ── */}
         <StudioTopBar
           video={video}
           phase={phase}
-          totalDuration={totalDuration}
-          scenesCount={scenes.length}
           onBack={() => router.push(video?.seriesId ? `/dashboard/series/${video.seriesId}` : "/dashboard/series")}
           onTogglePipelineMode={handleTogglePipelineMode}
         />

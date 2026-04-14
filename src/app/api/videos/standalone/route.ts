@@ -96,54 +96,60 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const [internalSeries] = await db
-    .insert(series)
-    .values({
-      userId: user.id,
-      name: seriesName,
-      niche: "custom",
-      style: data.style,
-      defaultVoiceId: data.voiceId || null,
-      llmModel: data.llmModel,
-      imageModel: data.imageModel,
-      videoModel: data.videoModel,
-      videoSize: data.videoSize,
-      language: data.language,
-      captionStyle: data.captionStyle,
-      sceneContinuity: data.sceneContinuity ? 1 : 0,
-      videoType: data.videoType,
-      storyAssets,
-      isInternal: true,
-      topicIdeas: [data.prompt],
-    })
-    .returning();
+  // const [internalSeries] = await db
+  //   .insert(series)
+  //   .values({
+  //     userId: user.id,
+  //     name: seriesName,
+  //     niche: "custom",
+  //     style: data.style,
+  //     defaultVoiceId: data.voiceId || null,
+  //     llmModel: data.llmModel,
+  //     imageModel: data.imageModel,
+  //     videoModel: data.videoModel,
+  //     videoSize: data.videoSize,
+  //     language: data.language,
+  //     captionStyle: data.captionStyle,
+  //     sceneContinuity: data.sceneContinuity ? 1 : 0,
+  //     videoType: data.videoType,
+  //     storyAssets,
+  //     isInternal: true,
+  //     topicIdeas: [data.prompt],
+  //   })
+  //   .returning();
 
   const config: Record<string, unknown> | undefined = data.duration
     ? {
-        duration: {
-          min: data.duration.min ?? Math.round(data.duration.preferred * 0.7),
-          preferred: data.duration.preferred,
-          max: data.duration.max ?? Math.round(data.duration.preferred * 1.33),
-          priority: data.duration.priority,
-        },
-      }
+      duration: {
+        min: data.duration.min ?? Math.round(data.duration.preferred * 0.7),
+        preferred: data.duration.preferred,
+        max: data.duration.max ?? Math.round(data.duration.preferred * 1.33),
+        priority: data.duration.priority,
+      },
+    }
     : undefined;
 
   const [videoProject] = await db
     .insert(videoProjects)
-    .values({ seriesId: internalSeries.id, status: "PENDING", config })
+    .values({
+      status: "PENDING",
+      llmModel: data.llmModel,
+      imageModel: data.imageModel,
+      videoModel: data.videoModel,
+      videoSize: data.videoSize,
+      config,
+    })
     .returning();
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
   await renderQueue.add("executive-produce", {
     videoProjectId: videoProject.id,
-    seriesId: internalSeries.id,
     userId: user.id,
   });
 
   return NextResponse.json(
-    { videoId: videoProject.id, seriesId: internalSeries.id },
+    { videoId: videoProject.id },
     { status: 201 }
   );
 }

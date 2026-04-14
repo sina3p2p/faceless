@@ -154,7 +154,7 @@ export const series = pgTable("series", {
 
 export const videoProjects = pgTable("video_projects", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  seriesId: text("series_id").notNull().references(() => series.id, { onDelete: "cascade" }),
+  seriesId: text("series_id").references(() => series.id, { onDelete: "cascade" }),
   status: videoStatusEnum("status").default("PENDING").notNull(),
   title: text("title"),
   script: text("script"),
@@ -162,6 +162,10 @@ export const videoProjects = pgTable("video_projects", {
   config: json("config"),
   outputUrl: text("output_url"),
   thumbnailUrl: text("thumbnail_url"),
+  llmModel: text("llm_model").default("anthropic/claude-opus-4.6"),
+  imageModel: text("image_model").default("dall-e-3"),
+  videoModel: text("video_model").default("kling-3-standard"),
+  videoSize: text("video_size"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
