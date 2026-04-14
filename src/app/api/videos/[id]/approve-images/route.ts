@@ -19,11 +19,10 @@ export async function POST(
     with: { series: { columns: { userId: true, id: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video) return notFound("Video not found");
 
   await renderQueue.add("generate-pipeline-motion", {
     videoProjectId: id,
-    seriesId: video.series.id,
     userId: user.id,
   });
 
