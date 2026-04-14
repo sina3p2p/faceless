@@ -113,10 +113,14 @@ export async function POST(
 
     await db
       .update(sceneFrames)
-      .set({ visualDescription: result.visualDescription })
+      .set({
+        motionSpec: result.motionSpec,
+        visualDescription: result.visualDescription,
+      })
       .where(eq(sceneFrames.id, frameId));
 
     return NextResponse.json({
+      motionSpec: result.motionSpec,
       visualDescription: result.visualDescription,
     });
   } catch (err) {

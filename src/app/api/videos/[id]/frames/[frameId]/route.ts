@@ -34,7 +34,10 @@ export async function PATCH(
 
   const updates: Record<string, unknown> = {};
   if (parsed.data.imagePrompt !== undefined) updates.imagePrompt = parsed.data.imagePrompt;
-  if (parsed.data.visualDescription !== undefined) updates.visualDescription = parsed.data.visualDescription;
+  if (parsed.data.visualDescription !== undefined) {
+    updates.visualDescription = parsed.data.visualDescription;
+    updates.motionSpec = null;
+  }
   if (parsed.data.clipDuration !== undefined) updates.clipDuration = parsed.data.clipDuration;
   if (parsed.data.assetRefs !== undefined) updates.assetRefs = parsed.data.assetRefs;
 

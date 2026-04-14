@@ -61,6 +61,7 @@ export async function GET(
             imagePrompt: frame.imagePrompt,
             imageSpec: frame.imageSpec,
             promptContractMeta: frame.promptContractMeta,
+            motionSpec: frame.motionSpec,
             visualDescription: frame.visualDescription,
             assetRefs: frame.assetRefs,
             modelUsed: frame.modelUsed,

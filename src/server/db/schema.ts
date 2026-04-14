@@ -11,6 +11,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { ImageSpec } from "@/server/services/llm/image-spec";
+import type { FrameMotionSpec } from "@/server/services/llm/motion";
 import type { ResultMeta } from "@/server/services/llm/prompt-contract";
 
 // ── Enums ──
@@ -209,6 +210,8 @@ export const sceneFrames = pgTable("scene_frames", {
   imageSpec: json("image_spec").$type<ImageSpec | null>(),
   /** Last prompt-contract assessment (deriveFinalStatus, reason codes, flags). */
   promptContractMeta: json("prompt_contract_meta").$type<ResultMeta | null>(),
+  /** Structured motion director output; visualDescription is the compiled video prompt. */
+  motionSpec: json("motion_spec").$type<FrameMotionSpec | null>(),
   visualDescription: text("visual_description"),
   imageMediaId: text("image_media_id"),
   videoMediaId: text("video_media_id"),

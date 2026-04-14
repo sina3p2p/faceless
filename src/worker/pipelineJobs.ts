@@ -994,7 +994,10 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
             await db
               .update(schema.sceneFrames)
-              .set({ visualDescription: result.visualDescription })
+              .set({
+                motionSpec: result.motionSpec,
+                visualDescription: result.visualDescription,
+              })
               .where(eq(schema.sceneFrames.id, frameData.frameId));
 
             console.log(`[generate-motion] Frame ${globalIdx + 1}/${framesToProcess.length} done`);
