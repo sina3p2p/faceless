@@ -37,8 +37,7 @@ export async function GET(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video) return notFound("Video not found");
 
-  const { series: _s, ...rest } = video;
-  return NextResponse.json(rest);
+  return NextResponse.json(video);
 }

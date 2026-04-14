@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, series, renderJobs } from "@/server/db/schema";
+import { videoProjects, videoScenes, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
 import { renderQueue } from "@/lib/queue";
@@ -22,7 +22,7 @@ export async function POST(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video) return notFound("Video not found");
 
   if (video.scenes.length === 0) {
     return badRequest("No scenes to render");
@@ -40,7 +40,6 @@ export async function POST(
 
   await renderQueue.add("render-from-scenes", {
     videoProjectId: id,
-    seriesId: video.series.id,
     userId: user.id,
   });
 

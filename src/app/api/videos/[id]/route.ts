@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, series, videoScenes, renderJobs } from "@/server/db/schema";
+import { videoProjects, videoScenes, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, asc, desc } from "drizzle-orm";
 import { z } from "zod";
 
 export async function GET(
@@ -23,23 +23,9 @@ export async function GET(
     },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video) return notFound("Video not found");
 
-  const { series: seriesData, ...rest } = video;
-  return NextResponse.json({
-    ...rest,
-    series: {
-      name: seriesData.name,
-      niche: seriesData.niche,
-      style: seriesData.style,
-      imageModel: seriesData.imageModel,
-      videoModel: seriesData.videoModel,
-      videoSize: seriesData.videoSize,
-      videoType: seriesData.videoType,
-      sceneContinuity: seriesData.sceneContinuity,
-      storyAssets: seriesData.storyAssets,
-    },
-  });
+  return NextResponse.json(video);
 }
 
 const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -94,7 +80,7 @@ export async function PATCH(
     with: { series: { columns: { userId: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video) return notFound("Video not found");
 
   const body = await req.json().catch(() => ({}));
   const parsed = patchSchema.safeParse(body);
