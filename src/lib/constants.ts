@@ -67,23 +67,27 @@ export const TTS = {
   defaultStyle: 0.3,
 } as const;
 
-// ── Media (OpenAI + fal.ai + Runway) ──
+// ── Media (OpenAI + Runway + Kling via AI_VIDEO keys) ──
 
 export const MEDIA = {
   get openaiApiKey() { return env("OPENAI_API_KEY"); },
-  get falKey() { return env("FAL_KEY"); },
   get runwayApiKey() { return env("RUNWAYML_API_SECRET"); },
 } as const;
 
-// ── AI Video (fal.ai + Runway) ──
+// ── AI Video (Kling + Google Veo + Runway + xAI Grok) ──
 
 export const AI_VIDEO = {
-  get falKey() { return env("FAL_KEY"); },
   get runwayApiKey() { return env("RUNWAYML_API_SECRET"); },
-  defaultI2vModel: "fal-ai/kling-video/v3/standard/image-to-video",
-  t2vModel: "fal-ai/wan-25-preview/text-to-video",
-  klingImageModel: "fal-ai/kling-image/v3/text-to-image",
-  nanoBananaModel: "fal-ai/nano-banana-2",
+  get googleGenaiApiKey() { return env("GOOGLE_GENAI_API_KEY"); },
+  get xaiApiKey() { return env("XAI_API_KEY"); },
+  get klingAccessKey() { return env("KLING_ACCESS_KEY"); },
+  get klingSecretKey() { return env("KLING_SECRET_KEY"); },
+  /** Kling API host (global Singapore region default). */
+  get klingBaseUrl() { return env("KLING_API_BASE", "https://api-singapore.klingai.com"); },
+  /** Kling text-to-image when no character references. */
+  klingImageModelDefault: "kling-v2",
+  /** Kling omni image when using reference images / elements. */
+  klingImageModelOmni: "kling-image-o1",
 } as const;
 
 // ── Music (Suno) ──
@@ -97,19 +101,12 @@ export const MUSIC = {
 export const VIDEO_MODELS = [
   { id: "runway-gen4-turbo", label: "Runway Gen-4 Turbo", modelId: "gen4_turbo", provider: "runway" as const, description: "Best quality + value ($0.05/s → ~$0.25/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false, durationFormat: "number" as const },
   { id: "runway-gen4.5", label: "Runway Gen-4.5", modelId: "gen4.5", provider: "runway" as const, description: "#1 ranked globally, premium ($0.12/s → ~$0.60/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "grok-imagine", label: "Grok Imagine Video", modelId: "xai/grok-imagine-video/image-to-video", provider: "fal" as const, description: "#1 ranked i2v, fast <15s ($0.07/s → ~$0.35/5s)", durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: false, durationFormat: "string" as const },
-  { id: "veo-31-lite", label: "Veo 3.1 Lite", modelId: "fal-ai/veo3.1/lite/image-to-video", provider: "fal" as const, description: "Google top-tier, best value ($0.05/s → ~$0.25/5s at 720p)", durations: [4, 5, 6, 7, 8] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "veo-31-fast", label: "Veo 3.1 Fast", modelId: "fal-ai/veo3.1/fast/image-to-video", provider: "fal" as const, description: "Google top-tier, 1080p ($0.10/s → ~$0.50/5s)", durations: [4, 6, 8] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "fal-ai/kling-video/v3/standard/image-to-video", provider: "fal" as const, description: "#2 ranked globally ($0.14/s → ~$0.70/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true, durationFormat: "string" as const },
-  { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "fal-ai/kling-video/v3/pro/image-to-video", provider: "fal" as const, description: "Top-tier cinematic quality (~$0.50/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true, durationFormat: "string" as const },
-  { id: "kling-o3", label: "Kling O3", modelId: "fal-ai/kling-video/o3/standard/image-to-video", provider: "fal" as const, description: "Best 3D spatial awareness (~$0.50/5s)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true, durationFormat: "string" as const },
-  { id: "hailuo-02-standard", label: "Hailuo 02 Standard", modelId: "fal-ai/minimax/hailuo-02/standard/image-to-video", provider: "fal" as const, description: "Natural motion, budget-friendly (~$0.27/6s)", durations: [6, 10] as number[], endFrame: true, durationFormat: "string" as const },
-  { id: "hailuo-02-pro", label: "Hailuo 02 Pro", modelId: "fal-ai/minimax/hailuo-02/pro/image-to-video", provider: "fal" as const, description: "1080p, great prompt following (~$0.48/6s)", durations: [6, 10] as number[], endFrame: true, durationFormat: "string" as const },
-  { id: "pixverse-v6", label: "PixVerse V6", modelId: "fal-ai/pixverse/v6/image-to-video", provider: "fal" as const, description: "Lifelike physics (~$0.45/5s)", durations: [5, 10] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "kling-25-turbo", label: "Kling 2.5 Turbo Pro", modelId: "fal-ai/kling-video/v2.5-turbo/pro/image-to-video", provider: "fal" as const, description: "Fast & cheap legacy model (~$0.35/5s)", durations: [5, 10] as number[], endFrame: true, durationFormat: "string" as const },
-  { id: "ltx-2-pro", label: "LTX 2.0 Pro", modelId: "fal-ai/ltx-2/image-to-video", provider: "fal" as const, description: "Best bang-for-buck (~$0.30/5s)", durations: [6, 8, 10] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "wan-27", label: "Wan 2.7", modelId: "fal-ai/wan/v2.7/image-to-video", provider: "fal" as const, description: "Native 1080p, scene consistency ($0.10/s → ~$0.50/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true, durationFormat: "number" as const },
-  { id: "wan-25", label: "Wan 2.5", modelId: "fal-ai/wan-25-preview/image-to-video", provider: "fal" as const, description: "Cheapest option (~$0.25/5s)", durations: [5, 10] as number[], endFrame: true, durationFormat: "number" as const },
+  { id: "grok-imagine", label: "Grok Imagine Video", modelId: "grok-imagine-video", provider: "grok" as const, description: "xAI image-to-video, 1–15s ($0.07/s → ~$0.35/5s)", durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: false, durationFormat: "number" as const },
+  { id: "veo-31-lite", label: "Veo 3.1 Lite", modelId: "veo-3.1-lite-generate-preview", provider: "google" as const, description: "Google Veo 3.1 Lite, 720p (Gemini API)", durations: [4, 5, 6, 7, 8] as number[], endFrame: false, durationFormat: "number" as const },
+  { id: "veo-31-fast", label: "Veo 3.1 Fast", modelId: "veo-3.1-fast-generate-preview", provider: "google" as const, description: "Google Veo 3.1 Fast, 1080p (Gemini API)", durations: [4, 6, 8] as number[], endFrame: false, durationFormat: "number" as const },
+  { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "kling-v2-1", provider: "kling" as const, description: "Kling image-to-video (standard, end-frame capable)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true, durationFormat: "string" as const },
+  { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "kling-v2-1-master", provider: "kling" as const, description: "Kling image-to-video (master quality)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: false, durationFormat: "string" as const },
+  { id: "kling-o3", label: "Kling O3", modelId: "kling-v2-6", provider: "kling" as const, description: "Kling v2.6 (sound / motion)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true, durationFormat: "string" as const },
 ] as const;
 
 export const DEFAULT_VIDEO_MODEL = "kling-3-standard";

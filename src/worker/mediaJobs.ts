@@ -24,7 +24,7 @@ import {
 import {
   getAIVideoForScene,
   downloadAIVideo,
-} from "@/server/services/ai-video";
+} from "@/server/services/ai/video";
 import { downloadFile } from "@/server/services/composer";
 import { uploadFile } from "@/lib/storage";
 import type { RenderJobData } from "@/lib/queue";

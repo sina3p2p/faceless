@@ -1,11 +1,12 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import * as path from "path";
-import { fal } from "@fal-ai/client";
-import { MUSIC, AI_VIDEO } from "@/lib/constants";
+import axios from "axios";
+import OpenAI, { toFile } from "openai";
+import { MUSIC, MEDIA } from "@/lib/constants";
 import type { WordTimestamp } from "@/server/services/tts";
 
-fal.config({ credentials: AI_VIDEO.falKey });
+const whisperClient = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
 const execAsync = promisify(exec);
 
@@ -214,33 +215,29 @@ interface WhisperWord {
   end: number;
 }
 
-interface WhisperChunk {
-  text: string;
-  timestamp: [number, number];
-}
-
 export async function transcribeSong(audioUrl: string): Promise<WhisperWord[]> {
   console.log("[whisper] Transcribing song for lyrics alignment...");
 
-  const result = await fal.subscribe("fal-ai/whisper", {
-    input: {
-      audio_url: audioUrl,
-      task: "transcribe",
-      chunk_level: "word",
-    },
-    logs: true,
+  const audioRes = await axios.get<ArrayBuffer>(audioUrl, {
+    responseType: "arraybuffer",
+    timeout: 300_000,
+  });
+  const buffer = Buffer.from(audioRes.data);
+  const file = await toFile(buffer, "song.mp3", { type: "audio/mpeg" });
+
+  const tr = await whisperClient.audio.transcriptions.create({
+    file,
+    model: "whisper-1",
+    response_format: "verbose_json",
+    timestamp_granularities: ["word"],
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const data = result.data as any;
-  const chunks: WhisperChunk[] = data?.chunks || [];
-
-  const words: WhisperWord[] = chunks
-    .filter((c) => c.timestamp?.[0] != null && c.timestamp?.[1] != null)
-    .map((c) => ({
-      word: c.text.trim(),
-      start: c.timestamp[0],
-      end: c.timestamp[1],
+  const words: WhisperWord[] = (tr.words ?? [])
+    .filter((w) => w.start != null && w.end != null && w.word)
+    .map((w) => ({
+      word: w.word.trim(),
+      start: w.start as number,
+      end: w.end as number,
     }));
 
   console.log(`[whisper] Transcribed ${words.length} words from song`);

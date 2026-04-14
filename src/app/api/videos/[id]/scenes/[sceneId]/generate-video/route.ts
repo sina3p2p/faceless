@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
-import { getAIVideoForScene } from "@/server/services/ai-video";
+import { getAIVideoForScene } from "@/server/services/ai/video";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod";
 

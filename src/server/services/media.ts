@@ -1,11 +1,9 @@
 import OpenAI from "openai";
-import { fal } from "@fal-ai/client";
 import { MEDIA, AI_VIDEO, LLM } from "@/lib/constants";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { getKlingApiClient, type KlingTaskSubmitResponse } from "@/server/services/ai/video/providers/kling";
 
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
-
-fal.config({ credentials: MEDIA.falKey });
 
 export interface MediaAsset {
   url: string;
@@ -39,6 +37,14 @@ function compositionSuffix(ar: AspectRatio): string {
   if (ar === "16:9") return "Landscape 16:9 composition";
   if (ar === "1:1") return "Square 1:1 composition";
   return "Vertical 9:16 composition";
+}
+
+function klingOmniPlaceholders(promptWithElements: string, elementCount: number): string {
+  let p = promptWithElements;
+  for (let i = 1; i <= elementCount; i++) {
+    p = p.replace(new RegExp(`@Element${i}\\b`, "g"), `<<<image_${i}>>>`);
+  }
+  return p;
 }
 export async function generateImageDallE3(
   prompt: string,
@@ -75,41 +81,75 @@ export async function generateKlingImage(
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const elements: any[] = [];
-
-    if (referenceImageUrl) {
-      elements.push({ reference_image_urls: [referenceImageUrl] });
-    }
+    const elements: { url: string }[] = [];
+    if (referenceImageUrl) elements.push({ url: referenceImageUrl });
     if (characterRefs && characterRefs.length > 0) {
       for (const ref of characterRefs) {
-        elements.push({ reference_image_urls: [ref.url] });
+        elements.push({ url: ref.url });
       }
     }
 
-    const elementRefs = elements.length > 0
-      ? ` ${elements.map((_, i) => `@Element${i + 1}`).join(" ")}`
-      : "";
+    const elementRefs =
+      elements.length > 0
+        ? ` ${elements.map((_, i) => `@Element${i + 1}`).join(" ")}`
+        : "";
 
     const fb = fallbackDimensions(aspectRatio);
+    const kling = getKlingApiClient();
+    const client = kling.getHttp();
 
-    const result = await fal.subscribe(AI_VIDEO.klingImageModel, {
-      input: {
-        prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks.${elementRefs}`,
-        ...(elements.length > 0 ? { elements } : {}),
+    if (elements.length > 0) {
+      const rawPrompt = `${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks.${elementRefs}`;
+      const omniPrompt = klingOmniPlaceholders(rawPrompt, elements.length);
+      const payload = {
+        model_name: AI_VIDEO.klingImageModelOmni,
+        prompt: omniPrompt,
+        image_list: elements.map((e) => ({ image: e.url })),
         aspect_ratio: aspectRatio,
-        num_images: 1,
-        output_format: "jpeg",
-      },
-      logs: true,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+        n: 1,
+      };
+      const { data: submit } = await client.post<KlingTaskSubmitResponse>(
+        "/v1/images/omni-image",
+        payload
+      );
+      if (submit?.code != null && submit.code !== 0) {
+        throw new Error(submit.message || `Kling omni-image error code ${submit.code}`);
+      }
+      const taskId = submit?.data?.task_id;
+      if (!taskId) throw new Error(submit?.message || "Kling omni-image returned no task_id");
+      const img = await kling.pollUntilImageReady(`/v1/images/omni-image/${taskId}`);
+      return {
+        url: img.url,
+        type: "image",
+        source: "kling",
+        width: img.width ?? fb.width,
+        height: img.height ?? fb.height,
+      };
+    }
 
-    const data = result.data as { images?: Array<{ url: string; width: number; height: number }> };
-    const image = data?.images?.[0];
-    if (!image?.url) return null;
-
-    return { url: image.url, type: "image", source: "kling", width: image.width || fb.width, height: image.height || fb.height };
+    const payload = {
+      model_name: AI_VIDEO.klingImageModelDefault,
+      prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks.`,
+      aspect_ratio: aspectRatio,
+      n: 1,
+    };
+    const { data: submit } = await client.post<KlingTaskSubmitResponse>(
+      "/v1/images/generations",
+      payload
+    );
+    if (submit?.code != null && submit.code !== 0) {
+      throw new Error(submit.message || `Kling image generations error code ${submit.code}`);
+    }
+    const taskId = submit?.data?.task_id;
+    if (!taskId) throw new Error(submit?.message || "Kling image generations returned no task_id");
+    const img = await kling.pollUntilImageReady(`/v1/images/generations/${taskId}`);
+    return {
+      url: img.url,
+      type: "image",
+      source: "kling",
+      width: img.width ?? fb.width,
+      height: img.height ?? fb.height,
+    };
   } catch (err) {
     const detail = err instanceof Error ? err.message : JSON.stringify(err);
     console.error(`Kling image generation failed:`, detail);
@@ -235,7 +275,7 @@ export async function generateViaOpenRouter(
       return null;
     }
 
-    // If it's a base64 data URL, convert to a hosted URL via fal storage
+    // If it's a base64 data URL, convert to a hosted URL via object storage
     if (imageDataUrl.startsWith("data:")) {
       const base64Match = imageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
       if (!base64Match) return null;

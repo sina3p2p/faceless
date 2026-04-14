@@ -36,7 +36,7 @@ import {
 } from "@/lib/types";
 import {
   getAIVideoForScene,
-} from "@/server/services/ai-video";
+} from "@/server/services/ai/video";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile, composeVideo, type ComposerScene } from "@/server/services/composer";
 import {
