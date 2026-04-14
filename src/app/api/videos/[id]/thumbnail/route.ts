@@ -6,10 +6,11 @@ import { eq } from "drizzle-orm";
 import { generateImage, generateKlingImage, generateViaOpenRouter } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod/v4";
+import { IMAGE_MODELS } from "@/lib/constants";
 
 const bodySchema = z.object({
   prompt: z.string().optional(),
-  imageModel: z.enum(["dall-e-3", "kling-image-v3", "nano-banana-2"]).default("dall-e-3"),
+  imageModel: z.enum(IMAGE_MODELS.map((m) => m.id) as [string, ...string[]]).default("dall-e-3"),
 });
 
 export async function POST(
@@ -112,7 +113,7 @@ export async function POST(
       const result = await generateKlingImage(prompt);
       imageUrl = result?.url ?? null;
     } else {
-      const result = await generateImage(prompt);
+      const result = await generateImage(prompt, imageModel, undefined, "16:9");
       imageUrl = result?.url ?? null;
     }
 

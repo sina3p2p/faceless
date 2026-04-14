@@ -5,14 +5,14 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { eq, and, inArray } from "drizzle-orm";
 import { generateImage, generateKlingImage, generateViaOpenRouter, type CharacterRef, type AspectRatio } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
-import { getVideoSize } from "@/lib/constants";
+import { getVideoSize, IMAGE_MODELS } from "@/lib/constants";
 import { z } from "zod";
 
 const bodySchema = z.object({
   imagePrompt: z.string().min(1).optional(),
   mode: z.enum(["regenerate", "edit"]).default("regenerate"),
   referenceSceneIds: z.array(z.string()).optional(),
-  imageModel: z.enum(["dall-e-3", "kling-image-v3", "nano-banana-2"]).optional(),
+  imageModel: z.enum(IMAGE_MODELS.map((m) => m.id) as [string, ...string[]]).optional(),
 });
 
 export async function POST(
@@ -135,7 +135,12 @@ export async function POST(
       const result = await generateKlingImage(cleanedPrompt, refUrl, charRefs.length > 0 ? charRefs : undefined, aspectRatio);
       imageUrl = result?.url ?? null;
     } else {
-      const result = await generateImage(cleanedPrompt, aspectRatio);
+      const result = await generateImage(
+        cleanedPrompt,
+        imageModel,
+        charRefs.length > 0 ? charRefs : undefined,
+        aspectRatio
+      );
       imageUrl = result?.url ?? null;
     }
 

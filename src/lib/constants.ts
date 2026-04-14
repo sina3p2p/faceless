@@ -113,6 +113,7 @@ export const DEFAULT_VIDEO_MODEL = "kling-3-standard";
 
 export const IMAGE_MODELS = [
   { id: "dall-e-3", label: "DALL-E 3", description: "Good quality, ~$0.04/image (OpenAI)" },
+  { id: "gpt-image-1.5", label: "GPT Image 1.5", description: "Best OpenAI image model, instruction-following (OpenAI)" },
   { id: "kling-image-v3", label: "Kling Image V3", description: "Excellent quality, character refs, ~$0.028/image" },
   { id: "nano-banana-2", label: "Nano Banana 2", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
   { id: "nano-banana-pro", label: "Nano Banana Pro", description: "High quality, character consistency, ~$0.04/image (Gemini)" },

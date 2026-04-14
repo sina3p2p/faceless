@@ -27,6 +27,18 @@ function dalleDimensions(ar: AspectRatio): { width: number; height: number } {
   return { width: 1024, height: 1792 };
 }
 
+function gptImage15Size(ar: AspectRatio): "1024x1536" | "1536x1024" | "1024x1024" {
+  if (ar === "16:9") return "1536x1024";
+  if (ar === "1:1") return "1024x1024";
+  return "1024x1536";
+}
+
+function gptImage15Dimensions(ar: AspectRatio): { width: number; height: number } {
+  if (ar === "16:9") return { width: 1536, height: 1024 };
+  if (ar === "1:1") return { width: 1024, height: 1024 };
+  return { width: 1024, height: 1536 };
+}
+
 function fallbackDimensions(ar: AspectRatio): { width: number; height: number } {
   if (ar === "16:9") return { width: 1344, height: 768 };
   if (ar === "1:1") return { width: 1024, height: 1024 };
@@ -69,6 +81,55 @@ export async function generateImageDallE3(
       width: dims.width,
       height: dims.height,
     };
+  } catch {
+    return null;
+  }
+}
+
+export async function generateImageGptImage15(
+  prompt: string,
+  aspectRatio: AspectRatio = "9:16"
+): Promise<MediaAsset | null> {
+  try {
+    const dims = gptImage15Dimensions(aspectRatio);
+    const response = await openai.images.generate({
+      model: "gpt-image-1.5",
+      prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`,
+      n: 1,
+      size: gptImage15Size(aspectRatio),
+      quality: "medium",
+      response_format: "b64_json",
+    });
+
+    const item = response.data?.[0];
+    const b64 = item?.b64_json;
+    const remoteUrl = item?.url;
+
+    if (b64) {
+      const buffer = Buffer.from(b64, "base64");
+      const key = `generated/gpt-image-1.5_${Date.now()}.png`;
+      await uploadFile(key, buffer, "image/png");
+      const signedUrl = await getSignedDownloadUrl(key);
+      return {
+        url: signedUrl,
+        type: "image",
+        source: "openai",
+        width: dims.width,
+        height: dims.height,
+      };
+    }
+
+    if (remoteUrl) {
+      return {
+        url: remoteUrl,
+        type: "image",
+        source: "openai",
+        width: dims.width,
+        height: dims.height,
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -403,6 +464,9 @@ export async function generateImage(
   }
   if (imageModel === "kling-image-v3") {
     return generateKlingImage(prompt, undefined, characterRefs, aspectRatio);
+  }
+  if (imageModel === "gpt-image-1.5") {
+    return generateImageGptImage15(prompt, aspectRatio);
   }
   return generateImageDallE3(prompt, aspectRatio);
 }
