@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, series } from "@/server/db/schema";
+import { videoProjects, videoScenes } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
@@ -23,7 +23,7 @@ export async function PUT(
     with: { series: { columns: { userId: true } } },
   });
 
-  if (!video || video.series.userId !== user.id) return notFound("Video not found");
+  if (!video) return notFound("Video not found");
 
   const body = await req.json();
   const parsed = reorderSchema.safeParse(body);
