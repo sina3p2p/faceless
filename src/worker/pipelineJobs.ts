@@ -216,17 +216,18 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const video = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!video) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "STORY");
 
-    const topicIdeas = seriesRecord.topicIdeas as string[];
-    const topicIdea = topicIdeas.length > 0
-      ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
-      : undefined;
+    const topicIdea = video.idea
+
+    if (!topicIdea) {
+      throw new Error("No idea found");
+    }
 
     const previousProjects = await db.query.videoProjects.findMany({
       where: eq(schema.videoProjects.seriesId, seriesId),
@@ -240,16 +241,15 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-story] Starting story generation for series=${seriesId}`);
 
-    const agents = getAgentModels(seriesRecord);
+    const agents = getAgentModels(video);
 
     const storyMarkdown = await generateStory(
-      seriesRecord.niche,
-      seriesRecord.style,
+      video.style,
       topicIdea,
-      seriesRecord.language || "en",
+      video.language,
       agents.storyModel,
       previousTopics,
-      seriesRecord.videoType || undefined,
+      video.videoType,
       config.creativeBrief
     );
 

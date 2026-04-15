@@ -27,7 +27,6 @@ export async function generateText(
 // ── Story Agent (generateText → markdown) ──
 
 export async function generateStory(
-  niche: string,
   style: string,
   topicIdea?: string,
   language = "en",
@@ -63,12 +62,8 @@ SONGWRITING RULES:
 - Verses build the story, chorus delivers the emotional hook
 - Keep lines short (4-10 words) for natural singing rhythm
 - Use vivid imagery and emotional language
-- The song should tell a story or convey a strong emotion
-${niche === "kids" ? `
-KIDS CONTENT RULES:
-- Target age: 4-10 years old. Simple, fun, singable.
-- NO scary or mature content. Educational and joyful.
-` : ""}`
+- The song should tell a story or convey a strong emotion`
+
     : `You are an elite storyteller. Write a COMPLETE story as flowing prose in markdown format.
 
 OUTPUT FORMAT:
@@ -88,12 +83,7 @@ STORYTELLING RULES:
 - End with something that makes viewers comment, follow, or share
 - Write like you're telling a secret to a friend, not giving a lecture
 - The story should have a complete arc: hook → build-up → climax → resolution
-${niche === "kids" ? `
-KIDS CONTENT RULES:
-- Target age: 4-10 years old. Simple, cheerful language.
-- NO scary, violent, dark, or mature content.
-- Fun and educational. Use excitement and wonder.
-` : ""}${brief ? `
+${brief ? `
 CREATIVE BRIEF (follow these constraints):
 - Concept: ${brief.concept}
 - Tone: ${brief.tone}
@@ -108,11 +98,11 @@ CREATIVE BRIEF (follow these constraints):
 
   const userPrompt = isMusic
     ? (topicIdea
-      ? `Write a catchy ${niche}-themed song about: ${topicIdea}. The music video visual style will be ${style}.${seriesContext}`
-      : `Write a catchy ${niche}-themed song. The music video visual style will be ${style}. Pick a topic that resonates emotionally.${seriesContext}`)
+      ? `Write a catchy song about: ${topicIdea}. The music video visual style will be ${style}.${seriesContext}`
+      : `Write a catchy song. The music video visual style will be ${style}. Pick a topic that resonates emotionally.${seriesContext}`)
     : (topicIdea
-      ? `Write a compelling ${niche} story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.${seriesContext}`
-      : `Write a compelling ${niche} story. The intended visual style is ${style}. Pick a topic that creates instant curiosity.${seriesContext}`);
+      ? `Write a compelling story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.${seriesContext}`
+      : `Write a compelling story. The intended visual style is ${style}. Pick a topic that creates instant curiosity.${seriesContext}`);
 
   return generateText(systemPrompt, userPrompt, { model: primaryModel, temperature: 0.85 });
 }
