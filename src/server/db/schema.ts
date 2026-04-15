@@ -172,6 +172,7 @@ export const videoProjects = pgTable("video_projects", {
   imageModel: text("image_model").default("dall-e-3"),
   videoModel: text("video_model").default("kling-3-standard"),
   videoSize: text("video_size"),
+  idea: text("prompt"),
   style: text("style").default("cinematic").notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

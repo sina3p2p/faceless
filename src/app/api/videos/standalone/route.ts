@@ -134,7 +134,9 @@ export async function POST(req: NextRequest) {
       videoModel: data.videoModel,
       videoSize: data.videoSize,
       language: data.language,
+      style: data.style,
       userId: user.id,
+      idea: data.prompt,
       config,
     })
     .returning();

@@ -159,10 +159,12 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
       ? config.duration
       : resolveDuration({ preferred: 30 });
 
-    const topicIdeas = video.series?.topicIdeas as string[];
-    const topicIdea = topicIdeas.length > 0
-      ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
-      : undefined;
+    const topicIdea = video.idea;
+    // const topicIdea = topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
+
+    if (!topicIdea) {
+      throw new Error("No idea found");
+    }
 
     let previousTopics: string[] = [];
     if (video.seriesId) {
@@ -176,7 +178,6 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
     } else {
       previousTopics = [];
     }
-
 
     const storyAssets = (video.series?.storyAssets ?? []) as StoryAssetInput[];
     const charImages = (video.series?.characterImages ?? []) as Array<{ url: string; description: string }>;

@@ -86,7 +86,7 @@ FORMAT CONSTRAINTS — you must decide:
 5. dialogueDensity: "none", "sparse" (occasional quotes), "moderate" (regular dialogue), "heavy" (mostly conversation)
 6. maxSentencesPerScene: how many narration sentences fit one scene (typically 1–4 for short-form)
 
-Choose these based on the niche, video type, and duration. A 15s video needs different constraints than a 120s video.${topicIdea ? `\n\nTOPIC DIRECTION: ${topicIdea}` : ""}`;
+Choose these based on the video type, and duration. A 15s video needs different constraints than a 120s video.${topicIdea ? `\n\nTOPIC DIRECTION: ${topicIdea}` : ""}`;
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
