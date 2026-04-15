@@ -35,7 +35,6 @@ const creativeBriefSchema = z.object({
 });
 
 export async function generateCreativeBrief(
-  niche: string,
   style: string,
   videoType: string,
   language: string,
@@ -68,7 +67,6 @@ export async function generateCreativeBrief(
 Your job is to create a CREATIVE BRIEF that all downstream agents (writer, director, cinematographer, etc.) will follow. Every decision you make here constrains what they can do.
 
 PRODUCTION PARAMETERS:
-- Niche: ${niche}
 - Visual style: ${style}
 - Video type: ${videoType}
 - Language: ${langName}

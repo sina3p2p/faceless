@@ -134,13 +134,22 @@ async function autoChainOrReview(
 // ── Executive Produce ──
 
 export async function executiveProduceJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const video = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      with: {
+        series: {
+          columns: {
+            topicIdeas: true,
+            storyAssets: true,
+            characterImages: true,
+          },
+        },
+      },
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!video) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "PRODUCING");
 
@@ -150,32 +159,37 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
       ? config.duration
       : resolveDuration({ preferred: 30 });
 
-    const topicIdeas = seriesRecord.topicIdeas as string[];
+    const topicIdeas = video.series?.topicIdeas as string[];
     const topicIdea = topicIdeas.length > 0
       ? topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
       : undefined;
 
-    const previousProjects = await db.query.videoProjects.findMany({
-      where: eq(schema.videoProjects.seriesId, seriesId),
-      columns: { title: true },
-      orderBy: (vp, { desc }) => [desc(vp.createdAt)],
-      limit: 50,
-    });
-    const previousTopics = previousProjects.map((v) => v.title).filter((t): t is string => !!t);
+    let previousTopics: string[] = [];
+    if (video.seriesId) {
+      const previousProjects = await db.query.videoProjects.findMany({
+        where: eq(schema.videoProjects.seriesId, video.seriesId),
+        columns: { title: true },
+        orderBy: (vp, { desc }) => [desc(vp.createdAt)],
+        limit: 50,
+      });
+      previousTopics = previousProjects.map((v) => v.title).filter((t): t is string => !!t);
+    } else {
+      previousTopics = [];
+    }
 
-    const storyAssets = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
-    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+
+    const storyAssets = (video.series?.storyAssets ?? []) as StoryAssetInput[];
+    const charImages = (video.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
     const assets = parseStoryAssets(storyAssets, charImages);
 
-    const agents = getAgentModels(seriesRecord);
+    const agents = getAgentModels(video);
 
-    console.log(`[executive-produce] Generating creative brief for series=${seriesId}`);
+    console.log(`[executive-produce] Generating creative brief for video=${videoProjectId}`);
 
     const brief = await generateCreativeBrief(
-      seriesRecord.niche,
-      seriesRecord.style,
-      seriesRecord.videoType || "standalone",
-      seriesRecord.language || "en",
+      video.style,
+      video.videoType,
+      video.language,
       duration,
       previousTopics,
       topicIdea,
@@ -187,7 +201,7 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     console.log(`[executive-produce] Brief ready: "${brief.concept}" (${brief.durationGuidance.wordBudgetTarget} target words)`);
 
-    await renderQueue.add("generate-story", { videoProjectId, seriesId, userId });
+    await renderQueue.add("generate-story", { videoProjectId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[executive-produce] Failed for ${videoProjectId}:`, msg);
