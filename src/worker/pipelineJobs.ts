@@ -3,7 +3,6 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import * as os from "os";
 import { v4 as uuid } from "uuid";
-
 import {
   db,
   schema,
@@ -162,22 +161,7 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
     const topicIdea = video.idea;
     // const topicIdea = topicIdeas[Math.floor(Math.random() * topicIdeas.length)]
 
-    if (!topicIdea) {
-      throw new Error("No idea found");
-    }
-
-    let previousTopics: string[] = [];
-    if (video.seriesId) {
-      const previousProjects = await db.query.videoProjects.findMany({
-        where: eq(schema.videoProjects.seriesId, video.seriesId),
-        columns: { title: true },
-        orderBy: (vp, { desc }) => [desc(vp.createdAt)],
-        limit: 50,
-      });
-      previousTopics = previousProjects.map((v) => v.title).filter((t): t is string => !!t);
-    } else {
-      previousTopics = [];
-    }
+    if (!topicIdea) throw new Error("No idea found");
 
     const storyAssets = (video.series?.storyAssets ?? []) as StoryAssetInput[];
     const charImages = (video.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
@@ -192,7 +176,6 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
       video.videoType,
       video.language,
       duration,
-      previousTopics,
       topicIdea,
       assets,
       agents.producerModel
@@ -229,17 +212,9 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       throw new Error("No idea found");
     }
 
-    const previousProjects = await db.query.videoProjects.findMany({
-      where: eq(schema.videoProjects.seriesId, seriesId),
-      columns: { title: true },
-      orderBy: (vp, { desc }) => [desc(vp.createdAt)],
-      limit: 50,
-    });
-    const previousTopics = previousProjects.map((v) => v.title).filter((t): t is string => !!t);
-
     const config = await loadProjectConfig(videoProjectId);
 
-    console.log(`[generate-story] Starting story generation for series=${seriesId}`);
+    console.log(`[generate-story] Starting story generation for video=${videoProjectId}`);
 
     const agents = getAgentModels(video);
 
@@ -248,7 +223,6 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       topicIdea,
       video.language,
       agents.storyModel,
-      previousTopics,
       video.videoType,
       config.creativeBrief
     );

@@ -28,20 +28,15 @@ export async function generateText(
 
 export async function generateStory(
   style: string,
-  topicIdea?: string,
+  topicIdea: string,
   language = "en",
   model?: string,
-  previousTopics: string[] = [],
   videoType?: string,
   brief?: CreativeBrief
 ): Promise<string> {
   const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
   const isMusic = videoType === "music_video";
-
-  const seriesContext = previousTopics.length > 0
-    ? `\n\nSERIES CONTINUITY — Previous episodes (most recent first):\n${previousTopics.map((t, i) => `  Episode ${previousTopics.length - i}: "${t}"`).join("\n")}\n\nCreate the NEXT episode. Build on the world/theme. NEVER repeat. Explore a fresh angle. Escalate the intrigue.`
-    : "";
 
   const systemPrompt = isMusic
     ? `You are an elite songwriter. Write COMPLETE song lyrics in markdown format.
@@ -97,12 +92,8 @@ CREATIVE BRIEF (follow these constraints):
 ` : ""}`;
 
   const userPrompt = isMusic
-    ? (topicIdea
-      ? `Write a catchy song about: ${topicIdea}. The music video visual style will be ${style}.${seriesContext}`
-      : `Write a catchy song. The music video visual style will be ${style}. Pick a topic that resonates emotionally.${seriesContext}`)
-    : (topicIdea
-      ? `Write a compelling story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.${seriesContext}`
-      : `Write a compelling story. The intended visual style is ${style}. Pick a topic that creates instant curiosity.${seriesContext}`);
+    ? `Write a catchy song about: ${topicIdea}. The music video visual style will be ${style}.`
+    : `Write a compelling story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.`;
 
   return generateText(systemPrompt, userPrompt, { model: primaryModel, temperature: 0.85 });
 }

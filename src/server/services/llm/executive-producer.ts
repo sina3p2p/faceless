@@ -39,7 +39,6 @@ export async function generateCreativeBrief(
   videoType: string,
   language: string,
   duration: DurationPreference,
-  previousTopics: string[],
   topicIdea: string | undefined,
   assets: StoryAsset[],
   model?: string
@@ -58,10 +57,6 @@ export async function generateCreativeBrief(
     ? `\nAvailable assets: ${assets.map((a) => `${a.name} (${a.type})`).join(", ")}`
     : "";
 
-  const previousContext = previousTopics.length > 0
-    ? `\nPrevious episodes (most recent first):\n${previousTopics.slice(0, 20).map((t, i) => `  ${i + 1}. "${t}"`).join("\n")}\nCreate the NEXT episode — fresh angle, never repeat.`
-    : "";
-
   const systemPrompt = `You are an Executive Producer planning a short-form video production.
 
 Your job is to create a CREATIVE BRIEF that all downstream agents (writer, director, cinematographer, etc.) will follow. Every decision you make here constrains what they can do.
@@ -72,7 +67,7 @@ PRODUCTION PARAMETERS:
 - Language: ${langName}
 - Duration target: ${duration.preferred}s (acceptable range: ${duration.min}s–${duration.max}s)
 - Duration priority: ${duration.priority === "quality" ? "Quality over exact timing — let the story breathe" : "Hit the target duration — trim to fit"}
-${assetSummary}${previousContext}
+${assetSummary}
 
 DURATION MATH (pre-calculated — use these values):
 - Word budget: ${wordBudgetMin}–${wordBudgetMax} words (target: ${wordBudgetTarget})
