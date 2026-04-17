@@ -15,7 +15,7 @@ import {
   generateMotionJob as pipelineGenerateMotionJob,
   generateFrameVideosJob,
   composeFinalJob,
-} from "./pipelineJobs";
+} from "./pipeline";
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { REDIS, WORKER } from "@/lib/constants";
