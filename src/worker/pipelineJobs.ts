@@ -251,14 +251,8 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
-    });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
-
     const videoProject = await db.query.videoProjects.findFirst({
       where: eq(schema.videoProjects.id, videoProjectId),
-      columns: { script: true },
     });
     if (!videoProject?.script) throw new Error("No story found to split");
 
@@ -268,14 +262,14 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     console.log(`[split-scenes] Splitting story into scenes for ${videoProjectId}`);
 
-    const agents = getAgentModels(seriesRecord);
+    const agents = getAgentModels(videoProject);
 
     const result = await splitStoryIntoScenes(
       videoProject.script,
-      seriesRecord.style,
-      seriesRecord.language || "en",
+      videoProject.style,
+      videoProject.language || "en",
       agents.directorModel,
-      seriesRecord.videoType || undefined,
+      videoProject.videoType || undefined,
       config.creativeBrief
     );
 
