@@ -13,6 +13,7 @@ import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
 import type { VideoScript } from "@/server/services/llm";
+import { env } from "@/lib/constants";
 
 const client = postgres(DATABASE.url);
 export const db = drizzle(client, { schema });
@@ -141,7 +142,7 @@ export function filterAssetsByRefs(
 
 export async function generateTTSParallel(
   sceneTexts: string[],
-  voiceId: string | undefined,
+  voiceId: string | null | undefined,
   workDir: string,
   concurrency = WORKER.parallelTTS,
   perSceneVoiceIds?: (string | undefined)[]
@@ -159,7 +160,7 @@ export async function generateTTSParallel(
   for (const chunk of chunks) {
     await Promise.all(
       chunk.map(async (i) => {
-        const sceneVoice = perSceneVoiceIds?.[i] ?? voiceId;
+        const sceneVoice = perSceneVoiceIds?.[i] ?? voiceId ?? env("ELEVENLABS_DEFAULT_VOICE_ID");
         const result = await generateSpeech(sceneTexts[i], { voiceId: sceneVoice });
         const audioPath = path.join(workDir, `audio_${i}.mp3`);
         await fs.writeFile(audioPath, result.audioBuffer);

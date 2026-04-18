@@ -2,7 +2,7 @@
 // Central configuration — all settings and env vars in one place
 // ─────────────────────────────────────────────────────────
 
-const env = (key: string, fallback = "") => process.env[key] || fallback;
+export const env = (key: string, fallback = "") => process.env[key] || fallback;
 
 // ── Database ──
 

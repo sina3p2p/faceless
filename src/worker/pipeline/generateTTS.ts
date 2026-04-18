@@ -21,10 +21,10 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
   await fs.mkdir(workDir, { recursive: true });
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "TTS_GENERATION");
 
@@ -35,13 +35,9 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
 
     if (existingScenes.length === 0) throw new Error("No scenes for audio generation");
 
-    const isMusic = seriesRecord.videoType === "music_video";
+    const isMusic = videoProject.videoType === "music_video";
 
     if (isMusic) {
-      const videoProject = await db.query.videoProjects.findFirst({
-        where: eq(schema.videoProjects.id, videoProjectId),
-        columns: { script: true, title: true, config: true },
-      });
       const scriptMd = videoProject?.script || "";
 
       const genreMatch = scriptMd.match(/^Genre:\s*(.+)$/m);
@@ -108,7 +104,7 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
 
       const { audioPaths, ttsResults } = await generateTTSParallel(
         sceneTexts,
-        seriesRecord.defaultVoiceId ?? undefined,
+        videoProject.voiceId,
         workDir
       );
 
