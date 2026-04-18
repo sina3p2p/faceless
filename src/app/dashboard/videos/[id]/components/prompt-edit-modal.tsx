@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { IMAGE_MODELS } from "@/lib/constants";
 import { SceneRefTextarea } from "./scene-ref-textarea";
-import type { Scene } from "../types";
+import type { Scene } from "@/types/video-detail";
 
 export function PromptEditModal({
   scene,

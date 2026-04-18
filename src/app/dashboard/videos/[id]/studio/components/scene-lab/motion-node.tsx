@@ -3,7 +3,7 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { useState } from "react";
 import { VIDEO_MODELS } from "@/lib/constants";
-import type { Media, SceneFrame } from "../../../types";
+import type { Media, SceneFrame } from "@/types/video-detail";
 import type { VideoPhase } from "../../../hooks/use-video-phase";
 import { useStudioContext } from "../../context/StudioContext";
 

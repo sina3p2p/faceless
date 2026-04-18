@@ -5,7 +5,7 @@ import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { generateSingleFrameMotion } from "@/server/services/llm";
-import type { PipelineConfig } from "@/lib/types";
+import type { PipelineConfig } from "@/types/pipeline";
 
 export async function POST(
   _req: NextRequest,

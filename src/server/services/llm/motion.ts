@@ -2,7 +2,7 @@ import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "./index";
-import type { MotionDirectorInput } from "@/lib/types";
+import type { MotionDirectorInput } from "@/types/pipeline";
 
 // ── Structured motion (LLM output) ──
 

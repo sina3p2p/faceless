@@ -1,22 +1,13 @@
 import { TTS } from "@/lib/constants";
+import type { TTSResult, WordTimestamp } from "@/types/tts";
+
+export type { TTSResult, WordTimestamp };
 
 interface TTSOptions {
   voiceId?: string;
   stability?: number;
   similarityBoost?: number;
   style?: number;
-}
-
-export interface WordTimestamp {
-  word: string;
-  start: number;
-  end: number;
-}
-
-export interface TTSResult {
-  audioBuffer: Buffer;
-  contentType: string;
-  wordTimestamps: WordTimestamp[];
 }
 
 export async function generateSpeech(

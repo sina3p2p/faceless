@@ -1,7 +1,7 @@
 import axios, { type AxiosInstance } from "axios";
 import * as crypto from "node:crypto";
 import { AI_VIDEO } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, VideoResult } from "../types";
+import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
 
 const TOKEN_VALIDITY_SECONDS = 1800;
 const CACHE_BUFFER_SECONDS = 300;

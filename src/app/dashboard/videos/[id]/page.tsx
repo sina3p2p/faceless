@@ -27,7 +27,7 @@ import {
   PhaseSidebar, StudioTopBar, InspectorPanel, ActivityFeed,
   PipelineFailureBanner,
 } from "./components";
-import type { Scene, VideoDetail, SceneUpdates } from "./types";
+import type { Scene, VideoDetail, SceneUpdates } from "@/types/video-detail";
 
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();

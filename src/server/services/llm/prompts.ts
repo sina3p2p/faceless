@@ -3,7 +3,7 @@ import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter, buildAssetBlock, type StoryAsset } from "./index";
-import type { VisualStyleGuide, FrameBreakdown, ContinuityNotes } from "@/lib/types";
+import type { VisualStyleGuide, FrameBreakdown, ContinuityNotes } from "@/types/pipeline";
 import {
   imageSpecSchema,
   mergeImageSpecWithUpstream,

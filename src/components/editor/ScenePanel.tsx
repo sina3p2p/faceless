@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import type { EditorScene } from "./VideoComposition";
+import type { EditorScene } from "@/types/editor";
 import Image from "next/image";
 
 interface ScenePanelProps {

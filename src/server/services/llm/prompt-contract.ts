@@ -19,7 +19,7 @@
  * - Canonical prompt string is produced by deterministic serialization from `ImageSpec` + upstream locks.
  */
 
-import type { CharacterEntry, FrameSpec, VisualStyleGuide } from "@/lib/types";
+import type { CharacterEntry, FrameSpec, VisualStyleGuide } from "@/types/pipeline";
 import { buildUpstreamFallbackImagePrompt } from "./image-spec";
 
 /** Bump when behavior above changes in a breaking way for fixtures / consumers. */

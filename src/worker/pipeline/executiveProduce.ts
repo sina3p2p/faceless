@@ -1,8 +1,9 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob, parseStoryAssets, type StoryAssetInput } from "../shared";
+import { db, schema, eq, updateVideoStatus, failJob, parseStoryAssets } from "../shared";
+import type { StoryAssetInput } from "@/types/worker";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
-import { resolveDuration, type DurationPreference } from "@/lib/types";
+import { resolveDuration, type DurationPreference } from "@/types/pipeline";
 import { generateCreativeBrief } from "@/server/services/llm";
 import { getAgentModels, loadProjectConfig, mergeProjectConfig } from "./shared";
 
@@ -12,15 +13,6 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
   try {
     const video = await db.query.videoProjects.findFirst({
       where: eq(schema.videoProjects.id, videoProjectId),
-      with: {
-        series: {
-          columns: {
-            topicIdeas: true,
-            storyAssets: true,
-            characterImages: true,
-          },
-        },
-      },
     });
     if (!video) throw new Error(`Video project not found: ${videoProjectId}`);
 
@@ -36,9 +28,8 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     if (!topicIdea) throw new Error("No idea found");
 
-    const storyAssets = (video.series?.storyAssets ?? []) as StoryAssetInput[];
-    const charImages = (video.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
-    const assets = parseStoryAssets(storyAssets, charImages);
+    const storyAssets = video.storyAssets as StoryAssetInput[];
+    const assets = parseStoryAssets(storyAssets);
 
     const agents = getAgentModels(video);
 

@@ -2,7 +2,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { generateFrameBreakdown } from "@/server/services/llm";
-import { resolveDuration, type DurationPreference } from "@/lib/types";
+import { resolveDuration, type DurationPreference } from "@/types/pipeline";
 import { getAgentModels, loadProjectConfig, mergeProjectConfig, autoChainOrReview, getModelDurationsArray } from "./shared";
 
 export async function storyboardJob(job: Job<RenderJobData>) {

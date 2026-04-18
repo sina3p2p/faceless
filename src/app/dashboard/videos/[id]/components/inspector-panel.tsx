@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { IMAGE_MODELS } from "@/lib/constants";
 import { SceneRefTextarea } from "./scene-ref-textarea";
 import { ActivityFeedCompact } from "./activity-feed";
-import type { VideoDetail, Scene } from "../types";
+import type { VideoDetail, Scene } from "@/types/video-detail";
 import type { VideoPhase, StudioPhaseId } from "../hooks/use-video-phase";
 
 export function InspectorPanel({

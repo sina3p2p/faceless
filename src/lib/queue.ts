@@ -1,6 +1,9 @@
 import { Queue } from "bullmq";
 import { redis } from "./redis";
 import { RENDER_QUEUE_NAME } from "./constants";
+import type { RenderJobData } from "@/types/queue";
+
+export type { RenderJobData };
 
 export const renderQueue = new Queue(RENDER_QUEUE_NAME, {
   connection: redis,
@@ -11,16 +14,7 @@ export const renderQueue = new Queue(RENDER_QUEUE_NAME, {
   },
 });
 
-export interface RenderJobData {
-  videoProjectId: string;
-  seriesId: string;
-  userId: string;
-  rerender?: boolean;
-}
-
-export async function enqueueRenderJob(
-  data: RenderJobData
-): Promise<string> {
+export async function enqueueRenderJob(data: RenderJobData): Promise<string> {
   const jobId = `render-${data.videoProjectId}-${Date.now()}`;
   const job = await renderQueue.add("render-video", data, { jobId });
   return job.id ?? data.videoProjectId;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import type { Scene, SceneFrame, VideoDetail, RefinedScene } from "../types";
+import type { Scene, SceneFrame, VideoDetail, RefinedScene } from "@/types/video-detail";
 
 export function useVideoActions(id: string) {
   const [scenes, setScenes] = useState<Scene[]>([]);

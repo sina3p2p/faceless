@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { CharacterEntry } from "@/lib/types";
-import type { FrameSpec, VisualStyleGuide } from "@/lib/types";
+import type { CharacterEntry, FrameSpec, VisualStyleGuide } from "@/types/pipeline";
 import {
   assembleSubjectIdentityFromFrame,
   buildFramePromptContractAssessment,

@@ -1,5 +1,6 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob, parseStoryAssets, type StoryAssetInput } from "../shared";
+import { db, schema, eq, updateVideoStatus, failJob, parseStoryAssets } from "../shared";
+import type { StoryAssetInput } from "@/types/worker";
 import type { RenderJobData } from "@/lib/queue";
 import { superviseScript } from "@/server/services/llm";
 import { getAgentModels, loadProjectConfig, mergeProjectConfig, autoChainOrReview } from "./shared";
@@ -10,9 +11,6 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
   try {
     const videoProject = await db.query.videoProjects.findFirst({
       where: eq(schema.videoProjects.id, videoProjectId),
-      with: {
-        series: { columns: { storyAssets: true, characterImages: true } },
-      },
     });
     if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
@@ -27,9 +25,8 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
     });
     if (existingScenes.length === 0) throw new Error("No scenes to supervise");
 
-    const storyAssets = (videoProject.series?.storyAssets ?? []) as StoryAssetInput[];
-    const charImages = (videoProject.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
-    const assets = parseStoryAssets(storyAssets, charImages);
+    const storyAssets = videoProject.storyAssets as StoryAssetInput[];
+    const assets = parseStoryAssets(storyAssets);
 
     const scenesInput = existingScenes.map((s) => ({
       sceneTitle: s.sceneTitle || "",

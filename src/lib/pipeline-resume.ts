@@ -5,8 +5,10 @@
  */
 
 import { inferResumeJobFromVideoStatus, type ResumeJobContext } from "./infer-resume-job";
+import type { RenderJobSnapshot } from "@/types/pipeline-resume";
 
 export { inferResumeJobFromVideoStatus, type ResumeJobContext };
+export type { RenderJobSnapshot } from "@/types/pipeline-resume";
 
 export const PIPELINE_JOB_LABELS: Record<string, string> = {
   "executive-produce": "Creative brief",
@@ -47,8 +49,6 @@ const JOBS_REQUIRING_SERIES = new Set([
   "generate-frame-videos",
   "compose-final",
 ]);
-
-export type RenderJobSnapshot = { status?: string; error?: string | null };
 
 /** Must match `cancel` route render_jobs error text. */
 export const RENDER_JOB_CANCELLED_MESSAGE = "Cancelled by user";

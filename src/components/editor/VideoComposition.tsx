@@ -13,22 +13,8 @@ import {
   spring,
 } from "remotion";
 
-export interface WordTimestamp {
-  word: string;
-  start: number;
-  end: number;
-}
-
-export interface EditorScene {
-  id: string;
-  sceneOrder: number;
-  text: string;
-  duration: number;
-  audioUrl: string;
-  assetUrl: string;
-  assetType: "video" | "image" | string;
-  wordTimestamps: WordTimestamp[];
-}
+import type { EditorScene } from "@/types/editor";
+import type { WordTimestamp } from "@/types/tts";
 
 interface VideoCompositionProps {
   scenes: EditorScene[];

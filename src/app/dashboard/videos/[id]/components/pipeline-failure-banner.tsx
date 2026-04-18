@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { ActivityFeed } from "./activity-feed";
-import type { Scene, VideoDetail } from "../types";
+import type { Scene, VideoDetail } from "@/types/video-detail";
 import { inferResumeJobFromVideoStatus } from "@/lib/infer-resume-job";
 import {
   canShowResumeForVideo,

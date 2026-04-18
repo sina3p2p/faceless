@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { VIDEO_MODELS } from "@/lib/constants";
-import type { SceneFrame, FrameVariant } from "../types";
+import type { SceneFrame, FrameVariant } from "@/types/video-detail";
 
 export function FrameCard({
   frame,

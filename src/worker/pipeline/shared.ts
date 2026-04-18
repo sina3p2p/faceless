@@ -1,7 +1,8 @@
 import { db, schema, eq, updateVideoStatus } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
-import { type PipelineConfig } from "@/lib/types";
+import { type PipelineConfig } from "@/types/pipeline";
+import type { AgentModels } from "@/types/worker-pipeline";
 
 function getPipelineMode(config: unknown): "manual" | "auto" {
   if (config && typeof config === "object" && "pipelineMode" in config) {
@@ -13,17 +14,6 @@ function getPipelineMode(config: unknown): "manual" | "auto" {
 export function getModelDurationsArray(videoModel?: string | null): number[] {
   const entry = VIDEO_MODELS.find((m) => m.id === (videoModel || DEFAULT_VIDEO_MODEL));
   return (entry?.durations as number[]) ?? [5, 10];
-}
-
-export interface AgentModels {
-  producerModel?: string;
-  storyModel?: string;
-  directorModel?: string;
-  supervisorModel?: string;
-  cinematographerModel?: string;
-  storyboardModel?: string;
-  promptModel?: string;
-  motionModel?: string;
 }
 
 export function getAgentModels(seriesRecord: { llmModel?: string | null }): AgentModels {

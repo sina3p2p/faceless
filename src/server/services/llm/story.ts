@@ -1,7 +1,7 @@
 import { generateText as aiGenerateText } from "ai";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter, type ChatMessage } from "./index";
-import type { CreativeBrief } from "@/lib/types";
+import type { CreativeBrief } from "@/types/pipeline";
 
 // ── Generic text generation (for non-structured calls) ──
 

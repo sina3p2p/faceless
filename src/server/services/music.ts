@@ -4,7 +4,7 @@ import * as path from "path";
 import axios from "axios";
 import OpenAI, { toFile } from "openai";
 import { MUSIC, MEDIA } from "@/lib/constants";
-import type { WordTimestamp } from "@/server/services/tts";
+import type { WordTimestamp } from "@/types/tts";
 
 const whisperClient = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 

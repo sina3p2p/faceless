@@ -13,6 +13,7 @@ import { relations } from "drizzle-orm";
 import type { ImageSpec } from "@/server/services/llm/image-spec";
 import type { FrameMotionSpec } from "@/server/services/llm/motion";
 import type { ResultMeta } from "@/server/services/llm/prompt-contract";
+import { StoryAsset } from "@/types/llm-common";
 
 // ── Enums ──
 
@@ -144,8 +145,7 @@ export const series = pgTable("series", {
   videoModel: text("video_model").default("kling-3-standard"),
   language: text("language").default("en").notNull(),
   captionStyle: text("caption_style").default("none").notNull(),
-  characterImages: json("character_images").$type<Array<{ url: string; description: string }>>().default([]),
-  storyAssets: json("story_assets").$type<Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }>>().default([]),
+  storyAssets: json("story_assets").$type<Array<StoryAsset>>().default([]),
   sceneContinuity: integer("scene_continuity").default(1).notNull(),
   videoSize: text("video_size").default("9:16").notNull(),
   videoType: text("video_type").default("standalone").notNull(),
@@ -175,6 +175,7 @@ export const videoProjects = pgTable("video_projects", {
   voiceId: text("voice_id"),
   idea: text("prompt"),
   style: text("style").default("cinematic").notNull(),
+  storyAssets: json("story_assets").$type<Array<StoryAsset>>().default([]),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -202,6 +203,7 @@ export const videoScenes = pgTable("video_scenes", {
 
 export const sceneFrames = pgTable("scene_frames", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  videoProjectId: text("video_project_id"),
   sceneId: text("scene_id").notNull().references(() => videoScenes.id, { onDelete: "cascade" }),
   frameOrder: integer("frame_order").notNull(),
   clipDuration: real("clip_duration"),

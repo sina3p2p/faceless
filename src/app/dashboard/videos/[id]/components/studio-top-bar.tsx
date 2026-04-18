@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import type { VideoDetail } from "../types";
+import type { VideoDetail } from "@/types/video-detail";
 import type { VideoPhase } from "../hooks/use-video-phase";
 
 export function StudioTopBar({

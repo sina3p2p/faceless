@@ -13,9 +13,6 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
   try {
     const videoProject = await db.query.videoProjects.findFirst({
       where: eq(schema.videoProjects.id, videoProjectId),
-      with: {
-        series: { columns: { imageModel: true, videoSize: true, storyAssets: true, characterImages: true } },
-      },
     });
     if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
@@ -26,8 +23,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     const ar = sizeConfig.id as AspectRatio;
 
     const allAssets = await resolveStoryAssets(
-      videoProject.series?.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> | null,
-      videoProject.series?.characterImages as Array<{ url: string; description: string }> | null
+      videoProject.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> | null,
     );
 
     const existingScenes = await db.query.videoScenes.findMany({
@@ -72,7 +68,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       const canonicalPrompt = frame.imagePrompt || `Scene ${sceneIdx + 1}`;
       const { providerPrompt: prompt } = serializeCanonicalForImageProvider(canonicalPrompt);
       const frameAssetRefs = frame.assetRefs as string[] | null;
-      const matchedAssets = filterAssetsByRefs(allAssets, frameAssetRefs);
+      const matchedAssets = filterAssetsByRefs(videoProject.storyAssets ?? [], frameAssetRefs);
 
       const sceneRefs = matchedAssets.map((a) => ({
         ...a,

@@ -2,7 +2,7 @@ import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter, type StoryAsset } from "./index";
-import type { CreativeBrief, DurationPreference } from "@/lib/types";
+import type { CreativeBrief, DurationPreference } from "@/types/pipeline";
 
 const WORDS_PER_SECOND = 2.5;
 

@@ -2,7 +2,7 @@ import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "./index";
-import type { CreativeBrief, VisualStyleGuide } from "@/lib/types";
+import type { CreativeBrief, VisualStyleGuide } from "@/types/pipeline";
 
 export interface CinematographerSceneInput {
   sceneTitle: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import type { VideoPhase, StudioPhaseId } from "../../hooks/use-video-phase";
-import type { Scene } from "../../types";
+import type { Scene } from "@/types/video-detail";
 import type { SelectedMedia } from "../context/StudioContext";
 
 interface DockTool {

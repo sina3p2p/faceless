@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { VideoDetail, Scene } from "../../types";
+import type { VideoDetail, Scene } from "@/types/video-detail";
 
 export type SelectedMedia = {
   mediaId: string;

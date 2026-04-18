@@ -1,5 +1,6 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob, parseStoryAssets, type StoryAssetInput } from "../shared";
+import { db, schema, eq, updateVideoStatus, failJob, parseStoryAssets } from "../shared";
+import type { StoryAssetInput } from "@/types/worker";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { generateFramePrompts } from "@/server/services/llm/prompts";
@@ -15,9 +16,6 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
   try {
     const videoProject = await db.query.videoProjects.findFirst({
       where: eq(schema.videoProjects.id, videoProjectId),
-      with: {
-        series: { columns: { storyAssets: true, characterImages: true } },
-      },
     });
     if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
@@ -35,9 +33,8 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
     if (!config.frameBreakdown) throw new Error("No frame breakdown found — run storyboard first");
     if (!config.continuityNotes) throw new Error("No continuity notes found — run supervise-script first");
 
-    const storyAssets = (videoProject.series?.storyAssets ?? []) as StoryAssetInput[];
-    const charImages = (videoProject.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
-    const assets = parseStoryAssets(storyAssets, charImages);
+    const storyAssets = videoProject.storyAssets as StoryAssetInput[];
+    const assets = parseStoryAssets(storyAssets);
 
     const scenesInput = existingScenes.map((s) => ({
       text: s.text,

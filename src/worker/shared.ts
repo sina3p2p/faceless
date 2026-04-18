@@ -12,8 +12,8 @@ import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL, WORKER } from "@/lib/const
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
-import type { VideoScript } from "@/server/services/llm";
 import { env } from "@/lib/constants";
+import type { PreApproved, StoryAssetInput, StoryAssetRef } from "@/types/worker";
 
 const client = postgres(DATABASE.url);
 export const db = drizzle(client, { schema });
@@ -82,23 +82,8 @@ export async function updateVideoStatus(
     .where(eq(schema.videoProjects.id, videoProjectId));
 }
 
-export interface CharacterRef {
-  url: string;
-  description: string;
-}
-
-export interface StoryAssetRef {
-  id: string;
-  type: "character" | "location" | "prop";
-  name: string;
-  description: string;
-  url: string;
-  sheetUrl?: string;
-}
-
 export async function resolveStoryAssets(
-  storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> | null | undefined,
-  characterImages?: Array<{ url: string; description: string }> | null
+  storyAssets: StoryAssetInput[] | null | undefined
 ): Promise<StoryAssetRef[]> {
   if (storyAssets && storyAssets.length > 0) {
     return Promise.all(
@@ -109,23 +94,6 @@ export async function resolveStoryAssets(
           ? (a.sheetUrl.startsWith("http") ? a.sheetUrl : await getSignedDownloadUrl(a.sheetUrl))
           : undefined,
       }))
-    );
-  }
-  // Backward compat: treat old characterImages as character-type assets
-  if (characterImages && characterImages.length > 0) {
-    return Promise.all(
-      characterImages.map(async (c, i) => {
-        const parts = c.description.split(":").map((s) => s.trim());
-        const name = parts.length >= 2 ? parts[0] : `Character ${i + 1}`;
-        const desc = parts.length >= 2 ? parts.slice(1).join(":").trim() : c.description;
-        return {
-          id: `legacy-${i}`,
-          type: "character" as const,
-          name,
-          description: desc,
-          url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
-        };
-      })
     );
   }
   return [];
@@ -174,10 +142,6 @@ export async function generateTTSParallel(
   return { audioPaths, ttsResults };
 }
 
-export type PreApproved = Map<number, { path: string; type: "video" | "image"; url: string }>;
-
-export type ScriptInput = Pick<VideoScript, "scenes">;
-
 export async function reusePreApprovedAssets(
   scenes: Array<{ imageUrl?: string | null; videoUrl?: string | null; assetUrl?: string | null; assetType?: string | null }>,
   workDir: string
@@ -216,32 +180,11 @@ export async function reusePreApprovedAssets(
   return { images, videos };
 }
 
-export function parseCharacters(charImages: Array<{ url: string; description: string }>) {
-  return charImages.map((c) => {
-    const parts = c.description.split(":").map((s) => s.trim());
-    return parts.length >= 2
-      ? { name: parts[0], description: parts.slice(1).join(":").trim() }
-      : { name: "Character", description: c.description };
-  });
-}
-
-export interface StoryAssetInput {
-  id: string;
-  type: "character" | "location" | "prop";
-  name: string;
-  description: string;
-  url: string;
-}
-
 export function parseStoryAssets(
-  storyAssets: StoryAssetInput[] | null | undefined,
-  charImages?: Array<{ url: string; description: string }> | null
+  storyAssets: StoryAssetInput[] | null | undefined
 ): Array<{ name: string; description: string; type: "character" | "location" | "prop" }> {
   if (storyAssets && storyAssets.length > 0) {
     return storyAssets.map((a) => ({ name: a.name, description: a.description, type: a.type }));
-  }
-  if (charImages && charImages.length > 0) {
-    return parseCharacters(charImages).map((c) => ({ ...c, type: "character" as const }));
   }
   return [];
 }

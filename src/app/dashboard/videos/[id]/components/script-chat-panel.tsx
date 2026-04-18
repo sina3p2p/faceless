@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import type { Scene, ChatMsg, RefinedScene, SceneChange } from "../types";
+import type { Scene, ChatMsg, RefinedScene, SceneChange } from "@/types/video-detail";
 
 function DiffBlock({ change }: { change: SceneChange }) {
   const [expanded, setExpanded] = useState(true);

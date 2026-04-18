@@ -1,24 +1,15 @@
-import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { LLM } from "@/lib/constants";
+import type { ChatMessage, StoryAsset } from "@/types/llm-common";
 
-export const openrouter = createOpenRouter({
-  apiKey: LLM.apiKey,
-});
+export type { ChatMessage, StoryAsset };
+export type {
+  ImagePromptOutput,
+  MotionOutput,
+  NarrationDialogueScript,
+  NarrationScript,
+  VideoScript,
+} from "@/types/narration-schemas";
 
-// ── Shared Types ──
-
-export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-export interface StoryAsset {
-  name: string;
-  description: string;
-  type: "character" | "location" | "prop";
-}
-
-// ── Shared Helpers ──
+export { openrouter } from "./openrouter-client";
 
 export function buildAssetBlock(assets: StoryAsset[]): string {
   if (assets.length === 0) return "";
@@ -29,15 +20,21 @@ export function buildAssetBlock(assets: StoryAsset[]): string {
   let block = "\n\nSTORY ASSETS (you MUST reference these by exact name in imagePrompt, visualDescription, and assetRefs):";
   if (characters.length > 0) {
     block += "\n  Characters:";
-    characters.forEach((c) => { block += `\n    - ${c.name}: ${c.description}`; });
+    characters.forEach((c) => {
+      block += `\n    - ${c.name}: ${c.description}`;
+    });
   }
   if (locations.length > 0) {
     block += "\n  Locations:";
-    locations.forEach((l) => { block += `\n    - ${l.name}: ${l.description}`; });
+    locations.forEach((l) => {
+      block += `\n    - ${l.name}: ${l.description}`;
+    });
   }
   if (props.length > 0) {
     block += "\n  Props:";
-    props.forEach((p) => { block += `\n    - ${p.name}: ${p.description}`; });
+    props.forEach((p) => {
+      block += `\n    - ${p.name}: ${p.description}`;
+    });
   }
   block += `\n\nASSET RULES:
 - DO NOT describe character/location/prop physical appearance in imagePrompt. The AI image model receives reference images for each asset — describing appearance wastes prompt space and can conflict with the reference.
@@ -81,8 +78,10 @@ export function buildDurationInstruction(targetDuration: number, durations?: num
 
 export function buildMusicDurationInstruction(targetDuration: number, durations?: number[]): string {
   if (!durations || durations.length === 0) {
-    if (targetDuration <= 30) return "Aim for 3-4 SHORT sections only (e.g. Intro + Verse + Chorus + Outro). Keep each section to 2-4 lines of lyrics MAX. Fewer sections = shorter song.";
-    if (targetDuration <= 45) return "Aim for 4-5 sections (e.g. Intro + Verse + Chorus + Verse + Outro). Keep lyrics concise — 2-4 lines per section.";
+    if (targetDuration <= 30)
+      return "Aim for 3-4 SHORT sections only (e.g. Intro + Verse + Chorus + Outro). Keep each section to 2-4 lines of lyrics MAX. Fewer sections = shorter song.";
+    if (targetDuration <= 45)
+      return "Aim for 4-5 sections (e.g. Intro + Verse + Chorus + Verse + Outro). Keep lyrics concise — 2-4 lines per section.";
     return "Aim for 5-7 sections: Intro + 2 Verses + 2 Choruses + Bridge/Outro.";
   }
   const min = Math.min(...durations);
@@ -96,10 +95,8 @@ export function buildMusicDurationInstruction(targetDuration: number, durations?
     ].join(" ");
   }
   const allowed = durations.join(" or ");
-  return `Each section's durationMs MUST produce exactly ${allowed} seconds (i.e. ${durations.map(d => d * 1000).join(" or ")}ms). You decide how many sections to create to fill ~${targetDuration}s using only ${allowed}s sections.`;
+  return `Each section's durationMs MUST produce exactly ${allowed} seconds (i.e. ${durations.map((d) => d * 1000).join(" or ")}ms). You decide how many sections to create to fill ~${targetDuration}s using only ${allowed}s sections.`;
 }
-
-// ── Re-export everything from sub-modules ──
 
 export * from "./story";
 export * from "./director";

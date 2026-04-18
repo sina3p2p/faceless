@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import type { SceneFrame } from "../../types";
+import type { SceneFrame } from "@/types/video-detail";
 
 interface CompareItem {
   id: string;

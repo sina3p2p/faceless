@@ -1,5 +1,5 @@
 import { DEFAULT_VIDEO_MODEL, VIDEO_MODELS } from "@/lib/constants";
-import type { ResolvedVideoModel, VideoProviderId } from "./types";
+import type { ResolvedVideoModel, VideoProviderId } from "@/types/video-provider";
 
 export function resolveModel(videoModelKey?: string): ResolvedVideoModel {
   const key = videoModelKey || DEFAULT_VIDEO_MODEL;

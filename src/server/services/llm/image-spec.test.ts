@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { FrameSpec, VisualStyleGuide } from "@/lib/types";
+import type { FrameSpec, VisualStyleGuide } from "@/types/pipeline";
 import {
   buildUpstreamFallbackImagePrompt,
   mergeImageSpecWithUpstream,

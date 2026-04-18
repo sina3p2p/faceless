@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { StoryAssetItem } from "../types";
+import type { StoryAssetItem } from "@/types/video-detail";
 
 const TYPE_COLORS: Record<string, string> = {
   character: "bg-violet-500/20 text-violet-300 border-violet-500/30",

@@ -1,4 +1,4 @@
-import type { I2vRequest, IVideoProvider, ResolvedVideoModel, VideoProviderId, VideoResult } from "./types";
+import type { I2vRequest, IVideoProvider, ResolvedVideoModel, VideoProviderId, VideoResult } from "@/types/video-provider";
 import { GoogleVideoProvider } from "./providers/google";
 import { GrokVideoProvider } from "./providers/grok";
 import { KlingVideoProvider } from "./providers/kling";

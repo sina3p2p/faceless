@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { FrameSpec, VisualStyleGuide } from "@/lib/types";
+import type { FrameSpec, VisualStyleGuide } from "@/types/pipeline";
 
 /**
  * Structured image prompt from the Prompt Architect (LLM).

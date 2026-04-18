@@ -1,6 +1,6 @@
 import RunwayML from "@runwayml/sdk";
 import { AI_VIDEO } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, VideoResult } from "../types";
+import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
 
 const RUNWAY_RATIO_MAP: Record<string, string> = {
   "9:16": "720:1280",

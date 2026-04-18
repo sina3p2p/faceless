@@ -5,7 +5,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { FrameCard } from "./frame-card";
 import { AssetRefPills } from "./asset-ref-pills";
-import type { Scene, StoryAssetItem, SceneUpdates } from "../types";
+import type { Scene, StoryAssetItem, SceneUpdates } from "@/types/video-detail";
 
 export function SortableSceneCard({
   scene,

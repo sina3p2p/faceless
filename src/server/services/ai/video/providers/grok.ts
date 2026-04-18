@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance } from "axios";
 import { AI_VIDEO } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, VideoResult } from "../types";
+import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
 
 const XAI_BASE = "https://api.x.ai/v1";
 

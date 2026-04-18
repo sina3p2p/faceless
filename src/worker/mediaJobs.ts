@@ -1,13 +1,8 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 
-import {
-  filterAssetsByRefs,
-  type CharacterRef,
-  type StoryAssetRef,
-  type PreApproved,
-  type ScriptInput,
-} from "./shared";
+import { filterAssetsByRefs } from "./shared";
+import type { CharacterRef, PreApproved, ScriptInput, StoryAssetRef } from "@/types/worker";
 import { WORKER } from "@/lib/constants";
 import {
   type AspectRatio,

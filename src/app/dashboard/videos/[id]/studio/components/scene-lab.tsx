@@ -13,7 +13,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { Media, Scene, SceneFrame, VideoDetail } from "../../types";
+import type { Media, Scene, SceneFrame, VideoDetail } from "@/types/video-detail";
 import type { VideoPhase } from "../../hooks/use-video-phase";
 import { useStudioContext } from "../context/StudioContext";
 import { BriefNode, VariantNode, SceneImageNode, ImageNode, VideoNode } from "./scene-lab/index";

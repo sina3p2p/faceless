@@ -1,4 +1,4 @@
-import type { VideoDetail } from "../types";
+import type { VideoDetail } from "@/types/video-detail";
 import { hasPipelineRenderFailure } from "@/lib/pipeline-resume";
 
 const PROCESSING_STATUSES = [

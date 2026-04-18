@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Scene } from "../../types";
+import type { Scene } from "@/types/video-detail";
 
 function SceneStatus({ scene, isGenerating }: { scene: Scene; isGenerating: boolean }) {
   if (isGenerating) {

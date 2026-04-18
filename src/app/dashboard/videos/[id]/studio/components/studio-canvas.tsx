@@ -18,7 +18,7 @@ import {
 import { SceneBlock } from "./scene-block";
 import { ZoomControls } from "./zoom-controls";
 import { useCanvasTransform } from "../hooks/use-canvas-transform";
-import type { Scene, VideoDetail } from "../../types";
+import type { Scene, VideoDetail } from "@/types/video-detail";
 
 export function StudioCanvas({
   scenes,

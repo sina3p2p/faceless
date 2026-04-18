@@ -2,7 +2,7 @@
 
 import { ActivityFeed } from "../../components";
 import type { VideoPhase, StudioPhaseId } from "../../hooks/use-video-phase";
-import type { Scene, VideoDetail } from "../../types";
+import type { Scene, VideoDetail } from "@/types/video-detail";
 
 function StatusBanner({ color, icon, children }: { color: string; icon?: "spinner"; children: React.ReactNode }) {
   const colors: Record<string, string> = {

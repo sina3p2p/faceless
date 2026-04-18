@@ -18,7 +18,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { EditorScene } from "./VideoComposition";
+import type { EditorScene } from "@/types/editor";
 import Image from "next/image";
 
 interface TimelineProps {

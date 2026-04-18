@@ -8,6 +8,7 @@ import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { getVideoSize, IMAGE_MODELS } from "@/lib/constants";
 import { z } from "zod";
+import { StoryAsset } from "@/types/llm-common";
 
 const bodySchema = z.object({
   imagePrompt: z.string().min(1).optional(),
@@ -25,17 +26,6 @@ export async function POST(
 
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoId),
-    with: {
-      series: {
-        columns: {
-          userId: true,
-          imageModel: true,
-          videoSize: true,
-          storyAssets: true,
-          characterImages: true,
-        },
-      },
-    },
   });
 
   if (!video || video.userId !== user.id) return notFound("Video not found");
@@ -59,8 +49,7 @@ export async function POST(
   const { providerPrompt } = serializeCanonicalForImageProvider(canonicalPrompt);
 
   // Resolve story assets filtered by frame's assetRefs
-  const rawAssets = (video.series?.storyAssets ?? []) as Array<{ id: string; type: string; name: string; description: string; url: string; sheetUrl?: string }>;
-  const rawChars = (video.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
+  const rawAssets = (video?.storyAssets ?? []) as StoryAsset[];
   const frameAssetRefs = (frame.assetRefs as string[] | null) ?? [];
 
   const characterRefs: CharacterRef[] = [];
@@ -77,11 +66,6 @@ export async function POST(
       const assetUrl = a.sheetUrl || a.url;
       const url = assetUrl.startsWith("http") ? assetUrl : await getSignedDownloadUrl(assetUrl);
       characterRefs.push({ url, description: `${a.name}: ${a.description}`, name: a.name, type: a.type as "character" | "location" | "prop" });
-    }
-  } else if (rawChars.length > 0) {
-    for (const c of rawChars) {
-      const url = c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url);
-      characterRefs.push({ url, description: c.description });
     }
   }
 

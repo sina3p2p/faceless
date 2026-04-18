@@ -5,32 +5,16 @@ import * as path from "path";
 import * as os from "os";
 import { v4 as uuid } from "uuid";
 import { VIDEO_DEFAULTS } from "@/lib/constants";
-import type { WordTimestamp } from "@/server/services/tts";
+import type { ComposerOptions, ComposerScene } from "@/types/composer";
+import type { WordTimestamp } from "@/types/tts";
+
+export type { ComposerOptions, ComposerScene };
 
 const execAsync = promisify(exec);
 const VIDEO_ENCODING = {
   preset: "medium",
   crf: 18,
 } as const;
-export interface ComposerScene {
-  audioPath: string;
-  mediaPath: string;
-  mediaType: "video" | "image";
-  text: string;
-  duration: number;
-  wordTimestamps: WordTimestamp[];
-}
-
-export interface ComposerOptions {
-  scenes: ComposerScene[];
-  captionStyle: string;
-  backgroundMusicPath?: string;
-  globalAudioPath?: string;
-  outputFormat?: string;
-  sceneContinuity?: boolean;
-  videoWidth?: number;
-  videoHeight?: number;
-}
 
 async function downloadFile(url: string, dest: string): Promise<void> {
   const response = await fetch(url);

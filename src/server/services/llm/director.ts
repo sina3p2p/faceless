@@ -2,7 +2,7 @@ import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter } from "./index";
-import type { CreativeBrief } from "@/lib/types";
+import type { CreativeBrief } from "@/types/pipeline";
 
 // ── Director Agent Schemas ──
 

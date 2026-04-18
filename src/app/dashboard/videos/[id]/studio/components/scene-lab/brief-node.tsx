@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import type { Scene, SceneFrame } from "../../../types";
+import type { Scene, SceneFrame } from "@/types/video-detail";
 
 export type BriefNodeData = {
   scene: Scene;

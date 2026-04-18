@@ -7,7 +7,7 @@ import type {
   ContinuityNotes,
   DurationPreference,
   FrameBreakdown,
-} from "@/lib/types";
+} from "@/types/pipeline";
 
 export interface StoryboardSceneInput {
   sceneTitle: string;

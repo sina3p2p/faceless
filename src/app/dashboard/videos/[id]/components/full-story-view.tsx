@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Scene } from "../types";
+import type { Scene } from "@/types/video-detail";
 
 export function FullStoryView({ scenes }: { scenes: Scene[] }) {
   const [collapsed, setCollapsed] = useState(false);

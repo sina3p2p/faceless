@@ -4,9 +4,9 @@ import { DEFAULT_VIDEO_MODEL } from "@/lib/constants";
 import { dispatchI2v } from "./registry";
 import { pickBestDuration } from "./pick-duration";
 import { resolveModel } from "./resolve-model";
-import type { VideoResult } from "./types";
+import type { VideoResult } from "@/types/video-provider";
 
-export type { VideoResult } from "./types";
+export type { VideoResult } from "@/types/video-provider";
 
 export async function generateVideoFromImage(
   imageUrl: string,

@@ -3,6 +3,10 @@
  * (`render_jobs.status` = FAILED). Used when `failed_job_name` is not stored.
  */
 
+import type { ResumeJobContext } from "@/types/pipeline-resume";
+
+export type { ResumeJobContext } from "@/types/pipeline-resume";
+
 const UNAMBIGUOUS_STATUS_TO_JOB: Record<string, string> = {
   PENDING: "executive-produce",
   PRODUCING: "executive-produce",
@@ -16,16 +20,7 @@ const UNAMBIGUOUS_STATUS_TO_JOB: Record<string, string> = {
   MOTION_GENERATION: "generate-pipeline-motion",
 };
 
-export type ResumeJobContext = {
-  hasSceneFrames: boolean;
-  /** Latest `render_jobs.step` (e.g. compose phase). */
-  renderJobStep?: string | null;
-};
-
-export function inferResumeJobFromVideoStatus(
-  status: string,
-  ctx: ResumeJobContext
-): string | null {
+export function inferResumeJobFromVideoStatus(status: string, ctx: ResumeJobContext): string | null {
   const direct = UNAMBIGUOUS_STATUS_TO_JOB[status];
   if (direct) return direct;
 
@@ -38,5 +33,6 @@ export function inferResumeJobFromVideoStatus(
   if (status === "RENDERING") {
     return "compose-final";
   }
+
   return null;
 }

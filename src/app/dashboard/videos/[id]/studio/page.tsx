@@ -8,7 +8,7 @@ import type { DragEndEvent } from "@dnd-kit/core";
 import { useVideoActions } from "../hooks/use-video-actions";
 import { useVideoPhase, type StudioPhaseId } from "../hooks/use-video-phase";
 import { InspectorPanel, ScriptChatPanel, StudioTopBar } from "../components";
-import type { Scene, SceneFrame } from "../types";
+import type { Scene, SceneFrame } from "@/types/video-detail";
 
 import { PhaseRail } from "./components/phase-rail";
 import { StudioCanvas } from "./components/studio-canvas";
