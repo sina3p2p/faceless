@@ -98,7 +98,6 @@ export async function generateImageGptImage15(
       n: 1,
       size: gptImage15Size(aspectRatio),
       quality: "medium",
-      response_format: "b64_json",
     });
 
     const item = response.data?.[0];
