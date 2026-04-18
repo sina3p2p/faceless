@@ -28,14 +28,9 @@ export async function GET(
 
   const scenesWithUrls = await Promise.all(
     video.scenes.map(async (scene) => {
-      const imgKey = scene.imageUrl || scene.assetUrl;
-      const vidKey = scene.videoUrl;
-
-      const [audioUrl, imageUrl, videoUrl] = await Promise.all([
-        scene.audioUrl ? getSignedDownloadUrl(scene.audioUrl) : null,
-        imgKey ? getSignedDownloadUrl(imgKey) : null,
-        vidKey ? getSignedDownloadUrl(vidKey) : null,
-      ]);
+      const audioUrl = scene.audioUrl
+        ? await getSignedDownloadUrl(scene.audioUrl)
+        : null;
 
       const mediaItems = await Promise.all(
         (scene.media || []).map(async (m) => ({
@@ -57,14 +52,11 @@ export async function GET(
         visualDescription: scene.visualDescription,
         searchQuery: scene.searchQuery,
         duration: scene.duration,
-        assetType: scene.assetType,
         wordTimestamps: scene.captionData || [],
         audioUrl,
-        assetUrl: imageUrl || videoUrl,
-        imageUrl,
-        videoUrl,
-        imageKey: imgKey,
-        videoKey: vidKey,
+        assetUrl: null,
+        imageUrl: null,
+        videoUrl: null,
         media: mediaItems,
       };
     })

@@ -98,10 +98,9 @@ export function ActivityFeed({
         {steps.map((step) => (
           <div
             key={step.id}
-            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              step.status === "running" ? "bg-violet-500/10" :
-              step.status === "failed" ? "bg-red-500/10" : ""
-            }`}
+            className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${step.status === "running" ? "bg-violet-500/10" :
+                step.status === "failed" ? "bg-red-500/10" : ""
+              }`}
           >
             {/* Status icon */}
             <div className="w-5 h-5 flex items-center justify-center shrink-0">
@@ -125,22 +124,20 @@ export function ActivityFeed({
 
             {/* Label + agent */}
             <div className="flex-1 min-w-0">
-              <span className={`text-xs font-medium ${
-                step.status === "done" ? "text-gray-500" :
-                step.status === "running" ? "text-violet-300" :
-                step.status === "failed" ? "text-red-200" :
-                "text-gray-600"
-              }`}>
+              <span className={`text-xs font-medium ${step.status === "done" ? "text-gray-500" :
+                  step.status === "running" ? "text-violet-300" :
+                    step.status === "failed" ? "text-red-200" :
+                      "text-gray-600"
+                }`}>
                 {step.label}
               </span>
             </div>
 
             {/* Agent name */}
-            <span className={`text-[10px] shrink-0 ${
-              step.status === "running" ? "text-violet-400/80" :
-              step.status === "failed" ? "text-red-400/80" :
-              "text-gray-700"
-            }`}>
+            <span className={`text-[10px] shrink-0 ${step.status === "running" ? "text-violet-400/80" :
+                step.status === "failed" ? "text-red-400/80" :
+                  "text-gray-700"
+              }`}>
               {step.agent}
             </span>
           </div>
@@ -174,11 +171,10 @@ export function ActivityFeed({
                 return (
                   <div
                     key={"id" in item ? item.id : i}
-                    className={`w-8 h-8 rounded shrink-0 overflow-hidden border transition-all ${
-                      hasOutput
+                    className={`w-8 h-8 rounded shrink-0 overflow-hidden border transition-all ${hasOutput
                         ? "border-violet-500/30 opacity-100"
                         : "border-white/5 opacity-30"
-                    }`}
+                      }`}
                   >
                     {url ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -238,12 +234,11 @@ export function ActivityFeedCompact({
         {steps.map((step) => (
           <div
             key={step.id}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              step.status === "done" ? "bg-emerald-500" :
-              step.status === "running" ? "bg-violet-500 animate-pulse" :
-              step.status === "failed" ? "bg-red-500" :
-              "bg-white/10"
-            }`}
+            className={`h-1 flex-1 rounded-full transition-colors ${step.status === "done" ? "bg-emerald-500" :
+                step.status === "running" ? "bg-violet-500 animate-pulse" :
+                  step.status === "failed" ? "bg-red-500" :
+                    "bg-white/10"
+              }`}
             title={`${step.label} — ${step.status}`}
           />
         ))}

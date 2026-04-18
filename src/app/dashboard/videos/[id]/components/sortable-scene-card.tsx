@@ -122,7 +122,7 @@ export function SortableSceneCard({
       className={`rounded-xl border transition-all ${isSelected
         ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/20"
         : "border-white/5 bg-white/2 hover:border-white/10"
-      }`}
+        }`}
     >
       <div className="flex gap-3 p-4">
         <div
@@ -156,7 +156,7 @@ export function SortableSceneCard({
               <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${scene.speaker.toLowerCase() === "narrator"
                 ? "bg-gray-500/20 text-gray-400"
                 : "bg-violet-500/20 text-violet-400"
-              }`}>
+                }`}>
                 {scene.speaker}
               </span>
             </div>
