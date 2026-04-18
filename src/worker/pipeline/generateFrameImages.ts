@@ -1,11 +1,10 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, resolveStoryAssets, filterAssetsByRefs, failJob } from "../shared";
-import { generateSceneImage } from "../mediaJobs";
 import { getVideoSize } from "@/lib/constants";
 import type { RenderJobData } from "@/lib/queue";
 import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt-contract";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
-import { type AspectRatio } from "@/server/services/media";
+import { generateImage, type AspectRatio } from "@/server/services/media";
 import { autoChainOrReview } from "./shared";
 
 export async function generateFrameImagesJob(job: Job<RenderJobData>) {
@@ -91,7 +90,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       }
 
       try {
-        const result = await generateSceneImage(prompt, imageModel!, sceneRefs, ar);
+        const result = await generateImage(prompt, imageModel!, sceneRefs, ar);
 
         const imgResp = await fetch(result.url);
         if (!imgResp.ok) throw new Error("Failed to download generated image");

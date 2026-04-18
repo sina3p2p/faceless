@@ -454,18 +454,22 @@ export async function generateImage(
   imageModel = "dall-e-3",
   characterRefs?: CharacterRef[],
   aspectRatio: AspectRatio = "9:16"
-): Promise<MediaAsset | null> {
-  if (imageModel === "nano-banana-2") {
-    return generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', characterRefs, aspectRatio);
+): Promise<MediaAsset> {
+  const models = {
+    "nano-banana-2": () => generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', characterRefs, aspectRatio),
+    "nano-banana-pro": () => generateViaOpenRouter(prompt, 'google/gemini-3-pro-image-preview', characterRefs, aspectRatio),
+    "kling-image-v3": () => generateKlingImage(prompt, undefined, characterRefs, aspectRatio),
+    "gpt-image-1.5": () => generateImageGptImage15(prompt, aspectRatio),
+    "dall-e-3": () => generateImageDallE3(prompt, aspectRatio),
   }
-  if (imageModel === "nano-banana-pro") {
-    return generateViaOpenRouter(prompt, 'google/gemini-3-pro-image-preview', characterRefs, aspectRatio);
+
+  const result = await models[imageModel as keyof typeof models]?.();
+
+  if (!result) {
+    throw new Error(
+      `${imageModel} failed to generate image. The job will fail — you can retry or switch to a different model in series settings.`
+    );
   }
-  if (imageModel === "kling-image-v3") {
-    return generateKlingImage(prompt, undefined, characterRefs, aspectRatio);
-  }
-  if (imageModel === "gpt-image-1.5") {
-    return generateImageGptImage15(prompt, aspectRatio);
-  }
-  return generateImageDallE3(prompt, aspectRatio);
+
+  return result;
 }

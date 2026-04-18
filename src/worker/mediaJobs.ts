@@ -10,7 +10,6 @@ import {
 } from "./shared";
 import { WORKER } from "@/lib/constants";
 import {
-  type MediaAsset,
   type AspectRatio,
   generateImage,
 } from "@/server/services/media";
@@ -19,21 +18,6 @@ import {
   downloadAIVideo,
 } from "@/server/services/ai/video";
 import { downloadFile } from "@/server/services/composer";
-
-export async function generateSceneImage(
-  imagePrompt: string,
-  imageModel: string,
-  characterRefs?: CharacterRef[],
-  aspectRatio: AspectRatio = "9:16"
-): Promise<MediaAsset> {
-  const result = await generateImage(imagePrompt, imageModel, characterRefs, aspectRatio);
-
-  if (!result) {
-    throw new Error(`${imageModel} failed to generate image. The job will fail — you can retry or switch to a different model in series settings.`);
-  }
-
-  return result;
-}
 
 export async function fetchAIVideoMediaParallel(
   script: ScriptInput & { sceneAssetRefs?: (string[] | null)[] },
@@ -98,7 +82,7 @@ export async function fetchAIVideoMediaParallel(
           const sceneRefs = allAssets.length > 0
             ? filterAssetsByRefs(allAssets, script.sceneAssetRefs?.[i] ?? null)
             : charRefs;
-          const generatedImage = await generateSceneImage(imagePrompt, imageModel, sceneRefs, aspectRatio);
+          const generatedImage = await generateImage(imagePrompt, imageModel, sceneRefs, aspectRatio);
           sceneImageUrls[i] = generatedImage.url;
           await downloadFile(generatedImage.url, imagePath);
         }
