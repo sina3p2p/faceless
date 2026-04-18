@@ -8,13 +8,13 @@ import { getSignedDownloadUrl } from "@/lib/storage";
 import { getAgentModels, loadProjectConfig, autoChainOrReview } from "./shared";
 
 export async function generateMotionJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "MOTION_GENERATION");
 
@@ -57,7 +57,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
     if (allFrameData.length === 0) {
       console.log(`[generate-motion] No frames found, skipping`);
-      await renderQueue.add("generate-frame-videos", { videoProjectId, seriesId, userId });
+      await renderQueue.add("generate-frame-videos", { videoProjectId, userId });
       return;
     }
 
@@ -72,7 +72,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-motion] Generating motion for ${framesToProcess.length} frames across ${existingScenes.length} scenes`);
 
-    const agents = getAgentModels(seriesRecord);
+    const agents = getAgentModels(videoProject);
     const BATCH_SIZE = WORKER.parallelImages;
 
     let globalFrameIdx = 0;

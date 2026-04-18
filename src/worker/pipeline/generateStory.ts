@@ -6,7 +6,7 @@ import { generateStory } from "@/server/services/llm";
 import { getAgentModels, loadProjectConfig } from "./shared";
 
 export async function generateStoryJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
     const video = await db.query.videoProjects.findFirst({
@@ -47,7 +47,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-story] Story ready: "${title}" (${storyMarkdown.length} chars)`);
 
-    await renderQueue.add("split-scenes", { videoProjectId, seriesId, userId });
+    await renderQueue.add("split-scenes", { videoProjectId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-story] Failed for ${videoProjectId}:`, msg);

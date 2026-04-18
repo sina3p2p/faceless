@@ -6,7 +6,7 @@ import { generateVisualStyleGuide } from "@/server/services/llm";
 import { getAgentModels, loadProjectConfig, mergeProjectConfig } from "./shared";
 
 export async function cinematographyJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -46,7 +46,7 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
 
     console.log(`[cinematography] Style guide ready: medium="${styleGuide.global.medium}", ${styleGuide.perScene.length} scene overrides`);
 
-    await renderQueue.add("storyboard", { videoProjectId, seriesId, userId });
+    await renderQueue.add("storyboard", { videoProjectId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[cinematography] Failed for ${videoProjectId}:`, msg);

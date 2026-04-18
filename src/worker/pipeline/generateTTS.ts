@@ -16,7 +16,7 @@ import {
 import { getProjectConfig } from "./shared";
 
 export async function generateTTSJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
   const workDir = path.join(os.tmpdir(), `faceless-tts-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
 
@@ -136,7 +136,7 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       console.log(`[generate-tts] All TTS complete`);
     }
 
-    await renderQueue.add("cinematography", { videoProjectId, seriesId, userId });
+    await renderQueue.add("cinematography", { videoProjectId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-tts] Failed for ${videoProjectId}:`, msg);

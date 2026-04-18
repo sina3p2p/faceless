@@ -10,7 +10,7 @@ import {
 import { getAgentModels, loadProjectConfig } from "./shared";
 
 export async function generatePromptsJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -111,7 +111,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-prompts] Created ${totalFrames} frames across ${existingScenes.length} scenes`);
 
-    await renderQueue.add("generate-frame-images", { videoProjectId, seriesId, userId });
+    await renderQueue.add("generate-frame-images", { videoProjectId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-prompts] Failed for ${videoProjectId}:`, msg);

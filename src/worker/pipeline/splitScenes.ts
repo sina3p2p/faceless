@@ -6,7 +6,7 @@ import { splitStoryIntoScenes } from "@/server/services/llm";
 import { getAgentModels, loadProjectConfig } from "./shared";
 
 export async function splitScenesJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -45,7 +45,7 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     console.log(`[split-scenes] Created ${result.scenes.length} scenes`);
 
-    await renderQueue.add("supervise-script", { videoProjectId, seriesId, userId });
+    await renderQueue.add("supervise-script", { videoProjectId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[split-scenes] Failed for ${videoProjectId}:`, msg);

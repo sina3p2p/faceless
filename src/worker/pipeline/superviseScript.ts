@@ -5,7 +5,7 @@ import { superviseScript } from "@/server/services/llm";
 import { getAgentModels, loadProjectConfig, mergeProjectConfig, autoChainOrReview } from "./shared";
 
 export async function superviseScriptJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({

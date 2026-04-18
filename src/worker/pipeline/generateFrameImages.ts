@@ -8,7 +8,7 @@ import { generateImage, type AspectRatio } from "@/server/services/media";
 import { autoChainOrReview } from "./shared";
 
 export async function generateFrameImagesJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({

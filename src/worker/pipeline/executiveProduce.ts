@@ -7,7 +7,7 @@ import { generateCreativeBrief } from "@/server/services/llm";
 import { getAgentModels, loadProjectConfig, mergeProjectConfig } from "./shared";
 
 export async function executiveProduceJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
     const video = await db.query.videoProjects.findFirst({
@@ -58,7 +58,7 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     console.log(`[executive-produce] Brief ready: "${brief.concept}" (${brief.durationGuidance.wordBudgetTarget} target words)`);
 
-    await renderQueue.add("generate-story", { videoProjectId, seriesId, userId });
+    await renderQueue.add("generate-story", { videoProjectId, userId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[executive-produce] Failed for ${videoProjectId}:`, msg);
