@@ -9,10 +9,10 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "CINEMATOGRAPHY");
 
@@ -30,15 +30,15 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
       directorNote: s.directorNote || "",
     }));
 
-    const agents = getAgentModels(seriesRecord);
+    const agents = getAgentModels(videoProject);
 
     console.log(`[cinematography] Generating visual style guide for ${videoProjectId}`);
 
     const styleGuide = await generateVisualStyleGuide(
       scenesInput,
       config.creativeBrief,
-      seriesRecord.style,
-      seriesRecord.videoType || "standalone",
+      videoProject.style,
+      videoProject.videoType,
       agents.cinematographerModel
     );
 

@@ -38,11 +38,11 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
     const isMusic = videoProject.videoType === "music_video";
 
     if (isMusic) {
-      const scriptMd = videoProject?.script || "";
+      const scriptMd = videoProject.script!;
 
       const genreMatch = scriptMd.match(/^Genre:\s*(.+)$/m);
       const genre = genreMatch ? genreMatch[1].trim() : "pop, catchy";
-      const title = videoProject?.title || "Untitled";
+      const title = videoProject.title ?? "Untitled";
 
       const songSections = existingScenes.map((s) => ({
         sectionName: s.sceneTitle || `Section ${s.sceneOrder + 1}`,
