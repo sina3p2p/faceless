@@ -24,15 +24,17 @@ export async function POST(
   if (!video || video.userId !== user.id) return notFound("Video not found");
   if (video.status !== "COMPLETED") return badRequest("Video must be completed to recompose");
   if (video.scenes.length === 0) return badRequest("No scenes to recompose");
+  if (!video.seriesId) return badRequest("Cannot recompose without a series.");
 
   await db
     .update(videoProjects)
     .set({ status: "RENDERING" })
     .where(eq(videoProjects.id, id));
 
-  await renderQueue.add("rerender-video", {
+  await renderQueue.add("compose-final", {
     videoProjectId: id,
     userId: user.id,
+    seriesId: video.seriesId,
   });
 
   return NextResponse.json({ success: true, status: "RENDERING" });

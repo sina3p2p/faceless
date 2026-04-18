@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { videoProjects, renderJobs } from "@/server/db/schema";
-import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
+import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { renderQueue } from "@/lib/queue";
 
@@ -19,6 +19,7 @@ export async function POST(
   });
 
   if (!video || video.userId !== user.id) return notFound("Video not found");
+  if (!video.seriesId) return badRequest("Cannot compose without a series.");
 
   await db
     .update(videoProjects)
@@ -32,10 +33,10 @@ export async function POST(
     progress: 0,
   });
 
-  await renderQueue.add("rerender-video", {
+  await renderQueue.add("compose-final", {
     videoProjectId: id,
     userId: user.id,
-    seriesId: video.seriesId ?? "",
+    seriesId: video.seriesId,
   });
 
   return NextResponse.json({ success: true });

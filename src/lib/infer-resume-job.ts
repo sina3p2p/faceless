@@ -18,7 +18,7 @@ const UNAMBIGUOUS_STATUS_TO_JOB: Record<string, string> = {
 
 export type ResumeJobContext = {
   hasSceneFrames: boolean;
-  /** Latest `render_jobs.step` (e.g. rerender inserts `COMPOSE`). */
+  /** Latest `render_jobs.step` (e.g. compose phase). */
   renderJobStep?: string | null;
 };
 
@@ -36,7 +36,6 @@ export function inferResumeJobFromVideoStatus(
     return ctx.hasSceneFrames ? "generate-frame-videos" : null;
   }
   if (status === "RENDERING") {
-    if (ctx.renderJobStep === "COMPOSE") return "rerender-video";
     return "compose-final";
   }
   return null;

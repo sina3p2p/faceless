@@ -1,6 +1,5 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { rerenderVideoJob } from "./renderJobs";
 import {
   executiveProduceJob,
   generateStoryJob,
@@ -54,8 +53,6 @@ const worker = new Worker(
       await generateFrameVideosJob(job);
     } else if (job.name === "compose-final") {
       await composeFinalJob(job);
-    } else if (job.name === "rerender-video") {
-      await rerenderVideoJob(job);
     } else {
       logger.warn("Skipping unknown/removed job", { jobName: job.name, jobId: job.id });
     }
