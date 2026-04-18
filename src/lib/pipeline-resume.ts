@@ -63,11 +63,6 @@ export function hasPipelineRenderFailure(rj: RenderJobSnapshot | undefined | nul
   return rj.error !== RENDER_JOB_CANCELLED_MESSAGE;
 }
 
-/** Older rows that still use `video_projects.status = FAILED`. */
-export function isLegacyFailedVideoStatus(status: string): boolean {
-  return status === "FAILED";
-}
-
 export function isResumablePipelineJob(jobName: string | null | undefined): jobName is string {
   return !!jobName && RESUMABLE_JOBS.has(jobName);
 }
@@ -86,7 +81,7 @@ export function canShowResumeForVideo(video: {
   status: string;
   renderJobs?: Array<RenderJobSnapshot & { step?: string }>;
 }): boolean {
-  if (video.status === "CANCELLED" || isLegacyFailedVideoStatus(video.status)) return false;
+  if (video.status === "CANCELLED") return false;
   if (!hasPipelineRenderFailure(video.renderJobs?.[0])) return false;
   const rj = video.renderJobs?.[0];
   const baseCtx = { hasSceneFrames: true, renderJobStep: rj?.step };
@@ -101,12 +96,12 @@ export function canRetryOrResumeFromFailure(video: {
   status: string;
   renderJobs?: RenderJobSnapshot[];
 }): boolean {
-  return isLegacyFailedVideoStatus(video.status) || hasPipelineRenderFailure(video.renderJobs?.[0]);
+  return hasPipelineRenderFailure(video.renderJobs?.[0]);
 }
 
 /** List / polling: not in an active generating state. */
 export function isVideoListNonActive(video: { status: string; renderJobs?: RenderJobSnapshot[] }): boolean {
-  if (video.status === "COMPLETED" || video.status === "CANCELLED" || isLegacyFailedVideoStatus(video.status)) {
+  if (video.status === "COMPLETED" || video.status === "CANCELLED") {
     return true;
   }
   return hasPipelineRenderFailure(video.renderJobs?.[0]);

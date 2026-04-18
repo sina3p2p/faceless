@@ -63,7 +63,6 @@ export async function mergeProjectConfig(videoProjectId: string, patch: Partial<
 
 export async function autoChainOrReview(
   videoProjectId: string,
-  seriesId: string,
   userId: string,
   reviewStatus: (typeof schema.videoStatusEnum.enumValues)[number],
   nextJobName: string
@@ -75,7 +74,7 @@ export async function autoChainOrReview(
   const mode = getPipelineMode(project?.config);
 
   if (mode === "auto") {
-    await renderQueue.add(nextJobName, { videoProjectId, seriesId, userId });
+    await renderQueue.add(nextJobName, { videoProjectId, userId });
   } else {
     await updateVideoStatus(videoProjectId, reviewStatus);
   }

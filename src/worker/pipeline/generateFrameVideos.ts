@@ -97,7 +97,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-videos] ${succeeded}/${targets.length} clips generated${failed > 0 ? ` (${failed} failed — content moderation or other error)` : ""}`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_PRODUCTION", "compose-final");
+    await autoChainOrReview(videoProjectId, userId, "REVIEW_PRODUCTION", "compose-final");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-videos] Failed for ${videoProjectId}:`, msg);

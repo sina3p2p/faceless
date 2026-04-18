@@ -193,9 +193,6 @@ export const videoScenes = pgTable("video_scenes", {
   audioUrl: text("audio_url"),
   imageUrl: text("image_url"),
   videoUrl: text("video_url"),
-  // deprecated — kept for backward compat with existing data
-  assetUrl: text("asset_url"),
-  assetType: text("asset_type"),
   modelUsed: text("model_used"),
   speaker: text("speaker"),
   assetRefs: json("asset_refs").$type<string[]>(),

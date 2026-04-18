@@ -6,13 +6,13 @@ import { resolveDuration, type DurationPreference } from "@/lib/types";
 import { getAgentModels, loadProjectConfig, mergeProjectConfig, autoChainOrReview, getModelDurationsArray } from "./shared";
 
 export async function storyboardJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId, userId } = job.data;
+  const { videoProjectId, userId } = job.data;
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "STORYBOARD");
 
@@ -21,7 +21,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
     if (!config.continuityNotes) throw new Error("No continuity notes found");
 
     const duration: DurationPreference = config.duration ?? resolveDuration({ preferred: 30 });
-    const supportedDurations = getModelDurationsArray(seriesRecord.videoModel);
+    const supportedDurations = getModelDurationsArray(videoProject.videoModel);
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
@@ -35,7 +35,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
       ttsDuration: s.duration ?? 5,
     }));
 
-    const agents = getAgentModels(seriesRecord);
+    const agents = getAgentModels(videoProject);
 
     console.log(`[storyboard] Generating frame breakdown for ${videoProjectId} (${scenesInput.length} scenes, durations: ${JSON.stringify(supportedDurations)})`);
 
@@ -53,7 +53,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
     const totalFrames = breakdown.scenes.reduce((sum, s) => sum + s.frames.length, 0);
     console.log(`[storyboard] Frame breakdown ready: ${totalFrames} frames across ${breakdown.scenes.length} scenes`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_PRE_PRODUCTION", "generate-prompts");
+    await autoChainOrReview(videoProjectId, userId, "REVIEW_PRE_PRODUCTION", "generate-prompts");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[storyboard] Failed for ${videoProjectId}:`, msg);

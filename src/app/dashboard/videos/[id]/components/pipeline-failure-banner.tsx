@@ -7,7 +7,6 @@ import { inferResumeJobFromVideoStatus } from "@/lib/infer-resume-job";
 import {
   canShowResumeForVideo,
   hasPipelineRenderFailure,
-  isLegacyFailedVideoStatus,
   pipelineJobDisplayName,
 } from "@/lib/pipeline-resume";
 
@@ -32,9 +31,7 @@ export function PipelineFailureBanner({
   const inferredJob =
     inferResumeJobFromVideoStatus(video.status, { hasSceneFrames: true, renderJobStep: rj0?.step }) ??
     inferResumeJobFromVideoStatus(video.status, { hasSceneFrames: false, renderJobStep: rj0?.step });
-  const feedStatus = isLegacyFailedVideoStatus(video.status)
-    ? "PENDING"
-    : video.status;
+  const feedStatus = video.status;
 
   return (
     <div className="mb-6 space-y-4">

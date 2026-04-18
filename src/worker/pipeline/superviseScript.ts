@@ -64,7 +64,7 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
 
     console.log(`[supervise-script] Supervised: ${result.scenes.length} scenes, ${result.continuityNotes.characterRegistry.length} characters, ${result.continuityNotes.locationRegistry.length} locations`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_STORY", "generate-tts");
+    await autoChainOrReview(videoProjectId, userId, "REVIEW_STORY", "generate-tts");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[supervise-script] Failed for ${videoProjectId}:`, msg);

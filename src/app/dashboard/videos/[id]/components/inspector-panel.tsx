@@ -7,7 +7,6 @@ import { SceneRefTextarea } from "./scene-ref-textarea";
 import { ActivityFeedCompact } from "./activity-feed";
 import type { VideoDetail, Scene } from "../types";
 import type { VideoPhase, StudioPhaseId } from "../hooks/use-video-phase";
-import { isLegacyFailedVideoStatus } from "@/lib/pipeline-resume";
 
 export function InspectorPanel({
   video,
@@ -53,12 +52,11 @@ export function InspectorPanel({
           </span>
           <div className="flex items-center gap-2">
             {currentPhase && (
-              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider ${
-                currentPhase.status === "processing" ? "bg-violet-500/20 text-violet-400" :
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider ${currentPhase.status === "processing" ? "bg-violet-500/20 text-violet-400" :
                 currentPhase.status === "review" ? "bg-amber-500/20 text-amber-400" :
-                currentPhase.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
-                "bg-white/5 text-gray-600"
-              }`}>
+                  currentPhase.status === "done" ? "bg-emerald-500/20 text-emerald-400" :
+                    "bg-white/5 text-gray-600"
+                }`}>
                 {currentPhase.label}
               </span>
             )}
@@ -207,7 +205,7 @@ function SceneEditor({
                   className={`relative shrink-0 rounded-md overflow-hidden border-2 transition-all hover:opacity-100 ${isCurrent
                     ? "border-violet-500 ring-1 ring-violet-500/30 opacity-100"
                     : "border-white/10 opacity-60 hover:border-white/30"
-                  }`}
+                    }`}
                   title={`${m.modelUsed || "Unknown"} — ${new Date(m.createdAt).toLocaleTimeString()}`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -259,7 +257,7 @@ function SceneEditor({
               className={`px-2 py-1 rounded-md text-[10px] font-medium transition-colors ${selectedModel === m.id
                 ? "bg-violet-600 text-white"
                 : "bg-white/5 border border-white/10 text-gray-500 hover:text-white hover:border-white/20"
-              }`}
+                }`}
             >
               {m.label}
             </button>
@@ -389,7 +387,7 @@ function DefaultInspectorBody({
 
       {phase.isFailed && video && (
         <ActivityFeedCompact
-          currentStatus={isLegacyFailedVideoStatus(video.status) ? "PENDING" : video.status}
+          currentStatus={video.status}
           scenes={scenes}
           highlightFailedStep
         />

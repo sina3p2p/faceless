@@ -1,5 +1,5 @@
 import type { VideoDetail } from "../types";
-import { hasPipelineRenderFailure, isLegacyFailedVideoStatus } from "@/lib/pipeline-resume";
+import { hasPipelineRenderFailure } from "@/lib/pipeline-resume";
 
 const PROCESSING_STATUSES = [
   "PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION",
@@ -74,7 +74,7 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
   const isVideoReview = status === "REVIEW_VIDEO";
 
   const rj = video?.renderJobs?.[0];
-  const isFailed = hasPipelineRenderFailure(rj) || isLegacyFailedVideoStatus(status);
+  const isFailed = hasPipelineRenderFailure(rj);
   const isProcessing = PROCESSING_STATUSES.includes(status) && !isFailed;
   const hasTTSRun = !isStoryReview && !isScenesReview && !isNarrationReview;
 
@@ -95,36 +95,36 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
 
   const headerTitle = video?.title ?? (
     isFailed ? "Generation failed" :
-    isStoryReview ? "Review Story" :
-    isPreProductionReview ? "Review Pre-Production" :
-    isImagesReview ? "Review Images" :
-    isProductionReview ? "Review Production" :
-    isScenesReview ? "Review Scenes" :
-    isTTSReview ? "Review Audio" :
-    isPromptsReview ? "Review Image Prompts" :
-    isNewMotionReview ? "Review Motion" :
-    isVideoReview ? "Review Video Clips" :
-    isMotionReview ? "Review Motion" :
-    isVisualReview ? "Review Visuals" :
-    isProcessing ? "Processing..." :
-    "Review"
+      isStoryReview ? "Review Story" :
+        isPreProductionReview ? "Review Pre-Production" :
+          isImagesReview ? "Review Images" :
+            isProductionReview ? "Review Production" :
+              isScenesReview ? "Review Scenes" :
+                isTTSReview ? "Review Audio" :
+                  isPromptsReview ? "Review Image Prompts" :
+                    isNewMotionReview ? "Review Motion" :
+                      isVideoReview ? "Review Video Clips" :
+                        isMotionReview ? "Review Motion" :
+                          isVisualReview ? "Review Visuals" :
+                            isProcessing ? "Processing..." :
+                              "Review"
   );
 
   const headerDescription =
     isFailed
       ? "The pipeline stopped with an error. Review the message below, then resume from the failed step or start over from the series page."
-    : isStoryReview ? "Review creative brief, story, scenes, and continuity. Then approve to generate audio." :
-    isPreProductionReview ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images." :
-    isImagesReview ? "Review the generated images below. Regenerate any you don't like, then approve to generate video clips." :
-    isProductionReview ? "Review the generated video clips below. Then approve to compose the final video." :
-    isScenesReview ? "Review the scene breakdown and director's notes, then generate audio." :
-    isTTSReview ? "Listen to the generated audio for each scene, then generate image prompts." :
-    isPromptsReview ? "Review the image prompts before generating images." :
-    isNewMotionReview ? "Review the motion descriptions for each frame, then generate video clips." :
-    isVideoReview ? "Review the generated video clips. Regenerate any you don't like, then approve to compose the final video." :
-    isProcessing ? "Your video is being processed..." :
-    isImageReview ? "Review generated images, then approve to generate motion." :
-    "Review your content and approve to continue.";
+      : isStoryReview ? "Review creative brief, story, scenes, and continuity. Then approve to generate audio." :
+        isPreProductionReview ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images." :
+          isImagesReview ? "Review the generated images below. Regenerate any you don't like, then approve to generate video clips." :
+            isProductionReview ? "Review the generated video clips below. Then approve to compose the final video." :
+              isScenesReview ? "Review the scene breakdown and director's notes, then generate audio." :
+                isTTSReview ? "Listen to the generated audio for each scene, then generate image prompts." :
+                  isPromptsReview ? "Review the image prompts before generating images." :
+                    isNewMotionReview ? "Review the motion descriptions for each frame, then generate video clips." :
+                      isVideoReview ? "Review the generated video clips. Regenerate any you don't like, then approve to compose the final video." :
+                        isProcessing ? "Your video is being processed..." :
+                          isImageReview ? "Review generated images, then approve to generate motion." :
+                            "Review your content and approve to continue.";
 
   // Phase categorization for sidebar
   const STORY_STATUSES = ["PENDING", "PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION", "REVIEW_STORY", "REVIEW_SCENES", "REVIEW_SCRIPT"];
@@ -156,7 +156,7 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
     return "locked";
   }
 
-  const failedAt = isFailed ? (isLegacyFailedVideoStatus(status) ? "PENDING" : status) : "";
+  const failedAt = isFailed ? status : "";
   const activePhaseId: StudioPhaseId = isFailed
     ? (FINAL_STATUSES.includes(failedAt) ? "final"
       : PRODUCTION_STATUSES.includes(failedAt) ? "production"
