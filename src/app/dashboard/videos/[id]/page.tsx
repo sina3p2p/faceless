@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -36,11 +36,11 @@ export default function ReviewPage() {
   const actions = useVideoActions(id);
   const {
     scenes, setScenes, video, setVideo, loading,
-    rendering, approving, generatingAll, generatingAllFrames, generatingMotion,
+    rendering, approving, generatingAllFrames, generatingMotion,
     generatingSceneIds, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds,
     downloadUrl, downloading, loadData,
     handleUpdateScene, handleUpdateAssetRefs, handleDeleteScene, handleUploadImage,
-    generateImageForScene, handleGenerateAllImages, handleGenerateFrameImage,
+    handleGenerateFrameImage,
     handleGenerateAllFrameImages, handleUpdateFramePrompt, handleUpdateFrameMotion,
     handleRegenerateFrameVideo, handleRegenerateFrameMotion, handleGenerateMotion,
     handleApprove, handleSaveStory, handleStartRendering, handleSelectMedia,
@@ -98,11 +98,18 @@ export default function ReviewPage() {
     });
   }
 
-  async function handleGenerateImage(prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[], modelOverride?: string) {
+  async function handleGenerateImage(prompt: string, mode: "regenerate" | "edit", _referenceSceneIds: string[], modelOverride?: string) {
     if (!editingScene) return;
+    const firstFrame = (editingScene.frames ?? [])[0];
+    if (!firstFrame) return;
     setPreviousAssetUrl(editingScene.assetUrl);
     setRegenerating(true);
-    await generateImageForScene(editingScene.id, prompt, mode, referenceSceneIds, modelOverride);
+    const base = firstFrame.imagePrompt || editingScene.imagePrompt || editingScene.text || "";
+    const imagePrompt =
+      mode === "edit"
+        ? (prompt.trim() ? `${base}${base ? ". " : ""}${prompt}`.trim() : base)
+        : prompt;
+    await handleGenerateFrameImage(firstFrame.id, imagePrompt || undefined, modelOverride);
     setRegenerating(false);
   }
 
@@ -125,8 +132,6 @@ export default function ReviewPage() {
   }
 
   // const totalDuration = useMemo(() => scenes.reduce((s, sc) => s + sc.duration, 0), [scenes]);
-  const allImagesGenerated = scenes.length > 0 && scenes.every((s) => s.assetUrl);
-  const someImagesGenerated = scenes.some((s) => s.assetUrl);
   const allFrames = scenes.flatMap((s) => s.frames ?? []);
   const hasFrames = allFrames.length > 0;
   const allFrameImagesGenerated = hasFrames && allFrames.every((f) => f.imageUrl);
@@ -183,11 +188,8 @@ export default function ReviewPage() {
               setEditingScene={setEditingScene}
               isMusicVideo={isMusicVideo}
               hasFrames={hasFrames}
-              allImagesGenerated={allImagesGenerated}
               allFrameImagesGenerated={allFrameImagesGenerated}
-              someImagesGenerated={someImagesGenerated}
               someFrameImagesGenerated={someFrameImagesGenerated}
-              generatingAll={generatingAll}
               generatingAllFrames={generatingAllFrames}
               generatingMotion={generatingMotion}
               rendering={rendering}
@@ -203,7 +205,6 @@ export default function ReviewPage() {
               onUpdateAssetRefs={handleUpdateAssetRefs}
               onDeleteScene={handleDeleteScene}
               onUploadImage={handleUploadImage}
-              onGenerateAllImages={handleGenerateAllImages}
               onGenerateAllFrameImages={handleGenerateAllFrameImages}
               onGenerateFrameImage={handleGenerateFrameImage}
               onUpdateFramePrompt={handleUpdateFramePrompt}
@@ -268,12 +269,12 @@ function CenterPanel({
   selectedPhaseId, phase, video, scenes, setVideo,
   sensors, selectedSceneId, setSelectedSceneId, setEditingScene,
   isMusicVideo, hasFrames,
-  allImagesGenerated, allFrameImagesGenerated, someImagesGenerated, someFrameImagesGenerated,
-  generatingAll, generatingAllFrames, generatingMotion, rendering, approving,
+  allFrameImagesGenerated, someFrameImagesGenerated,
+  generatingAllFrames, generatingMotion, rendering, approving,
   downloadUrl, downloading,
   generatingSceneIds, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds,
   onDragEnd, onUpdateScene, onUpdateAssetRefs, onDeleteScene, onUploadImage,
-  onGenerateAllImages, onGenerateAllFrameImages, onGenerateFrameImage,
+  onGenerateAllFrameImages, onGenerateFrameImage,
   onUpdateFramePrompt, onUpdateFrameMotion, onRegenerateFrameVideo, onRegenerateFrameMotion,
   onSelectFrameVariant, onGenerateMotion, onApprove, onSaveStory, onStartRendering, onRecompose, onDownload,
 }: {
@@ -288,11 +289,8 @@ function CenterPanel({
   setEditingScene: (scene: Scene | null) => void;
   isMusicVideo: boolean;
   hasFrames: boolean;
-  allImagesGenerated: boolean;
   allFrameImagesGenerated: boolean;
-  someImagesGenerated: boolean;
   someFrameImagesGenerated: boolean;
-  generatingAll: boolean;
   generatingAllFrames: boolean;
   generatingMotion: boolean;
   rendering: boolean;
@@ -308,7 +306,6 @@ function CenterPanel({
   onUpdateAssetRefs: (id: string, refs: string[]) => void;
   onDeleteScene: (id: string) => void;
   onUploadImage: (id: string, file: File) => void;
-  onGenerateAllImages: (regen: boolean) => void;
   onGenerateAllFrameImages: (regen: boolean) => void;
   onGenerateFrameImage: (frameId: string, prompt?: string) => void;
   onUpdateFramePrompt: (frameId: string, prompt: string) => void;
@@ -481,7 +478,7 @@ function CenterPanel({
           <div className="mt-6 flex justify-center gap-3">
             {(phase.isImagesReview || phase.isImageReview) && (
               <>
-                <Button variant="outline" loading={generatingAllFrames || generatingAll} onClick={() => hasFrames ? onGenerateAllFrameImages(true) : onGenerateAllImages(true)}>Regenerate All Images</Button>
+                <Button variant="outline" loading={generatingAllFrames} disabled={!hasFrames} title={!hasFrames ? "Complete storyboard to get frames first" : undefined} onClick={() => hasFrames && onGenerateAllFrameImages(true)}>Regenerate All Images</Button>
                 <Button variant="primary" loading={approving} onClick={() => onApprove(phase.isImagesReview ? "approve-images" : "approve-production")}>Approve &amp; Continue</Button>
               </>
             )}
@@ -498,9 +495,9 @@ function CenterPanel({
             )}
             {!phase.isImagesReview && !phase.isImageReview && !phase.isMotionReview && !phase.isNewMotionReview && !phase.isProductionReview && !phase.isVideoReview && (
               <>
-                {!allImagesGenerated && !allFrameImagesGenerated && (
-                  <Button variant="outline" loading={generatingAll || generatingAllFrames} onClick={() => hasFrames ? onGenerateAllFrameImages(false) : onGenerateAllImages(false)}>
-                    {(someImagesGenerated || someFrameImagesGenerated) ? "Generate Remaining" : "Generate Preview Images"}
+                {hasFrames && !allFrameImagesGenerated && (
+                  <Button variant="outline" loading={generatingAllFrames} onClick={() => onGenerateAllFrameImages(false)}>
+                    {someFrameImagesGenerated ? "Generate Remaining" : "Generate Preview Images"}
                   </Button>
                 )}
                 <Button variant="primary" loading={rendering} onClick={onStartRendering}>Generate Video</Button>
@@ -566,7 +563,7 @@ function CenterPanel({
                 onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
               />
               <div className="mt-6 flex justify-center gap-3">
-                <Button variant="outline" loading={generatingAllFrames || generatingAll} onClick={() => hasFrames ? onGenerateAllFrameImages(true) : onGenerateAllImages(true)}>
+                <Button variant="outline" loading={generatingAllFrames} disabled={!hasFrames} title={!hasFrames ? "Complete storyboard to get frames first" : undefined} onClick={() => hasFrames && onGenerateAllFrameImages(true)}>
                   Regenerate All Images
                 </Button>
                 <Button variant="primary" loading={rendering} onClick={onRecompose}>
@@ -639,7 +636,7 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
               onEditPrompt={() => setEditingScene(scene)}
               onUploadImage={(file) => onUploadImage(scene.id, file)}
               onUpdateAssetRefs={(refs) => onUpdateAssetRefs(scene.id, refs)}
-              generatingImage={generatingSceneIds.has(scene.id)}
+              generatingImage={generatingSceneIds.has(scene.id) || (scene.frames ?? []).some((f) => generatingFrameIds.has(f.id))}
               isMusicVideo={isMusicVideo}
               isDialogue={video?.series?.videoType === "dialogue"}
               storyAssets={video?.series?.storyAssets ?? []}

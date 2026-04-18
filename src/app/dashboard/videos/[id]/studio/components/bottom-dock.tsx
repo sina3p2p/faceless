@@ -126,10 +126,8 @@ export function BottomDock({
   hasScenes,
   hasFrames,
   allImagesGenerated,
-  someImagesGenerated,
   allFrameImagesGenerated,
   someFrameImagesGenerated,
-  generatingAll,
   generatingAllFrames,
   generatingMotion,
   rendering,
@@ -137,7 +135,6 @@ export function BottomDock({
   downloadUrl,
   downloading,
   onApprove,
-  onGenerateAllImages,
   onGenerateAllFrameImages,
   onGenerateMotion,
   onStartRendering,
@@ -162,10 +159,8 @@ export function BottomDock({
   hasScenes: boolean;
   hasFrames: boolean;
   allImagesGenerated: boolean;
-  someImagesGenerated: boolean;
   allFrameImagesGenerated: boolean;
   someFrameImagesGenerated: boolean;
-  generatingAll: boolean;
   generatingAllFrames: boolean;
   generatingMotion: boolean;
   rendering: boolean;
@@ -173,7 +168,6 @@ export function BottomDock({
   downloadUrl: string | null;
   downloading: boolean;
   onApprove: (endpoint: string) => void;
-  onGenerateAllImages: (regen: boolean) => void;
   onGenerateAllFrameImages: (regen: boolean) => void;
   onGenerateMotion: () => void;
   onStartRendering: () => void;
@@ -227,16 +221,17 @@ export function BottomDock({
         id: "regen-images",
         icon: icons.regenImages,
         label: "Regenerate All Images",
-        onClick: () => hasFrames ? onGenerateAllFrameImages(true) : onGenerateAllImages(true),
-        loading: generatingAllFrames || generatingAll,
+        onClick: () => { if (hasFrames) onGenerateAllFrameImages(true); },
+        loading: generatingAllFrames,
+        disabled: !hasFrames,
       });
-    } else if (!allImagesGenerated && !allFrameImagesGenerated && !approveAction) {
+    } else if (hasFrames && !allFrameImagesGenerated && !approveAction) {
       phaseTools.push({
         id: "gen-images",
         icon: icons.images,
-        label: someImagesGenerated || someFrameImagesGenerated ? "Generate Remaining" : "Generate Images",
-        onClick: () => hasFrames ? onGenerateAllFrameImages(false) : onGenerateAllImages(false),
-        loading: generatingAll || generatingAllFrames,
+        label: someFrameImagesGenerated ? "Generate Remaining" : "Generate Images",
+        onClick: () => onGenerateAllFrameImages(false),
+        loading: generatingAllFrames,
       });
     }
   }
@@ -253,7 +248,7 @@ export function BottomDock({
   }
 
   // Video rendering
-  if (selectedPhaseId === "production" && !phase.isProcessing && !approveAction && hasScenes && (allImagesGenerated || allFrameImagesGenerated)) {
+  if (selectedPhaseId === "production" && !phase.isProcessing && !approveAction && hasScenes && ((hasFrames && allFrameImagesGenerated) || (!hasFrames && allImagesGenerated))) {
     phaseTools.push({
       id: "gen-video",
       icon: icons.video,
@@ -288,8 +283,9 @@ export function BottomDock({
       id: "regen-images-final",
       icon: icons.regenImages,
       label: "Regenerate All Images",
-      onClick: () => hasFrames ? onGenerateAllFrameImages(true) : onGenerateAllImages(true),
-      loading: generatingAllFrames || generatingAll,
+      onClick: () => { if (hasFrames) onGenerateAllFrameImages(true); },
+      loading: generatingAllFrames,
+      disabled: !hasFrames,
     });
   }
 

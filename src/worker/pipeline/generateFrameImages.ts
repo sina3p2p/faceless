@@ -91,7 +91,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       }
 
       try {
-        const result = await generateSceneImage(prompt, imageModel!, sceneIdx, sceneRefs, ar);
+        const result = await generateSceneImage(prompt, imageModel!, sceneRefs, ar);
 
         const imgResp = await fetch(result.url);
         if (!imgResp.ok) throw new Error("Failed to download generated image");

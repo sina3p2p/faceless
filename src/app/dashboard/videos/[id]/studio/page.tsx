@@ -27,10 +27,10 @@ export default function StudioPage() {
   const actions = useVideoActions(id);
   const {
     scenes, setScenes, video, setVideo, loading,
-    rendering, approving, generatingAll, generatingAllFrames, generatingMotion,
+    rendering, approving, generatingAllFrames, generatingMotion,
     generatingSceneIds, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds,
     downloadUrl, downloading, loadData, handleDeleteScene, handleUploadImage,
-    generateImageForScene, handleGenerateAllImages, handleGenerateFrameImage,
+    handleGenerateFrameImage,
     handleGenerateAllFrameImages, handleUpdateFramePrompt, handleUpdateFrameMotion,
     handleRegenerateFrameVideo, handleRegenerateFrameMotion, handleGenerateMotion,
     handleApprove, handleSaveStory, handleStartRendering, handleSelectMedia,
@@ -94,11 +94,18 @@ export default function StudioPage() {
     });
   }
 
-  async function handleGenerateImage(prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[], modelOverride?: string) {
+  async function handleGenerateImage(prompt: string, mode: "regenerate" | "edit", _referenceSceneIds: string[], modelOverride?: string) {
     if (!editingScene) return;
+    const firstFrame = (editingScene.frames ?? [])[0];
+    if (!firstFrame) return;
     setPreviousAssetUrl(editingScene.assetUrl);
     setRegenerating(true);
-    await generateImageForScene(editingScene.id, prompt, mode, referenceSceneIds, modelOverride);
+    const base = firstFrame.imagePrompt || editingScene.imagePrompt || editingScene.text || "";
+    const imagePrompt =
+      mode === "edit"
+        ? (prompt.trim() ? `${base}${base ? ". " : ""}${prompt}`.trim() : base)
+        : prompt;
+    await handleGenerateFrameImage(firstFrame.id, imagePrompt || undefined, modelOverride);
     setRegenerating(false);
   }
 
@@ -121,7 +128,6 @@ export default function StudioPage() {
   }
 
   const allImagesGenerated = scenes.length > 0 && scenes.every((s) => s.assetUrl);
-  const someImagesGenerated = scenes.some((s) => s.assetUrl);
   const allFrames = scenes.flatMap((s) => s.frames ?? []);
   const hasFrames = allFrames.length > 0;
   const allFrameImagesGenerated = hasFrames && allFrames.every((f) => f.imageUrl);
@@ -226,10 +232,8 @@ export default function StudioPage() {
               hasScenes={scenes.length > 0}
               hasFrames={hasFrames}
               allImagesGenerated={allImagesGenerated}
-              someImagesGenerated={someImagesGenerated}
               allFrameImagesGenerated={allFrameImagesGenerated}
               someFrameImagesGenerated={someFrameImagesGenerated}
-              generatingAll={generatingAll}
               generatingAllFrames={generatingAllFrames}
               generatingMotion={generatingMotion}
               rendering={rendering}
@@ -237,7 +241,6 @@ export default function StudioPage() {
               downloadUrl={downloadUrl}
               downloading={downloading}
               onApprove={handleApprove}
-              onGenerateAllImages={handleGenerateAllImages}
               onGenerateAllFrameImages={handleGenerateAllFrameImages}
               onGenerateMotion={handleGenerateMotion}
               onStartRendering={handleStartRendering}

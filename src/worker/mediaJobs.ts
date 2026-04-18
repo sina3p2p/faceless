@@ -1,22 +1,14 @@
-import { Job } from "bullmq";
 import * as fs from "fs/promises";
 import * as path from "path";
 
 import {
-  db,
-  schema,
-  eq,
-  insertMedia,
-  updateVideoStatus,
-  failJob,
-  resolveStoryAssets,
   filterAssetsByRefs,
   type CharacterRef,
   type StoryAssetRef,
   type PreApproved,
   type ScriptInput,
 } from "./shared";
-import { getVideoSize, WORKER } from "@/lib/constants";
+import { WORKER } from "@/lib/constants";
 import {
   type MediaAsset,
   type AspectRatio,
@@ -27,22 +19,17 @@ import {
   downloadAIVideo,
 } from "@/server/services/ai/video";
 import { downloadFile } from "@/server/services/composer";
-import { uploadFile } from "@/lib/storage";
-import type { RenderJobData } from "@/lib/queue";
 
 export async function generateSceneImage(
   imagePrompt: string,
   imageModel: string,
-  sceneIndex: number,
   characterRefs?: CharacterRef[],
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset> {
-  console.log(`Scene ${sceneIndex}: Generating image with ${imageModel}${characterRefs?.length ? ` with ${characterRefs.length} character ref(s)` : ""}...`);
-
   const result = await generateImage(imagePrompt, imageModel, characterRefs, aspectRatio);
 
   if (!result) {
-    throw new Error(`${imageModel} failed to generate image for scene ${sceneIndex}. The job will fail — you can retry or switch to a different model in series settings.`);
+    throw new Error(`${imageModel} failed to generate image. The job will fail — you can retry or switch to a different model in series settings.`);
   }
 
   return result;
@@ -111,7 +98,7 @@ export async function fetchAIVideoMediaParallel(
           const sceneRefs = allAssets.length > 0
             ? filterAssetsByRefs(allAssets, script.sceneAssetRefs?.[i] ?? null)
             : charRefs;
-          const generatedImage = await generateSceneImage(imagePrompt, imageModel, i, sceneRefs, aspectRatio);
+          const generatedImage = await generateSceneImage(imagePrompt, imageModel, sceneRefs, aspectRatio);
           sceneImageUrls[i] = generatedImage.url;
           await downloadFile(generatedImage.url, imagePath);
         }
@@ -151,89 +138,5 @@ export async function fetchAIVideoMediaParallel(
   }
 
   return mediaPaths;
-}
-
-export async function generateImagesJob(job: Job<RenderJobData & { regenerateExisting?: boolean }>) {
-  const { videoProjectId, seriesId, regenerateExisting } = job.data;
-
-  try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
-    });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
-
-    const allAssets = await resolveStoryAssets(
-      seriesRecord.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }> | null,
-      seriesRecord.characterImages as Array<{ url: string; description: string }> | null
-    );
-
-    const imageModel = seriesRecord.imageModel || "dall-e-3";
-    const sizeConfig = getVideoSize(seriesRecord.videoSize);
-    const ar = sizeConfig.id as AspectRatio;
-
-    const existingScenes = await db.query.videoScenes.findMany({
-      where: eq(schema.videoScenes.videoProjectId, videoProjectId),
-      orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
-    });
-
-    if (existingScenes.length === 0) throw new Error("No scenes to generate images for");
-
-    const targets = regenerateExisting
-      ? existingScenes
-      : existingScenes.filter((s) => !s.imageUrl && !s.assetUrl);
-
-    if (targets.length === 0) {
-      console.log(`[generate-images] All scenes already have images, nothing to do`);
-      await updateVideoStatus(videoProjectId, "IMAGE_REVIEW");
-      return;
-    }
-
-    console.log(`[generate-images] Generating ${targets.length} images with ${imageModel} (parallel batches of ${WORKER.parallelImages}), ${allAssets.length} story assets`);
-
-    const BATCH_SIZE = WORKER.parallelImages;
-    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
-      const batch = targets.slice(i, i + BATCH_SIZE);
-
-      await Promise.all(
-        batch.map(async (scene) => {
-          const sceneIdx = existingScenes.findIndex((s) => s.id === scene.id);
-          const prompt = scene.imagePrompt || scene.text;
-          const sceneAssetRefs = scene.assetRefs as string[] | null;
-          const sceneRefs = filterAssetsByRefs(allAssets, sceneAssetRefs);
-          try {
-            const result = await generateSceneImage(prompt, imageModel, sceneIdx, sceneRefs, ar);
-
-            const imgResp = await fetch(result.url);
-            if (!imgResp.ok) throw new Error("Failed to download generated image");
-            const buffer = Buffer.from(await imgResp.arrayBuffer());
-
-            const key = `scenes/${videoProjectId}/preview_${scene.id}_${Date.now()}.jpg`;
-            await uploadFile(key, buffer, "image/jpeg");
-
-            await db
-              .update(schema.videoScenes)
-              .set({ assetUrl: key, assetType: "image", imageUrl: key, modelUsed: imageModel })
-              .where(eq(schema.videoScenes.id, scene.id));
-
-            await insertMedia({ sceneId: scene.id }, "image", key, prompt, imageModel);
-            console.log(`[generate-images] Scene ${sceneIdx} done`);
-          } catch (err) {
-            console.error(`[generate-images] Scene ${sceneIdx} failed:`, err);
-            throw err;
-          }
-        })
-      );
-
-      const progress = Math.round(((i + batch.length) / targets.length) * 100);
-      await job.updateProgress(progress);
-    }
-
-    await updateVideoStatus(videoProjectId, "IMAGE_REVIEW");
-    console.log(`[generate-images] All ${targets.length} images generated`);
-  } catch (error) {
-    const msg = await failJob(videoProjectId, error);
-    console.error(`[generate-images] Failed for ${videoProjectId}:`, msg);
-    throw error;
-  }
 }
 

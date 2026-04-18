@@ -22,7 +22,6 @@ export const PIPELINE_JOB_LABELS: Record<string, string> = {
   "generate-frame-videos": "Video clips",
   "compose-final": "Final composition",
   "rerender-video": "Re-compose video",
-  "generate-images": "Preview images",
   "render-music-video": "Music video render",
 };
 
@@ -40,7 +39,6 @@ const RESUMABLE_JOBS = new Set([
   "generate-frame-videos",
   "compose-final",
   "rerender-video",
-  "generate-images",
 ]);
 
 const JOBS_REQUIRING_SERIES = new Set([

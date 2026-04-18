@@ -9,7 +9,6 @@ export function useVideoActions(id: string) {
   const [loading, setLoading] = useState(true);
   const [rendering, setRendering] = useState(false);
   const [approving, setApproving] = useState(false);
-  const [generatingAll, setGeneratingAll] = useState(false);
   const [generatingAllFrames, setGeneratingAllFrames] = useState(false);
   const [generatingMotion, setGeneratingMotion] = useState(false);
   const [generatingSceneIds, setGeneratingSceneIds] = useState<Set<string>>(new Set());
@@ -117,44 +116,6 @@ export function useVideoActions(id: string) {
       await loadData();
     } finally {
       setGeneratingSceneIds((prev) => { const next = new Set(prev); next.delete(sceneId); return next; });
-    }
-  }
-
-  async function generateImageForScene(
-    sceneId: string,
-    promptOverride?: string,
-    mode: "regenerate" | "edit" = "regenerate",
-    referenceSceneIds?: string[],
-    modelOverride?: string
-  ) {
-    setGeneratingSceneIds((prev) => new Set(prev).add(sceneId));
-    try {
-      const body: Record<string, unknown> = { mode };
-      if (promptOverride) body.imagePrompt = promptOverride;
-      if (referenceSceneIds && referenceSceneIds.length > 0) body.referenceSceneIds = referenceSceneIds;
-      if (modelOverride) body.imageModel = modelOverride;
-      const res = await fetch(`/api/videos/${id}/scenes/${sceneId}/generate-image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (res.ok) await loadData();
-    } finally {
-      setGeneratingSceneIds((prev) => { const next = new Set(prev); next.delete(sceneId); return next; });
-    }
-  }
-
-  async function handleGenerateAllImages(regenerateExisting = false) {
-    setGeneratingAll(true);
-    try {
-      await fetch(`/api/videos/${id}/generate-images`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ regenerateExisting }),
-      });
-      setVideo((prev) => prev ? { ...prev, status: "IMAGE_GENERATION" } : prev);
-    } catch {
-      setGeneratingAll(false);
     }
   }
 
@@ -378,7 +339,6 @@ export function useVideoActions(id: string) {
     loading,
     rendering,
     approving,
-    generatingAll,
     generatingAllFrames,
     generatingMotion,
     generatingSceneIds,
@@ -392,8 +352,6 @@ export function useVideoActions(id: string) {
     handleUpdateAssetRefs,
     handleDeleteScene,
     handleUploadImage,
-    generateImageForScene,
-    handleGenerateAllImages,
     handleGenerateFrameImage,
     handleGenerateAllFrameImages,
     handleUpdateFramePrompt,

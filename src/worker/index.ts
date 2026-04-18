@@ -1,6 +1,5 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import { generateImagesJob } from "./mediaJobs";
 import { rerenderVideoJob } from "./renderJobs";
 import {
   executiveProduceJob,
@@ -55,8 +54,6 @@ const worker = new Worker(
       await generateFrameVideosJob(job);
     } else if (job.name === "compose-final") {
       await composeFinalJob(job);
-    } else if (job.name === "generate-images") {
-      await generateImagesJob(job);
     } else if (job.name === "rerender-video") {
       await rerenderVideoJob(job);
     } else {

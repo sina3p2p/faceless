@@ -30,7 +30,7 @@ export function inferResumeJobFromVideoStatus(
   if (direct) return direct;
 
   if (status === "IMAGE_GENERATION") {
-    return ctx.hasSceneFrames ? "generate-frame-images" : "generate-images";
+    return ctx.hasSceneFrames ? "generate-frame-images" : null;
   }
   if (status === "VIDEO_GENERATION") {
     return ctx.hasSceneFrames ? "generate-frame-videos" : null;

@@ -56,8 +56,6 @@ export async function GET(req: NextRequest) {
             imageUrl: true,
             videoUrl: true,
             audioUrl: true,
-            assetUrl: true,
-            assetType: true,
             imagePrompt: true,
             visualDescription: true,
             modelUsed: true,
@@ -80,8 +78,6 @@ export async function GET(req: NextRequest) {
             imageUrl: true,
             videoUrl: true,
             audioUrl: true,
-            assetUrl: true,
-            assetType: true,
             imagePrompt: true,
             visualDescription: true,
             modelUsed: true,
@@ -124,7 +120,7 @@ export async function GET(req: NextRequest) {
 
     for (const scene of project.scenes) {
       if (tab === "images") {
-        const imgKey = scene.imageUrl || (scene.assetType === "image" ? scene.assetUrl : null);
+        const imgKey = scene.imageUrl;
         if (imgKey) {
           const url = await resolveUrl(imgKey);
           if (url) {
