@@ -12,20 +12,23 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      with: {
+        series: { columns: { imageModel: true, videoSize: true, storyAssets: true, characterImages: true } },
+      },
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "IMAGE_GENERATION");
 
-    const imageModel = seriesRecord.imageModel || "dall-e-3";
-    const sizeConfig = getVideoSize(seriesRecord.videoSize);
+    const imageModel = videoProject.imageModel;
+    const sizeConfig = getVideoSize(videoProject.videoSize);
     const ar = sizeConfig.id as AspectRatio;
 
     const allAssets = await resolveStoryAssets(
-      seriesRecord.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> | null,
-      seriesRecord.characterImages as Array<{ url: string; description: string }> | null
+      videoProject.series?.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> | null,
+      videoProject.series?.characterImages as Array<{ url: string; description: string }> | null
     );
 
     const existingScenes = await db.query.videoScenes.findMany({
@@ -49,7 +52,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
-      await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
+      await autoChainOrReview(videoProjectId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
       return;
     }
 
@@ -88,7 +91,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       }
 
       try {
-        const result = await generateSceneImage(prompt, imageModel, sceneIdx, sceneRefs, ar);
+        const result = await generateSceneImage(prompt, imageModel!, sceneIdx, sceneRefs, ar);
 
         const imgResp = await fetch(result.url);
         if (!imgResp.ok) throw new Error("Failed to download generated image");
@@ -123,7 +126,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-images] All ${targets.length} images generated`);
 
-    await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
+    await autoChainOrReview(videoProjectId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, msg);
