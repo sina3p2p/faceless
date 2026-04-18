@@ -136,10 +136,10 @@ export default function EditSeriesPage() {
   }
 
   async function handleDeleteAsset(assetId: string) {
-    const res = await fetch(`/api/series/${id}/story-assets`, {
-      method: "DELETE",
+    const res = await fetch(`/api/story-assets/${assetId}/unlink`, {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assetId }),
+      body: JSON.stringify({ seriesId: id }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -148,14 +148,14 @@ export default function EditSeriesPage() {
   }
 
   async function handleUpdateAsset(assetId: string, updates: Partial<Pick<StoryAsset, "name" | "description" | "type" | "sheetUrl" | "voiceId">>) {
-    const res = await fetch(`/api/series/${id}/story-assets`, {
+    const res = await fetch(`/api/story-assets/${assetId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assetId, ...updates }),
+      body: JSON.stringify(updates),
     });
     if (res.ok) {
       const data = await res.json();
-      setAssets(data.storyAssets);
+      setAssets((prev) => prev.map((a) => (a.id === assetId ? { ...a, ...data.asset } : a)));
     }
   }
 
@@ -300,10 +300,10 @@ export default function EditSeriesPage() {
                         onClick={async () => {
                           setDescribingIdx(idx);
                           try {
-                            const res = await fetch("/api/describe-character", {
+                            const res = await fetch("/api/story-assets/describe", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ imageUrl: asset.sheetUrl || asset.url }),
+                              body: JSON.stringify({ imageUrl: asset.sheetUrl || asset.url, type: asset.type }),
                             });
                             if (res.ok) {
                               const data = await res.json();
@@ -353,10 +353,8 @@ export default function EditSeriesPage() {
                                   setPendingSheet(null);
                                   setGeneratingSheetId(asset.id);
                                   try {
-                                    const res = await fetch(`/api/series/${id}/story-assets/generate-sheet`, {
+                                    const res = await fetch(`/api/story-assets/${asset.id}/generate-sheet`, {
                                       method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({ assetId: asset.id }),
                                     });
                                     if (res.ok) {
                                       const data = await res.json();
@@ -388,10 +386,8 @@ export default function EditSeriesPage() {
                               onClick={async () => {
                                 setGeneratingSheetId(asset.id);
                                 try {
-                                  const res = await fetch(`/api/series/${id}/story-assets/generate-sheet`, {
+                                  const res = await fetch(`/api/story-assets/${asset.id}/generate-sheet`, {
                                     method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ assetId: asset.id }),
                                   });
                                   if (res.ok) {
                                     const data = await res.json();
@@ -415,10 +411,8 @@ export default function EditSeriesPage() {
                             onClick={async () => {
                               setGeneratingSheetId(asset.id);
                               try {
-                                const res = await fetch(`/api/series/${id}/story-assets/generate-sheet`, {
+                                const res = await fetch(`/api/story-assets/${asset.id}/generate-sheet`, {
                                   method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ assetId: asset.id }),
                                 });
                                 if (res.ok) {
                                   const data = await res.json();
@@ -478,7 +472,8 @@ export default function EditSeriesPage() {
                         const fd = new FormData();
                         fd.append("file", file);
                         fd.append("type", newAssetType);
-                        const res = await fetch(`/api/series/${id}/story-assets`, {
+                        fd.append("seriesId", id);
+                        const res = await fetch("/api/story-assets", {
                           method: "POST",
                           body: fd,
                         });
@@ -520,10 +515,15 @@ export default function EditSeriesPage() {
         onClose={() => setShowCharGenModal(false)}
         assetType={newAssetType}
         onCharacterGenerated={async (char) => {
-          const res = await fetch(`/api/series/${id}/story-assets`, {
+          const res = await fetch("/api/story-assets", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url: char.url, description: char.description, type: newAssetType }),
+            body: JSON.stringify({
+              seriesId: id,
+              url: char.url,
+              description: char.description,
+              type: newAssetType,
+            }),
           });
           if (res.ok) {
             const data = await res.json();

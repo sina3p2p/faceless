@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { series, videoProjects, renderJobs } from "@/server/db/schema";
+import { listStoryAssetsForSeries } from "@/server/db/story-assets";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -48,7 +49,8 @@ export async function GET(
 
   if (!result) return notFound("Series not found");
 
-  return NextResponse.json(result);
+  const storyAssets = await listStoryAssetsForSeries(id);
+  return NextResponse.json({ ...result, storyAssets });
 }
 
 export async function PATCH(

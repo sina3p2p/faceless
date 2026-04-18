@@ -6,6 +6,7 @@ import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { generateImage, type AspectRatio } from "@/server/services/media";
 import { autoChainOrReview } from "./shared";
+import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
 
 export async function generateFrameImagesJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -22,9 +23,8 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     const sizeConfig = getVideoSize(videoProject.videoSize);
     const ar = sizeConfig.id as AspectRatio;
 
-    const allAssets = await resolveStoryAssets(
-      videoProject.storyAssets as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> | null,
-    );
+    const storyInputs = await getStoryAssetInputsForVideoProject(videoProjectId);
+    const allAssets = await resolveStoryAssets(storyInputs);
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
@@ -68,7 +68,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       const canonicalPrompt = frame.imagePrompt || `Scene ${sceneIdx + 1}`;
       const { providerPrompt: prompt } = serializeCanonicalForImageProvider(canonicalPrompt);
       const frameAssetRefs = frame.assetRefs as string[] | null;
-      const matchedAssets = filterAssetsByRefs(videoProject.storyAssets ?? [], frameAssetRefs);
+      const matchedAssets = filterAssetsByRefs(allAssets, frameAssetRefs);
 
       const sceneRefs = matchedAssets.map((a) => ({
         ...a,

@@ -180,15 +180,6 @@ export async function reusePreApprovedAssets(
   return { images, videos };
 }
 
-export function parseStoryAssets(
-  storyAssets: StoryAssetInput[] | null | undefined
-): Array<{ name: string; description: string; type: "character" | "location" | "prop" }> {
-  if (storyAssets && storyAssets.length > 0) {
-    return storyAssets.map((a) => ({ name: a.name, description: a.description, type: a.type }));
-  }
-  return [];
-}
-
 export async function failJob(videoProjectId: string, error: unknown) {
   const errorMessage = error instanceof Error ? error.message : "Unknown error";
 

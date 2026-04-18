@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { listStoryAssetsForSeries, listStoryAssetsForVideo } from "@/server/db/story-assets";
 import { generateImage, generateKlingImage, generateViaOpenRouter } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod/v4";
@@ -23,23 +24,25 @@ export async function POST(
   const { id } = await params;
 
   const video = await db.query.videoProjects.findFirst({
-    where: eq(videoProjects.id, id),
+    where: and(eq(videoProjects.id, id), eq(videoProjects.userId, user.id)),
+    columns: { title: true, videoType: true, seriesId: true },
     with: {
       series: {
-        columns: {
-          userId: true, storyAssets: true, characterImages: true, niche: true, style: true,
-          videoType: true,
-        },
+        columns: { niche: true, style: true, videoType: true },
       },
       scenes: {
         columns: { text: true, imagePrompt: true, visualDescription: true },
-        orderBy: (s, { asc }) => [asc(s.sceneOrder)],
+        orderBy: (s, { asc: a }) => [a(s.sceneOrder)],
         limit: 3,
       },
     },
   });
 
-  if (!video || video.userId !== user.id) return notFound("Video not found");
+  if (!video) return notFound("Video not found");
+
+  const videoStoryAssetsList = await listStoryAssetsForVideo(id);
+  const seriesStoryAssetsList =
+    video.seriesId != null ? await listStoryAssetsForSeries(video.seriesId) : [];
 
   const body = await req.json();
   const parsed = bodySchema.safeParse(body);
@@ -59,11 +62,12 @@ export async function POST(
       || video.scenes?.[0]?.imagePrompt?.slice(0, 150)
       || "";
 
-    const rawAssets = (video.series?.storyAssets ?? []) as Array<{ name: string; description: string }>;
-    const rawChars = (video.series?.characterImages ?? []) as Array<{ description: string }>;
+    const videoAssets = videoStoryAssetsList;
+    const seriesAssets = seriesStoryAssetsList;
+    const rawAssets = (videoAssets.length > 0 ? videoAssets : seriesAssets) as Array<{ name: string; description: string }>;
     const assetDescs = rawAssets.length > 0
       ? rawAssets.filter((a) => a.description).map((a) => `${a.name}: ${a.description}`).join("; ")
-      : rawChars.filter((c) => c.description).map((c) => c.description).join("; ");
+      : "";
 
     prompt = [
       `A viral YouTube/TikTok thumbnail for a ${niche} video titled "${title}"`,
@@ -79,8 +83,15 @@ export async function POST(
   }
 
   // Resolve asset refs for image models that support them
-  const storyAssets = (video.series?.storyAssets ?? []) as Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string }>;
-  const legacyChars = (video.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
+  const videoAssetsForRefs = videoStoryAssetsList;
+  const seriesAssetsForRefs = seriesStoryAssetsList;
+  const storyAssets = (videoAssetsForRefs.length > 0 ? videoAssetsForRefs : seriesAssetsForRefs) as Array<{
+    id: string;
+    type: "character" | "location" | "prop";
+    name: string;
+    description: string;
+    url: string;
+  }>;
   let charRefs: Array<{ url: string; description: string; name?: string; type?: "character" | "location" | "prop" }> | undefined;
 
   if (imageModel === "nano-banana-2") {
@@ -91,13 +102,6 @@ export async function POST(
           description: `${a.name}: ${a.description}`,
           name: a.name,
           type: a.type,
-        }))
-      );
-    } else if (legacyChars.length > 0) {
-      charRefs = await Promise.all(
-        legacyChars.map(async (c) => ({
-          url: c.url.startsWith("http") ? c.url : await getSignedDownloadUrl(c.url),
-          description: c.description,
         }))
       );
     }

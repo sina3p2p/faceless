@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { videoProjects, videoScenes, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { eq, asc, desc } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { listStoryAssetsForSeries, listStoryAssetsForVideo } from "@/server/db/story-assets";
 import { z } from "zod";
 
 export async function GET(
@@ -15,17 +16,39 @@ export async function GET(
   const { id } = await params;
 
   const video = await db.query.videoProjects.findFirst({
-    where: eq(videoProjects.id, id),
+    where: and(eq(videoProjects.id, id), eq(videoProjects.userId, user.id)),
     with: {
       scenes: { orderBy: asc(videoScenes.sceneOrder) },
       renderJobs: { orderBy: desc(renderJobs.createdAt), limit: 1 },
-      series: { columns: { name: true, niche: true, style: true, imageModel: true, videoModel: true, videoSize: true, videoType: true, sceneContinuity: true, storyAssets: true, userId: true } },
+      series: {
+        columns: {
+          name: true,
+          niche: true,
+          style: true,
+          imageModel: true,
+          videoModel: true,
+          videoSize: true,
+          videoType: true,
+          sceneContinuity: true,
+          userId: true,
+        },
+      },
     },
   });
 
   if (!video) return notFound("Video not found");
 
-  return NextResponse.json(video);
+  const videoStoryAssets = await listStoryAssetsForVideo(id);
+  const seriesStoryAssets =
+    video.seriesId != null ? await listStoryAssetsForSeries(video.seriesId) : [];
+  const { series: seriesRow, ...rest } = video;
+  return NextResponse.json({
+    ...rest,
+    storyAssets: videoStoryAssets,
+    series: seriesRow
+      ? { ...seriesRow, storyAssets: seriesStoryAssets }
+      : seriesRow,
+  });
 }
 
 const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {

@@ -332,7 +332,8 @@ export default function CreateVideoPage() {
                             try {
                               const fd = new FormData();
                               fd.append("file", asset.file!);
-                              const res = await fetch("/api/describe-character", {
+                              fd.append("type", asset.type);
+                              const res = await fetch("/api/story-assets/describe", {
                                 method: "POST",
                                 body: fd,
                               });
@@ -390,7 +391,7 @@ export default function CreateVideoPage() {
                                     if (upRes.ok) uploadedUrl = (await upRes.json()).url;
                                   }
                                   if (!uploadedUrl) return;
-                                  const res = await fetch("/api/generate-sheet", {
+                                  const res = await fetch("/api/story-assets/generate-sheet", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
                                     body: JSON.stringify({ imageUrl: uploadedUrl, description: asset.description, name: asset.name, type: asset.type }),
@@ -424,7 +425,7 @@ export default function CreateVideoPage() {
                                   if (upRes.ok) uploadedUrl = (await upRes.json()).url;
                                 }
                                 if (!uploadedUrl) return;
-                                const res = await fetch("/api/generate-sheet", {
+                                const res = await fetch("/api/story-assets/generate-sheet", {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({ imageUrl: uploadedUrl, description: asset.description, name: asset.name, type: asset.type }),

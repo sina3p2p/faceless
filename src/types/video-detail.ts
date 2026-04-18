@@ -83,6 +83,8 @@ export interface StoryAssetItem {
   name: string;
   description: string;
   url: string;
+  sheetUrl?: string;
+  voiceId?: string;
 }
 
 export interface VideoDetail {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { series, videoProjects } from "@/server/db/schema";
+import { insertSeriesStoryAssets, listStoryAssetsForSeries } from "@/server/db/story-assets";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
     return badRequest(parsed.error.message);
   }
 
-  const { sceneContinuity, ...rest } = parsed.data;
+  const { sceneContinuity, storyAssets, ...rest } = parsed.data;
   const [newSeries] = await db
     .insert(series)
     .values({
@@ -80,5 +81,20 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  return NextResponse.json(newSeries, { status: 201 });
+  if (storyAssets.length > 0) {
+    await insertSeriesStoryAssets(
+      newSeries.id,
+      user.id,
+      storyAssets.map((a) => ({
+        id: a.id,
+        type: a.type,
+        name: a.name,
+        description: a.description,
+        url: a.url,
+      }))
+    );
+  }
+
+  const linkedAssets = await listStoryAssetsForSeries(newSeries.id);
+  return NextResponse.json({ ...newSeries, storyAssets: linkedAssets }, { status: 201 });
 }

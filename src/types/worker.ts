@@ -15,6 +15,8 @@ export interface StoryAssetInput {
   url: string;
   /** Optional character sheet image key or URL. */
   sheetUrl?: string;
+  /** Optional default voice for character assets. */
+  voiceId?: string;
 }
 
 /** Resolved row (same fields; URLs are typically signed HTTPS). */

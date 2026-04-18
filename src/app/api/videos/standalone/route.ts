@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { videoProjects, renderJobs } from "@/server/db/schema";
+import { insertVideoStoryAssets } from "@/server/db/story-assets";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
@@ -140,6 +141,10 @@ export async function POST(req: NextRequest) {
       config,
     })
     .returning();
+
+  if (storyAssets.length > 0) {
+    await insertVideoStoryAssets(videoProject.id, user.id, storyAssets);
+  }
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 

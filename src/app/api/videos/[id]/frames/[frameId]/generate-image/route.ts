@@ -8,7 +8,7 @@ import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { getVideoSize, IMAGE_MODELS } from "@/lib/constants";
 import { z } from "zod";
-import { StoryAsset } from "@/types/llm-common";
+import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
 
 const bodySchema = z.object({
   imagePrompt: z.string().min(1).optional(),
@@ -48,8 +48,14 @@ export async function POST(
   const canonicalPrompt = parsed.data.imagePrompt || frame.imagePrompt || "scene image";
   const { providerPrompt } = serializeCanonicalForImageProvider(canonicalPrompt);
 
-  // Resolve story assets filtered by frame's assetRefs
-  const rawAssets = (video?.storyAssets ?? []) as StoryAsset[];
+  const rawInputs = await getStoryAssetInputsForVideoProject(videoId);
+  const rawAssets = rawInputs.map((a) => ({
+    name: a.name,
+    description: a.description,
+    type: a.type,
+    url: a.url,
+    sheetUrl: a.sheetUrl,
+  }));
   const frameAssetRefs = (frame.assetRefs as string[] | null) ?? [];
 
   const characterRefs: CharacterRef[] = [];

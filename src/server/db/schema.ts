@@ -8,12 +8,12 @@ import {
   json,
   real,
   uniqueIndex,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { ImageSpec } from "@/server/services/llm/image-spec";
 import type { FrameMotionSpec } from "@/server/services/llm/motion";
 import type { ResultMeta } from "@/server/services/llm/prompt-contract";
-import { StoryAsset } from "@/types/llm-common";
 
 // ── Enums ──
 
@@ -145,7 +145,6 @@ export const series = pgTable("series", {
   videoModel: text("video_model").default("kling-3-standard"),
   language: text("language").default("en").notNull(),
   captionStyle: text("caption_style").default("none").notNull(),
-  storyAssets: json("story_assets").$type<Array<StoryAsset>>().default([]),
   sceneContinuity: integer("scene_continuity").default(1).notNull(),
   videoSize: text("video_size").default("9:16").notNull(),
   videoType: text("video_type").default("standalone").notNull(),
@@ -175,10 +174,51 @@ export const videoProjects = pgTable("video_projects", {
   voiceId: text("voice_id"),
   idea: text("prompt"),
   style: text("style").default("cinematic").notNull(),
-  storyAssets: json("story_assets").$type<Array<StoryAsset>>().default([]),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+/** User-owned story asset (image + metadata). Reused across series/videos via junction tables. */
+export const storyAssets = pgTable("story_assets", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull().$type<"character" | "location" | "prop">(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  url: text("url").notNull(),
+  sheetUrl: text("sheet_url"),
+  voiceId: text("voice_id"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const seriesStoryAssets = pgTable(
+  "series_story_assets",
+  {
+    seriesId: text("series_id")
+      .notNull()
+      .references(() => series.id, { onDelete: "cascade" }),
+    storyAssetId: text("story_asset_id")
+      .notNull()
+      .references(() => storyAssets.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.seriesId, t.storyAssetId] })]
+);
+
+export const videoStoryAssets = pgTable(
+  "video_story_assets",
+  {
+    videoProjectId: text("video_project_id")
+      .notNull()
+      .references(() => videoProjects.id, { onDelete: "cascade" }),
+    storyAssetId: text("story_asset_id")
+      .notNull()
+      .references(() => storyAssets.id, { onDelete: "cascade" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.videoProjectId, t.storyAssetId] })]
+);
 
 export const videoScenes = pgTable("video_scenes", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -291,17 +331,36 @@ export const usersRelations = relations(users, ({ many }) => ({
   series: many(series),
   subscriptions: many(subscriptions),
   usageEntries: many(usageEntries),
+  storyAssets: many(storyAssets),
 }));
 
 export const seriesRelations = relations(series, ({ one, many }) => ({
   user: one(users, { fields: [series.userId], references: [users.id] }),
   videoProjects: many(videoProjects),
+  seriesStoryAssets: many(seriesStoryAssets),
+}));
+
+export const storyAssetsRelations = relations(storyAssets, ({ one, many }) => ({
+  user: one(users, { fields: [storyAssets.userId], references: [users.id] }),
+  seriesMemberships: many(seriesStoryAssets),
+  videoMemberships: many(videoStoryAssets),
+}));
+
+export const seriesStoryAssetsRelations = relations(seriesStoryAssets, ({ one }) => ({
+  series: one(series, { fields: [seriesStoryAssets.seriesId], references: [series.id] }),
+  storyAsset: one(storyAssets, { fields: [seriesStoryAssets.storyAssetId], references: [storyAssets.id] }),
+}));
+
+export const videoStoryAssetsRelations = relations(videoStoryAssets, ({ one }) => ({
+  videoProject: one(videoProjects, { fields: [videoStoryAssets.videoProjectId], references: [videoProjects.id] }),
+  storyAsset: one(storyAssets, { fields: [videoStoryAssets.storyAssetId], references: [storyAssets.id] }),
 }));
 
 export const videoProjectsRelations = relations(videoProjects, ({ one, many }) => ({
   series: one(series, { fields: [videoProjects.seriesId], references: [series.id] }),
   scenes: many(videoScenes),
   renderJobs: many(renderJobs),
+  videoStoryAssets: many(videoStoryAssets),
 }));
 
 export const videoScenesRelations = relations(videoScenes, ({ one, many }) => ({
