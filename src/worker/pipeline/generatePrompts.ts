@@ -13,10 +13,13 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
   const { videoProjectId, seriesId, userId } = job.data;
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+      with: {
+        series: { columns: { storyAssets: true, characterImages: true } },
+      },
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "PROMPT_GENERATION");
 
@@ -32,8 +35,8 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
     if (!config.frameBreakdown) throw new Error("No frame breakdown found — run storyboard first");
     if (!config.continuityNotes) throw new Error("No continuity notes found — run supervise-script first");
 
-    const storyAssets = (seriesRecord.storyAssets ?? []) as StoryAssetInput[];
-    const charImages = (seriesRecord.characterImages ?? []) as Array<{ url: string; description: string }>;
+    const storyAssets = (videoProject.series?.storyAssets ?? []) as StoryAssetInput[];
+    const charImages = (videoProject.series?.characterImages ?? []) as Array<{ url: string; description: string }>;
     const assets = parseStoryAssets(storyAssets, charImages);
 
     const scenesInput = existingScenes.map((s) => ({
@@ -42,7 +45,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
       sceneTitle: s.sceneTitle || "",
     }));
 
-    const agents = getAgentModels(seriesRecord);
+    const agents = getAgentModels(videoProject);
 
     console.log(`[generate-prompts] Generating frame prompts for ${scenesInput.length} scenes`);
 
