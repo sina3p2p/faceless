@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { VIDEO_TYPES } from "@/lib/constants";
+import { canRetryOrResumeFromFailure, canShowResumeForVideo, isVideoListNonActive } from "@/lib/pipeline-resume";
 
 const DURATION_PRESETS = [
   { label: "15s", value: 15, hint: "Quick test" },
@@ -24,7 +25,12 @@ interface Video {
   status: string;
   duration: number | null;
   createdAt: string;
-  renderJobs: Array<{ progress: number; step: string; status: string }>;
+  renderJobs: Array<{
+    progress: number;
+    step: string;
+    status: string;
+    error?: string | null;
+  }>;
 }
 
 interface SeriesDetail {
@@ -46,6 +52,7 @@ export default function SeriesDetailPage() {
   const [generating, setGenerating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [resumingId, setResumingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [targetDuration, setTargetDuration] = useState(30);
@@ -68,7 +75,9 @@ export default function SeriesDetailPage() {
   useEffect(() => {
     if (!series) return;
     const hasActive = series.videoProjects.some(
-      (v) => !["COMPLETED", "FAILED", "REVIEW_SCRIPT", "IMAGE_REVIEW", "CANCELLED"].includes(v.status)
+      (v) =>
+        !["COMPLETED", "REVIEW_SCRIPT", "IMAGE_REVIEW", "CANCELLED"].includes(v.status) &&
+        !isVideoListNonActive(v)
     );
     if (!hasActive) return;
     const interval = setInterval(loadSeries, 3000);
@@ -113,6 +122,16 @@ export default function SeriesDetailPage() {
     }
   }
 
+  async function handleResumeFromStep(videoId: string) {
+    setResumingId(videoId);
+    const res = await fetch(`/api/videos/${videoId}/resume-pipeline`, { method: "POST" });
+    if (res.ok) {
+      router.push(`/dashboard/videos/${videoId}`);
+    } else {
+      setResumingId(null);
+    }
+  }
+
   async function handleCancel(videoId: string) {
     if (!confirm("Cancel this video generation? This cannot be undone.")) return;
     setCancellingId(videoId);
@@ -130,11 +149,11 @@ export default function SeriesDetailPage() {
     router.push("/dashboard/series");
   }
 
-  const statusVariant = (status: string) => {
+  const statusVariant = (video: Video) => {
+    if (video.status === "COMPLETED") return "success" as const;
+    if (canRetryOrResumeFromFailure(video) || video.status === "CANCELLED") return "danger" as const;
+    const { status } = video;
     switch (status) {
-      case "COMPLETED": return "success" as const;
-      case "FAILED":
-      case "CANCELLED": return "danger" as const;
       case "REVIEW_SCRIPT":
       case "REVIEW_MUSIC_SCRIPT":
       case "MUSIC_REVIEW":
@@ -276,7 +295,7 @@ export default function SeriesDetailPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     {video.renderJobs[0] &&
-                      !["COMPLETED", "FAILED", "CANCELLED"].includes(video.status) && (
+                      !isVideoListNonActive(video) && (
                         <div className="flex items-center gap-2">
                           <span className="text-xs text-gray-500">
                             {video.renderJobs[0].step}
@@ -311,7 +330,20 @@ export default function SeriesDetailPage() {
                         {video.status === "REVIEW_SCRIPT" ? "Review Script" : video.status === "IMAGE_GENERATION" ? "View Progress" : "Review Images"}
                       </Button>
                     )}
-                    {(video.status === "FAILED" || video.status === "CANCELLED") && (
+                    {canShowResumeForVideo(video) && (
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        loading={resumingId === video.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleResumeFromStep(video.id);
+                        }}
+                      >
+                        Resume step
+                      </Button>
+                    )}
+                    {canRetryOrResumeFromFailure(video) && (
                       <Button
                         size="sm"
                         variant="outline"
@@ -321,10 +353,10 @@ export default function SeriesDetailPage() {
                           handleRetry(video.id);
                         }}
                       >
-                        Retry
+                        Start over
                       </Button>
                     )}
-                    <Badge variant={statusVariant(video.status)}>
+                    <Badge variant={statusVariant(video)}>
                       {video.status.replace(/_/g, " ")}
                     </Badge>
                   </div>

@@ -1,4 +1,5 @@
 export { ActivityFeed, ActivityFeedCompact } from "./activity-feed";
+export { PipelineFailureBanner } from "./pipeline-failure-banner";
 export { AssetRefPills } from "./asset-ref-pills";
 export { FrameCard } from "./frame-card";
 export { FullStoryView } from "./full-story-view";

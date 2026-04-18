@@ -25,6 +25,7 @@ import { useVideoPhase, type StudioPhaseId, type VideoPhase } from "./hooks/use-
 import {
   SortableSceneCard, ScriptChatPanel, FullStoryView,
   PhaseSidebar, StudioTopBar, InspectorPanel, ActivityFeed,
+  PipelineFailureBanner,
 } from "./components";
 import type { Scene, VideoDetail, SceneUpdates } from "./types";
 
@@ -43,7 +44,8 @@ export default function ReviewPage() {
     handleGenerateAllFrameImages, handleUpdateFramePrompt, handleUpdateFrameMotion,
     handleRegenerateFrameVideo, handleRegenerateFrameMotion, handleGenerateMotion,
     handleApprove, handleSaveStory, handleStartRendering, handleSelectMedia,
-    handleSelectFrameVariant, handleRecompose, handleDownload, handleTogglePipelineMode, handleApplyRefinedScript,
+    handleSelectFrameVariant, handleRecompose, handleDownload,     handleTogglePipelineMode, handleApplyRefinedScript,
+    handleResumePipeline, resumingPipeline,
   } = actions;
 
   const phase = useVideoPhase(video);
@@ -161,6 +163,14 @@ export default function ReviewPage() {
         {/* Center panel */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-6 py-6">
+            {phase.isFailed && video && (
+              <PipelineFailureBanner
+                video={video}
+                scenes={scenes}
+                onResume={handleResumePipeline}
+                resuming={resumingPipeline}
+              />
+            )}
             <CenterPanel
               selectedPhaseId={selectedPhaseId}
               phase={phase}

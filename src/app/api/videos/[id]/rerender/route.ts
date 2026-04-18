@@ -35,6 +35,7 @@ export async function POST(
   await renderQueue.add("rerender-video", {
     videoProjectId: id,
     userId: user.id,
+    seriesId: video.seriesId ?? "",
   });
 
   return NextResponse.json({ success: true });

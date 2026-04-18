@@ -90,6 +90,12 @@ export interface VideoDetail {
   seriesId: string;
   title: string | null;
   status: (typeof videoStatusEnum.enumValues)[number];
+  renderJobs?: Array<{
+    error: string | null;
+    step?: string | null;
+    status?: string;
+    progress?: number;
+  }>;
   duration: number | null;
   script: string | null;
   outputUrl: string | null;

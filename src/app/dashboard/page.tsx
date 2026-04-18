@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { canRetryOrResumeFromFailure, isVideoListNonActive } from "@/lib/pipeline-resume";
 
 interface UsageData {
   allowed: boolean;
@@ -27,7 +28,7 @@ interface VideoData {
   title: string | null;
   status: string;
   createdAt: string;
-  renderJobs: Array<{ progress: number; step: string }>;
+  renderJobs: Array<{ progress: number; step: string; status?: string; error?: string | null }>;
 }
 
 export default function DashboardPage() {
@@ -42,10 +43,11 @@ export default function DashboardPage() {
     fetch("/api/videos").then((r) => r.json()).then(setVideos);
   }, []);
 
-  const statusVariant = (status: string) => {
+  const statusVariant = (video: VideoData) => {
+    if (canRetryOrResumeFromFailure(video)) return "danger";
+    const { status } = video;
     switch (status) {
       case "COMPLETED": return "success";
-      case "FAILED": return "danger";
       case "SCRIPT":
       case "MUSIC_SCRIPT":
       case "MUSIC_GENERATION":
@@ -142,13 +144,13 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-3">
                       {video.renderJobs[0] &&
                         video.status !== "COMPLETED" &&
-                        video.status !== "FAILED" && (
+                        !isVideoListNonActive(video) && (
                           <Progress
                             value={video.renderJobs[0].progress}
                             className="w-32"
                           />
                         )}
-                      <Badge variant={statusVariant(video.status)}>
+                      <Badge variant={statusVariant(video)}>
                         {video.status.replace(/_/g, " ")}
                       </Badge>
                     </div>

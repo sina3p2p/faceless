@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, renderJobs } from "@/server/db/schema";
+import { videoProjects, videoScenes, sceneFrames, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, count } from "drizzle-orm";
 import { renderQueue } from "@/lib/queue";
 
 export async function POST(
@@ -28,6 +28,20 @@ export async function POST(
     return badRequest("No scenes to render");
   }
 
+  if (!video.seriesId) {
+    return badRequest("Video must belong to a series to generate clips");
+  }
+
+  const [{ value: frameRowCount }] = await db
+    .select({ value: count() })
+    .from(sceneFrames)
+    .innerJoin(videoScenes, eq(sceneFrames.sceneId, videoScenes.id))
+    .where(eq(videoScenes.videoProjectId, id));
+
+  if (frameRowCount === 0) {
+    return badRequest("No storyboard frames yet. Complete the storyboard before generating video.");
+  }
+
   await db
     .update(videoProjects)
     .set({ status: "VIDEO_GENERATION" })
@@ -35,12 +49,13 @@ export async function POST(
 
   await db
     .update(renderJobs)
-    .set({ status: "ACTIVE", step: "TTS", progress: 0 })
+    .set({ status: "ACTIVE", step: "MEDIA", progress: 0 })
     .where(eq(renderJobs.videoProjectId, id));
 
-  await renderQueue.add("render-from-scenes", {
+  await renderQueue.add("generate-frame-videos", {
     videoProjectId: id,
     userId: user.id,
+    seriesId: video.seriesId,
   });
 
   return NextResponse.json({ success: true, status: "VIDEO_GENERATION" });

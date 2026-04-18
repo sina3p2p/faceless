@@ -7,6 +7,7 @@ import { SceneRefTextarea } from "./scene-ref-textarea";
 import { ActivityFeedCompact } from "./activity-feed";
 import type { VideoDetail, Scene } from "../types";
 import type { VideoPhase, StudioPhaseId } from "../hooks/use-video-phase";
+import { isLegacyFailedVideoStatus } from "@/lib/pipeline-resume";
 
 export function InspectorPanel({
   video,
@@ -384,6 +385,14 @@ function DefaultInspectorBody({
       {/* Processing activity feed */}
       {phase.isProcessing && (
         <ActivityFeedCompact currentStatus={video?.status || ""} scenes={scenes} />
+      )}
+
+      {phase.isFailed && video && (
+        <ActivityFeedCompact
+          currentStatus={isLegacyFailedVideoStatus(video.status) ? "PENDING" : video.status}
+          scenes={scenes}
+          highlightFailedStep
+        />
       )}
 
       {/* Completed — download */}

@@ -6,7 +6,7 @@ export interface PipelineStep {
   id: string;
   label: string;
   agent: string;
-  status: "pending" | "running" | "done";
+  status: "pending" | "running" | "done" | "failed";
 }
 
 const STORY_PIPELINE: Omit<PipelineStep, "status">[] = [
@@ -56,14 +56,25 @@ function getStepsForStatus(currentStatus: string): PipelineStep[] {
   });
 }
 
+function withFailedHighlight(steps: PipelineStep[]): PipelineStep[] {
+  return steps.map((s) => ({
+    ...s,
+    status: s.status === "running" ? "failed" : s.status,
+  }));
+}
+
 export function ActivityFeed({
   currentStatus,
   scenes,
+  highlightFailedStep,
 }: {
   currentStatus: string;
   scenes: Scene[];
+  /** When true, the active step is shown as failed (pipeline stopped there). */
+  highlightFailedStep?: boolean;
 }) {
-  const steps = getStepsForStatus(currentStatus);
+  const raw = getStepsForStatus(currentStatus);
+  const steps = highlightFailedStep ? withFailedHighlight(raw) : raw;
   if (steps.length === 0) return null;
 
   const isImageGen = currentStatus === "IMAGE_GENERATION";
@@ -88,7 +99,8 @@ export function ActivityFeed({
           <div
             key={step.id}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-              step.status === "running" ? "bg-violet-500/10" : ""
+              step.status === "running" ? "bg-violet-500/10" :
+              step.status === "failed" ? "bg-red-500/10" : ""
             }`}
           >
             {/* Status icon */}
@@ -101,6 +113,11 @@ export function ActivityFeed({
               {step.status === "running" && (
                 <div className="animate-spin w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full" />
               )}
+              {step.status === "failed" && (
+                <svg className="w-4 h-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
               {step.status === "pending" && (
                 <div className="w-2.5 h-2.5 rounded-full bg-white/10" />
               )}
@@ -111,6 +128,7 @@ export function ActivityFeed({
               <span className={`text-xs font-medium ${
                 step.status === "done" ? "text-gray-500" :
                 step.status === "running" ? "text-violet-300" :
+                step.status === "failed" ? "text-red-200" :
                 "text-gray-600"
               }`}>
                 {step.label}
@@ -119,7 +137,9 @@ export function ActivityFeed({
 
             {/* Agent name */}
             <span className={`text-[10px] shrink-0 ${
-              step.status === "running" ? "text-violet-400/80" : "text-gray-700"
+              step.status === "running" ? "text-violet-400/80" :
+              step.status === "failed" ? "text-red-400/80" :
+              "text-gray-700"
             }`}>
               {step.agent}
             </span>
@@ -183,14 +203,17 @@ export function ActivityFeed({
 export function ActivityFeedCompact({
   currentStatus,
   scenes,
+  highlightFailedStep,
 }: {
   currentStatus: string;
   scenes: Scene[];
+  highlightFailedStep?: boolean;
 }) {
-  const steps = getStepsForStatus(currentStatus);
+  const raw = getStepsForStatus(currentStatus);
+  const steps = highlightFailedStep ? withFailedHighlight(raw) : raw;
   if (steps.length === 0) return null;
 
-  const currentStep = steps.find((s) => s.status === "running");
+  const currentStep = steps.find((s) => s.status === "running" || s.status === "failed");
   const doneCount = steps.filter((s) => s.status === "done").length;
 
   const isImageGen = currentStatus === "IMAGE_GENERATION";
@@ -218,6 +241,7 @@ export function ActivityFeedCompact({
             className={`h-1 flex-1 rounded-full transition-colors ${
               step.status === "done" ? "bg-emerald-500" :
               step.status === "running" ? "bg-violet-500 animate-pulse" :
+              step.status === "failed" ? "bg-red-500" :
               "bg-white/10"
             }`}
             title={`${step.label} — ${step.status}`}
@@ -228,10 +252,14 @@ export function ActivityFeedCompact({
       {/* Current step info */}
       {currentStep && (
         <div className="flex items-center gap-2">
-          <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full shrink-0" />
+          {currentStep.status === "failed" ? (
+            <div className="w-3 h-3 rounded-full bg-red-500 shrink-0" />
+          ) : (
+            <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full shrink-0" />
+          )}
           <div className="min-w-0">
-            <span className="text-xs text-violet-300 block">{currentStep.label}</span>
-            <span className="text-[10px] text-violet-400/60">{currentStep.agent} · Step {doneCount + 1}/{steps.length}</span>
+            <span className={`text-xs block ${currentStep.status === "failed" ? "text-red-200" : "text-violet-300"}`}>{currentStep.label}</span>
+            <span className={`text-[10px] ${currentStep.status === "failed" ? "text-red-400/60" : "text-violet-400/60"}`}>{currentStep.agent} · Step {doneCount + 1}/{steps.length}</span>
           </div>
         </div>
       )}

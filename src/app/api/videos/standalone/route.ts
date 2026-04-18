@@ -146,6 +146,7 @@ export async function POST(req: NextRequest) {
   await renderQueue.add("executive-produce", {
     videoProjectId: videoProject.id,
     userId: user.id,
+    seriesId: "",
   });
 
   return NextResponse.json(

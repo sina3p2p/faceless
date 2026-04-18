@@ -1,4 +1,5 @@
 import type { VideoDetail } from "../types";
+import { hasPipelineRenderFailure, isLegacyFailedVideoStatus } from "@/lib/pipeline-resume";
 
 const PROCESSING_STATUSES = [
   "PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION",
@@ -35,6 +36,7 @@ export interface VideoPhase {
   isNarrationReview: boolean;
   // Processing
   isProcessing: boolean;
+  isFailed: boolean;
   isCompleted: boolean;
   hasTTSRun: boolean;
   // Status text
@@ -71,7 +73,9 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
   const isNewMotionReview = status === "REVIEW_MOTION";
   const isVideoReview = status === "REVIEW_VIDEO";
 
-  const isProcessing = PROCESSING_STATUSES.includes(status);
+  const rj = video?.renderJobs?.[0];
+  const isFailed = hasPipelineRenderFailure(rj) || isLegacyFailedVideoStatus(status);
+  const isProcessing = PROCESSING_STATUSES.includes(status) && !isFailed;
   const hasTTSRun = !isStoryReview && !isScenesReview && !isNarrationReview;
 
   const processingMessages: Record<string, string> = {
@@ -90,6 +94,7 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
   };
 
   const headerTitle = video?.title ?? (
+    isFailed ? "Generation failed" :
     isStoryReview ? "Review Story" :
     isPreProductionReview ? "Review Pre-Production" :
     isImagesReview ? "Review Images" :
@@ -106,7 +111,9 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
   );
 
   const headerDescription =
-    isStoryReview ? "Review creative brief, story, scenes, and continuity. Then approve to generate audio." :
+    isFailed
+      ? "The pipeline stopped with an error. Review the message below, then resume from the failed step or start over from the series page."
+    : isStoryReview ? "Review creative brief, story, scenes, and continuity. Then approve to generate audio." :
     isPreProductionReview ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images." :
     isImagesReview ? "Review the generated images below. Regenerate any you don't like, then approve to generate video clips." :
     isProductionReview ? "Review the generated video clips below. Then approve to compose the final video." :
@@ -126,6 +133,17 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
   const FINAL_STATUSES = ["RENDERING", "COMPLETED"];
 
   function phaseStatus(phaseStatuses: string[]): "locked" | "processing" | "review" | "done" {
+    if (isFailed) {
+      const at = failedAt || "PENDING";
+      if (phaseStatuses.includes(at)) return "processing";
+      const allPhases = [STORY_STATUSES, PREPROD_STATUSES, PRODUCTION_STATUSES, FINAL_STATUSES];
+      const failedIdx = allPhases.findIndex((p) => p.includes(at));
+      const thisIdx = allPhases.indexOf(phaseStatuses);
+      if (failedIdx === -1) return thisIdx === 0 ? "processing" : "locked";
+      if (thisIdx < failedIdx) return "done";
+      if (thisIdx === failedIdx) return "processing";
+      return "locked";
+    }
     if (phaseStatuses.includes(status)) {
       if (status.startsWith("REVIEW_") || status === "TTS_REVIEW" || status === "IMAGE_REVIEW") return "review";
       if (status === "COMPLETED") return "done";
@@ -138,11 +156,16 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
     return "locked";
   }
 
-  const activePhaseId: StudioPhaseId =
-    FINAL_STATUSES.includes(status) ? "final" :
-    PRODUCTION_STATUSES.includes(status) ? "production" :
-    PREPROD_STATUSES.includes(status) ? "pre-production" :
-    "story";
+  const failedAt = isFailed ? (isLegacyFailedVideoStatus(status) ? "PENDING" : status) : "";
+  const activePhaseId: StudioPhaseId = isFailed
+    ? (FINAL_STATUSES.includes(failedAt) ? "final"
+      : PRODUCTION_STATUSES.includes(failedAt) ? "production"
+        : PREPROD_STATUSES.includes(failedAt) ? "pre-production"
+          : "story")
+    : FINAL_STATUSES.includes(status) ? "final"
+      : PRODUCTION_STATUSES.includes(status) ? "production"
+        : PREPROD_STATUSES.includes(status) ? "pre-production"
+          : "story";
 
   const phases: PhaseInfo[] = [
     { id: "story", label: "Story", status: phaseStatus(STORY_STATUSES) },
@@ -154,6 +177,7 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
   return {
     activePhaseId,
     phases,
+    isFailed,
     isStoryReview,
     isPreProductionReview,
     isImagesReview,
@@ -170,7 +194,7 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
     isProcessing,
     isCompleted: status === "COMPLETED",
     hasTTSRun,
-    processingMessage: processingMessages[status] || "",
+    processingMessage: isFailed ? "Stopped with an error." : (processingMessages[status] || ""),
     headerTitle,
     headerDescription,
     showMotionEdit: isMotionReview || isNewMotionReview || isVideoReview || status === "COMPLETED",

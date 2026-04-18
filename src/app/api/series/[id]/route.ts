@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { series, videoProjects } from "@/server/db/schema";
+import { series, videoProjects, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and, desc } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -38,7 +38,7 @@ export async function GET(
         limit: 20,
         with: {
           renderJobs: {
-            orderBy: desc(videoProjects.createdAt),
+            orderBy: desc(renderJobs.createdAt),
             limit: 1,
           },
         },

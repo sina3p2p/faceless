@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { videoProjects, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
+import { RENDER_JOB_CANCELLED_MESSAGE } from "@/lib/pipeline-resume";
 import { eq } from "drizzle-orm";
 import { renderQueue } from "@/lib/queue";
 
@@ -47,7 +48,7 @@ export async function POST(
 
   await db
     .update(renderJobs)
-    .set({ status: "FAILED", error: "Cancelled by user" })
+    .set({ status: "FAILED", error: RENDER_JOB_CANCELLED_MESSAGE })
     .where(eq(renderJobs.videoProjectId, id));
 
   return NextResponse.json({ success: true, status: "CANCELLED" });

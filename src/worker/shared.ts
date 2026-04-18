@@ -248,7 +248,7 @@ export function parseStoryAssets(
 
 export async function failJob(videoProjectId: string, error: unknown) {
   const errorMessage = error instanceof Error ? error.message : "Unknown error";
-  await updateVideoStatus(videoProjectId, "FAILED");
+
   await db
     .update(schema.renderJobs)
     .set({ status: "FAILED", error: errorMessage })

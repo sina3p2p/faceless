@@ -18,6 +18,7 @@ export function useVideoActions(id: string) {
   const [generatingFrameMotionIds, setGeneratingFrameMotionIds] = useState<Set<string>>(new Set());
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [resumingPipeline, setResumingPipeline] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -334,6 +335,16 @@ export function useVideoActions(id: string) {
     await loadData();
   }
 
+  async function handleResumePipeline() {
+    setResumingPipeline(true);
+    try {
+      const res = await fetch(`/api/videos/${id}/resume-pipeline`, { method: "POST" });
+      if (res.ok) await loadData();
+    } finally {
+      setResumingPipeline(false);
+    }
+  }
+
   async function handleRecompose() {
     setRendering(true);
     try {
@@ -399,5 +410,7 @@ export function useVideoActions(id: string) {
     handleDownload,
     handleTogglePipelineMode,
     handleApplyRefinedScript,
+    handleResumePipeline,
+    resumingPipeline,
   };
 }

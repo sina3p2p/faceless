@@ -8,6 +8,7 @@ import {
   eq,
   insertMedia,
   updateVideoStatus,
+  failJob,
   resolveStoryAssets,
   filterAssetsByRefs,
   type CharacterRef,
@@ -230,9 +231,8 @@ export async function generateImagesJob(job: Job<RenderJobData & { regenerateExi
     await updateVideoStatus(videoProjectId, "IMAGE_REVIEW");
     console.log(`[generate-images] All ${targets.length} images generated`);
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error(`[generate-images] Failed for ${videoProjectId}:`, errorMessage);
-    await updateVideoStatus(videoProjectId, "FAILED");
+    const msg = await failJob(videoProjectId, error);
+    console.error(`[generate-images] Failed for ${videoProjectId}:`, msg);
     throw error;
   }
 }

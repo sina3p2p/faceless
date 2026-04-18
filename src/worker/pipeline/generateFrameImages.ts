@@ -1,5 +1,5 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, resolveStoryAssets, filterAssetsByRefs } from "../shared";
+import { db, schema, eq, updateVideoStatus, resolveStoryAssets, filterAssetsByRefs, failJob } from "../shared";
 import { generateSceneImage } from "../mediaJobs";
 import { getVideoSize } from "@/lib/constants";
 import type { RenderJobData } from "@/lib/queue";
@@ -125,9 +125,8 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     await autoChainOrReview(videoProjectId, seriesId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, errorMessage);
-    await updateVideoStatus(videoProjectId, "FAILED");
+    const msg = await failJob(videoProjectId, error);
+    console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, msg);
     throw error;
   }
 }
