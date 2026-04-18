@@ -130,8 +130,8 @@ export async function generateImageGptImage15(
     }
 
     return null;
-  } catch {
-    return null;
+  } catch (err) {
+    throw new Error(`Failed to generate image with gpt-image-1.5: ${err instanceof Error ? err.message : JSON.stringify(err)}`);
   }
 }
 
