@@ -27,14 +27,6 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const seriesId = searchParams.get("seriesId");
 
-  const userSeries = await db.query.series.findMany({
-    where: eq(series.userId, user.id),
-    columns: { id: true },
-  });
-  const seriesIds = userSeries.map((s) => s.id);
-
-  if (seriesIds.length === 0) return NextResponse.json([]);
-
   const videos = await db.query.videoProjects.findMany({
     where: seriesId
       ? and(eq(videoProjects.seriesId, seriesId))
@@ -49,9 +41,7 @@ export async function GET(req: NextRequest) {
     limit: 50,
   });
 
-  const filtered = videos.filter((v) => seriesIds.includes(v.seriesId ?? ""));
-
-  return NextResponse.json(filtered);
+  return NextResponse.json(videos);
 }
 
 export async function POST(req: NextRequest) {

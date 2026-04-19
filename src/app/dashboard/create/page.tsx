@@ -84,24 +84,37 @@ export default function CreateVideoPage() {
     setError("");
 
     try {
-      const storyAssets: Array<{ id: string; type: AssetType; imageUrl: string; name: string; description: string; sheetUrl?: string; voiceId?: string }> = [];
+      const storyAssetIds: string[] = [];
 
       for (const asset of pendingAssets) {
         let imageUrl = asset.generatedUrl;
         if (!imageUrl && asset.file) {
           imageUrl = (await uploadCharacterImage(asset.file)) || undefined;
         }
-        if (imageUrl) {
-          storyAssets.push({
-            id: crypto.randomUUID(),
+        if (!imageUrl) continue;
+
+        const id = crypto.randomUUID();
+        const saveRes = await fetch("/api/story-assets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id,
+            url: imageUrl,
             type: asset.type,
-            imageUrl,
-            name: asset.name || `${asset.type} ${storyAssets.length + 1}`,
+            name: asset.name || `${asset.type} ${storyAssetIds.length + 1}`,
             description: asset.description,
             sheetUrl: asset.sheetUrl || undefined,
             voiceId: asset.voiceId || undefined,
-          });
+          }),
+        });
+        if (!saveRes.ok) {
+          const err = await saveRes.json().catch(() => ({}));
+          setError((err as { error?: string }).error || "Failed to save story asset");
+          setLoading(false);
+          return;
         }
+        const saved = (await saveRes.json()) as { asset: { id: string } };
+        storyAssetIds.push(saved.asset.id);
       }
 
       const res = await fetch("/api/videos/standalone", {
@@ -123,7 +136,7 @@ export default function CreateVideoPage() {
             preferred: form.durationPreferred,
             priority: form.durationPriority,
           },
-          storyAssets: storyAssets.length > 0 ? storyAssets : undefined,
+          storyAssetIds: storyAssetIds.length > 0 ? storyAssetIds : undefined,
         }),
       });
 

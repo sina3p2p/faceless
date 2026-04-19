@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { videoProjects, renderJobs } from "@/server/db/schema";
-import { insertVideoStoryAssets } from "@/server/db/story-assets";
+import { linkStoryAssetsToVideo } from "@/server/db/story-assets";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
@@ -25,29 +25,8 @@ const standaloneSchema = z.object({
     max: z.number().min(10).max(300).optional(),
     priority: z.enum(["quality", "duration"]).default("quality"),
   }).optional(),
-  characters: z
-    .array(
-      z.object({
-        imageUrl: z.string(),
-        name: z.string(),
-        description: z.string(),
-        voiceId: z.string().optional(),
-      })
-    )
-    .optional(),
-  storyAssets: z
-    .array(
-      z.object({
-        id: z.string(),
-        type: z.enum(["character", "location", "prop"]),
-        imageUrl: z.string(),
-        name: z.string(),
-        description: z.string(),
-        sheetUrl: z.string().optional(),
-        voiceId: z.string().optional(),
-      })
-    )
-    .optional(),
+  /** Existing canonical story_assets ids (your library); linked to this video in order. */
+  storyAssetIds: z.array(z.string()).optional().default([]),
 });
 
 export async function POST(req: NextRequest) {
@@ -67,53 +46,6 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-
-  // Build storyAssets from the new format, or auto-migrate from legacy characters
-  let storyAssets: Array<{ id: string; type: "character" | "location" | "prop"; name: string; description: string; url: string; sheetUrl?: string }> = [];
-
-  if (data.storyAssets && data.storyAssets.length > 0) {
-    storyAssets = data.storyAssets.map((a) => ({
-      id: a.id,
-      type: a.type,
-      name: a.name,
-      description: a.description,
-      url: a.imageUrl,
-      sheetUrl: a.sheetUrl,
-    }));
-  } else if (data.characters && data.characters.length > 0) {
-    // Legacy path: auto-migrate characters to storyAssets
-    for (const c of data.characters) {
-      storyAssets.push({
-        id: crypto.randomUUID(),
-        type: "character",
-        name: c.name || "Character",
-        description: c.description,
-        url: c.imageUrl,
-      });
-    }
-  }
-
-  // const [internalSeries] = await db
-  //   .insert(series)
-  //   .values({
-  //     userId: user.id,
-  //     name: seriesName,
-  //     niche: "custom",
-  //     style: data.style,
-  //     defaultVoiceId: data.voiceId || null,
-  //     llmModel: data.llmModel,
-  //     imageModel: data.imageModel,
-  //     videoModel: data.videoModel,
-  //     videoSize: data.videoSize,
-  //     language: data.language,
-  //     captionStyle: data.captionStyle,
-  //     sceneContinuity: data.sceneContinuity ? 1 : 0,
-  //     videoType: data.videoType,
-  //     storyAssets,
-  //     isInternal: true,
-  //     topicIdeas: [data.prompt],
-  //   })
-  //   .returning();
 
   const config: Record<string, unknown> | undefined = data.duration
     ? {
@@ -142,8 +74,8 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  if (storyAssets.length > 0) {
-    await insertVideoStoryAssets(videoProject.id, user.id, storyAssets);
+  if (data.storyAssetIds.length > 0) {
+    await linkStoryAssetsToVideo(user.id, videoProject.id, data.storyAssetIds);
   }
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });

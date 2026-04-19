@@ -45,22 +45,7 @@ export async function getStoryAssetInputsForVideoProject(videoProjectId: string)
     .where(eq(videoStoryAssets.videoProjectId, videoProjectId))
     .orderBy(asc(videoStoryAssets.sortOrder));
 
-  if (ownRows.length > 0) return ownRows.map((r) => storyAssetRowToInput(r.asset));
-
-  const v = await db.query.videoProjects.findFirst({
-    where: eq(videoProjects.id, videoProjectId),
-    columns: { seriesId: true },
-  });
-  if (!v?.seriesId) return [];
-
-  const seriesRows = await db
-    .select({ asset: storyAssets })
-    .from(seriesStoryAssets)
-    .innerJoin(storyAssets, eq(seriesStoryAssets.storyAssetId, storyAssets.id))
-    .where(eq(seriesStoryAssets.seriesId, v.seriesId))
-    .orderBy(asc(seriesStoryAssets.sortOrder));
-
-  return seriesRows.map((r) => storyAssetRowToInput(r.asset));
+  return ownRows.map((r) => storyAssetRowToInput(r.asset));
 }
 
 export async function listStoryAssetsForSeries(seriesId: string): Promise<StoryAssetRow[]> {
@@ -129,6 +114,79 @@ export async function getStoryAssetForUser(
   return db.query.storyAssets.findFirst({
     where: and(eq(storyAssets.id, assetId), eq(storyAssets.userId, userId)),
   });
+}
+
+/** Canonical row only (no series/video link). */
+export async function saveStoryAssetLibraryOnly(
+  userId: string,
+  input: {
+    id?: string;
+    type: "character" | "location" | "prop";
+    name: string;
+    description: string;
+    url: string;
+    sheetUrl?: string | null;
+    voiceId?: string | null;
+  }
+): Promise<StoryAssetRow> {
+  const id = input.id ?? crypto.randomUUID();
+  const now = new Date();
+  await db.insert(storyAssets).values({
+    id,
+    userId,
+    type: input.type,
+    name: input.name,
+    description: input.description,
+    url: input.url,
+    sheetUrl: input.sheetUrl ?? null,
+    voiceId: input.voiceId ?? null,
+    createdAt: now,
+    updatedAt: now,
+  });
+  const row = await db.query.storyAssets.findFirst({ where: eq(storyAssets.id, id) });
+  if (!row) throw new Error("Failed to load saved story asset");
+  return row;
+}
+
+/**
+ * Attach existing canonical assets to a video (junction rows only).
+ * Preserves first-seen order; dedupes ids; skips assets already linked to this video.
+ */
+export async function linkStoryAssetsToVideo(
+  userId: string,
+  videoProjectId: string,
+  assetIdsInOrder: string[]
+): Promise<{ error?: string }> {
+  if (assetIdsInOrder.length === 0) return {};
+  if (!(await assertUserOwnsVideo(userId, videoProjectId))) {
+    return { error: "Video not found" };
+  }
+
+  const uniqueOrdered: string[] = [];
+  const seen = new Set<string>();
+  for (const id of assetIdsInOrder) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    uniqueOrdered.push(id);
+  }
+
+  const current = await listStoryAssetsForVideo(videoProjectId);
+  const already = new Set(current.map((a) => a.id));
+  let sortOrder = current.length;
+
+  for (const assetId of uniqueOrdered) {
+    const row = await getStoryAssetForUser(assetId, userId);
+    if (!row) return { error: `Unknown or inaccessible story asset: ${assetId}` };
+    if (already.has(assetId)) continue;
+    await db.insert(videoStoryAssets).values({
+      videoProjectId,
+      storyAssetId: assetId,
+      sortOrder: sortOrder++,
+    });
+    already.add(assetId);
+  }
+
+  return {};
 }
 
 export async function hasSeriesStoryAssetLink(seriesId: string, assetId: string): Promise<boolean> {

@@ -69,10 +69,6 @@ export default function SeriesDetailPage() {
   }, [loadSeries]);
 
   useEffect(() => {
-    if (series?.videoType === "music_video") setTargetDuration(60);
-  }, [series?.videoType]);
-
-  useEffect(() => {
     if (!series) return;
     const hasActive = series.videoProjects.some(
       (v) =>
@@ -215,11 +211,10 @@ export default function SeriesDetailPage() {
                     <button
                       key={p.value}
                       onClick={() => setTargetDuration(p.value)}
-                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        targetDuration === p.value
-                          ? "bg-violet-600 text-white"
-                          : "bg-white/5 text-gray-400 hover:bg-white/10"
-                      }`}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${targetDuration === p.value
+                        ? "bg-violet-600 text-white"
+                        : "bg-white/5 text-gray-400 hover:bg-white/10"
+                        }`}
                     >
                       <span className="block">{p.label}</span>
                       <span className="block text-[10px] opacity-60">{p.hint}</span>
