@@ -21,12 +21,9 @@ export async function POST(
 
   if (!video || video.userId !== user.id) return notFound("Video not found");
 
-  if (!video.seriesId) return badRequest("Cannot compose final without a series.");
-
   await renderQueue.add("compose-final", {
     videoProjectId: id,
     userId: user.id,
-    seriesId: video.seriesId,
   });
 
   return NextResponse.json({ success: true });

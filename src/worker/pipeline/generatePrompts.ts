@@ -93,6 +93,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
         }
 
         await db.insert(schema.sceneFrames).values({
+          videoProjectId,
           sceneId: existingScenes[i].id,
           frameOrder: j,
           clipDuration: sceneFrames[j].clipDuration,

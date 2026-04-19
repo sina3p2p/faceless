@@ -5,7 +5,7 @@ import type { RenderJobData } from "@/lib/queue";
 import { WORKER } from "@/lib/constants";
 import { generateSingleFrameMotion } from "@/server/services/llm";
 import { getSignedDownloadUrl } from "@/lib/storage";
-import { getAgentModels, loadProjectConfig, autoChainOrReview } from "./shared";
+import { getAgentModels, autoChainOrReview, getProjectConfig } from "./shared";
 
 export async function generateMotionJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -23,37 +23,26 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    const allFrameData: Array<{
-      frameId: string;
-      clipDuration: number;
-      sceneText: string;
-      imageUrl: string;
-    }> = [];
+    const frames = await db.query.sceneFrames.findMany({
+      where: eq(schema.sceneFrames.videoProjectId, videoProjectId),
+      orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
+      with: { imageMedia: true, scene: true },
+    });
 
-    for (let i = 0; i < existingScenes.length; i++) {
-      const scene = existingScenes[i];
-      const frames = await db.query.sceneFrames.findMany({
-        where: eq(schema.sceneFrames.sceneId, scene.id),
-        orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
-        with: { imageMedia: true },
-      });
-
-      for (const frame of frames) {
-        let signedUrl = "";
-        if (frame.imageMedia?.url) {
-          try {
-            signedUrl = await getSignedDownloadUrl(frame.imageMedia.url);
-          } catch { /* skip */ }
-        }
-
-        allFrameData.push({
-          frameId: frame.id,
-          clipDuration: frame.clipDuration ?? 5,
-          sceneText: scene.text,
-          imageUrl: signedUrl,
-        });
+    const allFrameData = await Promise.all(frames.map(async (frame) => {
+      let signedUrl = "";
+      if (frame.imageMedia?.url) {
+        try {
+          signedUrl = await getSignedDownloadUrl(frame.imageMedia.url);
+        } catch { /* skip */ }
       }
-    }
+      return {
+        frameId: frame.id,
+        clipDuration: frame.clipDuration ?? 5,
+        sceneText: frame.scene?.text ?? "",
+        imageUrl: signedUrl,
+      };
+    }));
 
     if (allFrameData.length === 0) {
       console.log(`[generate-motion] No frames found, skipping`);
@@ -61,7 +50,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       return;
     }
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = getProjectConfig(videoProject.config)
     const styleGuide = config.visualStyleGuide;
     const frameBreakdown = config.frameBreakdown;
 

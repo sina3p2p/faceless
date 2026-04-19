@@ -10,19 +10,19 @@ import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile, composeVideo, type ComposerScene } from "@/server/services/composer";
 
 export async function composeFinalJob(job: Job<RenderJobData>) {
-  const { videoProjectId, seriesId } = job.data;
+  const { videoProjectId } = job.data;
   const workDir = path.join(os.tmpdir(), `faceless-compose-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
 
   try {
-    const seriesRecord = await db.query.series.findFirst({
-      where: eq(schema.series.id, seriesId),
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
     });
-    if (!seriesRecord) throw new Error(`Series not found: ${seriesId}`);
+    if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "RENDERING");
 
-    const sizeConfig = getVideoSize(seriesRecord.videoSize);
+    const sizeConfig = getVideoSize(videoProject.videoSize);
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
@@ -89,7 +89,7 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
 
     if (composerScenes.length === 0) throw new Error("No scenes to compose");
 
-    const isMusic = seriesRecord.videoType === "music_video";
+    const isMusic = videoProject.videoType === "music_video";
     let globalAudioPath: string | undefined;
     if (isMusic) {
       const projectConfig = ((await db.query.videoProjects.findFirst({
@@ -110,7 +110,7 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
       scenes: composerScenes,
       videoWidth: sizeConfig.width,
       videoHeight: sizeConfig.height,
-      captionStyle: seriesRecord.captionStyle || "none",
+      captionStyle: "none",
       globalAudioPath,
     });
 
