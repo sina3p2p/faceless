@@ -74,16 +74,22 @@ export const MEDIA = {
   get runwayApiKey() { return env("RUNWAYML_API_SECRET"); },
 } as const;
 
-// ── AI Video (Kling + Google Veo + Runway + xAI Grok) ──
+// ── AI Video (Kling + Google Veo + Runway + xAI Grok + BytePlus Seedance) ──
 
 export const AI_VIDEO = {
   get runwayApiKey() { return env("RUNWAYML_API_SECRET"); },
   get googleGenaiApiKey() { return env("GOOGLE_GENAI_API_KEY"); },
   get xaiApiKey() { return env("XAI_API_KEY"); },
-  get klingAccessKey() { return env("KLING_ACCESS_KEY"); },
-  get klingSecretKey() { return env("KLING_SECRET_KEY"); },
+  /** BytePlus ModelArk (ByteDance Seed / Dreamina Seedance). https://seed.bytedance.com/ → console */
+  get byteplusArkApiKey() { return env("BYTEPLUS_ARK_API_KEY"); },
+  /** Data-plane base, default ap-southeast per ModelArk docs. */
+  get byteplusArkBaseUrl() {
+    return env("BYTEPLUS_ARK_BASE_URL", "https://ark.ap-southeast.bytepluses.com/api/v3");
+  },
+  get klingAccessKey() { return env("PROVIDER_KLING_ACCESS_KEY"); },
+  get klingSecretKey() { return env("PROVIDER_KLING_SECRET_KEY"); },
   /** Kling API host (global Singapore region default). */
-  get klingBaseUrl() { return env("KLING_API_BASE", "https://api-singapore.klingai.com"); },
+  get klingBaseUrl() { return env("PROVIDER_KLING_API_BASE", "https://api-singapore.klingai.com"); },
   /** Kling text-to-image when no character references. */
   klingImageModelDefault: "kling-v2",
   /** Kling omni image when using reference images / elements. */
@@ -99,6 +105,26 @@ export const MUSIC = {
 } as const;
 
 export const VIDEO_MODELS = [
+  {
+    id: "seedance-2-pro",
+    label: "Seedance 2 Pro",
+    modelId: "dreamina-seedance-2-0-260128",
+    provider: "byteplus" as const,
+    description: "ByteDance Seedance 2.0 via BytePlus ModelArk (https://seed.bytedance.com/) — i2v 4–15s, last-frame capable",
+    durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[],
+    endFrame: true,
+    durationFormat: "number" as const,
+  },
+  {
+    id: "seedance-2-fast",
+    label: "Seedance 2 Fast",
+    modelId: "dreamina-seedance-2-0-fast-260128",
+    provider: "byteplus" as const,
+    description: "Seedance 2.0 Fast on ModelArk — quicker runs; API caps at 720p for this model",
+    durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[],
+    endFrame: false,
+    durationFormat: "number" as const,
+  },
   { id: "runway-gen4-turbo", label: "Runway Gen-4 Turbo", modelId: "gen4_turbo", provider: "runway" as const, description: "Best quality + value ($0.05/s → ~$0.25/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false, durationFormat: "number" as const },
   { id: "runway-gen4.5", label: "Runway Gen-4.5", modelId: "gen4.5", provider: "runway" as const, description: "#1 ranked globally, premium ($0.12/s → ~$0.60/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false, durationFormat: "number" as const },
   { id: "grok-imagine", label: "Grok Imagine Video", modelId: "grok-imagine-video", provider: "grok" as const, description: "xAI image-to-video, 1–15s ($0.07/s → ~$0.35/5s)", durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: false, durationFormat: "number" as const },

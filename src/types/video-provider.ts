@@ -1,4 +1,4 @@
-export type VideoProviderId = "kling" | "google" | "runway" | "grok";
+export type VideoProviderId = "kling" | "google" | "runway" | "grok" | "byteplus";
 
 export interface VideoResult {
   videoUrl: string;
