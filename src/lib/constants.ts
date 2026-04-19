@@ -81,7 +81,7 @@ export const AI_VIDEO = {
   get googleGenaiApiKey() { return env("GOOGLE_GENAI_API_KEY"); },
   get xaiApiKey() { return env("XAI_API_KEY"); },
   /** BytePlus ModelArk (ByteDance Seed / Dreamina Seedance). https://seed.bytedance.com/ → console */
-  get byteplusArkApiKey() { return env("BYTEPLUS_ARK_API_KEY"); },
+  get byteplusArkApiKey() { return env("PROVIDER_BYTEPLUS_ARK_API_KEY"); },
   /** Data-plane base, default ap-southeast per ModelArk docs. */
   get byteplusArkBaseUrl() {
     return env("BYTEPLUS_ARK_BASE_URL", "https://ark.ap-southeast.bytepluses.com/api/v3");

@@ -47,7 +47,7 @@ export class BytePlusVideoProvider implements IVideoProvider {
   private getAuthHeaders(): Record<string, string> {
     const apiKey = AI_VIDEO.byteplusArkApiKey;
     if (!apiKey) {
-      throw new Error("BYTEPLUS_ARK_API_KEY is not set");
+      throw new Error("PROVIDER_BYTEPLUS_ARK_API_KEY is not set");
     }
     return {
       "Content-Type": "application/json",
