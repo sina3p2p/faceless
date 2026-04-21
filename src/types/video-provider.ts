@@ -1,4 +1,13 @@
-export type VideoProviderId = "kling" | "google" | "runway" | "grok" | "byteplus";
+export type FalVideoProfile =
+  | "kling_v21"
+  | "kling_v21_master"
+  | "kling_v16_tail"
+  | "kling_v26"
+  | "luma_ray2"
+  | "veo31"
+  | "grok_imagine"
+  | "seedance2"
+  | "seedance2_fast";
 
 export interface VideoResult {
   videoUrl: string;
@@ -16,13 +25,20 @@ export interface I2vRequest {
 }
 
 export interface ResolvedVideoModel {
-  modelId: string;
-  provider: VideoProviderId;
+  falEndpoint: string;
+  falProfile: FalVideoProfile;
+  falLumaResolution?: "540p" | "720p" | "1080p";
+  falVeoResolution?: "720p" | "1080p" | "4k";
+  /** Kling v2.6 on Fal only — O3 enables native audio. */
+  falKlingGenerateAudio?: boolean;
+  /** ByteDance Seedance 2.0 / 2.0 Fast on Fal (`bytedance/seedance-2.0/...`). */
+  falSeedanceResolution?: "480p" | "720p" | "1080p";
+  falSeedanceGenerateAudio?: boolean;
   durations: readonly number[];
   endFrame: boolean;
   durationFormat: "string" | "number";
 }
 
 export interface IVideoProvider {
-  generateFromImage(req: I2vRequest, modelId: string): Promise<VideoResult>;
+  generateFromImage(req: I2vRequest, resolved: ResolvedVideoModel): Promise<VideoResult>;
 }

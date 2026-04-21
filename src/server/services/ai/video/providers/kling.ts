@@ -1,7 +1,6 @@
 import axios, { type AxiosInstance } from "axios";
 import * as crypto from "node:crypto";
 import { AI_VIDEO } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
 
 const TOKEN_VALIDITY_SECONDS = 1800;
 const CACHE_BUFFER_SECONDS = 300;
@@ -53,7 +52,7 @@ interface KlingTaskStatusResponse {
 }
 
 /**
- * Authenticated Kling HTTP + polling. Lives with KlingVideoProvider; media image flow reuses the same singleton via getKlingApiClient().
+ * Authenticated Kling HTTP + polling for still-image tasks; media image flow uses getKlingApiClient().
  */
 export class KlingApiClient {
   private static cachedToken: string | null = null;
@@ -149,41 +148,4 @@ let defaultKlingApi: KlingApiClient | null = null;
 export function getKlingApiClient(): KlingApiClient {
   defaultKlingApi ??= new KlingApiClient();
   return defaultKlingApi;
-}
-
-export class KlingVideoProvider implements IVideoProvider {
-  constructor(private readonly kling: KlingApiClient = getKlingApiClient()) {}
-
-  async generateFromImage(req: I2vRequest, modelId: string): Promise<VideoResult> {
-    const client = this.kling.getHttp();
-    const useEnd = req.endFrame && !!req.endImageUrl;
-    const durationStr = String(req.apiDuration);
-
-    const payload: Record<string, unknown> = {
-      model_name: modelId,
-      image: req.imageUrl,
-      prompt: req.prompt,
-      duration: durationStr,
-    };
-    if (useEnd && req.endImageUrl) {
-      payload.image_tail = req.endImageUrl;
-    }
-
-    console.log(`[ai-video] kling POST /v1/videos/image2video model=${modelId} duration=${durationStr}`);
-
-    const { data: submit } = await client.post<KlingTaskSubmitResponse>(
-      "/v1/videos/image2video",
-      payload
-    );
-    if (submit?.code != null && submit.code !== 0) {
-      throw new Error(submit.message || `Kling image-to-video error code ${submit.code}`);
-    }
-    const taskId = submit?.data?.task_id;
-    if (!taskId) {
-      throw new Error(submit?.message || "Kling image-to-video returned no task_id");
-    }
-
-    const videoUrl = await this.kling.pollUntilVideoReady(`/v1/videos/image2video/${taskId}`);
-    return { videoUrl, durationSeconds: req.apiDuration };
-  }
 }

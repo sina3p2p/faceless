@@ -1,5 +1,5 @@
 import { DEFAULT_VIDEO_MODEL, VIDEO_MODELS } from "@/lib/constants";
-import type { ResolvedVideoModel, VideoProviderId } from "@/types/video-provider";
+import type { ResolvedVideoModel } from "@/types/video-provider";
 
 export function resolveModel(videoModelKey?: string): ResolvedVideoModel {
   const key = videoModelKey || DEFAULT_VIDEO_MODEL;
@@ -8,8 +8,13 @@ export function resolveModel(videoModelKey?: string): ResolvedVideoModel {
     VIDEO_MODELS.find((m) => m.id === DEFAULT_VIDEO_MODEL)!;
 
   return {
-    modelId: entry.modelId,
-    provider: entry.provider as VideoProviderId,
+    falEndpoint: entry.falEndpoint,
+    falProfile: entry.falProfile,
+    falLumaResolution: entry.falLumaResolution,
+    falVeoResolution: entry.falVeoResolution,
+    falKlingGenerateAudio: entry.falKlingGenerateAudio,
+    falSeedanceResolution: entry.falSeedanceResolution,
+    falSeedanceGenerateAudio: entry.falSeedanceGenerateAudio,
     durations: entry.durations,
     endFrame: entry.endFrame,
     durationFormat: entry.durationFormat,

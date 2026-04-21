@@ -2,6 +2,8 @@
 // Central configuration — all settings and env vars in one place
 // ─────────────────────────────────────────────────────────
 
+import type { FalVideoProfile } from "@/types/video-provider";
+
 export const env = (key: string, fallback = "") => process.env[key] || fallback;
 
 // ── Database ──
@@ -67,25 +69,16 @@ export const TTS = {
   defaultStyle: 0.3,
 } as const;
 
-// ── Media (OpenAI + Runway + Kling via AI_VIDEO keys) ──
+// ── Media (OpenAI + Kling image API) ──
 
 export const MEDIA = {
   get openaiApiKey() { return env("OPENAI_API_KEY"); },
-  get runwayApiKey() { return env("RUNWAYML_API_SECRET"); },
 } as const;
 
-// ── AI Video (Kling + Google Veo + Runway + xAI Grok + BytePlus Seedance) ──
+// ── AI Video (image-to-video only — routed through Fal; Kling keys below are for still-image generation) ──
 
 export const AI_VIDEO = {
-  get runwayApiKey() { return env("RUNWAYML_API_SECRET"); },
-  get googleGenaiApiKey() { return env("GOOGLE_GENAI_API_KEY"); },
-  get xaiApiKey() { return env("XAI_API_KEY"); },
-  /** BytePlus ModelArk (ByteDance Seed / Dreamina Seedance). https://seed.bytedance.com/ → console */
-  get byteplusArkApiKey() { return env("PROVIDER_BYTEPLUS_ARK_API_KEY"); },
-  /** Data-plane base, default ap-southeast per ModelArk docs. */
-  get byteplusArkBaseUrl() {
-    return env("BYTEPLUS_ARK_BASE_URL", "https://ark.ap-southeast.bytepluses.com/api/v3");
-  },
+  get falKey() { return env("FAL_KEY"); },
   get klingAccessKey() { return env("PROVIDER_KLING_ACCESS_KEY"); },
   get klingSecretKey() { return env("PROVIDER_KLING_SECRET_KEY"); },
   /** Kling API host (global Singapore region default). */
@@ -104,36 +97,135 @@ export const MUSIC = {
   sunoModel: "V5" as const,
 } as const;
 
-export const VIDEO_MODELS = [
+type VideoModelEntry = {
+  id: string;
+  label: string;
+  description: string;
+  falEndpoint: string;
+  falProfile: FalVideoProfile;
+  durations: readonly number[];
+  endFrame: boolean;
+  durationFormat: "string" | "number";
+  falLumaResolution?: "540p" | "720p" | "1080p";
+  falVeoResolution?: "720p" | "1080p" | "4k";
+  falKlingGenerateAudio?: boolean;
+  falSeedanceResolution?: "480p" | "720p" | "1080p";
+  falSeedanceGenerateAudio?: boolean;
+};
+
+const SEEDANCE2_DURATIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const;
+
+export const VIDEO_MODELS: readonly VideoModelEntry[] = [
   {
     id: "seedance-2-pro",
     label: "Seedance 2 Pro",
-    modelId: "dreamina-seedance-2-0-260128",
-    provider: "byteplus" as const,
-    description: "ByteDance Seedance 2.0 via BytePlus ModelArk (https://seed.bytedance.com/) — i2v 4–15s, last-frame capable",
-    durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[],
+    falEndpoint: "bytedance/seedance-2.0/image-to-video",
+    falProfile: "seedance2",
+    falSeedanceResolution: "720p",
+    falSeedanceGenerateAudio: false,
+    description: "ByteDance Seedance 2.0 i2v on Fal (4–15s, optional last frame, up to 1080p)",
+    durations: SEEDANCE2_DURATIONS,
     endFrame: true,
-    durationFormat: "number" as const,
+    durationFormat: "number",
   },
   {
     id: "seedance-2-fast",
     label: "Seedance 2 Fast",
-    modelId: "dreamina-seedance-2-0-fast-260128",
-    provider: "byteplus" as const,
-    description: "Seedance 2.0 Fast on ModelArk — quicker runs; API caps at 720p for this model",
-    durations: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[],
-    endFrame: false,
-    durationFormat: "number" as const,
+    falEndpoint: "bytedance/seedance-2.0/fast/image-to-video",
+    falProfile: "seedance2_fast",
+    falSeedanceResolution: "720p",
+    falSeedanceGenerateAudio: false,
+    description: "Seedance 2.0 Fast on Fal — lower latency; 480p/720p only on API",
+    durations: SEEDANCE2_DURATIONS,
+    endFrame: true,
+    durationFormat: "number",
   },
-  { id: "runway-gen4-turbo", label: "Runway Gen-4 Turbo", modelId: "gen4_turbo", provider: "runway" as const, description: "Best quality + value ($0.05/s → ~$0.25/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "runway-gen4.5", label: "Runway Gen-4.5", modelId: "gen4.5", provider: "runway" as const, description: "#1 ranked globally, premium ($0.12/s → ~$0.60/5s)", durations: [2, 3, 4, 5, 6, 7, 8, 9, 10] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "grok-imagine", label: "Grok Imagine Video", modelId: "grok-imagine-video", provider: "grok" as const, description: "xAI image-to-video, 1–15s ($0.07/s → ~$0.35/5s)", durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "veo-31-lite", label: "Veo 3.1 Lite", modelId: "veo-3.1-lite-generate-preview", provider: "google" as const, description: "Google Veo 3.1 Lite, 720p (Gemini API)", durations: [4, 5, 6, 7, 8] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "veo-31-fast", label: "Veo 3.1 Fast", modelId: "veo-3.1-fast-generate-preview", provider: "google" as const, description: "Google Veo 3.1 Fast, 1080p (Gemini API)", durations: [4, 6, 8] as number[], endFrame: false, durationFormat: "number" as const },
-  { id: "kling-3-standard", label: "Kling 3.0 Standard", modelId: "kling-v2-1", provider: "kling" as const, description: "Kling image-to-video (standard, end-frame capable)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true, durationFormat: "string" as const },
-  { id: "kling-3-pro", label: "Kling 3.0 Pro", modelId: "kling-v2-1-master", provider: "kling" as const, description: "Kling image-to-video (master quality)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: false, durationFormat: "string" as const },
-  { id: "kling-o3", label: "Kling O3", modelId: "kling-v2-6", provider: "kling" as const, description: "Kling v2.6 (sound / motion)", durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as number[], endFrame: true, durationFormat: "string" as const },
-] as const;
+  {
+    id: "runway-gen4-turbo",
+    label: "Runway Gen-4 Turbo",
+    falEndpoint: "fal-ai/luma-dream-machine/ray-2/image-to-video",
+    falProfile: "luma_ray2",
+    falLumaResolution: "720p",
+    description: "Strong motion quality (via Fal — Luma Ray 2), 5s or 9s",
+    durations: [5, 9],
+    endFrame: false,
+    durationFormat: "number",
+  },
+  {
+    id: "runway-gen4.5",
+    label: "Runway Gen-4.5",
+    falEndpoint: "fal-ai/luma-dream-machine/ray-2/image-to-video",
+    falProfile: "luma_ray2",
+    falLumaResolution: "1080p",
+    description: "Premium motion (via Fal — Luma Ray 2 @ 1080p), 5s or 9s",
+    durations: [5, 9],
+    endFrame: false,
+    durationFormat: "number",
+  },
+  {
+    id: "grok-imagine",
+    label: "Grok Imagine Video",
+    falEndpoint: "xai/grok-imagine-video/image-to-video",
+    falProfile: "grok_imagine",
+    description: "xAI Grok Imagine i2v with audio (via Fal), 1–15s",
+    durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    endFrame: false,
+    durationFormat: "number",
+  },
+  {
+    id: "veo-31-lite",
+    label: "Veo 3.1 Lite",
+    falEndpoint: "fal-ai/veo3.1/image-to-video",
+    falProfile: "veo31",
+    falVeoResolution: "720p",
+    description: "Google Veo 3.1 i2v (via Fal), 720p, 4s / 6s / 8s",
+    durations: [4, 6, 8],
+    endFrame: false,
+    durationFormat: "number",
+  },
+  {
+    id: "veo-31-fast",
+    label: "Veo 3.1 Fast",
+    falEndpoint: "fal-ai/veo3.1/image-to-video",
+    falProfile: "veo31",
+    falVeoResolution: "1080p",
+    description: "Google Veo 3.1 i2v (via Fal), 1080p, 4s / 6s / 8s",
+    durations: [4, 6, 8],
+    endFrame: false,
+    durationFormat: "number",
+  },
+  {
+    id: "kling-3-standard",
+    label: "Kling 3.0 Standard",
+    falEndpoint: "fal-ai/kling-video/v1.6/pro/image-to-video",
+    falProfile: "kling_v16_tail",
+    description: "Kling i2v with optional last frame (via Fal — v1.6 pro)",
+    durations: [5, 10],
+    endFrame: true,
+    durationFormat: "string",
+  },
+  {
+    id: "kling-3-pro",
+    label: "Kling 3.0 Pro",
+    falEndpoint: "fal-ai/kling-video/v2.1/master/image-to-video",
+    falProfile: "kling_v21_master",
+    description: "Kling master-quality i2v (via Fal — v2.1 master)",
+    durations: [5, 10],
+    endFrame: false,
+    durationFormat: "string",
+  },
+  {
+    id: "kling-o3",
+    label: "Kling O3",
+    falEndpoint: "fal-ai/kling-video/v2.6/pro/image-to-video",
+    falProfile: "kling_v26",
+    falKlingGenerateAudio: true,
+    description: "Kling v2.6 with native audio (via Fal)",
+    durations: [5, 10],
+    endFrame: true,
+    durationFormat: "string",
+  },
+];
 
 export const DEFAULT_VIDEO_MODEL = "kling-3-standard";
 
