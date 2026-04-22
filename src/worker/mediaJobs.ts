@@ -105,7 +105,14 @@ export async function fetchAIVideoMediaParallel(
           : undefined;
 
         console.log(`Scene ${i}: Generating AI video clip (${videoModelKey || "default"}, desired=${desiredDuration}s)${endImageUrl ? " → scene " + (i + 1) : ""}...`);
-        const videoResult = await getAIVideoForScene(startImageUrl, videoPrompt, desiredDuration, videoModelKey, endImageUrl);
+        const videoResult = await getAIVideoForScene(
+          startImageUrl,
+          videoPrompt,
+          desiredDuration,
+          videoModelKey,
+          endImageUrl,
+          aspectRatio
+        );
 
         const videoPath = path.join(workDir, `media_${i}.mp4`);
         await downloadAIVideo(videoResult.videoUrl, videoPath);

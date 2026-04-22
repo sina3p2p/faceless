@@ -2,6 +2,12 @@ import { fal } from "@fal-ai/client";
 import { AI_VIDEO } from "@/lib/constants";
 import type { I2vRequest, IVideoProvider, ResolvedVideoModel, VideoResult } from "@/types/video-provider";
 
+type FalResponse = {
+  video?: {
+    url?: string;
+  };
+} | undefined;
+
 function mapAspectKling(ar: string): "16:9" | "9:16" | "1:1" {
   if (ar === "16:9") return "16:9";
   if (ar === "1:1") return "1:1";
@@ -35,17 +41,15 @@ function mapAspectSeedance(ar: string): "auto" | "21:9" | "16:9" | "4:3" | "1:1"
   return "auto";
 }
 
-function extractVideoUrl(data: unknown): string {
+function extractVideoUrl(data: FalResponse): string {
   if (!data || typeof data !== "object") {
     throw new Error("Fal returned empty video payload");
   }
-  const rec = data as Record<string, unknown>;
-  const video = rec.video;
-  if (video && typeof video === "object" && video !== null) {
-    const url = (video as Record<string, unknown>).url;
-    if (typeof url === "string" && url.length > 0) return url;
+  const url = data.video?.url;
+  if (!url) {
+    throw new Error("Fal response missing video.url");
   }
-  throw new Error("Fal response missing video.url");
+  return url;
 }
 
 function readDurationSeconds(data: unknown, fallback: number): number {
@@ -60,29 +64,16 @@ function readDurationSeconds(data: unknown, fallback: number): number {
 
 function buildInput(req: I2vRequest, resolved: ResolvedVideoModel): Record<string, unknown> {
   const {
-    falProfile,
-    falLumaResolution,
-    falVeoResolution,
-    falKlingGenerateAudio,
-    falSeedanceResolution,
-    falSeedanceGenerateAudio,
+    falEndpoint,
+    resolution,
+    generateAudio,
   } = resolved;
-  const useEnd = req.endFrame && !!req.endImageUrl;
 
-  switch (falProfile) {
-    case "kling_v21":
-      return {
-        prompt: req.prompt,
-        image_url: req.imageUrl,
-        duration: String(req.apiDuration),
-      };
-    case "kling_v21_master":
-      return {
-        prompt: req.prompt,
-        image_url: req.imageUrl,
-        duration: String(req.apiDuration),
-      };
-    case "kling_v16_tail": {
+  const useEnd = req.endFrame && !!req.endImageUrl;
+  const res = resolution ?? "1080p";
+
+  switch (falEndpoint) {
+    case "fal-ai/kling-video/v3/standard/image-to-video": {
       const input: Record<string, unknown> = {
         prompt: req.prompt,
         image_url: req.imageUrl,
@@ -92,28 +83,28 @@ function buildInput(req: I2vRequest, resolved: ResolvedVideoModel): Record<strin
       if (useEnd && req.endImageUrl) input.tail_image_url = req.endImageUrl;
       return input;
     }
-    case "kling_v26": {
+    case "fal-ai/kling-video/v3/pro/image-to-video": {
       const input: Record<string, unknown> = {
         prompt: req.prompt,
         start_image_url: req.imageUrl,
         duration: String(req.apiDuration),
-        generate_audio: falKlingGenerateAudio ?? false,
+        generate_audio: generateAudio ?? false,
       };
       if (useEnd && req.endImageUrl) input.end_image_url = req.endImageUrl;
       return input;
     }
-    case "luma_ray2": {
+    case "fal-ai/luma-dream-machine/ray-2/image-to-video": {
       const input: Record<string, unknown> = {
         prompt: req.prompt,
         image_url: req.imageUrl,
         aspect_ratio: mapAspectLuma(req.aspectRatio),
-        resolution: falLumaResolution ?? "720p",
+        resolution: res,
         duration: req.apiDuration >= 9 ? "9s" : "5s",
       };
       if (useEnd && req.endImageUrl) input.end_image_url = req.endImageUrl;
       return input;
     }
-    case "veo31": {
+    case "fal-ai/luma-dream-machine/ray-2-flash/image-to-video": {
       const map: Record<number, string> = { 4: "4s", 6: "6s", 8: "8s" };
       const duration = map[req.apiDuration] ?? "8s";
       return {
@@ -121,34 +112,43 @@ function buildInput(req: I2vRequest, resolved: ResolvedVideoModel): Record<strin
         image_url: req.imageUrl,
         aspect_ratio: mapAspectVeo(req.aspectRatio),
         duration,
-        resolution: falVeoResolution ?? "720p",
+        resolution: res,
         generate_audio: false,
       };
     }
-    case "grok_imagine":
+    case "fal-ai/veo3.1/image-to-video":
+    case "fal-ai/veo3.1/fast/image-to-video": {
+      return {
+        prompt: req.prompt,
+        image_url: req.imageUrl,
+        aspect_ratio: mapAspectVeo(req.aspectRatio),
+        duration: req.apiDuration,
+        resolution: res,
+      };
+    }
+    case "xai/grok-imagine-video/image-to-video":
       return {
         prompt: req.prompt,
         image_url: req.imageUrl,
         duration: req.apiDuration,
         aspect_ratio: mapAspectGrok(req.aspectRatio),
-        resolution: "720p",
+        resolution,
       };
-    case "seedance2":
-    case "seedance2_fast": {
+    case "bytedance/seedance-2.0/image-to-video":
+    case "bytedance/seedance-2.0/fast/image-to-video": {
       const input: Record<string, unknown> = {
         prompt: req.prompt,
         image_url: req.imageUrl,
         duration: req.apiDuration,
         aspect_ratio: mapAspectSeedance(req.aspectRatio),
-        resolution: falSeedanceResolution ?? "720p",
-        generate_audio: falSeedanceGenerateAudio ?? false,
+        resolution: res,
+        generate_audio: generateAudio ?? false,
       };
       if (useEnd && req.endImageUrl) input.end_image_url = req.endImageUrl;
       return input;
     }
     default: {
-      const _exhaustive: never = falProfile;
-      return _exhaustive;
+      throw new Error(`Unsupported Fal endpoint: ${falEndpoint}`);
     }
   }
 }
@@ -165,7 +165,7 @@ export class FalVideoProvider implements IVideoProvider {
     const endpoint = resolved.falEndpoint;
 
     console.log(
-      `[ai-video] fal.subscribe(${endpoint}) duration=${req.apiDuration}s profile=${resolved.falProfile}`
+      `[ai-video] fal.subscribe(${endpoint}) duration=${req.apiDuration}s resolution=${resolved.resolution} generateAudio=${resolved.generateAudio}`
     );
 
     const result = await fal.subscribe(endpoint, {

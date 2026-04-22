@@ -83,7 +83,18 @@ export async function POST(req: NextRequest) {
 
   const [videoProject] = await db
     .insert(videoProjects)
-    .values({ seriesId: seriesRecord.id, status: "PENDING", config: Object.keys(config).length > 0 ? config : undefined })
+    .values({
+      seriesId: seriesRecord.id,
+      status: "PENDING",
+      config: Object.keys(config).length > 0 ? config : undefined,
+      llmModel: seriesRecord.llmModel,
+      imageModel: seriesRecord.imageModel,
+      videoModel: seriesRecord.videoModel,
+      videoSize: seriesRecord.videoSize,
+      language: seriesRecord.language,
+      style: seriesRecord.style,
+      videoType: seriesRecord.videoType,
+    })
     .returning();
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });

@@ -656,7 +656,7 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
               showFrameActions={phase.showFrameActions}
               showFrameMotion={phase.showFrameMotion}
               showFrameVideo={phase.showFrameVideo}
-              defaultVideoModel={video?.series?.videoModel || undefined}
+              defaultVideoModel={video?.videoModel || video?.series?.videoModel || undefined}
             />
           ))}
         </div>

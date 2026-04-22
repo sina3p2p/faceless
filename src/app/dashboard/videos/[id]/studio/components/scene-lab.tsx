@@ -65,7 +65,7 @@ function buildGraph(
 
   const frames = scene.frames ?? [];
   const defaultImageModel = video?.series?.imageModel || "dall-e-3";
-  const defaultVideoModel = video?.series?.videoModel || "";
+  const defaultVideoModel = video?.videoModel || video?.series?.videoModel || "";
 
   let x = 0;
 

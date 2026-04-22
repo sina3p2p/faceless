@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { IMAGE_MODELS } from "@/lib/constants";
+import { IMAGE_MODELS, VIDEO_I2V_PROVIDER } from "@/lib/constants";
 import { SceneRefTextarea } from "./scene-ref-textarea";
 import { ActivityFeedCompact } from "./activity-feed";
 import type { VideoDetail, Scene } from "@/types/video-detail";
@@ -72,7 +72,14 @@ export function InspectorPanel({
 
         <div className="space-y-1">
           <InfoRow label="Image" value={imageModel} />
-          <InfoRow label="Video" value={video?.series?.videoModel || "—"} />
+          <InfoRow
+            label="Video"
+            value={
+              [video?.videoModel || video?.series?.videoModel, VIDEO_I2V_PROVIDER === "replicate" ? "Replicate" : "Fal"]
+                .filter(Boolean)
+                .join(" · ") || "—"
+            }
+          />
           <InfoRow label="Size" value={video?.series?.videoSize || "9:16"} />
         </div>
       </div>

@@ -1,13 +1,17 @@
-export type FalVideoProfile =
-  | "kling_v21"
-  | "kling_v21_master"
-  | "kling_v16_tail"
-  | "kling_v26"
-  | "luma_ray2"
-  | "veo31"
-  | "grok_imagine"
-  | "seedance2"
-  | "seedance2_fast";
+/** User-selectable i2v backend. Fal = fal.ai. Replicate = same catalog entries where `replicateModel` is set (Seedance, etc.). */
+export type TVideoProviderId = "fal" | "replicate";
+
+export type TVideoModelEndpoint =
+  | "bytedance/seedance-2.0/image-to-video"
+  | "bytedance/seedance-2.0/fast/image-to-video"
+  | "fal-ai/luma-dream-machine/ray-2/image-to-video"
+  | "fal-ai/luma-dream-machine/ray-2-flash/image-to-video"
+  | "xai/grok-imagine-video/image-to-video"
+  | "fal-ai/veo3.1/image-to-video"
+  | "fal-ai/veo3.1/fast/image-to-video"
+  | "fal-ai/kling-video/v3/standard/image-to-video"
+  | "fal-ai/kling-video/v3/pro/image-to-video"
+  | "fal-ai/kling-video/v2.6/pro/image-to-video";
 
 export interface VideoResult {
   videoUrl: string;
@@ -20,23 +24,31 @@ export interface I2vRequest {
   apiDuration: number;
   endFrame: boolean;
   endImageUrl?: string;
-  durationFormat: "string" | "number";
   aspectRatio: string;
 }
 
-export interface ResolvedVideoModel {
-  falEndpoint: string;
-  falProfile: FalVideoProfile;
-  falLumaResolution?: "540p" | "720p" | "1080p";
-  falVeoResolution?: "720p" | "1080p" | "4k";
-  /** Kling v2.6 on Fal only — O3 enables native audio. */
-  falKlingGenerateAudio?: boolean;
-  /** ByteDance Seedance 2.0 / 2.0 Fast on Fal (`bytedance/seedance-2.0/...`). */
-  falSeedanceResolution?: "480p" | "720p" | "1080p";
-  falSeedanceGenerateAudio?: boolean;
+export type TVideoModelEntry = {
+  id: string;
+  label: string;
+  description: string;
+  falEndpoint: TVideoModelEndpoint;
+  /** When set, this model can be run on Replicate using this `owner/model` id (https://replicate.com). */
+  replicateModel?: `${string}/${string}`;
   durations: readonly number[];
   endFrame: boolean;
-  durationFormat: "string" | "number";
+  generateAudio?: boolean;
+  supportedResolution: readonly ("480p" | "540p" | "720p" | "1080p" | "4k")[];
+};
+
+export interface ResolvedVideoModel {
+  modelId: string;
+  provider: TVideoProviderId;
+  falEndpoint: TVideoModelEntry['falEndpoint'];
+  replicateModel?: TVideoModelEntry['replicateModel'];
+  resolution: TVideoModelEntry['supportedResolution'][number] | undefined;
+  generateAudio: TVideoModelEntry['generateAudio'];
+  durations: TVideoModelEntry['durations'];
+  endFrame: boolean;
 }
 
 export interface IVideoProvider {

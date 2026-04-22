@@ -1,12 +1,14 @@
 "use client";
 
+import { useEffect } from "react";
 import { OptionSelect } from "@/components/ui/option-select";
 import {
   LLM_MODELS,
   DEFAULT_LLM_MODEL,
   IMAGE_MODELS,
-  VIDEO_MODELS,
   DEFAULT_VIDEO_MODEL,
+  VIDEO_I2V_PROVIDER,
+  videoModelsForProvider,
   VIDEO_TYPES,
   VIDEO_SIZES,
   DEFAULT_VIDEO_SIZE,
@@ -64,16 +66,27 @@ export function ImageModelSelector({ value, onChange }: ModelSelectorProps) {
 }
 
 export function VideoModelSelector({ value, onChange }: ModelSelectorProps) {
+  const models = videoModelsForProvider(VIDEO_I2V_PROVIDER);
+  const defaultId = models.find((m) => m.id === DEFAULT_VIDEO_MODEL)?.id ?? models[0]?.id ?? DEFAULT_VIDEO_MODEL;
+  const coerced = models.some((m) => m.id === value) ? value : (models[0]?.id ?? value);
+
+  useEffect(() => {
+    const list = videoModelsForProvider(VIDEO_I2V_PROVIDER);
+    if (list.length && !list.some((m) => m.id === value) && list[0]) {
+      onChange(list[0].id);
+    }
+  }, [value, onChange]);
+
   return (
     <OptionSelect
       label="Video Generation Model"
-      value={value}
+      value={coerced}
       onChange={onChange}
-      options={VIDEO_MODELS.map((m) => ({
+      options={models.map((m) => ({
         value: m.id,
         label: m.label,
         description: m.description,
-        ...(m.id === DEFAULT_VIDEO_MODEL ? { badge: "RECOMMENDED" } : {}),
+        ...(m.id === defaultId ? { badge: "RECOMMENDED" } : {}),
       }))}
     />
   );

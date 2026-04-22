@@ -48,6 +48,21 @@ export async function storyboardJob(job: Job<RenderJobData>) {
       agents.storyboardModel
     );
 
+    for (const [indexScene, scene] of breakdown.scenes.entries()) {
+      for (const [index, frame] of scene.frames.entries()) {
+        if (!supportedDurations.includes(frame.clipDuration)) {
+          throw new Error(`Unsupported clip duration: ${frame.clipDuration}`);
+        }
+
+        await db.insert(schema.sceneFrames).values({
+          videoProjectId,
+          sceneId: existingScenes[indexScene].id,
+          frameOrder: index,
+          clipDuration: frame.clipDuration,
+        });
+      }
+    }
+
     await mergeProjectConfig(videoProjectId, { frameBreakdown: breakdown });
 
     const totalFrames = breakdown.scenes.reduce((sum, s) => sum + s.frames.length, 0);
