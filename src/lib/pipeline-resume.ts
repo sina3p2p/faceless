@@ -40,15 +40,6 @@ const RESUMABLE_JOBS = new Set([
   "compose-final",
 ]);
 
-const JOBS_REQUIRING_SERIES = new Set([
-  "cinematography",
-  "storyboard",
-  "generate-prompts",
-  "generate-frame-images",
-  "generate-pipeline-motion",
-  "generate-frame-videos",
-  "compose-final",
-]);
 
 /** Must match `cancel` route render_jobs error text. */
 export const RENDER_JOB_CANCELLED_MESSAGE = "Cancelled by user";
@@ -66,11 +57,6 @@ export function pipelineJobDisplayName(jobName: string | null | undefined): stri
   if (!jobName) return "Pipeline";
   return PIPELINE_JOB_LABELS[jobName] ?? jobName;
 }
-
-export function resumeRequiresSeriesId(jobName: string): boolean {
-  return JOBS_REQUIRING_SERIES.has(jobName);
-}
-
 /** Whether resume is plausible for this video + render row (client; server re-validates with DB). */
 export function canShowResumeForVideo(video: {
   status: string;

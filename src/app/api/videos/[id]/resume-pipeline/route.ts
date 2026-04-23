@@ -8,8 +8,6 @@ import {
   hasPipelineRenderFailure,
   inferResumeJobFromVideoStatus,
   isResumablePipelineJob,
-  pipelineJobDisplayName,
-  resumeRequiresSeriesId,
 } from "@/lib/pipeline-resume";
 
 export async function POST(
@@ -54,20 +52,12 @@ export async function POST(
     );
   }
 
-  if (resumeRequiresSeriesId(jobName) && !video.seriesId) {
-    return badRequest(
-      `Cannot resume “${pipelineJobDisplayName(jobName)}” without a series. Use Retry to start over.`
-    );
-  }
-
-  const seriesId = video.seriesId ?? "";
-
   await db
     .update(renderJobs)
     .set({ status: "QUEUED", error: null, progress: 0 })
     .where(eq(renderJobs.videoProjectId, id));
 
-  const payload = { videoProjectId: id, userId: user.id, seriesId };
+  const payload = { videoProjectId: id, userId: user.id };
 
   await renderQueue.add(jobName, payload);
 

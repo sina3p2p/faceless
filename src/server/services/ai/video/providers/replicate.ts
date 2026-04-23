@@ -5,6 +5,73 @@ const REPLICATE_API = "https://api.replicate.com/v1";
 
 const versionCache = new Map<string, string>();
 
+/** Serialize POST /v1/predictions so we never issue parallel creates (Replicate throttles burst=1 in low-balance mode). */
+let createPostQueue: Promise<unknown> = Promise.resolve();
+
+const CREATE_PREDICTION_MAX_ATTEMPTS = 15;
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+function parseReplicateCreateError(body: string): { retryAfterSec: number } | null {
+  try {
+    const j = JSON.parse(body) as { retry_after?: number; status?: number };
+    if (typeof j.retry_after === "number" && j.retry_after >= 0) {
+      return { retryAfterSec: j.retry_after };
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+async function withCreatePostLock<T>(fn: () => Promise<T>): Promise<T> {
+  const p = createPostQueue.then(() => fn());
+  createPostQueue = p.then(
+    () => undefined,
+    () => undefined
+  );
+  return p;
+}
+
+type PredictionResponse = { id: string; status: string; error?: string; output?: unknown; urls?: { get?: string } };
+
+async function postPredictionCreate(
+  versionId: string,
+  input: Record<string, unknown>,
+  token: string
+): Promise<PredictionResponse> {
+  return withCreatePostLock(async () => {
+    for (let attempt = 0; attempt < CREATE_PREDICTION_MAX_ATTEMPTS; attempt++) {
+      const r = await fetch(`${REPLICATE_API}/predictions`, {
+        method: "POST",
+        headers: { Authorization: `Token ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ version: versionId, input }),
+      });
+      const t = await r.text();
+      if (r.ok) {
+        return JSON.parse(t) as PredictionResponse;
+      }
+      if (r.status === 429) {
+        const meta = parseReplicateCreateError(t);
+        const sec = meta?.retryAfterSec ?? 10;
+        if (attempt === CREATE_PREDICTION_MAX_ATTEMPTS - 1) {
+          throw new Error(`Replicate: prediction create failed: 429 after ${CREATE_PREDICTION_MAX_ATTEMPTS} attempts ${t.slice(0, 500)}`);
+        }
+        const jitter = Math.random() * 500;
+        console.warn(
+          `[ai-video] Replicate create throttled (429), waiting ~${sec}s + jitter before retry (${attempt + 1}/${CREATE_PREDICTION_MAX_ATTEMPTS})`
+        );
+        await sleep(sec * 1000 + jitter);
+        continue;
+      }
+      throw new Error(`Replicate: prediction create failed: ${r.status} ${t.slice(0, 500)}`);
+    }
+    throw new Error("Replicate: prediction create failed: exhausted retries");
+  });
+}
+
 function mapAspectSeedance(ar: string): "auto" | "21:9" | "16:9" | "4:3" | "1:1" | "3:4" | "9:16" {
   if (ar === "21:9" || ar === "16:9" || ar === "4:3" || ar === "1:1" || ar === "3:4" || ar === "9:16") {
     return ar;
@@ -71,17 +138,7 @@ async function createAndWaitPrediction(
   input: Record<string, unknown>,
   token: string
 ): Promise<unknown> {
-  const r = await fetch(`${REPLICATE_API}/predictions`, {
-    method: "POST",
-    headers: { Authorization: `Token ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ version: versionId, input }),
-  });
-  if (!r.ok) {
-    const t = await r.text();
-    throw new Error(`Replicate: prediction create failed: ${r.status} ${t.slice(0, 500)}`);
-  }
-  const pred = (await r.json()) as { id: string; status: string; error?: string; output?: unknown; urls?: { get?: string } };
-  let p = pred;
+  let p: PredictionResponse = await postPredictionCreate(versionId, input, token);
   for (let i = 0; i < 900; i++) {
     if (p.status === "succeeded" || p.status === "failed" || p.status === "canceled") break;
     await new Promise((res) => setTimeout(res, 2000));
