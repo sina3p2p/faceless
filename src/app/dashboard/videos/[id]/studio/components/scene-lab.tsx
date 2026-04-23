@@ -15,6 +15,16 @@ import {
 import "@xyflow/react/dist/style.css";
 import type { Media, Scene, SceneFrame, VideoDetail } from "@/types/video-detail";
 import type { VideoPhase } from "../../hooks/use-video-phase";
+
+export type VideoNodeData = {
+  frame: SceneFrame;
+  media?: Media | { prompt?: string | null };
+  frameIndex: number;
+  defaultVideoModel?: string;
+  generatingVideo?: boolean;
+  onUpdateMotion?: (frameId: string, motion: string) => void | Promise<void>;
+  onRegenerateVideo?: (frameId: string, videoModel?: string) => void | Promise<unknown>;
+};
 import { useStudioContext } from "../context/StudioContext";
 import { BriefNode, VariantNode, SceneImageNode, ImageNode, VideoNode } from "./scene-lab/index";
 
@@ -163,6 +173,10 @@ function buildGraph(
           frame,
           frameIndex,
           video,
+          defaultVideoModel,
+          generatingVideo: generatingFrameVideoIds.has(frame.id),
+          onUpdateMotion: callbacks.onUpdateFrameMotion,
+          onRegenerateVideo: callbacks.onRegenerateFrameVideo,
           media: {
             prompt: frame.visualDescription,
           }
