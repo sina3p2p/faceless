@@ -1,7 +1,6 @@
 import OpenAI from "openai";
 import { MEDIA, AI_VIDEO, LLM } from "@/lib/constants";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
-import { getKlingApiClient, type KlingTaskSubmitResponse } from "@/server/services/ai/video/providers/kling";
 
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
@@ -131,89 +130,6 @@ export async function generateImageGptImage15(
     return null;
   } catch (err) {
     throw new Error(`Failed to generate image with gpt-image-1.5: ${err instanceof Error ? err.message : JSON.stringify(err)}`);
-  }
-}
-
-export async function generateKlingImage(
-  prompt: string,
-  referenceImageUrl?: string,
-  characterRefs?: CharacterRef[],
-  aspectRatio: AspectRatio = "9:16"
-): Promise<MediaAsset | null> {
-  try {
-    const elements: { url: string }[] = [];
-    if (referenceImageUrl) elements.push({ url: referenceImageUrl });
-    if (characterRefs && characterRefs.length > 0) {
-      for (const ref of characterRefs) {
-        elements.push({ url: ref.url });
-      }
-    }
-
-    const elementRefs =
-      elements.length > 0
-        ? ` ${elements.map((_, i) => `@Element${i + 1}`).join(" ")}`
-        : "";
-
-    const fb = fallbackDimensions(aspectRatio);
-    const kling = getKlingApiClient();
-    const client = kling.getHttp();
-
-    if (elements.length > 0) {
-      const rawPrompt = `${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks.${elementRefs}`;
-      const omniPrompt = klingOmniPlaceholders(rawPrompt, elements.length);
-      const payload = {
-        model_name: AI_VIDEO.klingImageModelOmni,
-        prompt: omniPrompt,
-        image_list: elements.map((e) => ({ image: e.url })),
-        aspect_ratio: aspectRatio,
-        n: 1,
-      };
-      const { data: submit } = await client.post<KlingTaskSubmitResponse>(
-        "/v1/images/omni-image",
-        payload
-      );
-      if (submit?.code != null && submit.code !== 0) {
-        throw new Error(submit.message || `Kling omni-image error code ${submit.code}`);
-      }
-      const taskId = submit?.data?.task_id;
-      if (!taskId) throw new Error(submit?.message || "Kling omni-image returned no task_id");
-      const img = await kling.pollUntilImageReady(`/v1/images/omni-image/${taskId}`);
-      return {
-        url: img.url,
-        type: "image",
-        source: "kling",
-        width: img.width ?? fb.width,
-        height: img.height ?? fb.height,
-      };
-    }
-
-    const payload = {
-      model_name: AI_VIDEO.klingImageModelDefault,
-      prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks.`,
-      aspect_ratio: aspectRatio,
-      n: 1,
-    };
-    const { data: submit } = await client.post<KlingTaskSubmitResponse>(
-      "/v1/images/generations",
-      payload
-    );
-    if (submit?.code != null && submit.code !== 0) {
-      throw new Error(submit.message || `Kling image generations error code ${submit.code}`);
-    }
-    const taskId = submit?.data?.task_id;
-    if (!taskId) throw new Error(submit?.message || "Kling image generations returned no task_id");
-    const img = await kling.pollUntilImageReady(`/v1/images/generations/${taskId}`);
-    return {
-      url: img.url,
-      type: "image",
-      source: "kling",
-      width: img.width ?? fb.width,
-      height: img.height ?? fb.height,
-    };
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : JSON.stringify(err);
-    console.error(`Kling image generation failed:`, detail);
-    return null;
   }
 }
 
@@ -458,7 +374,6 @@ export async function generateImage(
   const models = {
     "nano-banana-2": () => generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', characterRefs, aspectRatio),
     "nano-banana-pro": () => generateViaOpenRouter(prompt, 'google/gemini-3-pro-image-preview', characterRefs, aspectRatio),
-    "kling-image-v3": () => generateKlingImage(prompt, undefined, characterRefs, aspectRatio),
     "gpt-image-1.5": () => generateImageGptImage15(prompt, aspectRatio),
     "dall-e-3": () => generateImageDallE3(prompt, aspectRatio),
   }

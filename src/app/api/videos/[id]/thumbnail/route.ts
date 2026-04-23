@@ -4,7 +4,7 @@ import { videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { and, eq } from "drizzle-orm";
 import { listStoryAssetsForSeries, listStoryAssetsForVideo } from "@/server/db/story-assets";
-import { generateImage, generateKlingImage, generateViaOpenRouter } from "@/server/services/media";
+import { generateImage, generateViaOpenRouter } from "@/server/services/media";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod/v4";
 import { IMAGE_MODELS } from "@/lib/constants";
@@ -112,9 +112,6 @@ export async function POST(
 
     if (imageModel === "nano-banana-2") {
       const result = await generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', charRefs);
-      imageUrl = result?.url ?? null;
-    } else if (imageModel === "kling-image-v3") {
-      const result = await generateKlingImage(prompt);
       imageUrl = result?.url ?? null;
     } else {
       const result = await generateImage(prompt, imageModel, undefined, "16:9");
