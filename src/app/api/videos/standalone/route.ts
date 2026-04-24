@@ -7,6 +7,20 @@ import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
 import { z } from "zod/v4";
 
+const modelId = z.string().min(1);
+const optionalAgentModels = z
+  .object({
+    producerModel: modelId.optional(),
+    storyModel: modelId.optional(),
+    directorModel: modelId.optional(),
+    supervisorModel: modelId.optional(),
+    cinematographerModel: modelId.optional(),
+    storyboardModel: modelId.optional(),
+    promptModel: modelId.optional(),
+    motionModel: modelId.optional(),
+  })
+  .optional();
+
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
   videoType: z.enum(["standalone", "music_video", "dialogue"]).default("standalone"),
@@ -27,6 +41,8 @@ const standaloneSchema = z.object({
   }).optional(),
   /** Existing canonical story_assets ids (your library); linked to this video in order. */
   storyAssetIds: z.array(z.string()).optional().default([]),
+  /** Set when the user customizes per pipeline step; merged into `config.agentModels`. */
+  agentModels: optionalAgentModels,
 });
 
 export async function POST(req: NextRequest) {
@@ -47,16 +63,19 @@ export async function POST(req: NextRequest) {
 
   const data = parsed.data;
 
-  const config: Record<string, unknown> | undefined = data.duration
-    ? {
-      duration: {
-        min: data.duration.min ?? Math.round(data.duration.preferred * 0.7),
-        preferred: data.duration.preferred,
-        max: data.duration.max ?? Math.round(data.duration.preferred * 1.33),
-        priority: data.duration.priority,
-      },
-    }
-    : undefined;
+  const config: Record<string, unknown> = {};
+  if (data.duration) {
+    config.duration = {
+      min: data.duration.min ?? Math.round(data.duration.preferred * 0.7),
+      preferred: data.duration.preferred,
+      max: data.duration.max ?? Math.round(data.duration.preferred * 1.33),
+      priority: data.duration.priority,
+    };
+  }
+  if (data.agentModels) {
+    config.agentModels = data.agentModels;
+  }
+  const hasConfig = Object.keys(config).length > 0;
 
   const [videoProject] = await db
     .insert(videoProjects)
@@ -71,7 +90,7 @@ export async function POST(req: NextRequest) {
       style: data.style,
       userId: user.id,
       idea: data.prompt,
-      config,
+      config: hasConfig ? config : undefined,
     })
     .returning();
 

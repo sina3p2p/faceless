@@ -17,7 +17,15 @@ import {
   DEFAULT_LANGUAGE,
 } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
-import { VideoTypeSelector, LLMModelSelector, ImageModelSelector, VideoModelSelector, VideoSizeSelector } from "@/components/model-selectors";
+import {
+  VideoTypeSelector,
+  AgentLlmModelSection,
+  buildAgentModelsBody,
+  type AgentLlmOverrides,
+  ImageModelSelector,
+  VideoModelSelector,
+  VideoSizeSelector,
+} from "@/components/model-selectors";
 import { GenerateCharacterModal } from "@/components/generate-character-modal";
 
 type AssetType = "character" | "location" | "prop";
@@ -57,6 +65,8 @@ export default function CreateVideoPage() {
     style: ART_STYLES[0].id as string,
     captionStyle: CAPTION_STYLES[0].id as string,
     llmModel: DEFAULT_LLM_MODEL as string,
+    usePerStepLlm: false,
+    agentModelOverrides: {} as AgentLlmOverrides,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
     videoSize: DEFAULT_VIDEO_SIZE as string,
@@ -132,6 +142,9 @@ export default function CreateVideoPage() {
           language: form.language,
           sceneContinuity: form.sceneContinuity,
           voiceId: form.voiceId || undefined,
+          ...(form.usePerStepLlm
+            ? { agentModels: buildAgentModelsBody(form.llmModel, form.agentModelOverrides) }
+            : {}),
           duration: {
             preferred: form.durationPreferred,
             priority: form.durationPriority,
@@ -242,7 +255,14 @@ export default function CreateVideoPage() {
               </div>
             </div>
 
-            <LLMModelSelector value={form.llmModel} onChange={(v) => setForm({ ...form, llmModel: v })} />
+            <AgentLlmModelSection
+              defaultModel={form.llmModel}
+              onDefaultModelChange={(v) => setForm({ ...form, llmModel: v })}
+              perStep={form.usePerStepLlm}
+              onPerStepChange={(v) => setForm({ ...form, usePerStepLlm: v })}
+              overrides={form.agentModelOverrides}
+              onOverridesChange={(overrides) => setForm({ ...form, agentModelOverrides: overrides })}
+            />
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
             <VideoModelSelector value={form.videoModel} onChange={(v) => setForm({ ...form, videoModel: v })} />
 

@@ -11,11 +11,25 @@ import { trimJoin } from "./util";
 export type BuildMotionContextOpts = {
   /** Story assets tagged on the frame; drives reference block. */
   assetRefCount: number;
-  /** If true, apply hook pattern (when not "none" and isHookFrame allows). */
+  /** If true, we are on the “first in scene / opener” slot. Hook prose still requires a non-`none` `hookPatternId` (in opts for baseline; in hints in the full path). */
   isHookEligible: boolean;
+  /** If set, used with `isHookEligible` to decide hook MD. Omitted/undefined and `"none"` = no first-seconds / no SCENE-OPENER line. */
+  hookPatternId?: HookPatternId | null;
   /** If false, do not add first-seconds + hook block (still allow vertical + camera + music + reference + energy from MD as global tone). */
   useHookLayer?: boolean;
 };
+
+function includeHookProse(args: {
+  isHookEligible: boolean;
+  hookPatternId: HookPatternId | null | undefined;
+  useHookLayer: boolean;
+  isHookFrameFromHints?: boolean;
+}): boolean {
+  if (args.useHookLayer === false) return false;
+  if (!args.isHookEligible) return false;
+  if (args.isHookFrameFromHints === false) return false;
+  return (args.hookPatternId ?? "none") !== "none";
+}
 
 /**
  * Prose appended to the motion system prompt. Hybrid: MD for stable craft rules; TS for selected ids.
@@ -37,11 +51,12 @@ export function buildMotionSkillContext(
     ? musicSectionInjection(hints.musicSectionId)
     : "";
   const hookId = (hints.hookPatternId ?? "none") as HookPatternId;
-  const useHook =
-    opts.useHookLayer !== false &&
-    opts.isHookEligible &&
-    hookId !== "none" &&
-    (hints.isHookFrame !== false);
+  const useHook = includeHookProse({
+    isHookEligible: opts.isHookEligible,
+    hookPatternId: hints.hookPatternId,
+    useHookLayer: opts.useHookLayer !== false,
+    isHookFrameFromHints: hints.isHookFrame,
+  });
   const hookLine = useHook ? hookInjection(hookId) : "";
 
   const blocks: string[] = [buildReferenceBlock(opts.assetRefCount)];
@@ -73,9 +88,6 @@ export function buildMotionSkillContext(
     const fsh = getSkillContentFile("first-seconds-hooks");
     const hookBlocks = [fsh, hookLine && `PATTERN: ${hookLine}`].filter(Boolean) as string[];
     blocks.push(trimJoin(hookBlocks, "\n\n"));
-  } else {
-    const fsh = getSkillContentFile("first-seconds-hooks");
-    if (fsh) blocks.push(fsh);
   }
 
   const sm = getSkillContentFile("style-modes-01-15");
@@ -102,7 +114,6 @@ function buildBaselineBlocks(opts: BuildMotionContextOpts): string {
   const ref = buildReferenceBlock(opts.assetRefCount);
   if (ref) parts.push(ref);
   for (const key of [
-    "first-seconds-hooks",
     "camera-phrase-bank",
     "music-sections",
     "style-modes-01-15",
@@ -113,7 +124,15 @@ function buildBaselineBlocks(opts: BuildMotionContextOpts): string {
     const t = getSkillContentFile(key);
     if (t) parts.push(t);
   }
-  if (opts.isHookEligible) {
+  if (
+    includeHookProse({
+      isHookEligible: opts.isHookEligible,
+      hookPatternId: opts.hookPatternId,
+      useHookLayer: opts.useHookLayer !== false,
+    })
+  ) {
+    const fsh = getSkillContentFile("first-seconds-hooks");
+    if (fsh) parts.push(fsh);
     parts.push(
       "SCENE-OPENER SLOT: this frame is the first in its scene—maximize scroll-stopping clarity in the first 1–2s of the clip (see hook table above)."
     );

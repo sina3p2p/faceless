@@ -3,6 +3,7 @@
 // These are the source of truth — not prose, not markdown.
 
 import type { MotionSkillHints } from "@/types/motion-skill-hints";
+import type { AgentModels } from "@/types/worker-pipeline";
 
 // ── Duration ──
 
@@ -196,6 +197,8 @@ export interface MotionDirectorInput {
 
 export interface PipelineConfig {
   pipelineMode?: "manual" | "auto";
+  /** Per-pipeline-step OpenRouter model ids; stored when user customizes in create flow. */
+  agentModels?: Partial<AgentModels>;
   duration?: DurationPreference;
   creativeBrief?: CreativeBrief;
   continuityNotes?: ContinuityNotes;

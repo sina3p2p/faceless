@@ -13,6 +13,7 @@ import {
   VIDEO_SIZES,
   DEFAULT_VIDEO_SIZE,
 } from "@/lib/constants";
+import type { AgentModels } from "@/types/worker-pipeline";
 
 interface ModelSelectorProps {
   value: string;
@@ -131,6 +132,178 @@ export function VideoSizeSelector({ value, onChange }: ModelSelectorProps) {
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+const llmOptions = LLM_MODELS.map((m) => ({
+  value: m.id,
+  label: m.label,
+  description: m.description,
+  ...(m.id === DEFAULT_LLM_MODEL ? { badge: "RECOMMENDED" as const } : {}),
+}));
+
+const AGENT_LLM_GROUPS: {
+  title: string;
+  steps: { key: keyof AgentModels; label: string; blurb: string }[];
+}[] = [
+  {
+    title: "Planning",
+    steps: [
+      { key: "producerModel", label: "Executive producer", blurb: "Creative brief, tone, and format plan" },
+      { key: "storyModel", label: "Story", blurb: "Full script and title from your idea" },
+    ],
+  },
+  {
+    title: "Script & structure",
+    steps: [
+      { key: "directorModel", label: "Director", blurb: "Split story into timed scenes" },
+      { key: "supervisorModel", label: "Script supervisor", blurb: "Continuity, names, and carry-over" },
+    ],
+  },
+  {
+    title: "Look & motion",
+    steps: [
+      { key: "cinematographerModel", label: "Cinematographer", blurb: "Visual style and lighting" },
+      { key: "storyboardModel", label: "Storyboard", blurb: "Shots, framing, and pacing per scene" },
+      { key: "promptModel", label: "Image prompts", blurb: "Text-to-image prompts for each frame" },
+      { key: "motionModel", label: "Motion", blurb: "How each clip should move" },
+    ],
+  },
+];
+
+export type AgentLlmOverrides = Partial<Record<keyof AgentModels, string>>;
+
+type AgentLlmModelSectionProps = {
+  defaultModel: string;
+  onDefaultModelChange: (v: string) => void;
+  perStep: boolean;
+  onPerStepChange: (v: boolean) => void;
+  /** Keys omitted inherit `defaultModel`. */
+  overrides: AgentLlmOverrides;
+  onOverridesChange: (overrides: AgentLlmOverrides) => void;
+};
+
+/** Resolves a full `AgentModels` object for the API (used when per-step is on). */
+export function buildAgentModelsBody(
+  defaultModel: string,
+  overrides: AgentLlmOverrides
+): AgentModels {
+  const keys: (keyof AgentModels)[] = [
+    "producerModel",
+    "storyModel",
+    "directorModel",
+    "supervisorModel",
+    "cinematographerModel",
+    "storyboardModel",
+    "promptModel",
+    "motionModel",
+  ];
+  const out = {} as AgentModels;
+  for (const k of keys) {
+    out[k] = overrides[k] ?? defaultModel;
+  }
+  return out;
+}
+
+/**
+ * One default text model, or a labeled pick per pipeline role (director, story, motion, …).
+ */
+export function AgentLlmModelSection({
+  defaultModel,
+  onDefaultModelChange,
+  perStep,
+  onPerStepChange,
+  overrides,
+  onOverridesChange,
+}: AgentLlmModelSectionProps) {
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-sm font-medium text-gray-200">Text / reasoning models</p>
+        <p className="text-xs text-gray-500 mt-0.5">
+          OpenRouter models for the pipeline. Use one for everything, or pick per step.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onPerStepChange(false)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            !perStep
+              ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+              : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+          }`}
+        >
+          One model for all steps
+        </button>
+        <button
+          type="button"
+          onClick={() => onPerStepChange(true)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            perStep
+              ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+              : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+          }`}
+        >
+          Pick per step
+        </button>
+      </div>
+
+      <OptionSelect
+        label={perStep ? "Default (fallback for all steps below)" : "Text model"}
+        value={defaultModel}
+        onChange={onDefaultModelChange}
+        options={llmOptions}
+      />
+
+      {perStep && (
+        <div className="space-y-5 rounded-xl border border-white/10 bg-white/2 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-gray-400">Each step uses the model you choose, or the default above.</p>
+            <button
+              type="button"
+              onClick={() => onOverridesChange({})}
+              className="text-xs font-medium text-violet-400/90 hover:text-violet-300"
+            >
+              Inherit all from default
+            </button>
+          </div>
+
+          {AGENT_LLM_GROUPS.map((group) => (
+            <div key={group.title} className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">{group.title}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {group.steps.map((step) => {
+                  const value = overrides[step.key] ?? defaultModel;
+                  return (
+                    <div key={step.key} className="min-w-0">
+                      <p className="text-[11px] text-gray-500 mb-1.5 leading-snug">{step.blurb}</p>
+                      <OptionSelect
+                        label={step.label}
+                        triggerAriaLabel={`${step.label} model`}
+                        value={value}
+                        onChange={(v) =>
+                          onOverridesChange({
+                            ...overrides,
+                            [step.key]: v === defaultModel ? undefined : v,
+                          })
+                        }
+                        options={llmOptions}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          <p className="text-xs text-gray-500 leading-relaxed -mt-1">
+            Same order the pipeline runs: brief, script, scene split, continuity, look, storyboard, images, then motion.
+          </p>
+        </div>
+      )}
     </div>
   );
 }

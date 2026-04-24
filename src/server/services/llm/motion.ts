@@ -82,6 +82,7 @@ export async function generateSingleFrameMotion(
   const skillProse = buildMotionSkillContext(input.skillHints, {
     assetRefCount: input.assetRefCount ?? 0,
     isHookEligible: isHookSlot,
+    hookPatternId: input.skillHints?.hookPatternId,
   });
 
   const motionIntensity: Record<string, string> = {
