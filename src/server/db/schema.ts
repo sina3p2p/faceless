@@ -15,6 +15,7 @@ import type { ImageSpec } from "@/server/services/llm/image-spec";
 import type { FrameMotionSpec } from "@/server/services/llm/motion";
 import type { MotionSkillHints } from "@/types/motion-skill-hints";
 import type { ResultMeta } from "@/server/services/llm/prompt-contract";
+import type { ModelSettings } from "@/types/llm-common";
 
 // ── Enums ──
 
@@ -171,6 +172,7 @@ export const videoProjects = pgTable("video_projects", {
   llmModel: text("llm_model").default("anthropic/claude-opus-4.6"),
   imageModel: text("image_model").default("dall-e-3"),
   videoModel: text("video_model").default("kling-3-standard"),
+  modelSettings: json("model_settings").$type<ModelSettings>(),
   videoSize: text("video_size"),
   voiceId: text("voice_id"),
   idea: text("prompt"),

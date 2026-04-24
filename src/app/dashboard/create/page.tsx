@@ -135,16 +135,25 @@ export default function CreateVideoPage() {
           videoType: form.videoType,
           style: form.style,
           captionStyle: form.captionStyle,
-          llmModel: form.llmModel,
-          imageModel: form.imageModel,
-          videoModel: form.videoModel,
           videoSize: form.videoSize,
           language: form.language,
           sceneContinuity: form.sceneContinuity,
           voiceId: form.voiceId || undefined,
-          ...(form.usePerStepLlm
-            ? { agentModels: buildAgentModelsBody(form.llmModel, form.agentModelOverrides) }
-            : {}),
+          ...(() => {
+            const m = buildAgentModelsBody(form.llmModel, form.agentModelOverrides);
+            return {
+              storyModel: m.storyModel,
+              directorModel: m.directorModel,
+              supervisorModel: m.supervisorModel,
+              cinematographerModel: m.cinematographerModel,
+              storyboardModel: m.storyboardModel,
+              promptModel: m.promptModel,
+              motionModel: m.motionModel,
+              producerModel: m.producerModel,
+            };
+          })(),
+          imageModel: form.imageModel,
+          videoModel: form.videoModel,
           duration: {
             preferred: form.durationPreferred,
             priority: form.durationPriority,

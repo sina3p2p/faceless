@@ -2,6 +2,7 @@ import { db, schema, eq, updateVideoStatus } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL, LLM } from "@/lib/constants";
 import { type PipelineConfig } from "@/types/pipeline";
+import type { ModelSettings } from "@/types/llm-common";
 import type { AgentModels } from "@/types/worker-pipeline";
 
 const LLM_DEFAULT_BY_AGENT: Record<keyof AgentModels, string> = {
@@ -39,15 +40,25 @@ export function getModelDurationsArray(videoModel?: string | null): number[] {
 }
 
 export function getAgentModels(
-  project: { llmModel?: string | null; config?: unknown } | null | undefined
+  project: {
+    llmModel?: string | null;
+    modelSettings?: ModelSettings | null;
+    config?: unknown;
+  } | null | undefined
 ): AgentModels {
+  const s = project?.modelSettings;
   const fromProject = project?.llmModel || undefined;
   const cfg = getProjectConfig(project?.config);
   const fromConfig = cfg.agentModels;
   const out: AgentModels = {};
   for (const k of AGENT_MODEL_KEYS) {
-    const chosen = fromConfig?.[k] || fromProject;
-    out[k] = chosen || LLM_DEFAULT_BY_AGENT[k];
+    if (k === "producerModel") {
+      out.producerModel =
+        fromConfig?.producerModel || fromProject || LLM_DEFAULT_BY_AGENT.producerModel;
+      continue;
+    }
+    const fromMs = s?.[k as keyof ModelSettings] as string | undefined;
+    out[k] = fromMs || fromConfig?.[k] || fromProject || LLM_DEFAULT_BY_AGENT[k];
   }
   return out;
 }
