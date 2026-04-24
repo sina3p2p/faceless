@@ -54,9 +54,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
       agents.promptModel
     );
 
-    for (const scene of existingScenes) {
-      await db.delete(schema.sceneFrames).where(eq(schema.sceneFrames.sceneId, scene.id));
-    }
+    await db.delete(schema.sceneFrames).where(eq(schema.sceneFrames.videoProjectId, videoProjectId));
 
     let totalFrames = 0;
     for (let i = 0; i < existingScenes.length; i++) {
@@ -95,7 +93,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
         await db.insert(schema.sceneFrames).values({
           videoProjectId,
           sceneId: existingScenes[i].id,
-          frameOrder: j,
+          frameOrder: totalFrames,
           clipDuration: sceneFrames[j].clipDuration,
           imagePrompt,
           imageSpec: sceneFrames[j].imageSpec,
