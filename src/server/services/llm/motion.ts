@@ -3,6 +3,10 @@ import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "./index";
 import type { MotionDirectorInput } from "@/types/pipeline";
+import {
+  buildMotionSkillContext,
+  resolveEffectiveMotionPolicy,
+} from "@/server/prompts/skill-packs";
 
 // ── Structured motion (LLM output) ──
 
@@ -69,6 +73,17 @@ export async function generateSingleFrameMotion(
 ): Promise<SingleFrameMotionResult> {
   const primaryModel = model || LLM.motionModel;
 
+  const basePolicy = input.motionPolicy;
+  const effectivePolicy = resolveEffectiveMotionPolicy(basePolicy, {
+    narrativeIntent: input.narrativeIntent,
+    musicSectionId: input.skillHints?.musicSectionId,
+  });
+  const isHookSlot = input.isDefaultHookSlot === true;
+  const skillProse = buildMotionSkillContext(input.skillHints, {
+    assetRefCount: input.assetRefCount ?? 0,
+    isHookEligible: isHookSlot,
+  });
+
   const motionIntensity: Record<string, string> = {
     static: "Environmental motion ONLY (wind, particles, light shifts). NO subject movement. Camera locked or imperceptible drift. primaryAction should still name the environmental motion richly; subjectDynamics covers subtle environmental detail.",
     subtle: "ONE small gesture — breathing, weight shift, blink, gentle hand movement. subjectDynamics: natural secondary physics (hair sway, cloth settle). Camera may drift.",
@@ -85,13 +100,17 @@ export async function generateSingleFrameMotion(
     ? `\nMATERIAL LANGUAGE: Use this material's physics in primaryAction and subjectDynamics: "${input.materialLanguage}". Example: "sculpted clay arm extends" not "arm reaches forward".`
     : "";
 
+  const skillBlock = skillProse
+    ? `\n\nMOTION CRAFT (follow — compressed rules from editors; do not restate the whole image description):\n${skillProse}\n`
+    : "";
+
   const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and a single compiled text prompt. You output STRUCTURED fields that will be assembled into that prompt.
 
 CORE PRINCIPLE: AI video models execute ONE action well. Multiple unrelated primary actions produce garbled, morphing artifacts.
 
-MOTION POLICY: ${input.motionPolicy.toUpperCase()}
-${motionIntensity[input.motionPolicy]}
-${cameraConstraint}${materialConstraint}
+MOTION POLICY: ${effectivePolicy.toUpperCase()}${basePolicy !== effectivePolicy ? ` (refined from base ${basePolicy} via section/intent rules)` : ""}
+${motionIntensity[effectivePolicy] ?? motionIntensity.moderate}
+${cameraConstraint}${materialConstraint}${skillBlock}
 
 FIELD GUIDANCE (dense physical language in each — no filler):
 - primaryAction: ONE dominant beat. Specific directions, speeds, body parts. "lifts left hand to forehead, fingers spread, elbow rising to shoulder height" not "raises hand".
@@ -121,7 +140,7 @@ TARGET: Compiled prompt ~40–100 words total across fields; every phrase should
 
   let context = `\nNarration context (story only — do NOT include dialogue or on-screen text): "${input.sceneText}"`;
   context += `\nClip duration: ${input.clipDuration}s`;
-  context += `\nMotion policy: ${input.motionPolicy}`;
+  context += `\nMotion policy: ${effectivePolicy} (base: ${input.motionPolicy})`;
   if (input.transitionIn) context += `\nTransition style: ${input.transitionIn}`;
   context += `\n\nFill all five structured fields.`;
   contentParts.push({ type: "text", text: context });

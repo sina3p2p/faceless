@@ -13,6 +13,7 @@ import {
 import { relations } from "drizzle-orm";
 import type { ImageSpec } from "@/server/services/llm/image-spec";
 import type { FrameMotionSpec } from "@/server/services/llm/motion";
+import type { MotionSkillHints } from "@/types/motion-skill-hints";
 import type { ResultMeta } from "@/server/services/llm/prompt-contract";
 
 // ── Enums ──
@@ -254,6 +255,8 @@ export const sceneFrames = pgTable("scene_frames", {
   promptContractMeta: json("prompt_contract_meta").$type<ResultMeta | null>(),
   /** Structured motion director output; visualDescription is the compiled video prompt. */
   motionSpec: json("motion_spec").$type<FrameMotionSpec | null>(),
+  /** Optional per-frame skill pack (hook, camera, music, vertical) for motion LLM. */
+  motionSkillHints: json("motion_skill_hints").$type<MotionSkillHints | null>(),
   visualDescription: text("visual_description"),
   imageMediaId: text("image_media_id"),
   videoMediaId: text("video_media_id"),

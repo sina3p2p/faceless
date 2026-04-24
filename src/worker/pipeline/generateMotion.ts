@@ -41,6 +41,8 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
         clipDuration: frame.clipDuration ?? 5,
         sceneText: frame.scene?.text ?? "",
         imageUrl: signedUrl,
+        motionSkillHints: frame.motionSkillHints ?? null,
+        assetRefs: frame.assetRefs,
       };
     }));
 
@@ -95,6 +97,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
           const frameSpec = mapping
             ? frameBreakdown?.scenes?.[mapping.sceneIdx]?.frames?.[mapping.frameIdx]
             : undefined;
+          const fi = mapping?.frameIdx ?? 0;
 
           try {
             const result = await generateSingleFrameMotion(
@@ -106,6 +109,10 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
                 sceneText: frameData.sceneText,
                 cameraPhysics,
                 materialLanguage,
+                skillHints: frameData.motionSkillHints,
+                narrativeIntent: frameSpec?.narrativeIntent,
+                assetRefCount: frameData.assetRefs?.length ?? 0,
+                isDefaultHookSlot: fi === 0,
               },
               currentImageUrl,
               nextImageUrl,

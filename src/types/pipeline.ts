@@ -2,6 +2,8 @@
 // Structured types shared across all pipeline agents.
 // These are the source of truth — not prose, not markdown.
 
+import type { MotionSkillHints } from "@/types/motion-skill-hints";
+
 // ── Duration ──
 
 export interface DurationPreference {
@@ -178,6 +180,16 @@ export interface MotionDirectorInput {
   sceneText: string;
   cameraPhysics: string;
   materialLanguage: string;
+  /** Per-frame skill pack (hook / camera / music / vertical) — see `src/server/prompts/skill-packs`. */
+  skillHints?: MotionSkillHints | null;
+  /** Storyboard intent — refines effective motion policy with the energy ladder. */
+  narrativeIntent?: NarrativeIntent;
+  /** Count of `assetRefs` on this frame (reference discipline in skill layer). */
+  assetRefCount?: number;
+  /**
+   * When true, this frame is the default “hook” slot (e.g. first in scene) unless `skillHints.isHookFrame === false`.
+   */
+  isDefaultHookSlot?: boolean;
 }
 
 // ── Pipeline Config (stored in video_projects.config) ──

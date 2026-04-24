@@ -96,6 +96,7 @@ export async function POST(
     const frameSpec = frameBreakdown?.scenes?.[sceneIdx]?.frames?.[frameIdx];
 
     const isLastFrame = currentIdx === allFrames.length - 1;
+    const assetRefs = (frame.assetRefs as string[] | null) ?? [];
 
     const result = await generateSingleFrameMotion(
       {
@@ -106,6 +107,10 @@ export async function POST(
         sceneText: scene.text,
         cameraPhysics: styleGuide?.global?.cameraPhysics ?? "",
         materialLanguage: styleGuide?.global?.materialLanguage ?? "",
+        skillHints: frame.motionSkillHints,
+        narrativeIntent: frameSpec?.narrativeIntent,
+        assetRefCount: assetRefs.length,
+        isDefaultHookSlot: frameIdx === 0,
       },
       currentImageUrl,
       nextImageUrl,

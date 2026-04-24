@@ -28,7 +28,6 @@ import {
   PipelineFailureBanner,
 } from "./components";
 import type { Scene, VideoDetail, SceneUpdates } from "@/types/video-detail";
-
 export default function ReviewPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -41,7 +40,7 @@ export default function ReviewPage() {
     downloadUrl, downloading, loadData,
     handleUpdateScene, handleUpdateAssetRefs, handleDeleteScene, handleUploadImage,
     handleGenerateFrameImage,
-    handleGenerateAllFrameImages, handleUpdateFramePrompt, handleUpdateFrameMotion,
+    handleGenerateAllFrameImages, handleUpdateFramePrompt,     handleUpdateFrameMotion,
     handleRegenerateFrameVideo, handleRegenerateFrameMotion, handleGenerateMotion,
     handleApprove, handleSaveStory, handleStartRendering, handleSelectMedia,
     handleSelectFrameVariant, handleRecompose, handleDownload,     handleTogglePipelineMode, handleApplyRefinedScript,
@@ -374,7 +373,8 @@ function CenterPanel({
             onDragEnd={onDragEnd} onUpdateScene={onUpdateScene} onUpdateAssetRefs={onUpdateAssetRefs}
             onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
             onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
-            onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
+            onUpdateFrameMotion={onUpdateFrameMotion}
+            onRegenerateFrameVideo={onRegenerateFrameVideo}
             onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
           />
         )}
@@ -416,7 +416,8 @@ function CenterPanel({
               onDragEnd={onDragEnd} onUpdateScene={onUpdateScene} onUpdateAssetRefs={onUpdateAssetRefs}
               onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
               onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
-              onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
+              onUpdateFrameMotion={onUpdateFrameMotion}
+              onRegenerateFrameVideo={onRegenerateFrameVideo}
               onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
             />
             <div className="mt-4 flex justify-center">
@@ -468,7 +469,8 @@ function CenterPanel({
             onDragEnd={onDragEnd} onUpdateScene={onUpdateScene} onUpdateAssetRefs={onUpdateAssetRefs}
             onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
             onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
-            onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
+            onUpdateFrameMotion={onUpdateFrameMotion}
+            onRegenerateFrameVideo={onRegenerateFrameVideo}
             onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
           />
         )}
@@ -559,7 +561,8 @@ function CenterPanel({
                 onDragEnd={onDragEnd} onUpdateScene={onUpdateScene} onUpdateAssetRefs={onUpdateAssetRefs}
                 onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
                 onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
-                onUpdateFrameMotion={onUpdateFrameMotion} onRegenerateFrameVideo={onRegenerateFrameVideo}
+                onUpdateFrameMotion={onUpdateFrameMotion}
+                onRegenerateFrameVideo={onRegenerateFrameVideo}
                 onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
               />
               <div className="mt-6 flex justify-center gap-3">
