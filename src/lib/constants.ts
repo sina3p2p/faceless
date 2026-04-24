@@ -53,7 +53,7 @@ export const LLM_MODELS = [
   { id: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", description: "Newest Opus; best for complex scripts (~$0.04+/script)" },
   { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Great quality, moderate cost (~$0.02/script)" },
   { id: "openai/gpt-4.1", label: "GPT-4.1", description: "Good quality, lower cost (~$0.01/script)" },
-  { id: "openai/gpt-5.5", label: "GPT-5.5", description: "Latest GPT flagships; strong reasoning and long context" },
+  { id: "openai/gpt-5.4", label: "GPT-5.5", description: "Latest GPT flagships; strong reasoning and long context" },
   { id: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", description: "Decent quality, cheapest (~$0.003/script)" },
   { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Great quality, competitive cost (~$0.02/script)" },
 ] as const;
