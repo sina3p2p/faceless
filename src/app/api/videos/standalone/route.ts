@@ -16,6 +16,8 @@ const mediaModelOpt = z.string().min(1).optional();
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
   videoType: z.enum(["standalone", "music_video", "dialogue"]).default("standalone"),
+  /** English style string for AI music generation when `videoType` is music_video. */
+  musicGenre: z.string().min(1).max(500).optional(),
   style: z.string().default("cinematic"),
   videoSize: z.string().default("9:16"),
   voiceId: z.string().optional(),
@@ -132,6 +134,9 @@ export async function POST(req: NextRequest) {
     };
   } else {
     config.agentModels = { producerModel: producerResolved };
+  }
+  if (data.videoType === "music_video" && data.musicGenre?.trim()) {
+    config.musicGenre = data.musicGenre.trim();
   }
   const hasConfig = Object.keys(config).length > 0;
 

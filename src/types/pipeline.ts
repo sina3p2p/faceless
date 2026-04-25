@@ -199,6 +199,8 @@ export interface PipelineConfig {
   pipelineMode?: "manual" | "auto";
   /** Per-pipeline-step OpenRouter model ids; stored when user customizes in create flow. */
   agentModels?: Partial<AgentModels>;
+  /** Music-video production style (English) for the song generator; overrides script `Genre:` line when set. */
+  musicGenre?: string;
   duration?: DurationPreference;
   creativeBrief?: CreativeBrief;
   continuityNotes?: ContinuityNotes;

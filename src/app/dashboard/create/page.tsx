@@ -15,6 +15,9 @@ import {
   DEFAULT_VIDEO_SIZE,
   LANGUAGES,
   DEFAULT_LANGUAGE,
+  MUSIC_VIDEO_GENRES,
+  DEFAULT_MUSIC_VIDEO_GENRE_ID,
+  getMusicVideoGenreStyle,
 } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
 import {
@@ -75,6 +78,7 @@ export default function CreateVideoPage() {
     voiceId: "",
     durationPreferred: 30,
     durationPriority: "quality" as "quality" | "duration",
+    musicVideoGenreId: DEFAULT_MUSIC_VIDEO_GENRE_ID as string,
   });
 
   async function uploadCharacterImage(file: File): Promise<string | null> {
@@ -133,6 +137,9 @@ export default function CreateVideoPage() {
         body: JSON.stringify({
           prompt: form.prompt,
           videoType: form.videoType,
+          ...(form.videoType === "music_video"
+            ? { musicGenre: getMusicVideoGenreStyle(form.musicVideoGenreId) }
+            : {}),
           style: form.style,
           captionStyle: form.captionStyle,
           videoSize: form.videoSize,
@@ -208,6 +215,18 @@ export default function CreateVideoPage() {
             </div>
 
             <VideoTypeSelector value={form.videoType} onChange={(v) => setForm({ ...form, videoType: v })} />
+
+            {form.videoType === "music_video" && (
+              <Select
+                label="Music genre"
+                value={form.musicVideoGenreId}
+                onChange={(e) => setForm({ ...form, musicVideoGenreId: e.target.value })}
+                options={MUSIC_VIDEO_GENRES.map((g) => ({
+                  value: g.id,
+                  label: g.label,
+                }))}
+              />
+            )}
 
             <VideoSizeSelector value={form.videoSize} onChange={(v) => setForm({ ...form, videoSize: v })} />
 

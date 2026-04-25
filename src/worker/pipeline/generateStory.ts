@@ -34,7 +34,8 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       video.language,
       agents.storyModel,
       video.videoType,
-      config.creativeBrief
+      config.creativeBrief,
+      typeof config.musicGenre === "string" ? config.musicGenre : undefined
     );
 
     const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);

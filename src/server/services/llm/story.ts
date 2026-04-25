@@ -32,7 +32,8 @@ export async function generateStory(
   language = "en",
   model?: string,
   videoType?: string,
-  brief?: CreativeBrief
+  brief?: CreativeBrief,
+  musicGenreStyle?: string
 ): Promise<string> {
   const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
@@ -57,7 +58,11 @@ SONGWRITING RULES:
 - Verses build the story, chorus delivers the emotional hook
 - Keep lines short (4-10 words) for natural singing rhythm
 - Use vivid imagery and emotional language
-- The song should tell a story or convey a strong emotion`
+- The song should tell a story or convey a strong emotion
+${musicGenreStyle ? `
+GENRE CONSTRAINT:
+- The user chose this production style for the music generator: ${musicGenreStyle}
+- The "Genre:" line MUST describe this style in English (you may add short vocal hints after a comma).` : ""}`
 
     : `You are an elite storyteller. Write a COMPLETE story as flowing prose in markdown format.
 
@@ -92,7 +97,7 @@ CREATIVE BRIEF (follow these constraints):
 ` : ""}`;
 
   const userPrompt = isMusic
-    ? `Write a catchy song about: ${topicIdea}. The music video visual style will be ${style}.`
+    ? `Write a catchy song about: ${topicIdea}. The music video visual style will be ${style}.${musicGenreStyle ? ` Target sound: ${musicGenreStyle}.` : ""}`
     : `Write a compelling story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.`;
 
   return generateText(systemPrompt, userPrompt, { model: primaryModel, temperature: 0.85 });

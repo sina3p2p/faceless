@@ -351,3 +351,24 @@ export const VIDEO_TYPES = [
   { id: "music_video", label: "Music Video", description: "AI-generated song with vocals + cinematic visuals (~$3-4/video)" },
   { id: "dialogue", label: "Dialogue", description: "Conversational story between characters with different voices" },
 ] as const;
+
+/** Preset music genres for music videos — `style` is English text for the AI music generator (e.g. Suno). */
+export const MUSIC_VIDEO_GENRES = [
+  { id: "pop", label: "Pop", style: "pop, upbeat, catchy, radio-friendly vocals" },
+  { id: "rap", label: "Hip-hop / Rap", style: "hip hop rap, rhythmic flow, modern beats, confident rap vocals" },
+  { id: "kids", label: "Kids / Family", style: "kids music, cheerful, simple melody, playful, family-friendly vocals" },
+  { id: "rock", label: "Rock", style: "rock, electric guitars, driving drums, powerful vocals" },
+  { id: "rnb", label: "R&B / Soul", style: "R&B soul, smooth groove, warm bass, expressive vocals" },
+  { id: "electronic", label: "Electronic / EDM", style: "electronic dance, synths, punchy beat, festival energy vocals" },
+  { id: "country", label: "Country", style: "country, acoustic guitar, storytelling, heartfelt country vocals" },
+  { id: "lofi", label: "Lo-fi", style: "lofi chill hop, mellow, soft drums, intimate relaxed vocals" },
+  { id: "latin", label: "Latin", style: "latin pop, rhythmic percussion, danceable, vibrant vocals" },
+  { id: "cinematic", label: "Cinematic / Epic", style: "cinematic orchestral, epic sweep, dramatic lead vocals" },
+] as const;
+
+export const DEFAULT_MUSIC_VIDEO_GENRE_ID = MUSIC_VIDEO_GENRES[0].id;
+
+export function getMusicVideoGenreStyle(genreId: string): string {
+  const g = MUSIC_VIDEO_GENRES.find((x) => x.id === genreId);
+  return g?.style ?? MUSIC_VIDEO_GENRES[0].style;
+}

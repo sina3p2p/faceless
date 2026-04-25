@@ -39,9 +39,12 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
 
     if (isMusic) {
       const scriptMd = videoProject.script!;
+      const projectConfig = getProjectConfig(videoProject?.config);
 
       const genreMatch = scriptMd.match(/^Genre:\s*(.+)$/m);
-      const genre = genreMatch ? genreMatch[1].trim() : "pop, catchy";
+      const fromScript = genreMatch ? genreMatch[1].trim() : "pop, catchy";
+      const fromConfig = projectConfig.musicGenre?.trim();
+      const genre = fromConfig || fromScript;
       const title = videoProject.title ?? "Untitled";
 
       const songSections = existingScenes.map((s) => ({
@@ -50,7 +53,6 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
         durationMs: (s.duration ?? 10) * 1000,
       }));
 
-      const projectConfig = getProjectConfig(videoProject?.config);
       const targetDurationSec = projectConfig.duration?.preferred;
 
       console.log(`[generate-tts] Music mode: generating song "${title}" (${genre}), ${songSections.length} sections${targetDurationSec ? `, target ~${targetDurationSec}s` : ""}`);
