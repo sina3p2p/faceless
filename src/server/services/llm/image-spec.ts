@@ -4,45 +4,48 @@ import type { FrameSpec, VisualStyleGuide } from "@/types/pipeline";
 /**
  * Structured image prompt from the Prompt Architect (LLM).
  * Upstream locks (subject identity line, shot type, style prefixes) are applied in `serializeFrameImageSpec`.
+ *
+ * Azure / OpenAI structured outputs: every `properties` key must appear in `required`.
+ * Optional fields are modeled as required keys with empty defaults.
  */
 export const imageSpecSchema = z.object({
   subject: z.object({
     primary: z.string().describe("Subject label from frame — will be replaced by continuity-safe primary when resolved"),
-    secondary: z.array(z.string()).optional(),
-    focus: z.string().optional(),
+    secondary: z.array(z.string()).default([]).describe("Max 2 short labels; empty if none"),
+    focus: z.string().default("").describe("Framing note; empty if none"),
   }),
-  action: z.string().optional(),
+  action: z.string().default(""),
   shot: z
     .object({
-      type: z.string().optional(),
-      angle: z.string().optional(),
-      composition: z.string().optional(),
-      depthOfField: z.string().optional(),
+      type: z.string().default(""),
+      angle: z.string().default(""),
+      composition: z.string().default(""),
+      depthOfField: z.string().default(""),
     })
-    .optional(),
+    .default({ type: "", angle: "", composition: "", depthOfField: "" }),
   environment: z
     .object({
-      setting: z.string().optional(),
-      background: z.string().optional(),
-      effects: z.array(z.string()).optional(),
+      setting: z.string().default(""),
+      background: z.string().default(""),
+      effects: z.array(z.string()).default([]),
     })
-    .optional(),
+    .default({ setting: "", background: "", effects: [] }),
   lighting: z
     .object({
-      key: z.string().optional(),
-      accent: z.string().optional(),
-      practicals: z.string().optional(),
+      key: z.string().default(""),
+      accent: z.string().default(""),
+      practicals: z.string().default(""),
     })
-    .optional(),
+    .default({ key: "", accent: "", practicals: "" }),
   style: z
     .object({
-      medium: z.string().optional(),
-      material: z.string().optional(),
-      palette: z.array(z.string()).optional(),
+      medium: z.string().default(""),
+      material: z.string().default(""),
+      palette: z.array(z.string()).default([]),
     })
-    .optional(),
-  constraints: z.array(z.string()).optional(),
-  negativeCues: z.array(z.string()).optional(),
+    .default({ medium: "", material: "", palette: [] }),
+  constraints: z.array(z.string()).default([]),
+  negativeCues: z.array(z.string()).default([]),
 });
 
 export type ImageSpec = z.infer<typeof imageSpecSchema>;
@@ -87,7 +90,7 @@ export function mergeImageSpecWithUpstream(
 
   const rawFocus = spec.subject.focus;
   let focus = rawFocus?.trim() ?? "";
-  if (rawFocus !== undefined && rawFocus !== "" && focus.length === 0) {
+  if (rawFocus !== "" && focus.length === 0) {
     mergeReasonCodes.push("MERGE_SUBJECT_FOCUS_TRIMMED");
   }
   if (focus && options?.assetRef && FOCUS_APPEARANCE_ROLE.test(focus)) {
@@ -101,12 +104,21 @@ export function mergeImageSpecWithUpstream(
     mergeReasonCodes.push("MERGE_SUBJECT_SECONDARY_TRIMMED");
   }
 
-  const subject: ImageSpec["subject"] = { primary };
-  if (secondary.length > 0) subject.secondary = secondary;
-  if (focus) subject.focus = focus;
+  const subject: ImageSpec["subject"] = {
+    primary,
+    secondary,
+    focus,
+  };
 
+  // Re-parse so omitted keys and empty `{}` from the transport layer get Zod field defaults; strip undefined
+  // so top-level keys fall back to schema defaults.
+  const merged = { ...spec, subject };
+  const pruned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(merged)) {
+    if (v !== undefined) pruned[k] = v;
+  }
   return {
-    spec: { ...spec, subject },
+    spec: imageSpecSchema.parse(pruned),
     mergeReasonCodes,
   };
 }
@@ -130,25 +142,25 @@ export function serializeFrameImageSpec(params: {
   const ps = styleGuide.perScene.find((p) => p.sceneIndex === sceneIndex);
 
   const globalPalette = styleGuide.global.colorPalette.join(", ");
-  const paletteText = spec.style?.palette?.length
+  const paletteText = spec.style.palette.length
     ? spec.style.palette.join(", ")
     : ps?.paletteOverride?.join(", ") ?? globalPalette;
 
   const lightingDetail =
-    [spec.lighting?.key, spec.lighting?.accent, spec.lighting?.practicals].filter(Boolean).join("; ") ||
+    [spec.lighting.key, spec.lighting.accent, spec.lighting.practicals].filter(Boolean).join("; ") ||
     ps?.lightingOverride ||
     styleGuide.global.defaultLighting;
 
-  const cameraParts = [frameSpec.shotType, spec.shot?.angle, spec.shot?.composition, spec.shot?.depthOfField].filter(
+  const cameraParts = [frameSpec.shotType, spec.shot.angle, spec.shot.composition, spec.shot.depthOfField].filter(
     Boolean
   );
   const cameraLine = cameraParts.join(", ");
 
-  const envParts = [spec.environment?.background, spec.environment?.setting, spec.environment?.effects?.join(", ")]
+  const envParts = [spec.environment.background, spec.environment.setting, spec.environment.effects.join(", ")]
     .filter(Boolean)
     .join(", ");
 
-  const secondary = spec.subject.secondary?.length ? ` ${spec.subject.secondary.join(", ")}` : "";
+  const secondary = spec.subject.secondary.length ? ` ${spec.subject.secondary.join(", ")}` : "";
   const focusFrag = spec.subject.focus ? ` (${spec.subject.focus})` : "";
   const actionFrag = spec.action ? ` ${spec.action}` : "";
 
@@ -161,19 +173,19 @@ export function serializeFrameImageSpec(params: {
   lines.push(`Color palette: ${paletteText}.`);
 
   const globalMed = styleGuide.global.medium.trim();
-  const specMed = spec.style?.medium?.trim();
+  const specMed = spec.style.medium.trim();
   const mediumLine =
     specMed && specMed.toLowerCase() !== globalMed.toLowerCase() ? specMed : globalMed;
   lines.push(`MEDIUM: ${mediumLine}.`);
 
-  if (spec.style?.material?.trim()) {
+  if (spec.style.material.trim()) {
     lines.push(`Material: ${spec.style.material.trim()}.`);
   }
 
-  if (spec.constraints?.length) {
+  if (spec.constraints.length) {
     lines.push(`Constraints: ${spec.constraints.join("; ")}.`);
   }
-  if (spec.negativeCues?.length) {
+  if (spec.negativeCues.length) {
     lines.push(`Avoid: ${spec.negativeCues.join("; ")}.`);
   }
 
