@@ -85,14 +85,18 @@ export async function generateImageDallE3(
   }
 }
 
-export async function generateImageGptImage15(
+type OpenAiGptImageModelId = "gpt-image-1.5" | "gpt-image-2";
+
+/** Shared path for gpt-image-1.5 and gpt-image-2 (Images API, same size / quality tier). */
+async function generateOpenAiGptImageModel(
+  model: OpenAiGptImageModelId,
   prompt: string,
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   try {
     const dims = gptImage15Dimensions(aspectRatio);
     const response = await openai.images.generate({
-      model: "gpt-image-1.5",
+      model,
       prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`,
       n: 1,
       size: gptImage15Size(aspectRatio),
@@ -102,10 +106,11 @@ export async function generateImageGptImage15(
     const item = response.data?.[0];
     const b64 = item?.b64_json;
     const remoteUrl = item?.url;
+    const storagePrefix = model.replace(/\./g, "-");
 
     if (b64) {
       const buffer = Buffer.from(b64, "base64");
-      const key = `generated/gpt-image-1.5_${Date.now()}.png`;
+      const key = `generated/${storagePrefix}_${Date.now()}.png`;
       await uploadFile(key, buffer, "image/png");
       const signedUrl = await getSignedDownloadUrl(key);
       return {
@@ -129,8 +134,17 @@ export async function generateImageGptImage15(
 
     return null;
   } catch (err) {
-    throw new Error(`Failed to generate image with gpt-image-1.5: ${err instanceof Error ? err.message : JSON.stringify(err)}`);
+    throw new Error(
+      `Failed to generate image with ${model}: ${err instanceof Error ? err.message : JSON.stringify(err)}`
+    );
   }
+}
+
+export async function generateImageGptImage15(
+  prompt: string,
+  aspectRatio: AspectRatio = "9:16"
+): Promise<MediaAsset | null> {
+  return generateOpenAiGptImageModel("gpt-image-1.5", prompt, aspectRatio);
 }
 
 export interface CharacterRef {
@@ -375,6 +389,7 @@ export async function generateImage(
     "nano-banana-2": () => generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', characterRefs, aspectRatio),
     "nano-banana-pro": () => generateViaOpenRouter(prompt, 'google/gemini-3-pro-image-preview', characterRefs, aspectRatio),
     "gpt-image-1.5": () => generateImageGptImage15(prompt, aspectRatio),
+    "gpt-image-2": () => generateOpenAiGptImageModel("gpt-image-2", prompt, aspectRatio),
     "dall-e-3": () => generateImageDallE3(prompt, aspectRatio),
   }
 

@@ -9,8 +9,11 @@ type ModelTag = (typeof MODEL_TAGS)[number];
 
 const MODEL_META: Record<string, { icon: string; color: string; tags: ModelTag[] }> = {
   "dall-e-3": { icon: "D", color: "bg-emerald-500", tags: ["Quality"] },
+  "gpt-image-1.5": { icon: "1", color: "bg-sky-600", tags: ["Quality"] },
+  "gpt-image-2": { icon: "2", color: "bg-cyan-600", tags: ["Quality"] },
   "kling-image-v3": { icon: "K", color: "bg-blue-500", tags: ["Quality", "Consistent"] },
   "nano-banana-2": { icon: "G", color: "bg-violet-500", tags: ["Fast", "Consistent", "Quality"] },
+  "nano-banana-pro": { icon: "G", color: "bg-fuchsia-600", tags: ["Consistent", "Quality"] },
 };
 
 export function ModelPicker({
