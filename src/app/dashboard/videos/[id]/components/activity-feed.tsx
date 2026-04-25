@@ -11,6 +11,7 @@ export interface PipelineStep {
 
 const STORY_PIPELINE: Omit<PipelineStep, "status">[] = [
   { id: "PRODUCING", label: "Creative brief", agent: "Executive Producer" },
+  { id: "RESEARCH", label: "Web research", agent: "Research Agent" },
   { id: "STORY", label: "Story writing", agent: "Head Writer" },
   { id: "SCENE_SPLIT", label: "Scene breakdown", agent: "Director" },
   { id: "SCRIPT_SUPERVISION", label: "Continuity check", agent: "Script Supervisor" },

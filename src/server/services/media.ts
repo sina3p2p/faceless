@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { MEDIA, AI_VIDEO, LLM } from "@/lib/constants";
+import { MEDIA, LLM } from "@/lib/constants";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });

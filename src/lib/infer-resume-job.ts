@@ -10,6 +10,7 @@ export type { ResumeJobContext } from "@/types/pipeline-resume";
 const UNAMBIGUOUS_STATUS_TO_JOB: Record<string, string> = {
   PENDING: "executive-produce",
   PRODUCING: "executive-produce",
+  RESEARCH: "web-research",
   STORY: "generate-story",
   SCENE_SPLIT: "split-scenes",
   SCRIPT_SUPERVISION: "supervise-script",

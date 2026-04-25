@@ -47,6 +47,8 @@ const standaloneSchema = z.object({
   }).optional(),
   /** Existing canonical story_assets ids (your library); linked to this video in order. */
   storyAssetIds: z.array(z.string()).optional().default([]),
+  /** When true, run Tavily-backed web research after the creative brief and before story. */
+  webResearch: z.boolean().optional().default(false),
   /** Falls back for any omitted text model when the top-level *Model field is not sent. */
   llmModel: modelId.optional(),
   /**
@@ -137,6 +139,9 @@ export async function POST(req: NextRequest) {
   }
   if (data.videoType === "music_video" && data.musicGenre?.trim()) {
     config.musicGenre = data.musicGenre.trim();
+  }
+  if (data.webResearch) {
+    config.webResearch = true;
   }
   const hasConfig = Object.keys(config).length > 0;
 

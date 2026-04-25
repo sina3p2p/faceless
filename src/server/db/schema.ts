@@ -9,6 +9,7 @@ import {
   real,
   uniqueIndex,
   primaryKey,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { ImageSpec } from "@/server/services/llm/image-spec";
@@ -25,6 +26,7 @@ export const videoStatusEnum = pgEnum("video_status", [
   "PENDING",
   // Phase 1: Story
   "PRODUCING",
+  "RESEARCH",
   "STORY",
   "SCENE_SPLIT",
   "SCRIPT_SUPERVISION",
@@ -180,6 +182,49 @@ export const videoProjects = pgTable("video_projects", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+/** Web research pack for a video (1:1). Claims live in `research_claims`. */
+export const researchPacks = pgTable("research_packs", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  videoProjectId: text("video_project_id")
+    .notNull()
+    .references(() => videoProjects.id, { onDelete: "cascade" })
+    .unique(),
+  generatedAt: timestamp("generated_at", { mode: "date" }).notNull(),
+  queries: json("queries").$type<string[]>().notNull(),
+  searchProvider: text("search_provider").notNull().default("tavily"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const researchClaims = pgTable(
+  "research_claims",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    researchPackId: text("research_pack_id")
+      .notNull()
+      .references(() => researchPacks.id, { onDelete: "cascade" }),
+    videoProjectId: text("video_project_id")
+      .notNull()
+      .references(() => videoProjects.id, { onDelete: "cascade" }),
+    claimOrder: integer("claim_order").notNull(),
+    claimText: text("claim_text").notNull(),
+    sourceUrl: text("source_url").notNull(),
+    evidenceSnippet: text("evidence_snippet").notNull(),
+    retrievedAt: timestamp("retrieved_at", { mode: "date" }).notNull(),
+    asOfDate: timestamp("as_of_date", { mode: "date" }),
+    confidence: text("confidence").notNull(),
+    sourceTitle: text("source_title").notNull(),
+    sourceDomain: text("source_domain").notNull(),
+    sourcePublishedAt: timestamp("source_published_at", { mode: "date" }),
+    sourceType: text("source_type"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("research_claims_video_project_id_idx").on(t.videoProjectId),
+    index("research_claims_research_pack_id_idx").on(t.researchPackId),
+  ]
+);
 
 /** User-owned story asset (image + metadata). Reused across series/videos via junction tables. */
 export const storyAssets = pgTable("story_assets", {
@@ -361,11 +406,22 @@ export const videoStoryAssetsRelations = relations(videoStoryAssets, ({ one }) =
   storyAsset: one(storyAssets, { fields: [videoStoryAssets.storyAssetId], references: [storyAssets.id] }),
 }));
 
+export const researchPacksRelations = relations(researchPacks, ({ one, many }) => ({
+  videoProject: one(videoProjects, { fields: [researchPacks.videoProjectId], references: [videoProjects.id] }),
+  claims: many(researchClaims),
+}));
+
+export const researchClaimsRelations = relations(researchClaims, ({ one }) => ({
+  researchPack: one(researchPacks, { fields: [researchClaims.researchPackId], references: [researchPacks.id] }),
+  videoProject: one(videoProjects, { fields: [researchClaims.videoProjectId], references: [videoProjects.id] }),
+}));
+
 export const videoProjectsRelations = relations(videoProjects, ({ one, many }) => ({
   series: one(series, { fields: [videoProjects.seriesId], references: [series.id] }),
   scenes: many(videoScenes),
   renderJobs: many(renderJobs),
   videoStoryAssets: many(videoStoryAssets),
+  researchPack: one(researchPacks, { fields: [videoProjects.id], references: [researchPacks.videoProjectId] }),
 }));
 
 export const videoScenesRelations = relations(videoScenes, ({ one, many }) => ({

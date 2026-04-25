@@ -48,7 +48,12 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     console.log(`[executive-produce] Brief ready: "${brief.concept}" (${brief.durationGuidance.wordBudgetTarget} target words)`);
 
-    await renderQueue.add("generate-story", { videoProjectId, userId });
+    const afterBrief = await loadProjectConfig(videoProjectId);
+    if (afterBrief.webResearch) {
+      await renderQueue.add("web-research", { videoProjectId, userId });
+    } else {
+      await renderQueue.add("generate-story", { videoProjectId, userId });
+    }
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[executive-produce] Failed for ${videoProjectId}:`, msg);

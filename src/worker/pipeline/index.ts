@@ -1,4 +1,5 @@
 export { executiveProduceJob } from "./executiveProduce";
+export { webResearchJob } from "./webResearch";
 export { generateStoryJob } from "./generateStory";
 export { splitScenesJob } from "./splitScenes";
 export { superviseScriptJob } from "./superviseScript";

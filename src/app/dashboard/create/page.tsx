@@ -75,6 +75,7 @@ export default function CreateVideoPage() {
     videoSize: DEFAULT_VIDEO_SIZE as string,
     language: DEFAULT_LANGUAGE as string,
     sceneContinuity: true,
+    webResearch: false,
     voiceId: "",
     durationPreferred: 30,
     durationPriority: "quality" as "quality" | "duration",
@@ -165,6 +166,7 @@ export default function CreateVideoPage() {
             preferred: form.durationPreferred,
             priority: form.durationPriority,
           },
+          webResearch: form.webResearch,
           storyAssetIds: storyAssetIds.length > 0 ? storyAssetIds : undefined,
         }),
       });
@@ -293,6 +295,33 @@ export default function CreateVideoPage() {
             />
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
             <VideoModelSelector value={form.videoModel} onChange={(v) => setForm({ ...form, videoModel: v })} />
+
+            <div
+              onClick={() => setForm({ ...form, webResearch: !form.webResearch })}
+              className={`rounded-xl border p-4 cursor-pointer transition-all ${form.webResearch
+                ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                : "border-white/10 bg-white/5 hover:border-white/20"
+                }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-white">Web research (Tavily)</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    After the creative brief, search the web and ground facts before the writer runs. Requires{" "}
+                    <code className="text-violet-300">TAVILY_API_KEY</code>.
+                  </p>
+                </div>
+                <div
+                  className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${form.webResearch ? "bg-violet-500" : "bg-white/10"
+                    }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${form.webResearch ? "translate-x-5" : "translate-x-0"
+                      }`}
+                  />
+                </div>
+              </div>
+            </div>
 
             <div
               onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}

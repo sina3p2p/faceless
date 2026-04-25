@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { videoProjects, videoScenes, renderJobs } from "@/server/db/schema";
+import { videoProjects, videoScenes, renderJobs, researchPacks } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { desc, eq } from "drizzle-orm";
@@ -38,13 +38,15 @@ export async function POST(
     .delete(videoScenes)
     .where(eq(videoScenes.videoProjectId, id));
 
+  await db.delete(researchPacks).where(eq(researchPacks.videoProjectId, id));
+
   await db
     .delete(renderJobs)
     .where(eq(renderJobs.videoProjectId, id));
 
   await db.insert(renderJobs).values({ videoProjectId: id });
 
-  await renderQueue.add("generate-story", {
+  await renderQueue.add("executive-produce", {
     videoProjectId: id,
     userId: user.id,
     seriesId: video.seriesId ?? "",

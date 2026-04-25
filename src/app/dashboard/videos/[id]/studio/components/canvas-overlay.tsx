@@ -40,7 +40,7 @@ export function CanvasOverlay({
 
   // Processing activity feed
   const isProcessingInPhase =
-    (selectedPhaseId === "story" && phase.isProcessing && ["PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION"].includes(status)) ||
+    (selectedPhaseId === "story" && phase.isProcessing && ["PRODUCING", "RESEARCH", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION"].includes(status)) ||
     (selectedPhaseId === "pre-production" && phase.isProcessing && ["TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD"].includes(status)) ||
     (selectedPhaseId === "production" && phase.isProcessing && ["PROMPT_GENERATION", "IMAGE_GENERATION", "MOTION_GENERATION", "VIDEO_GENERATION"].includes(status)) ||
     (selectedPhaseId === "final" && phase.isProcessing && status === "RENDERING");

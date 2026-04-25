@@ -323,7 +323,7 @@ function CenterPanel({
   if (selectedPhaseId === "story") {
     return (
       <>
-        {phase.isProcessing && ["PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION"].includes(video?.status || "") && (
+        {phase.isProcessing && ["PRODUCING", "RESEARCH", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION"].includes(video?.status || "") && (
           <ActivityFeed currentStatus={video?.status || ""} scenes={scenes} />
         )}
 

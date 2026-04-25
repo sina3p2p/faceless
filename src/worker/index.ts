@@ -2,6 +2,7 @@ import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import {
   executiveProduceJob,
+  webResearchJob,
   generateStoryJob,
   splitScenesJob,
   superviseScriptJob,
@@ -31,6 +32,8 @@ const worker = new Worker(
     logger.info("Job started", { jobId: job.id, jobName: job.name, data: job.data });
     if (job.name === "executive-produce") {
       await executiveProduceJob(job);
+    } else if (job.name === "web-research") {
+      await webResearchJob(job);
     } else if (job.name === "generate-story") {
       await generateStoryJob(job);
     } else if (job.name === "split-scenes") {

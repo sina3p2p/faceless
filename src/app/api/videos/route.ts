@@ -18,6 +18,7 @@ const createVideoSchema = z.object({
   seriesId: z.string().min(1),
   duration: durationSchema.optional(),
   pipelineMode: z.enum(["manual", "auto"]).optional(),
+  webResearch: z.boolean().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
     };
   }
   if (parsed.data.pipelineMode) config.pipelineMode = parsed.data.pipelineMode;
+  if (parsed.data.webResearch === true) config.webResearch = true;
 
   const [videoProject] = await db
     .insert(videoProjects)

@@ -12,6 +12,7 @@ export type { RenderJobSnapshot } from "@/types/pipeline-resume";
 
 export const PIPELINE_JOB_LABELS: Record<string, string> = {
   "executive-produce": "Creative brief",
+  "web-research": "Web research",
   "generate-story": "Story writing",
   "split-scenes": "Scene breakdown",
   "supervise-script": "Continuity check",
@@ -27,6 +28,7 @@ export const PIPELINE_JOB_LABELS: Record<string, string> = {
 
 const RESUMABLE_JOBS = new Set([
   "executive-produce",
+  "web-research",
   "generate-story",
   "split-scenes",
   "supervise-script",

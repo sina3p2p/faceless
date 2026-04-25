@@ -3,6 +3,7 @@ import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { generateStory } from "@/server/services/llm";
+import { getResearchPackForVideo } from "@/server/db/research";
 import { getAgentModels, loadProjectConfig } from "./shared";
 
 export async function generateStoryJob(job: Job<RenderJobData>) {
@@ -28,6 +29,12 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
 
     const agents = getAgentModels(video);
 
+    const researchPack =
+      config.webResearch === true ? await getResearchPackForVideo(videoProjectId) : null;
+    if (config.webResearch === true && (!researchPack || researchPack.claims.length === 0)) {
+      throw new Error("Web research is enabled but no research pack was found. Re-run the research step.");
+    }
+
     const storyMarkdown = await generateStory(
       video.style,
       topicIdea,
@@ -35,7 +42,8 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       agents.storyModel,
       video.videoType,
       config.creativeBrief,
-      typeof config.musicGenre === "string" ? config.musicGenre : undefined
+      typeof config.musicGenre === "string" ? config.musicGenre : undefined,
+      researchPack
     );
 
     const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);

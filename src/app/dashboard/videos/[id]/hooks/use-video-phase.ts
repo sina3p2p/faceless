@@ -2,7 +2,7 @@ import type { VideoDetail } from "@/types/video-detail";
 import { hasPipelineRenderFailure } from "@/lib/pipeline-resume";
 
 const PROCESSING_STATUSES = [
-  "PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION",
+  "PRODUCING", "RESEARCH", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION",
   "TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD",
   "PROMPT_GENERATION", "MOTION_GENERATION", "IMAGE_GENERATION",
   "VIDEO_GENERATION", "RENDERING",
@@ -80,6 +80,7 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
 
   const processingMessages: Record<string, string> = {
     PRODUCING: "Executive Producer is crafting the creative brief...",
+    RESEARCH: "Research Agent is gathering web sources and facts...",
     STORY: "Head Writer is writing your story...",
     SCENE_SPLIT: "Director is splitting story into scenes...",
     SCRIPT_SUPERVISION: "Script Supervisor is enforcing continuity...",
@@ -127,7 +128,7 @@ export function useVideoPhase(video: VideoDetail | null): VideoPhase {
                             "Review your content and approve to continue.";
 
   // Phase categorization for sidebar
-  const STORY_STATUSES = ["PENDING", "PRODUCING", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION", "REVIEW_STORY", "REVIEW_SCENES", "REVIEW_SCRIPT"];
+  const STORY_STATUSES = ["PENDING", "PRODUCING", "RESEARCH", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION", "REVIEW_STORY", "REVIEW_SCENES", "REVIEW_SCRIPT"];
   const PREPROD_STATUSES = ["TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD", "REVIEW_PRE_PRODUCTION", "TTS_REVIEW", "REVIEW_PROMPTS"];
   const PRODUCTION_STATUSES = ["PROMPT_GENERATION", "IMAGE_GENERATION", "REVIEW_IMAGES", "MOTION_GENERATION", "VIDEO_GENERATION", "REVIEW_PRODUCTION", "IMAGE_REVIEW", "REVIEW_VISUAL", "REVIEW_MOTION", "REVIEW_VIDEO"];
   const FINAL_STATUSES = ["RENDERING", "COMPLETED"];

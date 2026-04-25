@@ -193,9 +193,56 @@ export interface MotionDirectorInput {
   isDefaultHookSlot?: boolean;
 }
 
+// ── Web research (DB: research_packs + research_claims) ──
+
+export const RESEARCH_SOURCE_TYPES = [
+  "news",
+  "blog",
+  "wiki",
+  "gov",
+  "academic",
+  "corporate",
+  "social",
+  "other",
+] as const;
+
+export type ResearchSourceType = (typeof RESEARCH_SOURCE_TYPES)[number];
+
+export type ResearchClaimConfidence = "high" | "medium" | "low";
+
+/** One research claim (matches `research_claims` row + pack link). */
+export interface ResearchClaim {
+  id: string;
+  researchPackId: string;
+  videoProjectId: string;
+  claimOrder: number;
+  claimText: string;
+  sourceUrl: string;
+  evidenceSnippet: string;
+  retrievedAt: Date;
+  asOfDate: Date | null;
+  confidence: ResearchClaimConfidence;
+  sourceTitle: string;
+  sourceDomain: string;
+  sourcePublishedAt: Date | null;
+  sourceType: ResearchSourceType | null;
+}
+
+/** Pack header + claims (assembled for story LLM and APIs). */
+export interface ResearchPackWithClaims {
+  id: string;
+  videoProjectId: string;
+  generatedAt: Date;
+  queries: string[];
+  searchProvider: string;
+  claims: ResearchClaim[];
+}
+
 // ── Pipeline Config (stored in video_projects.config) ──
 
 export interface PipelineConfig {
+  /** When true, run `web-research` after creative brief and before story. */
+  webResearch?: boolean;
   pipelineMode?: "manual" | "auto";
   /** Per-pipeline-step OpenRouter model ids; stored when user customizes in create flow. */
   agentModels?: Partial<AgentModels>;

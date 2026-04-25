@@ -77,6 +77,14 @@ export const MEDIA = {
   get openaiApiKey() { return env("OPENAI_API_KEY"); },
 } as const;
 
+// ── Web research (Tavily) ──
+
+export const RESEARCH = {
+  get tavilyApiKey() { return env("TAVILY_API_KEY"); },
+  /** OpenRouter model for query planning + claim extraction (cheap / fast). */
+  researchModel: "openai/gpt-4.1-mini",
+} as const;
+
 // ── AI Video (image-to-video) ──
 
 export const AI_VIDEO = {

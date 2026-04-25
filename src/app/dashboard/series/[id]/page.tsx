@@ -56,6 +56,7 @@ export default function SeriesDetailPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [targetDuration, setTargetDuration] = useState(30);
+  const [webResearch, setWebResearch] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   const loadSeries = useCallback(() => {
@@ -97,7 +98,11 @@ export default function SeriesDetailPage() {
     const res = await fetch("/api/videos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ seriesId: id, duration: { preferred: targetDuration } }),
+      body: JSON.stringify({
+        seriesId: id,
+        duration: { preferred: targetDuration },
+        ...(webResearch ? { webResearch: true } : {}),
+      }),
     });
 
     if (res.ok) {
@@ -221,6 +226,15 @@ export default function SeriesDetailPage() {
                     </button>
                   ))}
                 </div>
+                <label className="flex items-center gap-2 mb-3 text-sm text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={webResearch}
+                    onChange={(e) => setWebResearch(e.target.checked)}
+                    className="rounded border-white/20"
+                  />
+                  Web research (Tavily) before story
+                </label>
                 <Button
                   className="w-full"
                   loading={generating}
