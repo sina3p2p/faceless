@@ -13,7 +13,7 @@ const researchQueriesSchema = z.object({
 
 const extractedClaimSchema = z.object({
   claimText: z.string().min(1),
-  sourceUrl: z.string().url(),
+  sourceUrl: z.string().min(1), // no .url(): Azure structured outputs reject JSON Schema format "uri"
   evidenceSnippet: z.string().min(1).max(2000),
   confidence: z.enum(["high", "medium", "low"]),
 });
