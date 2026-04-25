@@ -2,13 +2,49 @@ import { z } from "zod";
 import type { FrameSpec, VisualStyleGuide } from "@/types/pipeline";
 
 /**
- * Structured image prompt from the Prompt Architect (LLM).
- * Upstream locks (subject identity line, shot type, style prefixes) are applied in `serializeFrameImageSpec`.
+ * Vercel AI SDK → Zod 4 `toJSONSchema(..., { io: "input" })`: fields with `.default()` are
+ * omitted from `required`, which Azure / OpenAI strict structured outputs reject.
  *
- * Azure / OpenAI structured outputs: every `properties` key must appear in `required`.
- * Optional fields are modeled as required keys with empty defaults.
+ * - `imageSpecSchemaStrict` — use for OpenAI (and Azure) models; every key required (`""` / `[]` when unused).
+ * - `imageSpecSchemaOptional` — use for other providers (Anthropic, Google, …) with `.default()` / optional ergonomics.
+ *
+ * Persisted shape is always normalized via `normalizeImageSpecInput` → `ImageSpec` (strict).
  */
-export const imageSpecSchema = z.object({
+
+export const imageSpecSchemaStrict = z.object({
+  subject: z.object({
+    primary: z.string().describe("Subject label from frame — will be replaced by continuity-safe primary when resolved"),
+    secondary: z.array(z.string()).describe("Max 2 short labels; use [] if none"),
+    focus: z.string().describe('Framing note; use "" if none'),
+  }),
+  action: z.string(),
+  shot: z.object({
+    type: z.string(),
+    angle: z.string(),
+    composition: z.string(),
+    depthOfField: z.string(),
+  }),
+  environment: z.object({
+    setting: z.string(),
+    background: z.string(),
+    effects: z.array(z.string()),
+  }),
+  lighting: z.object({
+    key: z.string(),
+    accent: z.string(),
+    practicals: z.string(),
+  }),
+  style: z.object({
+    medium: z.string(),
+    material: z.string(),
+    palette: z.array(z.string()),
+  }),
+  constraints: z.array(z.string()),
+  negativeCues: z.array(z.string()),
+});
+
+/** Relaxed schema for models that accept optional / defaulted JSON Schema fields (e.g. Claude, Gemini). */
+export const imageSpecSchemaOptional = z.object({
   subject: z.object({
     primary: z.string().describe("Subject label from frame — will be replaced by continuity-safe primary when resolved"),
     secondary: z.array(z.string()).default([]).describe("Max 2 short labels; empty if none"),
@@ -48,7 +84,90 @@ export const imageSpecSchema = z.object({
   negativeCues: z.array(z.string()).default([]),
 });
 
-export type ImageSpec = z.infer<typeof imageSpecSchema>;
+/** Canonical persisted / merged shape (strict). */
+export type ImageSpec = z.infer<typeof imageSpecSchemaStrict>;
+
+const EMPTY_IMAGE_SPEC: ImageSpec = {
+  subject: { primary: "", secondary: [], focus: "" },
+  action: "",
+  shot: { type: "", angle: "", composition: "", depthOfField: "" },
+  environment: { setting: "", background: "", effects: [] },
+  lighting: { key: "", accent: "", practicals: "" },
+  style: { medium: "", material: "", palette: [] },
+  constraints: [],
+  negativeCues: [],
+};
+
+function asRecord(v: unknown): Record<string, unknown> | null {
+  if (v !== null && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>;
+  return null;
+}
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v : "";
+}
+
+function strArr(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/**
+ * True when structured output JSON Schema must list every `properties` key under `required`
+ * (OpenAI + Azure chat completions). Other providers tolerate Zod `io: "input"` + defaults.
+ */
+export function usesStrictStructuredImageSpecModel(modelId: string): boolean {
+  const m = modelId.trim().toLowerCase();
+  if (!m) return false;
+  return m.startsWith("openai/") || m.startsWith("azure/");
+}
+
+/** Coerce partial / legacy `imageSpec` JSON into canonical `ImageSpec`. */
+export function normalizeImageSpecInput(input: unknown): ImageSpec {
+  if (input === null || typeof input !== "object" || Array.isArray(input)) {
+    return imageSpecSchemaStrict.parse(EMPTY_IMAGE_SPEC);
+  }
+  const o = input as Record<string, unknown>;
+  const sub = asRecord(o.subject);
+  const shot = asRecord(o.shot);
+  const env = asRecord(o.environment);
+  const lit = asRecord(o.lighting);
+  const sty = asRecord(o.style);
+
+  return imageSpecSchemaStrict.parse({
+    subject: {
+      primary: str(sub?.primary),
+      secondary: strArr(sub?.secondary),
+      focus: str(sub?.focus),
+    },
+    action: str(o.action),
+    shot: {
+      type: str(shot?.type),
+      angle: str(shot?.angle),
+      composition: str(shot?.composition),
+      depthOfField: str(shot?.depthOfField),
+    },
+    environment: {
+      setting: str(env?.setting),
+      background: str(env?.background),
+      effects: strArr(env?.effects),
+    },
+    lighting: {
+      key: str(lit?.key),
+      accent: str(lit?.accent),
+      practicals: str(lit?.practicals),
+    },
+    style: {
+      medium: str(sty?.medium),
+      material: str(sty?.material),
+      palette: strArr(sty?.palette),
+    },
+    constraints: strArr(o.constraints),
+    negativeCues: strArr(o.negativeCues),
+  });
+}
+
+/** @deprecated Use `imageSpecSchemaStrict` or `imageSpecSchemaOptional`. */
+export const imageSpecSchema = imageSpecSchemaOptional;
 
 /** Machine codes for upstream merge / sanitize (stored on ResultMeta.mergeReasonCodes). */
 export const MERGE_REASON_CODES = [
@@ -76,20 +195,22 @@ const MAX_SECONDARY = 2;
 
 /**
  * Merge LLM spec with upstream identity: lock primary, cap/sanitize focus & secondary.
+ * Accepts either strict or optional LLM output; always returns canonical `ImageSpec`.
  */
 export function mergeImageSpecWithUpstream(
-  spec: ImageSpec,
+  spec: unknown,
   upstreamSubjectPrimary: string,
   options?: MergeImageSpecOptions
 ): MergeImageSpecResult {
+  const base = normalizeImageSpecInput(spec);
   const mergeReasonCodes: string[] = [];
-  const primary = upstreamSubjectPrimary.trim() || spec.subject.primary.trim();
-  if (primary !== spec.subject.primary.trim()) {
+  const primary = upstreamSubjectPrimary.trim() || base.subject.primary.trim();
+  if (primary !== base.subject.primary.trim()) {
     mergeReasonCodes.push("MERGE_SUBJECT_PRIMARY_LOCKED");
   }
 
-  const rawFocus = spec.subject.focus;
-  let focus = rawFocus?.trim() ?? "";
+  const rawFocus = base.subject.focus;
+  let focus = rawFocus.trim();
   if (rawFocus !== "" && focus.length === 0) {
     mergeReasonCodes.push("MERGE_SUBJECT_FOCUS_TRIMMED");
   }
@@ -98,7 +219,7 @@ export function mergeImageSpecWithUpstream(
     mergeReasonCodes.push("MERGE_SUBJECT_FOCUS_STRIPPED_REF_ASSET");
   }
 
-  let secondary = (spec.subject.secondary ?? []).map((s) => s.trim()).filter(Boolean);
+  let secondary = base.subject.secondary.map((s) => s.trim()).filter(Boolean);
   if (secondary.length > MAX_SECONDARY) {
     secondary = secondary.slice(0, MAX_SECONDARY);
     mergeReasonCodes.push("MERGE_SUBJECT_SECONDARY_TRIMMED");
@@ -110,21 +231,14 @@ export function mergeImageSpecWithUpstream(
     focus,
   };
 
-  // Re-parse so omitted keys and empty `{}` from the transport layer get Zod field defaults; strip undefined
-  // so top-level keys fall back to schema defaults.
-  const merged = { ...spec, subject };
-  const pruned: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(merged)) {
-    if (v !== undefined) pruned[k] = v;
-  }
   return {
-    spec: imageSpecSchema.parse(pruned),
+    spec: normalizeImageSpecInput({ ...base, subject }),
     mergeReasonCodes,
   };
 }
 
 /** @deprecated Use `mergeImageSpecWithUpstream` for merge audit codes. */
-export function mergeImageSpecWithUpstreamSubject(spec: ImageSpec, upstreamSubjectPrimary: string): ImageSpec {
+export function mergeImageSpecWithUpstreamSubject(spec: unknown, upstreamSubjectPrimary: string): ImageSpec {
   return mergeImageSpecWithUpstream(spec, upstreamSubjectPrimary, { assetRef: null }).spec;
 }
 

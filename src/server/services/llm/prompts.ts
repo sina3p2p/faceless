@@ -5,28 +5,33 @@ import { LLM } from "@/lib/constants";
 import { openrouter, buildAssetBlock, type StoryAsset } from "./index";
 import type { VisualStyleGuide, FrameBreakdown, ContinuityNotes } from "@/types/pipeline";
 import {
-  imageSpecSchema,
+  imageSpecSchemaOptional,
+  imageSpecSchemaStrict,
   mergeImageSpecWithUpstream,
   serializeFrameImageSpec,
+  usesStrictStructuredImageSpecModel,
   type ImageSpec,
 } from "./image-spec";
 import { assembleSubjectIdentityFromFrame, normalizeSubjectIdentity } from "./prompt-contract";
 
 // ── Image Prompt Agent (LLM outputs structured spec; we serialize deterministically) ──
 
-const frameLlmSchema = z.object({
-  imageSpec: imageSpecSchema.describe("Visual spec; subject.primary is overwritten from continuity at merge"),
-  assetRefs: z.array(z.string()).default([]).describe("Story asset names visible in frame"),
-  clipDuration: z.number().describe("Echo storyboard duration only"),
-});
-
-const sceneFramePromptsSchema = z.object({
-  frames: z.array(frameLlmSchema),
-});
-
-const framePromptsLlmOutputSchema = z.object({
-  scenes: z.array(sceneFramePromptsSchema),
-});
+function buildFramePromptsLlmOutputSchema(strictStructuredOutputs: boolean) {
+  const imageSpec = strictStructuredOutputs ? imageSpecSchemaStrict : imageSpecSchemaOptional;
+  const frameLlmSchema = z.object({
+    imageSpec: imageSpec.describe("Visual spec; subject.primary is overwritten from continuity at merge"),
+    assetRefs: strictStructuredOutputs
+      ? z.array(z.string()).describe("Story asset names visible in frame; use [] if none")
+      : z.array(z.string()).default([]).describe("Story asset names visible in frame"),
+    clipDuration: z.number().describe("Echo storyboard duration only"),
+  });
+  const sceneFramePromptsSchema = z.object({
+    frames: z.array(frameLlmSchema),
+  });
+  return z.object({
+    scenes: z.array(sceneFramePromptsSchema),
+  });
+}
 
 export type FramePromptRecord = {
   imageSpec: ImageSpec;
@@ -103,6 +108,9 @@ Frame counts: ${frameBreakdown.scenes.map((s, i) => `scene ${i}=${s.frames.lengt
 No copyrighted names or logos. ${assets.length > 0 ? "Use exact asset names in assetRefs when visible." : ""}
 ${buildAssetBlock(assets)}
 Return exactly ${scenes.length} scenes.`;
+
+  const strictStructuredOutputs = usesStrictStructuredImageSpecModel(primaryModel);
+  const framePromptsLlmOutputSchema = buildFramePromptsLlmOutputSchema(strictStructuredOutputs);
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
