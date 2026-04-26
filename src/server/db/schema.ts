@@ -175,6 +175,7 @@ export const videoProjects = pgTable("video_projects", {
   imageModel: text("image_model").default("dall-e-3"),
   videoModel: text("video_model").default("kling-3-standard"),
   modelSettings: json("model_settings").$type<ModelSettings>(),
+  sceneContinuity: integer("scene_continuity").default(1).notNull(),
   videoSize: text("video_size"),
   voiceId: text("voice_id"),
   idea: text("prompt"),

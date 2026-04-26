@@ -1,8 +1,9 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
-import { VIDEO_I2V_PROVIDER, WORKER } from "@/lib/constants";
+import { getVideoSize, VIDEO_I2V_PROVIDER, WORKER } from "@/lib/constants";
 import { getAIVideoForScene } from "@/server/services/ai/video";
+import { resolveModel } from "@/server/services/ai/video/resolve-model";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { autoChainOrReview } from "./shared";
 import { and, isNotNull } from "drizzle-orm";
@@ -18,17 +19,31 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "VIDEO_GENERATION");
 
-    const allFrames = await db.query.sceneFrames.findMany({
+    const rawFrames = await db.query.sceneFrames.findMany({
       where: eq(schema.sceneFrames.videoProjectId, videoProjectId),
-      orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
-      with: { imageMedia: true },
+      with: { imageMedia: true, scene: true },
     });
 
-    const targets = allFrames.filter((frame) => !frame.videoMediaId && frame.imageMediaId);
+    const timeline = [...rawFrames].sort((a, b) => {
+      const sa = a.scene?.sceneOrder ?? 0;
+      const sb = b.scene?.sceneOrder ?? 0;
+      if (sa !== sb) return sa - sb;
+      return a.frameOrder - b.frameOrder;
+    });
 
-    console.log(`[generate-frame-videos] Generating ${targets.length} video clips`);
+    const targets = timeline.filter((frame) => !frame.videoMediaId && frame.imageMediaId);
 
+    const useContinuity = !!videoProject.sceneContinuity;
     const videoModelKey = videoProject.videoModel || undefined;
+    const { endFrame: modelSupportsEndFrame } = resolveModel(videoModelKey);
+    const aspectRatio = getVideoSize(videoProject.videoSize).id;
+
+    const indexById = new Map(timeline.map((f, i) => [f.id, i] as const));
+
+    console.log(
+      `[generate-frame-videos] Generating ${targets.length} video clips (continuity=${useContinuity ? "on" : "off"}, endFrame support=${modelSupportsEndFrame ? "yes" : "no"})`
+    );
+
     /** Replicate: run one i2v at a time; create requests are also serialized+retried in the Replicate client. */
     const BATCH_SIZE = VIDEO_I2V_PROVIDER === "replicate" ? 1 : WORKER.parallelVideos;
 
@@ -42,10 +57,37 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
             const videoPrompt = frame.visualDescription
               || `Cinematic motion, smooth camera movement.`;
             const desiredDuration = frame.clipDuration;
+            const frameIdx = indexById.get(frame.id);
 
-            console.log(`[generate-frame-videos] Frame ${frame.id}: ${desiredDuration}s clip`);
+            let endImageUrl: string | undefined = undefined;
+            if (
+              useContinuity
+              && modelSupportsEndFrame
+              && frameIdx !== undefined
+              && frameIdx < timeline.length - 1
+            ) {
+              const next = timeline[frameIdx + 1];
+              if (next?.imageMedia?.url) {
+                endImageUrl = await getSignedDownloadUrl(next.imageMedia.url);
+              }
+            }
 
-            const videoResult = await getAIVideoForScene(imageSignedUrl, videoPrompt, desiredDuration, videoModelKey);
+            if (endImageUrl && frameIdx !== undefined) {
+              console.log(
+                `[generate-frame-videos] Frame ${frame.id}: ${desiredDuration}s clip → next frame ${timeline[frameIdx + 1]!.id}`
+              );
+            } else {
+              console.log(`[generate-frame-videos] Frame ${frame.id}: ${desiredDuration}s clip`);
+            }
+
+            const videoResult = await getAIVideoForScene(
+              imageSignedUrl,
+              videoPrompt,
+              desiredDuration,
+              videoModelKey,
+              endImageUrl,
+              aspectRatio
+            );
 
             const videoResp = await fetch(videoResult.videoUrl);
             if (!videoResp.ok) throw new Error("Failed to download video");
@@ -72,8 +114,10 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
         })
       );
 
-      const progress = Math.round(((i + batch.length) / targets.length) * 100);
-      await job.updateProgress(progress);
+      if (targets.length > 0) {
+        const progress = Math.round(((i + batch.length) / targets.length) * 100);
+        await job.updateProgress(progress);
+      }
     }
 
     const updatedFrames = await db.query.sceneFrames.findMany({
@@ -83,7 +127,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     const succeeded = updatedFrames.length;
 
-    console.log(`[generate-frame-videos] ${succeeded}/${allFrames.length} clips generated`);
+    console.log(`[generate-frame-videos] ${succeeded}/${timeline.length} clips generated`);
 
     await autoChainOrReview(videoProjectId, userId, "REVIEW_PRODUCTION", "compose-final");
   } catch (error) {

@@ -161,6 +161,7 @@ export async function POST(req: NextRequest) {
       idea: data.prompt,
       voiceId: data.voiceId,
       config: hasConfig ? config : undefined,
+      sceneContinuity: data.sceneContinuity ? 1 : 0,
     })
     .returning();
 
