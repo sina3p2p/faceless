@@ -17,6 +17,7 @@ import type { FrameMotionSpec } from "@/server/services/llm/motion";
 import type { MotionSkillHints } from "@/types/motion-skill-hints";
 import type { ResultMeta } from "@/server/services/llm/prompt-contract";
 import type { ModelSettings } from "@/types/llm-common";
+import { PipelineConfig } from "@/types/pipeline";
 
 // ── Enums ──
 
@@ -168,7 +169,7 @@ export const videoProjects = pgTable("video_projects", {
   videoType: text("video_type").default("standalone").notNull(),
   script: text("script"),
   duration: integer("duration"),
-  config: json("config"),
+  config: json("config").$type<PipelineConfig>(),
   outputUrl: text("output_url"),
   thumbnailUrl: text("thumbnail_url"),
   llmModel: text("llm_model").default("anthropic/claude-opus-4.6"),

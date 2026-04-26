@@ -92,11 +92,8 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
     const isMusic = videoProject.videoType === "music_video";
     let globalAudioPath: string | undefined;
     if (isMusic) {
-      const projectConfig = ((await db.query.videoProjects.findFirst({
-        where: eq(schema.videoProjects.id, videoProjectId),
-        columns: { config: true },
-      }))?.config ?? {}) as Record<string, unknown>;
-      const songKey = projectConfig.songUrl as string | undefined;
+      const projectConfig = videoProject.config ?? {};
+      const songKey = projectConfig.songUrl;
       if (songKey) {
         const songSignedUrl = await getSignedDownloadUrl(songKey);
         globalAudioPath = path.join(workDir, "global_song.mp3");
@@ -111,6 +108,7 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
       videoWidth: sizeConfig.width,
       videoHeight: sizeConfig.height,
       captionStyle: "none",
+      sceneContinuity: videoProject.sceneContinuity === 1,
       globalAudioPath,
     });
 
