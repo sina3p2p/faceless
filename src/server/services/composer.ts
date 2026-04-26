@@ -199,7 +199,7 @@ function formatAssTime(seconds: number): string {
 export async function composeVideo(
   options: ComposerOptions
 ): Promise<string> {
-  const { scenes, captionStyle, backgroundMusicPath, globalAudioPath, sceneContinuity, videoWidth, videoHeight } = options;
+  const { scenes, captionStyle, backgroundMusicPath, globalAudioPath, videoWidth, videoHeight } = options;
   const workDir = path.join(os.tmpdir(), `faceless-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
   const W = videoWidth ?? VIDEO_DEFAULTS.width;
@@ -220,8 +220,9 @@ export async function composeVideo(
         : Math.max(await getAudioDuration(scene.audioPath) + 0.5, 2);
       sceneDurations.push(duration);
 
-      const fadeOutStart = Math.max(0, duration - 0.4);
-      const fadeFilter = sceneContinuity ? "" : `,fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`;
+      const fadeFilter = ''
+      // const fadeOutStart = Math.max(0, duration - 0.4);
+      // const fadeFilter = sceneContinuity ? "" : `,fade=t=in:st=0:d=0.3,fade=t=out:st=${fadeOutStart}:d=0.4`;
 
       if (scene.mediaType === "video") {
         const videoDuration = await getMediaDuration(scene.mediaPath);

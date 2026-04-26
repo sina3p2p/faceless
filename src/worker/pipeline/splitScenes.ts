@@ -3,7 +3,7 @@ import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { splitStoryIntoScenes } from "@/server/services/llm";
-import { getAgentModels, loadProjectConfig } from "./shared";
+import { getAgentModels } from "./shared";
 
 export async function splitScenesJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -16,7 +16,7 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "SCENE_SPLIT");
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = videoProject.config ?? {};
 
     console.log(`[split-scenes] Splitting story into scenes for ${videoProjectId}`);
 

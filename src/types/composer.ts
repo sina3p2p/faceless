@@ -15,7 +15,6 @@ export interface ComposerOptions {
   backgroundMusicPath?: string;
   globalAudioPath?: string;
   outputFormat?: string;
-  sceneContinuity?: boolean;
   videoWidth?: number;
   videoHeight?: number;
 }

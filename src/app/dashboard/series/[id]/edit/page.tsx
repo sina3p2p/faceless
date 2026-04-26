@@ -35,7 +35,6 @@ interface SeriesData {
   videoModel: string | null;
   videoSize: string | null;
   language: string | null;
-  sceneContinuity: number;
   storyAssets: StoryAsset[] | null;
   defaultVoiceId: string | null;
   topicIdeas: string[];
@@ -70,7 +69,6 @@ export default function EditSeriesPage() {
     videoModel: DEFAULT_VIDEO_MODEL as string,
     videoSize: DEFAULT_VIDEO_SIZE as string,
     language: DEFAULT_LANGUAGE as string,
-    sceneContinuity: false,
     defaultVoiceId: "",
     topicIdeas: "",
   });
@@ -90,7 +88,6 @@ export default function EditSeriesPage() {
           videoModel: data.videoModel || DEFAULT_VIDEO_MODEL,
           videoSize: data.videoSize || DEFAULT_VIDEO_SIZE,
           language: data.language || DEFAULT_LANGUAGE,
-          sceneContinuity: !!data.sceneContinuity,
           defaultVoiceId: data.defaultVoiceId || "",
           topicIdeas: (data.topicIdeas || []).join("\n"),
         });
@@ -122,7 +119,6 @@ export default function EditSeriesPage() {
         videoModel: form.videoModel,
         videoSize: form.videoSize,
         language: form.language,
-        sceneContinuity: form.sceneContinuity,
         defaultVoiceId: form.defaultVoiceId || null,
         topicIdeas,
       }),
@@ -190,27 +186,6 @@ export default function EditSeriesPage() {
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
             <VideoModelSelector value={form.videoModel} onChange={(v) => setForm({ ...form, videoModel: v })} />
 
-            {(form.videoType !== "music_video") && (
-              <div
-                onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
-                className={`rounded-xl border p-4 cursor-pointer transition-all ${
-                  form.sceneContinuity
-                    ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                    : "border-white/10 bg-white/5 hover:border-white/20"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-white">Scene Continuity</p>
-                    <p className="text-xs text-gray-400 mt-1">Each video clip smoothly transitions from one scene image to the next.</p>
-                  </div>
-                  <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${form.sceneContinuity ? "bg-violet-500" : "bg-white/10"}`}>
-                    <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${form.sceneContinuity ? "translate-x-5" : "translate-x-0"}`} />
-                  </div>
-                </div>
-              </div>
-            )}
-
             <Select label="Niche" value={form.niche} onChange={(e) => setForm({ ...form, niche: e.target.value })} options={NICHES.map((n) => ({ value: n.id, label: `${n.label} — ${n.description}` }))} />
             <Select label="Script Language" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} options={LANGUAGES.map((l) => ({ value: l.id, label: l.label }))} />
             <Select label="Art Style" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} options={ART_STYLES.map((s) => ({ value: s.id, label: s.label }))} />
@@ -262,11 +237,10 @@ export default function EditSeriesPage() {
                       >
                         &times;
                       </button>
-                      <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
-                        asset.type === "character" ? "bg-violet-500/80 text-white" :
+                      <span className={`absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${asset.type === "character" ? "bg-violet-500/80 text-white" :
                         asset.type === "location" ? "bg-blue-500/80 text-white" :
-                        "bg-amber-500/80 text-white"
-                      }`}>
+                          "bg-amber-500/80 text-white"
+                        }`}>
                         {asset.type}
                       </span>
                     </div>

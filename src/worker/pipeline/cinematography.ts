@@ -3,7 +3,7 @@ import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { generateVisualStyleGuide } from "@/server/services/llm";
-import { getAgentModels, loadProjectConfig, mergeProjectConfig } from "./shared";
+import { getAgentModels, mergeProjectConfig } from "./shared";
 
 export async function cinematographyJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -16,7 +16,7 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "CINEMATOGRAPHY");
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = videoProject.config ?? {};
     if (!config.creativeBrief) throw new Error("No creative brief found");
 
     const existingScenes = await db.query.videoScenes.findMany({

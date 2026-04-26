@@ -4,7 +4,7 @@ import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { resolveDuration, type DurationPreference } from "@/types/pipeline";
 import { generateCreativeBrief } from "@/server/services/llm";
-import { getAgentModels, loadProjectConfig, mergeProjectConfig } from "./shared";
+import { getAgentModels, mergeProjectConfig } from "./shared";
 import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
 
 export async function executiveProduceJob(job: Job<RenderJobData>) {
@@ -18,7 +18,7 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "PRODUCING");
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = video.config ?? {};
 
     const duration: DurationPreference = config.duration
       ? config.duration
@@ -48,8 +48,7 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     console.log(`[executive-produce] Brief ready: "${brief.concept}" (${brief.durationGuidance.wordBudgetTarget} target words)`);
 
-    const afterBrief = await loadProjectConfig(videoProjectId);
-    if (afterBrief.webResearch) {
+    if (config.webResearch) {
       await renderQueue.add("web-research", { videoProjectId, userId });
     } else {
       await renderQueue.add("generate-story", { videoProjectId, userId });

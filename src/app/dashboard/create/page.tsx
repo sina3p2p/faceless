@@ -74,7 +74,6 @@ export default function CreateVideoPage() {
     videoModel: DEFAULT_VIDEO_MODEL as string,
     videoSize: DEFAULT_VIDEO_SIZE as string,
     language: DEFAULT_LANGUAGE as string,
-    sceneContinuity: true,
     webResearch: false,
     voiceId: "",
     durationPreferred: 30,
@@ -145,7 +144,6 @@ export default function CreateVideoPage() {
           captionStyle: form.captionStyle,
           videoSize: form.videoSize,
           language: form.language,
-          sceneContinuity: form.sceneContinuity,
           voiceId: form.voiceId || undefined,
           ...(() => {
             const m = buildAgentModelsBody(form.llmModel, form.agentModelOverrides);
@@ -319,28 +317,6 @@ export default function CreateVideoPage() {
                     className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${form.webResearch ? "translate-x-5" : "translate-x-0"
                       }`}
                   />
-                </div>
-              </div>
-            </div>
-
-            <div
-              onClick={() => setForm({ ...form, sceneContinuity: !form.sceneContinuity })}
-              className={`rounded-xl border p-4 cursor-pointer transition-all ${form.sceneContinuity
-                ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                : "border-white/10 bg-white/5 hover:border-white/20"
-                }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-white">Scene Continuity</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Each video clip smoothly transitions from one scene image to the next.
-                  </p>
-                </div>
-                <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${form.sceneContinuity ? "bg-violet-500" : "bg-white/10"
-                  }`}>
-                  <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${form.sceneContinuity ? "translate-x-5" : "translate-x-0"
-                    }`} />
                 </div>
               </div>
             </div>

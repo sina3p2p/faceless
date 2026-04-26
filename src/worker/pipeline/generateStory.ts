@@ -4,7 +4,7 @@ import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { generateStory } from "@/server/services/llm";
 import { getResearchPackForVideo } from "@/server/db/research";
-import { getAgentModels, loadProjectConfig } from "./shared";
+import { getAgentModels } from "./shared";
 
 export async function generateStoryJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -23,7 +23,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       throw new Error("No idea found");
     }
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = video.config ?? {};
 
     console.log(`[generate-story] Starting story generation for video=${videoProjectId}`);
 

@@ -15,7 +15,6 @@ const createSeriesSchema = z.object({
   imageModel: z.string().default("dall-e-3"),
   videoModel: z.string().default("kling-3-standard"),
   videoSize: z.string().default("9:16"),
-  sceneContinuity: z.boolean().default(false),
   captionStyle: z.string().default("none"),
   language: z.string().default("en"),
   videoType: z.enum(["standalone", "music_video", "dialogue"]).default("standalone"),
@@ -71,12 +70,11 @@ export async function POST(req: NextRequest) {
     return badRequest(parsed.error.message);
   }
 
-  const { sceneContinuity, storyAssets, ...rest } = parsed.data;
+  const { storyAssets, ...rest } = parsed.data;
   const [newSeries] = await db
     .insert(series)
     .values({
       ...rest,
-      sceneContinuity: sceneContinuity ? 1 : 0,
       userId: user.id,
     })
     .returning();

@@ -73,7 +73,7 @@ export async function loadProjectConfig(videoProjectId: string): Promise<Pipelin
     where: eq(schema.videoProjects.id, videoProjectId),
     columns: { config: true },
   });
-  return getProjectConfig(project?.config);
+  return project?.config ?? {}
 }
 
 export async function mergeProjectConfig(videoProjectId: string, patch: Partial<PipelineConfig>) {

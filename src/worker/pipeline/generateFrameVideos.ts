@@ -33,7 +33,6 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     const targets = timeline.filter((frame) => !frame.videoMediaId && frame.imageMediaId);
 
-    const useContinuity = !!videoProject.sceneContinuity;
     const videoModelKey = videoProject.videoModel || undefined;
     const { endFrame: modelSupportsEndFrame } = resolveModel(videoModelKey);
     const aspectRatio = getVideoSize(videoProject.videoSize).id;
@@ -41,7 +40,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
     const indexById = new Map(timeline.map((f, i) => [f.id, i] as const));
 
     console.log(
-      `[generate-frame-videos] Generating ${targets.length} video clips (continuity=${useContinuity ? "on" : "off"}, endFrame support=${modelSupportsEndFrame ? "yes" : "no"})`
+      `[generate-frame-videos] Generating ${targets.length} video clips (endFrame support=${modelSupportsEndFrame ? "yes" : "no"})`
     );
 
     /** Replicate: run one i2v at a time; create requests are also serialized+retried in the Replicate client. */
@@ -61,8 +60,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
             let endImageUrl: string | undefined = undefined;
             if (
-              useContinuity
-              && modelSupportsEndFrame
+              modelSupportsEndFrame
               && frameIdx !== undefined
               && frameIdx < timeline.length - 1
             ) {

@@ -8,7 +8,7 @@ import {
   formatPromptContractLogLine,
   resolveFrameImagePromptWithFallback,
 } from "@/server/services/llm/prompt-contract";
-import { getAgentModels, loadProjectConfig } from "./shared";
+import { getAgentModels } from "./shared";
 
 export async function generatePromptsJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -28,7 +28,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
 
     if (existingScenes.length === 0) throw new Error("No scenes for prompt generation");
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = videoProject.config ?? {};
     if (!config.visualStyleGuide) throw new Error("No visual style guide found — run cinematography first");
     if (!config.frameBreakdown) throw new Error("No frame breakdown found — run storyboard first");
     if (!config.continuityNotes) throw new Error("No continuity notes found — run supervise-script first");

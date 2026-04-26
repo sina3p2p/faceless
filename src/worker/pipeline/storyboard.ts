@@ -2,7 +2,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { generateFrameBreakdown } from "@/server/services/llm";
-import { getAgentModels, loadProjectConfig, mergeProjectConfig, autoChainOrReview, getModelDurationsArray } from "./shared";
+import { getAgentModels, mergeProjectConfig, autoChainOrReview, getModelDurationsArray } from "./shared";
 
 export async function storyboardJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -15,7 +15,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "STORYBOARD");
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = videoProject.config ?? {};
     if (!config.creativeBrief) throw new Error("No creative brief found");
     if (!config.continuityNotes) throw new Error("No continuity notes found");
 

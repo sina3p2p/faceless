@@ -29,7 +29,6 @@ export async function GET(
           videoModel: true,
           videoSize: true,
           videoType: true,
-          sceneContinuity: true,
           userId: true,
         },
       },

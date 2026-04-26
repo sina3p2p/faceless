@@ -2,7 +2,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { superviseScript } from "@/server/services/llm";
-import { getAgentModels, loadProjectConfig, mergeProjectConfig, autoChainOrReview } from "./shared";
+import { getAgentModels, mergeProjectConfig, autoChainOrReview } from "./shared";
 import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
 
 export async function superviseScriptJob(job: Job<RenderJobData>) {
@@ -16,7 +16,7 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "SCRIPT_SUPERVISION");
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = videoProject.config ?? {};
     if (!config.creativeBrief) throw new Error("No creative brief found — run executive-produce first");
 
     const existingScenes = await db.query.videoScenes.findMany({

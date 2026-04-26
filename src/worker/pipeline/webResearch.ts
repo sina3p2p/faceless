@@ -4,7 +4,6 @@ import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { replaceResearchPackWithClaims } from "@/server/db/research";
 import { buildResearchPack } from "@/server/services/research/buildResearchPack";
-import { loadProjectConfig } from "./shared";
 
 export async function webResearchJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -15,7 +14,7 @@ export async function webResearchJob(job: Job<RenderJobData>) {
     });
     if (!video) throw new Error(`Video project not found: ${videoProjectId}`);
 
-    const config = await loadProjectConfig(videoProjectId);
+    const config = video.config ?? {};
     if (!config.webResearch) {
       throw new Error("webResearch is not enabled for this project");
     }

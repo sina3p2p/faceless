@@ -1,11 +1,10 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
-import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { WORKER } from "@/lib/constants";
 import { generateSingleFrameMotion } from "@/server/services/llm";
 import { getSignedDownloadUrl } from "@/lib/storage";
-import { getAgentModels, autoChainOrReview, getProjectConfig } from "./shared";
+import { getAgentModels, autoChainOrReview } from "./shared";
 
 export async function generateMotionJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -23,10 +22,21 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    const frames = await db.query.sceneFrames.findMany({
+    const rawFrames = await db.query.sceneFrames.findMany({
       where: eq(schema.sceneFrames.videoProjectId, videoProjectId),
-      orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
       with: { imageMedia: true, scene: true },
+    });
+
+
+    if (rawFrames.length === 0) {
+      throw new Error("No frames found");
+    }
+
+    const frames = [...rawFrames].sort((a, b) => {
+      const sa = a.scene?.sceneOrder ?? 0;
+      const sb = b.scene?.sceneOrder ?? 0;
+      if (sa !== sb) return sa - sb;
+      return a.frameOrder - b.frameOrder;
     });
 
     const allFrameData = await Promise.all(frames.map(async (frame) => {
@@ -46,13 +56,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       };
     }));
 
-    if (allFrameData.length === 0) {
-      console.log(`[generate-motion] No frames found, skipping`);
-      await renderQueue.add("generate-frame-videos", { videoProjectId, userId });
-      return;
-    }
-
-    const config = getProjectConfig(videoProject.config)
+    const config = videoProject.config ?? {};
     const styleGuide = config.visualStyleGuide;
     const frameBreakdown = config.frameBreakdown;
 

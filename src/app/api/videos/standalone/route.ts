@@ -23,7 +23,6 @@ const standaloneSchema = z.object({
   voiceId: z.string().optional(),
   language: z.string().default("en"),
   captionStyle: z.string().default("none"),
-  sceneContinuity: z.boolean().default(true),
   /**
    * Top-level `*Model` fields = request body (matches `ModelSettings` + `producerModel`).
    * Omitted text fields are filled from `llmModel` (legacy) or `agentModels` or defaults.
@@ -161,7 +160,6 @@ export async function POST(req: NextRequest) {
       idea: data.prompt,
       voiceId: data.voiceId,
       config: hasConfig ? config : undefined,
-      sceneContinuity: data.sceneContinuity ? 1 : 0,
     })
     .returning();
 

@@ -108,7 +108,6 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
       videoWidth: sizeConfig.width,
       videoHeight: sizeConfig.height,
       captionStyle: "none",
-      sceneContinuity: videoProject.sceneContinuity === 1,
       globalAudioPath,
     });
 

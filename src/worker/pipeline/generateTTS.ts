@@ -13,7 +13,6 @@ import {
   transcribeSong,
   alignLyricsToTranscription,
 } from "@/server/services/music";
-import { getProjectConfig } from "./shared";
 
 export async function generateTTSJob(job: Job<RenderJobData>) {
   const { videoProjectId, userId } = job.data;
@@ -39,7 +38,7 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
 
     if (isMusic) {
       const scriptMd = videoProject.script!;
-      const projectConfig = getProjectConfig(videoProject?.config);
+      const projectConfig = videoProject.config ?? {};
 
       const genreMatch = scriptMd.match(/^Genre:\s*(.+)$/m);
       const fromScript = genreMatch ? genreMatch[1].trim() : "pop, catchy";
@@ -69,16 +68,11 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       const totalDurationMs = Math.round(songResult.duration * 1000);
       const alignedSections = alignLyricsToTranscription(songSections, whisperWords, totalDurationMs);
 
-      const existingConfig = ((await db.query.videoProjects.findFirst({
-        where: eq(schema.videoProjects.id, videoProjectId),
-        columns: { config: true },
-      }))?.config ?? {}) as Record<string, unknown>;
-
       await db
         .update(schema.videoProjects)
         .set({
           duration: Math.round(songResult.duration),
-          config: { ...existingConfig, songUrl: songKey, alignedSections },
+          config: { ...projectConfig, songUrl: songKey, alignedSections },
         })
         .where(eq(schema.videoProjects.id, videoProjectId));
 
