@@ -164,10 +164,6 @@ export class FalVideoProvider implements IVideoProvider {
     const input = buildInput(req, resolved);
     const endpoint = resolved.falEndpoint;
 
-    console.log(
-      `[ai-video] fal.subscribe(${endpoint}) duration=${req.apiDuration}s resolution=${resolved.resolution} generateAudio=${resolved.generateAudio}`
-    );
-
     const result = await fal.subscribe(endpoint, {
       input,
       logs: true,

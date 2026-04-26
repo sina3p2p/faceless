@@ -108,7 +108,7 @@ function buildSeedanceInput(
     generate_audio: generateAudio ?? false,
   };
   if (modelId === "seedance-2-pro" || modelId === "seedance-2-fast") {
-    if (useEnd && req.endImageUrl) input.end_image = req.endImageUrl;
+    if (useEnd && req.endImageUrl) input.last_frame_image = req.endImageUrl;
   }
   return input;
 }
@@ -172,9 +172,6 @@ export class ReplicateVideoProvider implements IVideoProvider {
     if (modelId === "seedance-2-pro" || modelId === "seedance-2-fast") {
       const versionId = await getLatestVersionId(replicateModel, token);
       const input = buildSeedanceInput(modelId, req, resolved);
-      console.log(
-        `[ai-video] Replicate ${replicateModel} (version ${versionId}) duration=${req.apiDuration}s resolution=${resolved.resolution ?? "default"}`
-      );
       const output = await createAndWaitPrediction(versionId, input, token);
       return { videoUrl: extractOutputUrl(output), durationSeconds: req.apiDuration };
     }

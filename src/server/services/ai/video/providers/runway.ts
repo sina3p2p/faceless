@@ -22,8 +22,6 @@
 //     const client = this.getClient();
 //     const ratio = RUNWAY_RATIO_MAP[req.aspectRatio] || "720:1280";
 
-//     console.log(`[ai-video] runway.imageToVideo(${modelId}) duration=${req.apiDuration}s ratio=${ratio}`);
-
 //     type RunwayRatio = "1280:720" | "720:1280" | "1104:832" | "832:1104" | "960:960" | "1584:672";
 
 //     const task = await client.imageToVideo
