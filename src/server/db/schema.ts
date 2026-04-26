@@ -285,7 +285,7 @@ export const videoScenes = pgTable("video_scenes", {
   modelUsed: text("model_used"),
   speaker: text("speaker"),
   assetRefs: json("asset_refs").$type<string[]>(),
-  duration: real("duration"),
+  duration: real("duration").notNull().default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -294,7 +294,7 @@ export const sceneFrames = pgTable("scene_frames", {
   videoProjectId: text("video_project_id"),
   sceneId: text("scene_id").notNull().references(() => videoScenes.id, { onDelete: "cascade" }),
   frameOrder: integer("frame_order").notNull(),
-  clipDuration: real("clip_duration"),
+  clipDuration: real("clip_duration").notNull().default(0),
   imagePrompt: text("image_prompt"),
   /** Structured architect output; subject.primary merged with continuity before serialize. */
   imageSpec: json("image_spec").$type<ImageSpec | null>(),

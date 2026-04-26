@@ -5,7 +5,6 @@ import { openrouter } from "./index";
 import type {
   CreativeBrief,
   ContinuityNotes,
-  DurationPreference,
   FrameBreakdown,
 } from "@/types/pipeline";
 
@@ -38,7 +37,7 @@ export async function generateFrameBreakdown(
   scenes: StoryboardSceneInput[],
   supportedClipDurations: number[],
   brief: CreativeBrief,
-  duration: DurationPreference,
+  duration: number,
   continuity: ContinuityNotes,
   model?: string
 ): Promise<FrameBreakdown> {
@@ -61,11 +60,12 @@ export async function generateFrameBreakdown(
 
 SUPPORTED CLIP DURATIONS: [${durationsList}] seconds — every clipDuration MUST be one of these values.
 
-DURATION CONSTRAINTS:
-- Target: ${duration.preferred}s (range: ${duration.min}s–${duration.max}s)
-- Priority: ${duration.priority}
-- The sum of all clipDurations across all scenes should approximate the total video duration
-- Each scene's total frame duration should cover its audio duration (${scenes.map((s) => s.ttsDuration + "s").join(", ")})
+DURATION CONSTRAINTS (from generated audio — TTS or final song):
+- Target total duration: ${duration}s
+- GOAL: keep the sum of all clipDurations as close to ${duration}s as allowed clip lengths permit, without going far over
+- The sum of all clipDurations across all scenes must approximate that total; per-scene frame sums must still cover each scene's audio below
+- Per-scene audio length (sum these for a cross-check: ${scenes.map((s) => s.ttsDuration + "s").join(" + ")} = ${scenes.reduce((a, s) => a + s.ttsDuration, 0)}s)
+- Each scene's frames' clipDurations should sum to at least that scene's audio seconds (${scenes.map((s) => s.ttsDuration + "s").join(", ")})
 
 PACING STRATEGY: ${brief.pacingStrategy}
 
@@ -97,7 +97,7 @@ RULES:
    - "whip-pan": high energy transitions only
 7. First frame of the video should use "fade" transitionIn
 8. You MUST produce exactly ${scenes.length} scene entries, one per input scene
-9. If priority is "duration" and total would exceed ${duration.max}s, reduce frame count in later scenes`;
+9. If the total duration would exceed ${duration}s, reduce frame count in later scenes`;
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),

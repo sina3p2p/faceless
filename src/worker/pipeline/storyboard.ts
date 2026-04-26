@@ -2,7 +2,6 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { generateFrameBreakdown } from "@/server/services/llm";
-import { resolveDuration, type DurationPreference } from "@/types/pipeline";
 import { getAgentModels, loadProjectConfig, mergeProjectConfig, autoChainOrReview, getModelDurationsArray } from "./shared";
 
 export async function storyboardJob(job: Job<RenderJobData>) {
@@ -20,13 +19,13 @@ export async function storyboardJob(job: Job<RenderJobData>) {
     if (!config.creativeBrief) throw new Error("No creative brief found");
     if (!config.continuityNotes) throw new Error("No continuity notes found");
 
-    const duration: DurationPreference = config.duration ?? resolveDuration({ preferred: 30 });
-    const supportedDurations = getModelDurationsArray(videoProject.videoModel);
-
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
+
+    const duration = existingScenes.reduce((acc, s) => acc + (s.duration ?? 0), 0);
+    const supportedDurations = getModelDurationsArray(videoProject.videoModel);
 
     const scenesInput = existingScenes.map((s) => ({
       sceneTitle: s.sceneTitle || "",
@@ -37,7 +36,9 @@ export async function storyboardJob(job: Job<RenderJobData>) {
 
     const agents = getAgentModels(videoProject);
 
-    console.log(`[storyboard] Generating frame breakdown for ${videoProjectId} (${scenesInput.length} scenes, durations: ${JSON.stringify(supportedDurations)})`);
+    console.log(
+      `[storyboard] Generating frame breakdown for ${videoProjectId} (${scenesInput.length} scenes, audio total ${duration}s, clip sizes ${JSON.stringify(supportedDurations)})`
+    );
 
     const breakdown = await generateFrameBreakdown(
       scenesInput,
