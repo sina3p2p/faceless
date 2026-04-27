@@ -124,7 +124,6 @@ QUALITY RULES:
 - Directional and speed-specific language throughout
 - Do not describe static appearance — the model sees the image
 - No abstract emotion ("feeling of wonder")
-- Active voice
 - Do not use the words "scene", "frame", "clip", "shot" in any field
 
 TARGET: Compiled prompt ~40–100 words total across fields; every phrase should earn its place.`;
