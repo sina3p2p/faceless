@@ -115,7 +115,7 @@ export function FrameCard({
         <div className="mt-1.5">
           <div className="relative group">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={frame.imageUrl} alt={`Frame ${frameIndex + 1}`} className="rounded w-full max-h-40 object-cover" />
+            <img src={frame.imageUrl} alt={`Frame ${frameIndex + 1}`} className="rounded w-full aspect-video object-cover bg-black" />
             {showActions && !generating && (
               <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
@@ -213,7 +213,7 @@ export function FrameCard({
           <div className={`relative group ${isVideoStale ? "ring-1 ring-amber-500/40 rounded" : ""}`}>
             <video
               src={frame.videoUrl}
-              className="rounded w-full max-h-40 object-cover bg-black"
+              className="rounded w-full aspect-video object-cover bg-black"
               muted
               loop
               playsInline
@@ -345,9 +345,9 @@ function VariantStrip({
       <div className="relative shrink-0 rounded border-2 border-violet-500 ring-1 ring-violet-500/30 overflow-hidden">
         {type === "image" ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={currentUrl} alt="Current" className="w-10 h-10 object-cover" />
+          <img src={currentUrl} alt="Current" className="w-14 h-14 object-cover" />
         ) : (
-          <video src={currentUrl} className="w-10 h-10 object-cover" muted />
+          <video src={currentUrl} className="w-14 h-14 object-cover" muted />
         )}
         <div className="absolute inset-0 flex items-center justify-center bg-violet-500/20">
           <svg className="w-3 h-3 text-white drop-shadow" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
@@ -366,9 +366,9 @@ function VariantStrip({
         >
           {type === "image" ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={v.url} alt="" className="w-10 h-10 object-cover" />
+            <img src={v.url} alt="" className="w-14 h-14 object-cover" />
           ) : (
-            <video src={v.url} className="w-10 h-10 object-cover" muted />
+            <video src={v.url} className="w-14 h-14 object-cover" muted />
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover/variant:opacity-100 transition-opacity">
             <span className="text-[8px] text-white font-semibold">Use</span>

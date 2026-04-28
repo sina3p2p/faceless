@@ -55,7 +55,9 @@ export function compileMotionPrompt(spec: FrameMotionSpec): string {
   if (es) parts.push(`Ending: ${es}`);
   if (neg) parts.push(`Avoid: ${neg}`);
 
-  return parts.join(" ").replace(/\s+/g, " ").trim();
+  const body = parts.join(" ").replace(/\s+/g, " ").trim();
+  if (!body) return "";
+  return `Smooth continuous motion throughout — ${body}`;
 }
 
 export type SingleFrameMotionResult = {
@@ -87,9 +89,9 @@ export async function generateSingleFrameMotion(
 
   const motionIntensity: Record<string, string> = {
     static: "Environmental motion ONLY (wind, particles, light shifts). NO subject movement. Camera locked or imperceptible drift. primaryAction should still name the environmental motion richly; subjectDynamics covers subtle environmental detail.",
-    subtle: "ONE small gesture — breathing, weight shift, blink, gentle hand movement. subjectDynamics: natural secondary physics (hair sway, cloth settle). Camera may drift.",
-    moderate: "ONE clear primary action with full body mechanics. subjectDynamics: secondary physics (hair, cloth, objects). Camera may track or pan slowly.",
-    dynamic: "ONE strong primary action — muscle engagement, weight transfer, follow-through. subjectDynamics: reactive physics. Camera can dolly, pan, or arc.",
+    subtle: "ONE small gesture — breathing, weight shift, blink, gentle hand movement — but let it develop across time (ease-in, sustain, settle). subjectDynamics: natural secondary physics (hair sway, cloth settle). Camera may drift slowly so pixels move throughout.",
+    moderate: "ONE clear primary action with full body mechanics — staged so motion is visibly underway early and resolves toward the end (not a pose held until the last second). subjectDynamics: secondary physics (hair, cloth, objects). Camera tracks, pans, or pushes enough that the frame reads as video, not a photo.",
+    dynamic: "ONE strong primary action — muscle engagement, weight transfer, follow-through — with camera as active participant (dolly, pan, arc). subjectDynamics: reactive physics. Entire clip should feel kinetic.",
     frenetic: "ONE fast, intense primary action — snap, thrust, whip. subjectDynamics: explosive reactive physics. Dramatic camera move.",
   };
 
@@ -109,6 +111,8 @@ export async function generateSingleFrameMotion(
 
 CORE PRINCIPLE: AI video models execute ONE action well. Multiple unrelated primary actions produce garbled, morphing artifacts.
 
+TEMPORAL READ: The output must describe motion that READS AS VIDEO across the whole clip — visible movement early, middle, and late (camera drift counts). Avoid prompts that imply a nearly frozen tableau or only a twitch at the end; that yields slideshow-like clips.
+
 MOTION POLICY: ${effectivePolicy.toUpperCase()}${basePolicy !== effectivePolicy ? ` (refined from base ${basePolicy} via section/intent rules)` : ""}
 ${motionIntensity[effectivePolicy] ?? motionIntensity.moderate}
 ${cameraConstraint}${materialConstraint}${skillBlock}
@@ -121,12 +125,12 @@ FIELD GUIDANCE (dense physical language in each — no filler):
 - negativeMotion: List what must NOT happen (extra actions, morphing, wrong camera grammar for the medium, dialogue text on screen).
 
 QUALITY RULES:
-- Directional and speed-specific language throughout
+- Directional and speed-specific language throughout; tie beats to clip duration (build, peak, settle — not instant snap unless frenetic)
 - Do not describe static appearance — the model sees the image
 - No abstract emotion ("feeling of wonder")
 - Do not use the words "scene", "frame", "clip", "shot" in any field
 
-TARGET: Compiled prompt ~40–100 words total across fields; every phrase should earn its place.`;
+TARGET: Compiled prompt ~55–130 words total across fields; include enough temporal detail that motion feels continuous, not a caption for one still.`;
 
   const contentParts: Array<{ type: "text"; text: string } | { type: "image"; image: URL }> = [];
 

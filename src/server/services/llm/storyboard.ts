@@ -74,7 +74,7 @@ KNOWN LOCATIONS: ${locationNames.join(", ") || "none"}
 
 RULES:
 1. clipDuration MUST be from [${durationsList}] — no other values
-2. Each scene's frames should sum to at least the scene's audio duration
+2. Each scene's frames should sum to at least the scene's audio duration; when pacing allows, prefer FEWER frames with LONGER clipDuration over many short clips — tiny clips read as a slideshow of stills; longer clips let motion register as video
 3. narrativeIntent must match the story moment:
    - "introduce": first appearance of character or setting
    - "build": rising tension, adding detail
