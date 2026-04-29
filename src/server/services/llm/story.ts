@@ -2,22 +2,7 @@ import { generateText as aiGenerateText } from "ai";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter, type ChatMessage } from "./index";
 import type { CreativeBrief, ResearchPackWithClaims } from "@/types/pipeline";
-
-function formatResearchEvidence(pack: ResearchPackWithClaims): string {
-  const lines = pack.claims.map((c, i) => {
-    const pub = c.sourcePublishedAt ? c.sourcePublishedAt.toISOString().slice(0, 10) : "unknown";
-    return `${i + 1}. [${c.confidence}] ${c.claimText}
-   Source: ${c.sourceTitle} (${c.sourceDomain}) | published: ${pub} | ${c.sourceUrl}
-   Evidence: ${c.evidenceSnippet.slice(0, 500)}${c.evidenceSnippet.length > 500 ? "…" : ""}`;
-  });
-  return `RESEARCH_EVIDENCE (web retrieval; use only these for factual assertions):
-${lines.join("\n\n")}
-
-GROUNDING RULE (non-negotiable):
-- Do not state specific facts, numbers, proper names, or dates that are not supported by the research evidence above.
-- If a desired detail is missing or confidence is low, use uncertainty ("reportedly", "some sources suggest") or omit.
-- Creative metaphors and emotional language are allowed; factual claims about the real world must follow this rule.`;
-}
+import { formatResearchEvidence } from "./research-evidence";
 
 // ── Generic text generation (for non-structured calls) ──
 
@@ -47,42 +32,14 @@ export async function generateStory(
   topicIdea: string,
   language = "en",
   model?: string,
-  videoType?: string,
   brief?: CreativeBrief,
-  musicGenreStyle?: string,
   researchPack?: ResearchPackWithClaims | null
 ): Promise<string> {
   const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
-  const isMusic = videoType === "music_video";
   const researchBlock = researchPack?.claims?.length ? `\n\n${formatResearchEvidence(researchPack)}` : "";
 
-  const systemPrompt = isMusic
-    ? `You are an elite songwriter. Write COMPLETE song lyrics in markdown format.
-
-OUTPUT FORMAT:
-- Start with a # Song Title (catchy, memorable)
-- On the next line write: Genre: [genre/style description for the AI music generator, e.g. "pop, upbeat, catchy, female vocals"]
-- Then use ## Section Name (e.g. ## Intro, ## Verse 1, ## Chorus, ## Verse 2, ## Bridge, ## Outro) for each section
-- Write singable lyrics under each section — short lines, good rhythm, rhyme where natural
-- A typical song has 4-8 sections
-
-OUTPUT LANGUAGE (CRITICAL):
-- The title and ALL lyrics MUST be written in ${langName}.
-- The Genre line should remain in English for AI music model compatibility.
-
-SONGWRITING RULES:
-- The chorus must be catchy and repeatable
-- Verses build the story, chorus delivers the emotional hook
-- Keep lines short (4-10 words) for natural singing rhythm
-- Use vivid imagery and emotional language
-- The song should tell a story or convey a strong emotion
-${musicGenreStyle ? `
-GENRE CONSTRAINT:
-- The user chose this production style for the music generator: ${musicGenreStyle}
-- The "Genre:" line MUST describe this style in English (you may add short vocal hints after a comma).` : ""}${researchBlock}`
-
-    : `You are an elite storyteller. Write a COMPLETE story as flowing prose in markdown format.
+  const systemPrompt = `You are an elite storyteller. Write a COMPLETE story as flowing prose in markdown format.
 
 OUTPUT FORMAT:
 - Start with a # Title (the story's title — SEO-optimized, emotionally compelling)
@@ -114,9 +71,7 @@ CREATIVE BRIEF (follow these constraints):
 - Resolution: ${brief.formatConstraints.resolutionType === "closed" ? "Complete, satisfying ending" : brief.formatConstraints.resolutionType === "open" ? "Ambiguous, thought-provoking ending" : "Unresolved tension — leave them wanting more"}
 ` : ""}${researchBlock}`;
 
-  const userPrompt = isMusic
-    ? `Write a catchy song about: ${topicIdea}. The music video visual style will be ${style}.${musicGenreStyle ? ` Target sound: ${musicGenreStyle}.` : ""}`
-    : `Write a compelling story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.`;
+  const userPrompt = `Write a compelling story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.`;
 
   return generateText(systemPrompt, userPrompt, { model: primaryModel, temperature: 0.85 });
 }

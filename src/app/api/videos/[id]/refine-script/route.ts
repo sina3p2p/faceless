@@ -7,11 +7,30 @@ import {
   refineNarrationScript,
   refineStory,
   refineMusicLyrics,
+  safeParseMusicLyricsScript,
+  parseLyricsBodyIntoSections,
   type ChatMessage,
   type NarrationScript,
-  type MusicLyrics,
+  type MusicLyricsScript,
 } from "@/server/services/llm";
 import { z } from "zod";
+
+function buildMusicLyricsFromVideo(video: {
+  script: string | null;
+  title: string | null;
+  scenes: Array<{ sceneTitle?: string | null; text: string; duration?: number | null }>;
+}): MusicLyricsScript {
+  const parsed = safeParseMusicLyricsScript(video.script ?? "");
+  if (parsed) return parsed;
+  const lines: string[] = [];
+  for (const s of video.scenes) {
+    lines.push(`## ${s.sceneTitle?.trim() || "Section"}`, s.text, "");
+  }
+  return {
+    title: video.title ?? "Untitled",
+    lyrics: lines.join("\n").trim(),
+  };
+}
 
 const bodySchema = z.object({
   message: z.string().min(1),
@@ -50,6 +69,32 @@ export async function POST(
     if (video.status === "REVIEW_STORY") {
       const currentStory = video.script || "";
 
+      if (isMusic) {
+        const parsed = safeParseMusicLyricsScript(currentStory);
+        if (parsed) {
+          const refined = await refineMusicLyrics(
+            parsed,
+            message,
+            chatHistory as ChatMessage[],
+            video.llmModel || undefined,
+            video.language || "en"
+          );
+          const next = JSON.stringify(refined);
+          return NextResponse.json({
+            script: next,
+            title: refined.title,
+            scenes: [],
+            changes: [
+              {
+                scene: 0,
+                type: "modified" as const,
+                fields: [{ field: "story", old: currentStory.slice(0, 100), new: next.slice(0, 100) }],
+              },
+            ],
+          });
+        }
+      }
+
       const refined = await refineStory(
         currentStory,
         message,
@@ -70,49 +115,37 @@ export async function POST(
     }
 
     if (isMusic) {
-      const currentLyrics: MusicLyrics = {
-        title: video.title || "Untitled",
-        genre: "",
-        sections: video.scenes.map((s) => ({
-          sectionName: "Section",
-          lyrics: s.text.split("\n"),
-          durationMs: (s.duration ?? 10) * 1000,
-          positiveStyles: [],
-          negativeStyles: [],
-        })),
-      };
-
-      const scriptJson = video.script ? JSON.parse(video.script) : null;
-      if (scriptJson?.genre) currentLyrics.genre = scriptJson.genre;
-      if (scriptJson?.sections) {
-        for (let i = 0; i < currentLyrics.sections.length && i < scriptJson.sections.length; i++) {
-          const src = scriptJson.sections[i];
-          if (src.sectionName) currentLyrics.sections[i].sectionName = src.sectionName;
-          if (src.positiveStyles) currentLyrics.sections[i].positiveStyles = src.positiveStyles;
-          if (src.negativeStyles) currentLyrics.sections[i].negativeStyles = src.negativeStyles;
-        }
-      }
+      const current = buildMusicLyricsFromVideo({
+        script: video.script,
+        title: video.title,
+        scenes: video.scenes,
+      });
 
       const refined = await refineMusicLyrics(
-        currentLyrics,
+        current,
         message,
         chatHistory as ChatMessage[],
         video.llmModel || undefined,
         video.language || "en"
       );
 
+      const sections = parseLyricsBodyIntoSections(refined.lyrics);
+      const newScenePayload = sections.map((sec, i) => ({
+        text: sec.body,
+        duration: video.scenes[i]?.duration ?? 10,
+      }));
+
+      const scriptJson = JSON.stringify(refined);
+
       return NextResponse.json({
-        script: refined,
-        scenes: refined.sections.map((s, i) => ({
+        script: scriptJson,
+        scenes: sections.map((sec, i) => ({
           sceneOrder: i,
-          text: s.lyrics.join("\n"),
-          duration: s.durationMs / 1000,
+          text: sec.body,
+          duration: video.scenes[i]?.duration ?? 10,
         })),
         title: refined.title,
-        changes: buildChanges(video.scenes, refined.sections.map((s) => ({
-          text: s.lyrics.join("\n"),
-          duration: s.durationMs / 1000,
-        }))),
+        changes: buildChanges(video.scenes, newScenePayload),
       });
     } else if (video.status === "REVIEW_SCRIPT") {
       const currentScript: NarrationScript = {

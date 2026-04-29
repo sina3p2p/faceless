@@ -2,7 +2,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
-import { generateStory } from "@/server/services/llm";
+import { generateStory, generateMusicLyrics } from "@/server/services/llm";
 import { getResearchPackForVideo } from "@/server/db/research";
 import { getAgentModels } from "./shared";
 
@@ -35,26 +35,44 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       throw new Error("Web research is enabled but no research pack was found. Re-run the research step.");
     }
 
-    const storyMarkdown = await generateStory(
-      video.style,
-      topicIdea,
-      video.language,
-      agents.storyModel,
-      video.videoType,
-      config.creativeBrief,
-      typeof config.musicGenre === "string" ? config.musicGenre : undefined,
-      researchPack
-    );
+    const isMusic = video.videoType === "music_video";
 
-    const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
-    const title = titleMatch ? titleMatch[1].trim() : "Untitled";
+    let title: string;
+    let scriptPayload: string;
+
+    if (isMusic) {
+      const preferred = config.duration?.preferred ?? 60;
+      const song = await generateMusicLyrics({
+        style: video.style,
+        topicIdea,
+        language: video.language ?? undefined,
+        model: agents.storyModel,
+        musicGenreStyle: config.musicGenre,
+        researchPack,
+        targetDurationSec: preferred,
+      });
+      title = song.title;
+      scriptPayload = song.lyrics;
+      console.log(`[generate-story] Music lyrics ready: "${title}" (${scriptPayload.length} chars body)`);
+    } else {
+      const storyMarkdown = await generateStory(
+        video.style,
+        topicIdea,
+        video.language,
+        agents.storyModel,
+        config.creativeBrief,
+        researchPack
+      );
+      const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
+      title = titleMatch ? titleMatch[1].trim() : "Untitled";
+      scriptPayload = storyMarkdown;
+      console.log(`[generate-story] Story ready: "${title}" (${storyMarkdown.length} chars)`);
+    }
 
     await db
       .update(schema.videoProjects)
-      .set({ title, script: storyMarkdown })
+      .set({ title, script: scriptPayload })
       .where(eq(schema.videoProjects.id, videoProjectId));
-
-    console.log(`[generate-story] Story ready: "${title}" (${storyMarkdown.length} chars)`);
 
     await renderQueue.add("split-scenes", { videoProjectId, userId });
   } catch (error) {

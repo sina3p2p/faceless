@@ -2,7 +2,9 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
-import { splitStoryIntoScenes } from "@/server/services/llm";
+import {
+  splitStoryIntoScenes,
+} from "@/server/services/llm";
 import { getAgentModels } from "./shared";
 
 export async function splitScenesJob(job: Job<RenderJobData>) {
@@ -22,8 +24,13 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     const agents = getAgentModels(videoProject);
 
+    let storyInput = videoProject.script;
+    if (videoProject.videoType === "music_video") {
+      storyInput = `# ${videoProject.title}\n\nGenre: ${videoProject.config!.musicGenre!}\n\n${videoProject.script!.trim()}`;
+    }
+
     const result = await splitStoryIntoScenes(
-      videoProject.script,
+      storyInput,
       videoProject.style,
       videoProject.language || "en",
       agents.directorModel,

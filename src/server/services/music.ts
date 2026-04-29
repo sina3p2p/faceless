@@ -5,6 +5,7 @@ import axios from "axios";
 import OpenAI, { toFile } from "openai";
 import { MUSIC, MEDIA } from "@/lib/constants";
 import type { WordTimestamp } from "@/types/tts";
+import { type TVideoScene } from "@/types/video";
 
 const whisperClient = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
@@ -50,17 +51,6 @@ interface SongSection {
   sectionName: string;
   lyrics: string[];
   durationMs: number;
-}
-
-function buildLyricsPrompt(sections: SongSection[]): string {
-  return sections
-    .map((s) => {
-      const tag = s.sectionName.match(/intro|verse|chorus|bridge|outro|hook|pre-chorus/i)
-        ? `[${s.sectionName}]`
-        : `[${s.sectionName}]`;
-      return `${tag}\n${s.lyrics.join("\n")}`;
-    })
-    .join("\n\n");
 }
 
 async function sunoFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -114,15 +104,15 @@ async function pollForCompletion(taskId: string, maxWaitMs = 300_000): Promise<S
 export async function generateSong(
   title: string,
   genre: string,
-  sections: SongSection[],
+  lyrics: string,
   targetDurationSec?: number
 ): Promise<MusicResult> {
-  let lyrics = buildLyricsPrompt(sections);
+  let l = lyrics.trim();
   if (targetDurationSec) {
-    lyrics = `[Duration: ~${targetDurationSec} seconds]\n\n${lyrics}`;
+    l = `[Duration: ~${targetDurationSec} seconds]\n\n${l}`;
   }
 
-  console.log(`[suno] Generating song: "${title}" (${genre}), ${lyrics.length} chars of lyrics`);
+  console.log(`[suno] Generating song: "${title}" (${genre}), ${l.length} chars of lyrics`);
 
   const response = await sunoFetch<SunoGenerateResponse>("/api/v1/generate", {
     method: "POST",
@@ -252,9 +242,8 @@ function normalizeText(text: string): string {
     .trim();
 }
 
-function getFirstMeaningfulWords(lyrics: string[], count = 3): string[] {
+function getFirstMeaningfulWords(lyrics: string, count = 3): string[] {
   const allWords = lyrics
-    .join(" ")
     .split(/\s+/)
     .map((w) => normalizeText(w))
     .filter((w) => w.length > 0);
@@ -269,13 +258,12 @@ export interface AlignedSection {
 }
 
 export function alignLyricsToTranscription(
-  sections: SongSection[],
+  scenes: TVideoScene[],
   whisperWords: WhisperWord[],
   totalDurationMs: number
 ): AlignedSection[] {
   if (whisperWords.length === 0) {
-    console.log("[align] No whisper words available, falling back to proportional split");
-    return proportionalFallback(sections, totalDurationMs);
+    throw new Error("[align] No whisper words available, falling back to proportional split");
   }
 
   const normalizedWhisper = whisperWords.map((w) => ({
@@ -286,13 +274,12 @@ export function alignLyricsToTranscription(
   const aligned: AlignedSection[] = [];
   let whisperIdx = 0;
 
-  for (let si = 0; si < sections.length; si++) {
-    const section = sections[si];
-    const targetWords = getFirstMeaningfulWords(section.lyrics, 4);
+  for (const [index, scene] of scenes.entries()) {
+    const targetWords = getFirstMeaningfulWords(scene.text, 4);
 
     if (targetWords.length === 0) {
       aligned.push({
-        sectionIndex: si,
+        sectionIndex: index,
         startMs: -1,
         endMs: -1,
         wordTimestamps: [],
@@ -323,22 +310,25 @@ export function alignLyricsToTranscription(
     if (bestMatchIdx >= 0 && bestScore >= matchThreshold) {
       const startMs = Math.round(normalizedWhisper[bestMatchIdx].start * 1000);
       aligned.push({
-        sectionIndex: si,
+        sectionIndex: index,
         startMs,
         endMs: -1,
         wordTimestamps: [],
       });
       whisperIdx = bestMatchIdx + 1;
-      console.log(`[align] Section ${si} (${section.sectionName}): matched at ${(startMs / 1000).toFixed(1)}s (score ${bestScore}/${targetWords.length})`);
+      console.log(`[align] Section ${index}: matched at ${(startMs / 1000).toFixed(1)}s (score ${bestScore}/${targetWords.length})`);
     } else {
       aligned.push({
-        sectionIndex: si,
+        sectionIndex: index,
         startMs: -1,
         endMs: -1,
         wordTimestamps: [],
       });
-      console.log(`[align] Section ${si} (${section.sectionName}): no match found, will interpolate`);
     }
+  }
+
+  for (let si = 0; si < scenes.length; si++) {
+
   }
 
   // Fill in missing startMs by interpolation
@@ -380,51 +370,4 @@ export function alignLyricsToTranscription(
   }
 
   return aligned;
-}
-
-function proportionalFallback(sections: SongSection[], totalDurationMs: number): AlignedSection[] {
-  const requestedTotal = sections.reduce((sum, s) => sum + s.durationMs, 0);
-  const scale = requestedTotal > 0 ? totalDurationMs / requestedTotal : 1;
-  let offset = 0;
-
-  return sections.map((s, i) => {
-    const startMs = Math.round(offset);
-    const duration = i === sections.length - 1
-      ? totalDurationMs - offset
-      : Math.round(s.durationMs * scale);
-    offset += duration;
-    return {
-      sectionIndex: i,
-      startMs,
-      endMs: Math.round(startMs + duration),
-      wordTimestamps: [],
-    };
-  });
-}
-
-export async function splitSongAligned(
-  songPath: string,
-  alignedSections: AlignedSection[],
-  outputDir: string
-): Promise<SplitResult> {
-  const audioPaths: string[] = [];
-  const actualDurationsMs: number[] = [];
-
-  for (let i = 0; i < alignedSections.length; i++) {
-    const section = alignedSections[i];
-    const durationMs = section.endMs - section.startMs;
-    const startSec = section.startMs / 1000;
-    const durationSec = durationMs / 1000;
-    const outputPath = path.join(outputDir, `section_audio_${i}.mp3`);
-
-    await execAsync(
-      `ffmpeg -y -i "${songPath}" -ss ${startSec.toFixed(3)} -t ${durationSec.toFixed(3)} -c copy "${outputPath}"`
-    );
-
-    audioPaths.push(outputPath);
-    actualDurationsMs.push(durationMs);
-    console.log(`[align] Split section ${i}: ${startSec.toFixed(1)}s → ${(startSec + durationSec).toFixed(1)}s (${durationSec.toFixed(1)}s)`);
-  }
-
-  return { audioPaths, actualDurationsMs };
 }

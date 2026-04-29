@@ -1,169 +1,147 @@
 import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
-import { openrouter, buildInputTypeInstruction, buildMusicDurationInstruction, type ChatMessage, type StoryAsset } from "./index";
+import { openrouter, buildMusicDurationInstruction, type ChatMessage } from "./index";
+import type { ResearchPackWithClaims } from "@/types/pipeline";
+import { formatResearchEvidence } from "./research-evidence";
 
-// ── Music Schemas ──
-const musicLyricsSectionSchema = z.object({
-  sectionName: z.string().describe("Section type, e.g. 'Intro', 'Verse 1', 'Chorus', 'Bridge', 'Outro'"),
-  lyrics: z.array(z.string()).describe("Song lyrics for this section, one line per array element"),
-  durationMs: z.number().describe("Estimated section duration in milliseconds — will be replaced by actual timestamps after song generation"),
-  positiveStyles: z.array(z.string()).describe("Musical elements to include, e.g. 'electric guitar', 'driving drums', 'female vocals'"),
-  negativeStyles: z.array(z.string()).describe("Musical elements to avoid, e.g. 'saxophone', 'country twang'"),
-});
-
-const musicLyricsSchema = z.object({
+const musicLyricsScriptSchema = z.object({
   title: z.string().describe("Catchy song title"),
-  genre: z.string().describe("Music genre/style for the AI music generator, e.g. 'pop, upbeat, catchy'"),
-  sections: z.array(musicLyricsSectionSchema),
+  lyrics: z.string().describe(
+    "Full lyrics body only: use ## Section Name (Intro, Verse 1, Chorus, …) then lines under each section. No # title and no Genre line here."
+  ),
 });
 
-export type MusicLyrics = z.infer<typeof musicLyricsSchema>;
+export type MusicLyricsScript = z.infer<typeof musicLyricsScriptSchema>;
 
-// ── Music Lyrics Generation ──
+export interface GenerateMusicLyricsParams {
+  style: string;
+  topicIdea: string;
+  language?: string;
+  model?: string;
+  musicGenreStyle?: string;
+  researchPack?: ResearchPackWithClaims | null;
+  targetDurationSec?: number;
+  durations?: number[];
+}
 
-export async function generateMusicLyrics(
-  niche: string,
-  style: string,
-  topicIdea?: string,
-  targetDuration = 60,
-  model?: string,
-  previousTopics: string[] = [],
-  language = "en",
-  durations?: number[]
-): Promise<MusicLyrics> {
-  const primaryModel = model || LLM.defaultModel;
+/**
+ * Stored in `video_projects.script` as JSON.stringify({ title, lyrics }).
+ * Genre comes from user config (`musicGenre`), not from the model.
+ */
+export async function generateMusicLyrics(params: GenerateMusicLyricsParams): Promise<MusicLyricsScript> {
+  const {
+    style,
+    topicIdea,
+    language = "en",
+    model,
+    musicGenreStyle,
+    researchPack,
+    targetDurationSec = 60,
+    durations,
+  } = params;
+
+  const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
+  const researchBlock = researchPack?.claims?.length ? `\n\n${formatResearchEvidence(researchPack)}` : "";
 
-  const systemPrompt = `You are an elite songwriter. You create songs that go viral on TikTok and YouTube Shorts.
+  const systemPrompt = `You are an elite songwriter. Output structured song data only (title + lyrics body).
+
+STRUCTURE:
+- title: the song title only (catchy, memorable).
+- lyrics: the FULL lyric text as markdown WITH section headings only inside this field:
+  - Use ## Intro, ## Verse 1, ## Chorus, ## Verse 2, ## Bridge, ## Outro (or similar).
+  - Under each heading, write singable lines (short lines, natural rhythm, rhyme where natural).
+  - Do NOT repeat the song title inside lyrics as an H1. Do NOT include any "Genre:" line — production style is chosen separately by the user.
 
 OUTPUT LANGUAGE (CRITICAL):
-- ALL lyrics, song title, and sectionName MUST be written in ${langName}.
-- genre, positiveStyles, and negativeStyles MUST remain in English for best AI compatibility.
+- title and ALL lyric lines MUST be in ${langName}.
 
-SONGWRITING RULES:
-1. Write lyrics that are CATCHY, MEMORABLE, and SINGABLE. Use rhyme, repetition, and strong hooks.
-2. The chorus should be the most memorable part — repeat it 2-3 times.
-3. Keep lyrics SHORT per line (5-10 words). Each line must be at most 200 characters.
-4. Match the genre to the niche: ${niche}
-5. Total song duration MUST be approximately ${targetDuration} seconds. This is CRITICAL for cost control.
-6. ${buildMusicDurationInstruction(targetDuration, durations)}
-7. positiveStyles should describe instruments, tempo, and vocal characteristics that match the genre.
-8. negativeStyles should list elements that would clash with the desired sound.
-${niche === "kids" ? `
-KIDS MUSIC RULES:
-- Write fun, educational, catchy songs for ages 4-10.
-- Simple words, lots of repetition, energetic and joyful.
-- Genre should be upbeat pop or playful children's music.
-` : ""}`;
+SONGWRITING:
+- Chorus catchy and repeatable; verses build the story.
+- Total song length should fit roughly ${targetDurationSec} seconds (${buildMusicDurationInstruction(targetDurationSec, durations)})
+- Vivid imagery and emotion.${researchBlock}
+GENRE CONSTRAINT:
+- The user chose this production style for the music generator: ${musicGenreStyle}`
 
-  const seriesContext = previousTopics.length > 0
-    ? `\n\nALBUM CONTINUITY — Previous tracks:\n${previousTopics.map((t, i) => `  Track ${previousTopics.length - i}: "${t}"`).join("\n")}\n\nCreate the NEXT track. Same album feel, but fresh topic/lyrics. NEVER repeat.`
-    : "";
-
-  const userPrompt = topicIdea
-    ? `Create a viral ${niche}-themed song about: ${topicIdea}. The song should be irresistibly catchy.${seriesContext}`
-    : `Create a viral ${niche}-themed song. Pick a topic that resonates emotionally.${seriesContext}`;
+  const userPrompt = `Write a catchy song about: ${topicIdea}. The music video visual style is ${style}. Target sound: ${musicGenreStyle}.`;
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: musicLyricsSchema }),
+    output: Output.object({ schema: musicLyricsScriptSchema }),
     system: systemPrompt,
     prompt: userPrompt,
     temperature: 0.85,
   });
+
   if (!output) throw new Error("Failed to generate music lyrics");
-
   return output;
 }
 
-export async function generateStandaloneMusicLyrics(
-  prompt: string,
-  style: string,
-  characters: StoryAsset[] = [],
-  targetDuration = 60,
-  model?: string,
-  language = "en",
-  durations?: number[]
-): Promise<MusicLyrics> {
-  const primaryModel = model || LLM.defaultModel;
-  const langName = getLanguageName(language);
-
-  const charBlock = characters.length > 0
-    ? `\n\nCHARACTERS / ASSETS:\n${characters.map((c) => `  - ${c.name} (${c.type}): ${c.description}`).join("\n")}\nReference these in the lyrics where appropriate.\n`
-    : "";
-
-  const systemPrompt = `You are an elite songwriter. Create songs that go viral on TikTok and YouTube.
-
-OUTPUT LANGUAGE (CRITICAL):
-- ALL lyrics, song title, sectionName MUST be in ${langName}.
-- genre, positiveStyles, negativeStyles MUST remain in English.
-
-SONGWRITING RULES:
-1. CATCHY, MEMORABLE, SINGABLE lyrics. Rhyme, repetition, strong hooks.
-2. Chorus = most memorable part, repeat 2-3 times.
-3. SHORT lines (5-10 words, max 200 chars each).
-4. Total song duration ~${targetDuration} seconds.
-5. ${buildMusicDurationInstruction(targetDuration, durations)}
-6. positiveStyles: instruments, tempo, vocals.
-7. negativeStyles: elements to avoid.
-${charBlock}`;
-
-  const userPrompt = buildInputTypeInstruction(prompt) + `\n\nThe song should be irresistibly catchy.`;
-
-  const { output } = await aiGenerateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: musicLyricsSchema }),
-    system: systemPrompt,
-    prompt: userPrompt,
-    temperature: 0.85,
-  });
-  if (!output) throw new Error("Failed to generate standalone music lyrics");
-
-  return output;
+/** Safe parse for refine / workers. */
+export function safeParseMusicLyricsScript(raw: string | null | undefined): MusicLyricsScript | null {
+  if (!raw?.trim()) return null;
+  try {
+    const j = JSON.parse(raw) as unknown;
+    const r = musicLyricsScriptSchema.safeParse(j);
+    return r.success ? r.data : null;
+  } catch {
+    return null;
+  }
 }
 
-// ── Music Lyrics Refinement ──
+/** Map `lyrics` body (with ## sections) to scene-sized chunks for refine-script responses. */
+export function parseLyricsBodyIntoSections(lyrics: string): { sectionName: string; body: string }[] {
+  const trimmed = lyrics.trim();
+  if (!trimmed) return [];
+
+  const parts = trimmed.split(/^##\s+/gm);
+  if (parts.length < 2) {
+    return [{ sectionName: "Lyrics", body: trimmed }];
+  }
+
+  const sections: { sectionName: string; body: string }[] = [];
+  for (let i = 1; i < parts.length; i++) {
+    const block = parts[i];
+    const nl = block.indexOf("\n");
+    const sectionName = (nl === -1 ? block : block.slice(0, nl)).trim();
+    const body = nl === -1 ? "" : block.slice(nl + 1).trim();
+    if (sectionName) sections.push({ sectionName, body });
+  }
+  return sections;
+}
 
 export async function refineMusicLyrics(
-  currentLyrics: MusicLyrics,
+  current: MusicLyricsScript,
   userMessage: string,
   chatHistory: ChatMessage[] = [],
   model?: string,
   language = "en"
-): Promise<MusicLyrics> {
-  const primaryModel = model || LLM.defaultModel;
+): Promise<MusicLyricsScript> {
+  const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
 
-  const systemPrompt = `You are a collaborative songwriter. The user has song lyrics and wants to improve them through conversation.
+  const systemPrompt = `You are a collaborative songwriter. The user wants to improve song lyrics through conversation.
 
-CURRENT LYRICS:
-${JSON.stringify(currentLyrics, null, 2)}
+CURRENT (JSON shape — title + lyrics body with ## sections inside lyrics):
+${JSON.stringify(current, null, 2)}
 
 RULES:
-- Apply the user's requested changes and return the COMPLETE modified lyrics
-- Only change what the user asks for — preserve everything else exactly as-is
-- If the user asks to change a specific section, only modify that section
-- If the user asks for tone/style/genre changes, apply them appropriately
-- Lyrics must remain singable — short lines, good rhythm
-- If the user's request is vague, make your best creative judgment
-
-LANGUAGE RULE (CRITICAL):
-- The user may write their instructions in ANY language, but the output (title, lyrics, sectionName) MUST ALWAYS be written in ${langName}.
-- genre, positiveStyles, negativeStyles should remain in English for best AI compatibility.
-- Never switch the language based on the user's input language. Always output lyrics and titles in ${langName}.`;
+- Return the COMPLETE updated object with the same shape: title + lyrics only.
+- lyrics must remain markdown with ## section headings unless the user asks to merge/split sections.
+- Only change what the user asks for.
+- title and all lyric lines MUST stay in ${langName}.
+- Never add a genre field; never put a Genre: line in lyrics.`;
 
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
-
   for (const msg of chatHistory) {
     messages.push({ role: msg.role, content: msg.content });
   }
-
   messages.push({ role: "user", content: userMessage });
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: musicLyricsSchema }),
+    output: Output.object({ schema: musicLyricsScriptSchema }),
     system: systemPrompt,
     messages,
     temperature: 0.7,

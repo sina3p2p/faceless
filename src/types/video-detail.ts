@@ -90,6 +90,7 @@ export interface StoryAssetItem {
 export interface VideoDetail {
   id: string;
   seriesId: string;
+  videoType: 'standalone' | 'music_video';
   title: string | null;
   status: (typeof videoStatusEnum.enumValues)[number];
   renderJobs?: Array<{

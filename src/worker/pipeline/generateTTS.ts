@@ -27,36 +27,26 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "TTS_GENERATION");
 
-    const existingScenes = await db.query.videoScenes.findMany({
+    const scenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    if (existingScenes.length === 0) throw new Error("No scenes for audio generation");
+    if (scenes.length === 0) throw new Error("No scenes for audio generation");
 
     const isMusic = videoProject.videoType === "music_video";
 
     if (isMusic) {
-      const scriptMd = videoProject.script!;
       const projectConfig = videoProject.config ?? {};
-
-      const genreMatch = scriptMd.match(/^Genre:\s*(.+)$/m);
-      const fromScript = genreMatch ? genreMatch[1].trim() : "pop, catchy";
-      const fromConfig = projectConfig.musicGenre?.trim();
-      const genre = fromConfig || fromScript;
+      const genre = projectConfig.musicGenre?.trim() || "pop, catchy";
       const title = videoProject.title ?? "Untitled";
-
-      const songSections = existingScenes.map((s) => ({
-        sectionName: s.sceneTitle || `Section ${s.sceneOrder + 1}`,
-        lyrics: s.text.split("\n").filter((l: string) => l.trim()),
-        durationMs: (s.duration ?? 10) * 1000,
-      }));
+      const lyrics = videoProject.script!.trim();
 
       const targetDurationSec = projectConfig.duration?.preferred;
 
-      console.log(`[generate-tts] Music mode: generating song "${title}" (${genre}), ${songSections.length} sections${targetDurationSec ? `, target ~${targetDurationSec}s` : ""}`);
+      console.log(`[generate-tts] Music mode: generating song "${title}" (${genre}), ${lyrics.length} chars of lyrics${targetDurationSec ? `, target ~${targetDurationSec}s` : ""}`);
 
-      const songResult = await generateSong(title, genre, songSections, targetDurationSec);
+      const songResult = await generateSong(title, genre, lyrics, targetDurationSec);
 
       const songPath = path.join(workDir, "song.mp3");
       await downloadFile(songResult.audioUrl, songPath);
@@ -66,7 +56,7 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
 
       const whisperWords = await transcribeSong(songResult.audioUrl);
       const totalDurationMs = Math.round(songResult.duration * 1000);
-      const alignedSections = alignLyricsToTranscription(songSections, whisperWords, totalDurationMs);
+      const alignedSections = alignLyricsToTranscription(scenes, whisperWords, totalDurationMs);
 
       await db
         .update(schema.videoProjects)
@@ -76,8 +66,8 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
         })
         .where(eq(schema.videoProjects.id, videoProjectId));
 
-      for (let i = 0; i < existingScenes.length; i++) {
-        const aligned = alignedSections[i];
+      for (const [index, scene] of scenes.entries()) {
+        const aligned = alignedSections[index];
         if (!aligned) continue;
         const durationSec = Math.ceil((aligned.endMs - aligned.startMs) / 1000);
 
@@ -88,14 +78,14 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
             captionData: aligned.wordTimestamps,
             duration: durationSec,
           })
-          .where(eq(schema.videoScenes.id, existingScenes[i].id));
+          .where(eq(schema.videoScenes.id, scene.id));
 
-        console.log(`[generate-tts] Section ${i} (${songSections[i].sectionName}): ${durationSec}s`);
+        console.log(`[generate-tts] Section ${index} (${scene.sceneTitle}): ${durationSec}s`);
       }
 
       console.log(`[generate-tts] Song generated and aligned (${alignedSections.length} sections, ${songResult.duration.toFixed(1)}s total)`);
     } else {
-      const sceneTexts = existingScenes.map((s) => s.text);
+      const sceneTexts = scenes.map((scene) => scene.text);
       console.log(`[generate-tts] Generating TTS for ${sceneTexts.length} scenes`);
 
       const { audioPaths, ttsResults } = await generateTTSParallel(
@@ -104,15 +94,15 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
         workDir
       );
 
-      for (let i = 0; i < existingScenes.length; i++) {
-        const audioBuffer = await fs.readFile(audioPaths[i]);
-        const audioKey = `scenes/${videoProjectId}/audio_${existingScenes[i].id}_${Date.now()}.mp3`;
+      for (const [index, scene] of scenes.entries()) {
+        const audioBuffer = await fs.readFile(audioPaths[index]);
+        const audioKey = `scenes/${videoProjectId}/audio_${scene.id}_${Date.now()}.mp3`;
         await uploadFile(audioKey, audioBuffer, "audio/mpeg");
 
         let durationSec = 5;
         try {
           const { stdout } = await execAsync(
-            `ffprobe -v error -show_entries format=duration -of csv=p=0 "${audioPaths[i]}"`
+            `ffprobe -v error -show_entries format=duration -of csv=p=0 "${audioPaths[index]}"`
           );
           durationSec = Math.ceil(parseFloat(stdout.trim()) || 5);
         } catch { /* fallback to 5s */ }
@@ -121,12 +111,12 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
           .update(schema.videoScenes)
           .set({
             audioUrl: audioKey,
-            captionData: ttsResults[i].wordTimestamps,
+            captionData: ttsResults[index].wordTimestamps,
             duration: durationSec,
           })
-          .where(eq(schema.videoScenes.id, existingScenes[i].id));
+          .where(eq(schema.videoScenes.id, scene.id));
 
-        console.log(`[generate-tts] Scene ${i}: ${durationSec}s audio uploaded`);
+        console.log(`[generate-tts] Scene ${index}: ${durationSec}s audio uploaded`);
       }
 
       console.log(`[generate-tts] All TTS complete`);
