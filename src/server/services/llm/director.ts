@@ -1,7 +1,8 @@
 import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
-import { openrouter } from "./index";
+import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
+import { openrouter, type StoryAsset } from "./index";
 import type { CreativeBrief } from "@/types/pipeline";
 
 // ── Director Agent Schemas ──
@@ -26,11 +27,17 @@ export async function splitStoryIntoScenes(
   language = "en",
   model?: string,
   videoType?: string,
-  brief?: CreativeBrief
+  brief?: CreativeBrief,
+  assets?: StoryAsset[]
 ): Promise<DirectorOutput> {
   const primaryModel = model || LLM.directorModel;
   const langName = getLanguageName(language);
   const isMusic = videoType === "music_video";
+
+  const assetSys =
+    assets && assets.length > 0
+      ? `\n\nSTORY ASSETS: Reference images are attached in the user message (when present). For each named asset, match wardrobe, hair, and environment to what you see; use that asset's exact name in directorNote when they appear.`
+      : "";
 
   const briefConstraints = brief ? `
   CREATIVE BRIEF CONSTRAINTS:
@@ -115,11 +122,19 @@ LANGUAGE RULE:
 - sceneTitle and text MUST be in ${langName}
 - directorNote MUST be in English`;
 
+  const userStoryPrompt = `Split this story into scenes and write director's notes:\n\n${storyMarkdown}`;
+  const visionParts = assets && assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
+
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: directorOutputSchema }),
-    system: isMusic ? musicInstruction : storyInstruction,
-    prompt: `Split this story into scenes and write director's notes:\n\n${storyMarkdown}`,
+    system: (isMusic ? musicInstruction : storyInstruction) + assetSys,
+    messages: [
+      {
+        role: "user",
+        content: [...visionParts, { type: "text", text: userStoryPrompt }],
+      },
+    ],
     temperature: 0.7,
   });
   if (!output) throw new Error("Failed to split story into scenes");

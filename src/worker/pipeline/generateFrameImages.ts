@@ -6,10 +6,9 @@ import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { generateImage, type AspectRatio } from "@/server/services/media";
 import { autoChainOrReview } from "./shared";
-import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
 
 export async function generateFrameImagesJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -23,8 +22,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     const sizeConfig = getVideoSize(videoProject.videoSize);
     const ar = sizeConfig.id as AspectRatio;
 
-    const storyInputs = await getStoryAssetInputsForVideoProject(videoProjectId);
-    const allAssets = await resolveStoryAssets(storyInputs);
+    const allAssets = await resolveStoryAssets(videoProjectId);
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
@@ -47,7 +45,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
-      await autoChainOrReview(videoProjectId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
+      await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", "generate-pipeline-motion");
       return;
     }
 
@@ -121,7 +119,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-images] All ${targets.length} images generated`);
 
-    await autoChainOrReview(videoProjectId, userId, "REVIEW_IMAGES", "generate-pipeline-motion");
+    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", "generate-pipeline-motion");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, msg);

@@ -15,7 +15,7 @@ import {
 } from "@/server/services/music";
 
 export async function generateTTSJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
   const workDir = path.join(os.tmpdir(), `faceless-tts-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
 
@@ -122,7 +122,7 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       console.log(`[generate-tts] All TTS complete`);
     }
 
-    await renderQueue.add("cinematography", { videoProjectId, userId });
+    await renderQueue.add("cinematography", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-tts] Failed for ${videoProjectId}:`, msg);

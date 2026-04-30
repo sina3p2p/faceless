@@ -1,7 +1,8 @@
-import { generateText as aiGenerateText, Output } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
-import { openrouter } from "./index";
+import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
+import { openrouter, type StoryAsset } from "./index";
 import type { CreativeBrief, VisualStyleGuide } from "@/types/pipeline";
 
 export interface CinematographerSceneInput {
@@ -39,12 +40,13 @@ export async function generateVisualStyleGuide(
   brief: CreativeBrief,
   style: string,
   videoType: string,
-  model?: string
+  model?: string,
+  assets: StoryAsset[] = []
 ): Promise<VisualStyleGuide> {
   const primaryModel = model || LLM.cinematographerModel;
 
   const sceneSummary = scenes.map((s, i) =>
-    `Scene ${i} — "${s.sceneTitle}": ${s.directorNote.slice(0, 200)}`
+    `Scene ${i} — "${s.sceneTitle}": ${s.directorNote}`
   ).join("\n");
 
   const systemPrompt = `You are a Cinematographer designing the visual language for a video production.
@@ -82,13 +84,22 @@ STYLE-SPECIFIC CONSTRAINTS:
 PER-SCENE OVERRIDES:
 - Only override when the narrative demands it (night scene, flashback, emotional shift)
 - null means "use global defaults"
-- You MUST have exactly ${scenes.length} entries in perScene, one per scene`;
+- You MUST have exactly ${scenes.length} entries in perScene, one per scene
+${assets.length > 0 ? `\nSTORY ASSET REFERENCES: When images are attached in the user message, align global colorPalette, materialLanguage, and defaultLighting with the dominant look of those assets while staying faithful to VISUAL STYLE and the brief.` : ""}`;
 
-  const { output } = await aiGenerateText({
+  const stylePrompt = `Design the visual style guide for these ${scenes.length} scenes:\n\n${sceneSummary}`;
+  const visionParts = assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
+
+  const { output } = await generateText({
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: visualStyleGuideSchema }),
     system: systemPrompt,
-    prompt: `Design the visual style guide for these ${scenes.length} scenes:\n\n${sceneSummary}`,
+    messages: [
+      {
+        role: "user",
+        content: [...visionParts, { type: "text", text: stylePrompt }],
+      },
+    ],
     temperature: 0.7,
   });
   if (!output) throw new Error("Failed to generate visual style guide");

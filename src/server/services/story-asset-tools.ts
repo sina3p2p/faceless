@@ -1,6 +1,7 @@
-import { generateText } from "ai";
+import { generateText, ImagePart, TextPart, UserContent } from "ai";
 import { openrouter } from "@/server/services/llm";
 import { generateViaOpenRouter, type CharacterRef } from "@/server/services/media";
+import type { StoryAsset } from "@/types/llm-common";
 import { getSignedDownloadUrl, uploadFile } from "@/lib/storage";
 
 const VISION_MODEL = "openai/gpt-4.1";
@@ -37,6 +38,29 @@ export async function imageUrlToVisionDataUrl(imageUrl: string): Promise<string>
   const buffer = Buffer.from(await imgRes.arrayBuffer());
   const mime = (imgRes.headers.get("content-type") || "image/jpeg").split(";")[0];
   return `data:${mime};base64,${buffer.toString("base64")}`;
+}
+
+/**
+ * Multimodal user-message fragments for vision models (AI SDK format).
+ * Skips assets with missing URLs or failed fetch; logs warnings.
+ */
+export async function buildStoryAssetVisionContentParts(
+  assets: StoryAsset[]
+): Promise<(ImagePart | TextPart)[]> {
+  const messages = await Promise.all(
+    assets.map(async (a) => {
+      const url = await getSignedDownloadUrl(a.url, 3600);
+      return [
+        { type: "image", image: url },
+        {
+          type: "text",
+          text: `Story asset (${a.type}) "${a.name}": ${a.description.trim() || "—"}`,
+        }
+      ] as [ImagePart, TextPart];
+    })
+  );
+
+  return messages.flat()
 }
 
 export async function describeStoryAssetFromVision(params: {

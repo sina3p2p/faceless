@@ -7,7 +7,7 @@ import { getSignedDownloadUrl } from "@/lib/storage";
 import { getAgentModels, autoChainOrReview } from "./shared";
 
 export async function generateMotionJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -144,7 +144,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-motion] Motion descriptions ready`);
 
-    await autoChainOrReview(videoProjectId, userId, "REVIEW_MOTION", "generate-frame-videos");
+    await autoChainOrReview(videoProjectId, "REVIEW_MOTION", "generate-frame-videos");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-motion] Failed for ${videoProjectId}:`, msg);

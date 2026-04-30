@@ -19,9 +19,6 @@ export interface StoryAssetInput {
   voiceId?: string;
 }
 
-/** Resolved row (same fields; URLs are typically signed HTTPS). */
-export type StoryAssetRef = StoryAssetInput;
-
 export type PreApproved = Map<number, { path: string; type: "video" | "image"; url: string }>;
 
 export type ScriptInput = Pick<VideoScript, "scenes">;

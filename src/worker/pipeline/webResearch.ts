@@ -6,7 +6,7 @@ import { replaceResearchPackWithClaims } from "@/server/db/research";
 import { buildResearchPack } from "@/server/services/research/buildResearchPack";
 
 export async function webResearchJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const video = await db.query.videoProjects.findFirst({
@@ -41,7 +41,7 @@ export async function webResearchJob(job: Job<RenderJobData>) {
       `[web-research] Stored ${built.claims.length} claims (${built.queries.length} queries) for video=${videoProjectId}`
     );
 
-    await renderQueue.add("generate-story", { videoProjectId, userId });
+    await renderQueue.add("generate-story", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[web-research] Failed for ${videoProjectId}:`, msg);

@@ -7,7 +7,7 @@ import { getResearchPackForVideo } from "@/server/db/research";
 import { getAgentModels } from "./shared";
 
 export async function generateStoryJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const video = await db.query.videoProjects.findFirst({
@@ -74,7 +74,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       .set({ title, script: scriptPayload })
       .where(eq(schema.videoProjects.id, videoProjectId));
 
-    await renderQueue.add("split-scenes", { videoProjectId, userId });
+    await renderQueue.add("split-scenes", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-story] Failed for ${videoProjectId}:`, msg);

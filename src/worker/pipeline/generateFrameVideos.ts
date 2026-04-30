@@ -9,7 +9,7 @@ import { autoChainOrReview } from "./shared";
 import { and, isNotNull } from "drizzle-orm";
 
 export async function generateFrameVideosJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -127,7 +127,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-videos] ${succeeded}/${timeline.length} clips generated`);
 
-    await autoChainOrReview(videoProjectId, userId, "REVIEW_PRODUCTION", "compose-final");
+    await autoChainOrReview(videoProjectId, "REVIEW_PRODUCTION", "compose-final");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-videos] Failed for ${videoProjectId}:`, msg);

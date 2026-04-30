@@ -6,14 +6,15 @@ import * as path from "path";
 export const execAsync = promisify(exec);
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, and, ne, desc } from "drizzle-orm";
+import { eq, and, ne, desc, asc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL, WORKER } from "@/lib/constants";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
 import { env } from "@/lib/constants";
-import type { PreApproved, StoryAssetInput, StoryAssetRef } from "@/types/worker";
+import type { PreApproved, StoryAssetInput } from "@/types/worker";
+import { storyAssets, videoStoryAssets } from "@/server/db/schema";
 
 const client = postgres(DATABASE.url);
 export const db = drizzle(client, { schema });
@@ -83,26 +84,32 @@ export async function updateVideoStatus(
 }
 
 export async function resolveStoryAssets(
-  storyAssets: StoryAssetInput[] | null | undefined
-): Promise<StoryAssetRef[]> {
-  if (storyAssets && storyAssets.length > 0) {
-    return Promise.all(
-      storyAssets.map(async (a) => ({
-        ...a,
-        url: a.url.startsWith("http") ? a.url : await getSignedDownloadUrl(a.url),
-        sheetUrl: a.sheetUrl
-          ? (a.sheetUrl.startsWith("http") ? a.sheetUrl : await getSignedDownloadUrl(a.sheetUrl))
-          : undefined,
-      }))
-    );
-  }
-  return [];
+  videoProjectId: string
+): Promise<StoryAssetInput[]> {
+  const rows = await db
+    .select({ asset: storyAssets })
+    .from(videoStoryAssets)
+    .innerJoin(storyAssets, eq(videoStoryAssets.storyAssetId, storyAssets.id))
+    .where(eq(videoStoryAssets.videoProjectId, videoProjectId))
+    .orderBy(asc(videoStoryAssets.sortOrder));
+
+  return Promise.all(
+    rows.map(async (a) => ({
+      ...a.asset,
+      url: a.asset.url.startsWith("http") ? a.asset.url : await getSignedDownloadUrl(a.asset.url),
+      sheetUrl: a.asset.sheetUrl
+        ? (a.asset.sheetUrl.startsWith("http") ? a.asset.sheetUrl : await getSignedDownloadUrl(a.asset.sheetUrl))
+        : undefined,
+      voiceId: a.asset.voiceId ?? undefined,
+    }))
+  );
+
 }
 
 export function filterAssetsByRefs(
-  allAssets: StoryAssetRef[],
+  allAssets: StoryAssetInput[],
   assetRefs: string[] | null | undefined
-): StoryAssetRef[] {
+): StoryAssetInput[] {
   if (!assetRefs || assetRefs.length === 0) return allAssets;
   const refSet = new Set(assetRefs.map((r) => r.toLowerCase()));
   return allAssets.filter((a) => refSet.has(a.name.toLowerCase()));

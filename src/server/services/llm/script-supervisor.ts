@@ -1,8 +1,10 @@
 import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
+import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
 import { openrouter, type StoryAsset } from "./index";
 import type { CreativeBrief } from "@/types/pipeline";
+import { TVideoScene } from "@/types/video";
 
 const characterEntrySchema = z.object({
   canonicalName: z.string().describe("The ONE correct name for this character, used everywhere downstream. Must match storyAssets name if an asset exists."),
@@ -57,7 +59,7 @@ export interface SceneInput {
 }
 
 export async function superviseScript(
-  scenes: SceneInput[],
+  scenes: TVideoScene[],
   brief: CreativeBrief,
   storyAssets: StoryAsset[],
   model?: string
@@ -106,13 +108,22 @@ ${assetList}
 
 FORMAT CONSTRAINTS FROM BRIEF:
 - Max sentences per scene: ${brief.formatConstraints.maxSentencesPerScene}
-- Narration style: ${brief.formatConstraints.narrationStyle}`;
+- Narration style: ${brief.formatConstraints.narrationStyle}
+${storyAssets.length > 0 ? `\nREFERENCE IMAGES: When the user message includes story asset images, use them as ground truth for appearance locking and registry entries; resolve contradictions between scene text and the visuals in favor of the visuals for named assets.` : ""}`;
+
+  const reviewPrompt = `Review and correct these ${scenes.length} scenes:\n\n${scenesContext}`;
+  const visionParts = await buildStoryAssetVisionContentParts(storyAssets);
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: supervisorOutputSchema }),
     system: systemPrompt,
-    prompt: `Review and correct these ${scenes.length} scenes:\n\n${scenesContext}`,
+    messages: [
+      {
+        role: "user",
+        content: [...visionParts, { type: "text", text: reviewPrompt }],
+      },
+    ],
     temperature: 0.4,
   });
   if (!output) throw new Error("Failed to supervise script");

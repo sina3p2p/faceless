@@ -1,5 +1,5 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
+import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import {
@@ -8,7 +8,7 @@ import {
 import { getAgentModels } from "./shared";
 
 export async function splitScenesJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -24,6 +24,8 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     const agents = getAgentModels(videoProject);
 
+    const assets = await resolveStoryAssets(videoProjectId);
+
     let storyInput = videoProject.script;
     if (videoProject.videoType === "music_video") {
       storyInput = `# ${videoProject.title}\n\nGenre: ${videoProject.config!.musicGenre!}\n\n${videoProject.script!.trim()}`;
@@ -35,24 +37,25 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
       videoProject.language || "en",
       agents.directorModel,
       videoProject.videoType || undefined,
-      config.creativeBrief
+      config.creativeBrief,
+      assets
     );
 
     await db.delete(schema.videoScenes).where(eq(schema.videoScenes.videoProjectId, videoProjectId));
 
-    for (let i = 0; i < result.scenes.length; i++) {
-      await db.insert(schema.videoScenes).values({
+    await db.insert(schema.videoScenes).values(
+      result.scenes.map((s, i) => ({
         videoProjectId,
         sceneOrder: i,
-        sceneTitle: result.scenes[i].sceneTitle,
-        directorNote: result.scenes[i].directorNote,
-        text: result.scenes[i].text,
-      });
-    }
+        sceneTitle: s.sceneTitle,
+        directorNote: s.directorNote,
+        text: s.text,
+      }))
+    );
 
     console.log(`[split-scenes] Created ${result.scenes.length} scenes`);
 
-    await renderQueue.add("supervise-script", { videoProjectId, userId });
+    await renderQueue.add("supervise-script", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[split-scenes] Failed for ${videoProjectId}:`, msg);

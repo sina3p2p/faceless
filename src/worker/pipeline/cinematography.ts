@@ -1,12 +1,12 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
+import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { generateVisualStyleGuide } from "@/server/services/llm";
 import { getAgentModels, mergeProjectConfig } from "./shared";
 
 export async function cinematographyJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -32,6 +32,8 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
 
     const agents = getAgentModels(videoProject);
 
+    const assets = await resolveStoryAssets(videoProjectId);
+
     console.log(`[cinematography] Generating visual style guide for ${videoProjectId}`);
 
     const styleGuide = await generateVisualStyleGuide(
@@ -39,14 +41,15 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
       config.creativeBrief,
       videoProject.style,
       videoProject.videoType,
-      agents.cinematographerModel
+      agents.cinematographerModel,
+      assets
     );
 
     await mergeProjectConfig(videoProjectId, { visualStyleGuide: styleGuide });
 
     console.log(`[cinematography] Style guide ready: medium="${styleGuide.global.medium}", ${styleGuide.perScene.length} scene overrides`);
 
-    await renderQueue.add("storyboard", { videoProjectId, userId });
+    await renderQueue.add("storyboard", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[cinematography] Failed for ${videoProjectId}:`, msg);

@@ -1,6 +1,7 @@
-import { generateText as aiGenerateText, Output } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
+import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
 import { openrouter, type StoryAsset } from "./index";
 import type { CreativeBrief, DurationPreference } from "@/types/pipeline";
 
@@ -53,10 +54,6 @@ export async function generateCreativeBrief(
   const sceneBudgetMin = Math.max(2, Math.floor(duration.min / 10));
   const sceneBudgetMax = Math.ceil(duration.max / 5);
 
-  const assetSummary = assets.length > 0
-    ? `\nAvailable assets: ${assets.map((a) => `${a.name} (${a.type})`).join(", ")}`
-    : "";
-
   const systemPrompt = `You are an Executive Producer planning a short-form video production.
 
 Your job is to create a CREATIVE BRIEF that all downstream agents (writer, director, cinematographer, etc.) will follow. Every decision you make here constrains what they can do.
@@ -67,7 +64,6 @@ PRODUCTION PARAMETERS:
 - Language: ${langName}
 - Duration target: ${duration.preferred}s (acceptable range: ${duration.min}s–${duration.max}s)
 - Duration priority: ${duration.priority === "quality" ? "Quality over exact timing — let the story breathe" : "Hit the target duration — trim to fit"}
-${assetSummary}
 
 DURATION MATH (pre-calculated — use these values):
 - Word budget: ${wordBudgetMin}–${wordBudgetMax} words (target: ${wordBudgetTarget})
@@ -83,11 +79,20 @@ FORMAT CONSTRAINTS — you must decide:
 
 Choose these based on the video type, and duration. A 15s video needs different constraints than a 120s video.${topicIdea ? `\n\nTOPIC DIRECTION: ${topicIdea}` : ""}`;
 
-  const { output } = await aiGenerateText({
+  const visionParts = await buildStoryAssetVisionContentParts(assets);
+  const { output } = await generateText({
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: creativeBriefSchema }),
     system: systemPrompt,
-    prompt: "Create the creative brief for this production.",
+    messages: [
+      {
+        role: "user",
+        content: [
+          ...visionParts,
+          { type: "text", text: "Create the creative brief for this production." },
+        ],
+      },
+    ],
     temperature: 0.8,
   });
   if (!output) throw new Error("Failed to generate creative brief");

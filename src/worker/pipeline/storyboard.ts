@@ -5,7 +5,7 @@ import { generateFrameBreakdown } from "@/server/services/llm";
 import { getAgentModels, mergeProjectConfig, autoChainOrReview, getModelDurationsArray } from "./shared";
 
 export async function storyboardJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -54,7 +54,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
     const totalFrames = breakdown.scenes.reduce((sum, s) => sum + s.frames.length, 0);
     console.log(`[storyboard] Frame breakdown ready: ${totalFrames} frames across ${breakdown.scenes.length} scenes`);
 
-    await autoChainOrReview(videoProjectId, userId, "REVIEW_PRE_PRODUCTION", "generate-prompts");
+    await autoChainOrReview(videoProjectId, "REVIEW_PRE_PRODUCTION", "generate-prompts");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[storyboard] Failed for ${videoProjectId}:`, msg);

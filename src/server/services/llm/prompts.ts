@@ -2,6 +2,7 @@
 import { generateText as aiGenerateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
+import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
 import { openrouter, buildAssetBlock, type StoryAsset } from "./index";
 import type { VisualStyleGuide, FrameBreakdown, ContinuityNotes } from "@/types/pipeline";
 import {
@@ -13,6 +14,7 @@ import {
   type ImageSpec,
 } from "./image-spec";
 import { assembleSubjectIdentityFromFrame, normalizeSubjectIdentity } from "./prompt-contract";
+import { TVideoScene } from "@/types/video";
 
 // ── Image Prompt Agent (LLM outputs structured spec; we serialize deterministically) ──
 
@@ -48,7 +50,7 @@ export type FramePromptsOutput = {
 // ── Prompt Architect (strict translator contract) ──
 
 export async function generateFramePrompts(
-  scenes: Array<{ text: string; directorNote: string; sceneTitle: string }>,
+  scenes: TVideoScene[],
   assets: StoryAsset[],
   styleGuide: VisualStyleGuide,
   frameBreakdown: FrameBreakdown,
@@ -68,12 +70,12 @@ export async function generateFramePrompts(
   const characterCompact =
     continuity.characterRegistry.length > 0
       ? continuity.characterRegistry
-          .map((c) => {
-            const ref = c.assetRef ? "REF→no appearance in any field" : `look:${[c.appearance.clothing, c.appearance.hair].filter(Boolean).join("; ").slice(0, 100)}`;
-            const al = c.aliases.length ? `; aliases forbidden, use "${c.canonicalName}"` : "";
-            return `${c.canonicalName}${c.assetRef ? "*" : ""} (${ref})${al}`;
-          })
-          .join("\n  ")
+        .map((c) => {
+          const ref = c.assetRef ? "REF→no appearance in any field" : `look:${[c.appearance.clothing, c.appearance.hair].filter(Boolean).join("; ").slice(0, 100)}`;
+          const al = c.aliases.length ? `; aliases forbidden, use "${c.canonicalName}"` : "";
+          return `${c.canonicalName}${c.assetRef ? "*" : ""} (${ref})${al}`;
+        })
+        .join("\n  ")
       : "";
 
   const perSceneOneLine = styleGuide.perScene
@@ -107,16 +109,29 @@ Intent→energy (one line): introduce|build|climax|react|transition|resolve — 
 Frame counts: ${frameBreakdown.scenes.map((s, i) => `scene ${i}=${s.frames.length}`).join("; ")}
 No copyrighted names or logos. ${assets.length > 0 ? "Use exact asset names in assetRefs when visible." : ""}
 ${buildAssetBlock(assets)}
+${assets.length > 0 ? "\nWhen reference images are attached in the user message, use them to decide which assets belong in assetRefs per frame; still obey ASSET RULES — no appearance pile-up in imageSpec for ref-backed characters." : ""}
 Return exactly ${scenes.length} scenes.`;
 
   const strictStructuredOutputs = usesStrictStructuredImageSpecModel(primaryModel);
   const framePromptsLlmOutputSchema = buildFramePromptsLlmOutputSchema(strictStructuredOutputs);
 
+  const frameTaskPrompt = `Create imageSpec for each frame:\n\n${scenesContext}`;
+  const visionParts = assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
+
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: framePromptsLlmOutputSchema }),
     system: systemPrompt,
-    prompt: `Create imageSpec for each frame:\n\n${scenesContext}`,
+    ...(visionParts.length > 0
+      ? {
+        messages: [
+          {
+            role: "user" as const,
+            content: [...visionParts, { type: "text" as const, text: frameTaskPrompt }],
+          },
+        ],
+      }
+      : { prompt: frameTaskPrompt }),
     temperature: 0.8,
   });
   if (!output) throw new Error("Failed to generate frame prompts");

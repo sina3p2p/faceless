@@ -1,12 +1,11 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
+import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { superviseScript } from "@/server/services/llm";
 import { getAgentModels, mergeProjectConfig, autoChainOrReview } from "./shared";
-import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
 
 export async function superviseScriptJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -25,20 +24,14 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
     });
     if (existingScenes.length === 0) throw new Error("No scenes to supervise");
 
-    const assets = await getStoryAssetInputsForVideoProject(videoProjectId);
-
-    const scenesInput = existingScenes.map((s) => ({
-      sceneTitle: s.sceneTitle || "",
-      text: s.text,
-      directorNote: s.directorNote || "",
-    }));
+    const assets = await resolveStoryAssets(videoProjectId);
 
     const agents = getAgentModels(videoProject);
 
-    console.log(`[supervise-script] Supervising ${scenesInput.length} scenes for ${videoProjectId}`);
+    console.log(`[supervise-script] Supervising ${existingScenes.length} scenes for ${videoProjectId}`);
 
     const result = await superviseScript(
-      scenesInput,
+      existingScenes,
       config.creativeBrief,
       assets,
       agents.supervisorModel
@@ -46,21 +39,19 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
 
     await db.delete(schema.videoScenes).where(eq(schema.videoScenes.videoProjectId, videoProjectId));
 
-    for (let i = 0; i < result.scenes.length; i++) {
-      await db.insert(schema.videoScenes).values({
-        videoProjectId,
-        sceneOrder: i,
-        sceneTitle: result.scenes[i].sceneTitle,
-        directorNote: result.scenes[i].directorNote,
-        text: result.scenes[i].text,
-      });
-    }
+    await db.insert(schema.videoScenes).values(result.scenes.map((s, i) => ({
+      videoProjectId,
+      sceneOrder: i,
+      sceneTitle: s.sceneTitle,
+      directorNote: s.directorNote,
+      text: s.text,
+    })));
 
     await mergeProjectConfig(videoProjectId, { continuityNotes: result.continuityNotes });
 
     console.log(`[supervise-script] Supervised: ${result.scenes.length} scenes, ${result.continuityNotes.characterRegistry.length} characters, ${result.continuityNotes.locationRegistry.length} locations`);
 
-    await autoChainOrReview(videoProjectId, userId, "REVIEW_STORY", "generate-tts");
+    await autoChainOrReview(videoProjectId, "REVIEW_STORY", "generate-tts");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[supervise-script] Failed for ${videoProjectId}:`, msg);

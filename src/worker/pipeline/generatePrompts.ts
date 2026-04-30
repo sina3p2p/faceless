@@ -1,6 +1,5 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
-import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
+import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { generateFramePrompts } from "@/server/services/llm/prompts";
@@ -11,7 +10,7 @@ import {
 import { getAgentModels } from "./shared";
 
 export async function generatePromptsJob(job: Job<RenderJobData>) {
-  const { videoProjectId, userId } = job.data;
+  const { videoProjectId } = job.data;
 
   try {
     const videoProject = await db.query.videoProjects.findFirst({
@@ -33,20 +32,14 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
     if (!config.frameBreakdown) throw new Error("No frame breakdown found — run storyboard first");
     if (!config.continuityNotes) throw new Error("No continuity notes found — run supervise-script first");
 
-    const assets = await getStoryAssetInputsForVideoProject(videoProjectId);
-
-    const scenesInput = existingScenes.map((s) => ({
-      text: s.text,
-      directorNote: s.directorNote || "",
-      sceneTitle: s.sceneTitle || "",
-    }));
+    const assets = await resolveStoryAssets(videoProjectId);
 
     const agents = getAgentModels(videoProject);
 
-    console.log(`[generate-prompts] Generating frame prompts for ${scenesInput.length} scenes`);
+    console.log(`[generate-prompts] Generating frame prompts for ${existingScenes.length} scenes`);
 
     const result = await generateFramePrompts(
-      scenesInput,
+      existingScenes,
       assets,
       config.visualStyleGuide,
       config.frameBreakdown,
@@ -106,7 +99,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-prompts] Created ${totalFrames} frames across ${existingScenes.length} scenes`);
 
-    await renderQueue.add("generate-frame-images", { videoProjectId, userId });
+    await renderQueue.add("generate-frame-images", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-prompts] Failed for ${videoProjectId}:`, msg);
