@@ -179,6 +179,8 @@ export const videoProjects = pgTable("video_projects", {
   voiceId: text("voice_id"),
   idea: text("prompt"),
   style: text("style").default("cinematic").notNull(),
+  /** Master seed for deterministic re-rolls. Per-stage subseeds derived in pipeline. */
+  seed: integer("seed"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

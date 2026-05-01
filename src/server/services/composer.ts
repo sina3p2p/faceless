@@ -5,16 +5,19 @@ import * as path from "path";
 import * as os from "os";
 import { v4 as uuid } from "uuid";
 import { VIDEO_DEFAULTS } from "@/lib/constants";
-import type { ComposerOptions, ComposerScene } from "@/types/composer";
+import type { ColorGrade, ComposerOptions, ComposerScene, QualityTier } from "@/types/composer";
 import type { WordTimestamp } from "@/types/tts";
+import { groupWordsByPauses } from "./captions";
 
 export type { ComposerOptions, ComposerScene };
 
 const execAsync = promisify(exec);
-const VIDEO_ENCODING = {
-  preset: "medium",
-  crf: 18,
-} as const;
+
+const ENCODING_TIERS: Record<QualityTier, { preset: string; crf: number }> = {
+  draft: { preset: "veryfast", crf: 24 },
+  standard: { preset: "medium", crf: 18 },
+  hero: { preset: "slow", crf: 16 },
+};
 
 async function downloadFile(url: string, dest: string): Promise<void> {
   const response = await fetch(url);
@@ -106,18 +109,6 @@ function getCaptionStyle(style: string): CaptionStyleConfig {
   return styles[style] || styles.default;
 }
 
-function groupWords(words: WordTimestamp[], wordsPerGroup: number): { text: string; start: number; end: number }[] {
-  const groups: { text: string; start: number; end: number }[] = [];
-  for (let i = 0; i < words.length; i += wordsPerGroup) {
-    const chunk = words.slice(i, i + wordsPerGroup);
-    groups.push({
-      text: chunk.map((w) => w.word).join(" "),
-      start: chunk[0].start,
-      end: chunk[chunk.length - 1].end,
-    });
-  }
-  return groups;
-}
 
 function estimateWordTimestamps(text: string, duration: number): WordTimestamp[] {
   const words = text.split(/\s+/).filter(Boolean);
@@ -168,7 +159,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       ? scene.wordTimestamps
       : estimateWordTimestamps(scene.text, duration);
 
-    const groups = groupWords(timestamps, 3);
+    const groups = groupWordsByPauses(timestamps);
 
     for (const group of groups) {
       const absStart = timeOffset + group.start;
@@ -199,13 +190,25 @@ function formatAssTime(seconds: number): string {
 export async function composeVideo(
   options: ComposerOptions
 ): Promise<string> {
-  const { scenes, captionStyle, backgroundMusicPath, globalAudioPath, videoWidth, videoHeight } = options;
+  const {
+    scenes,
+    captionStyle,
+    backgroundMusicPath,
+    globalAudioPath,
+    videoWidth,
+    videoHeight,
+    qualityTier,
+    colorGrade,
+  } = options;
   const workDir = path.join(os.tmpdir(), `faceless-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
   const W = videoWidth ?? VIDEO_DEFAULTS.width;
   const H = videoHeight ?? VIDEO_DEFAULTS.height;
   const FPS = VIDEO_DEFAULTS.fps;
   const useGlobalAudio = !!globalAudioPath;
+  const enc = ENCODING_TIERS[qualityTier ?? "standard"];
+  const lutPath = await resolveColorGradeLut(colorGrade);
+  const lutFilter = lutPath ? `,lut3d='${escapeFilterPath(lutPath)}'` : "";
 
   try {
     const scenePaths: string[] = [];
@@ -226,23 +229,25 @@ export async function composeVideo(
 
       if (scene.mediaType === "video") {
         const videoDuration = await getMediaDuration(scene.mediaPath);
-        const ptsFactor = videoDuration > 0 && videoDuration < duration
-          ? duration / videoDuration
-          : 1;
+        // Hold the last frame instead of slow-mo stretching when the I2V clip is shorter than the VO.
+        // setpts=PTS*N ghosts/judders; tpad clones the final frame cleanly.
+        const padSeconds = videoDuration > 0 && videoDuration < duration
+          ? duration - videoDuration
+          : 0;
 
         const videoFilters = [
-          ...(ptsFactor > 1 ? [`setpts=PTS*${ptsFactor.toFixed(6)}`] : []),
           `scale=${W}:${H}:force_original_aspect_ratio=increase`,
           `crop=${W}:${H}`,
           `setsar=1`,
           `fps=${FPS}`,
-        ].join(",") + fadeFilter;
+          ...(padSeconds > 0 ? [`tpad=stop_mode=clone:stop_duration=${padSeconds.toFixed(3)}`] : []),
+        ].join(",") + lutFilter + fadeFilter;
 
         if (useGlobalAudio) {
           await execAsync(
             `ffmpeg -y -i "${scene.mediaPath}" ` +
             `-vf "${videoFilters}" -an ` +
-            `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+            `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-t ${duration} "${sceneOutput}"`
           );
         } else {
@@ -250,7 +255,7 @@ export async function composeVideo(
             `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
             `-filter_complex "[0:v]${videoFilters}[outv];[1:a]aresample=44100[outa]" ` +
             `-map "[outv]" -map "[outa]" ` +
-            `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+            `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
             `-t ${duration} "${sceneOutput}"`
           );
@@ -270,13 +275,13 @@ export async function composeVideo(
           `crop=${W * 2}:${H * 2}`,
           `setsar=1`,
           `zoompan=z='${effect.zoom}':x='${effect.x}':y='${effect.y}':d=${totalFrames}:s=${W}x${H}:fps=${FPS}`,
-        ].join(",") + fadeFilter;
+        ].join(",") + lutFilter + fadeFilter;
 
         if (useGlobalAudio) {
           await execAsync(
             `ffmpeg -y -loop 1 -i "${scene.mediaPath}" ` +
             `-vf "${imageFilter}" -an ` +
-            `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+            `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-t ${duration} "${sceneOutput}"`
           );
         } else {
@@ -284,7 +289,7 @@ export async function composeVideo(
             `ffmpeg -y -loop 1 -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
             `-filter_complex "[0:v]${imageFilter}[outv];[1:a]aresample=44100[outa]" ` +
             `-map "[outv]" -map "[outa]" ` +
-            `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+            `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
             `-t ${duration} "${sceneOutput}"`
           );
@@ -305,7 +310,7 @@ export async function composeVideo(
 
       await execAsync(
         `ffmpeg -y -f concat -safe 0 -i "${concatList}" ` +
-        `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+        `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
         (useGlobalAudio ? `-an ` : `-c:a aac -b:a 192k `) +
         `"${rawConcat}"`
       );
@@ -324,7 +329,7 @@ export async function composeVideo(
       await execAsync(
         `ffmpeg -y -i "${rawConcat}" ` +
         `-vf "ass='${assPathEscaped}'" ` +
-        `-c:v libx264 -preset ${VIDEO_ENCODING.preset} -crf ${VIDEO_ENCODING.crf} -pix_fmt yuv420p ` +
+        `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
         (useGlobalAudio ? `-an ` : `-c:a copy `) +
         `"${withCaptions}"`
       );
@@ -343,9 +348,19 @@ export async function composeVideo(
 
     if (backgroundMusicPath) {
       const finalOutput = path.join(workDir, "final.mp4");
+      // Sidechain compression: VO drives the compressor on the music bus, so
+      // the music ducks under speech and rebounds during pauses. Replaces a
+      // flat 10% bed mix that buried the music outside speech and still fought
+      // the VO during it.
+      const duckFilter =
+        `[1:a]volume=0.45,aresample=44100[bgRaw];` +
+        `[0:a]asplit=2[voPlay][voSc];` +
+        `[bgRaw][voSc]sidechaincompress=` +
+        `threshold=0.06:ratio=8:attack=20:release=350:makeup=1[bgDucked];` +
+        `[voPlay][bgDucked]amix=inputs=2:duration=first:dropout_transition=0[outa]`;
       await execAsync(
         `ffmpeg -y -i "${currentVideo}" -i "${backgroundMusicPath}" ` +
-        `-filter_complex "[1:a]volume=0.10[bg];[0:a][bg]amix=inputs=2:duration=first[outa]" ` +
+        `-filter_complex "${duckFilter}" ` +
         `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${finalOutput}"`
       );
       return finalOutput;
@@ -359,3 +374,26 @@ export async function composeVideo(
 }
 
 export { downloadFile };
+
+/**
+ * Resolves a color grade name to a 3D LUT path under public/luts/. Returns
+ * undefined (i.e. no grade applied) when the file is missing so the option can
+ * be wired in code before the LUT assets land. Drop matching `.cube` files
+ * under `public/luts/{warm,cool,teal-orange,mono}.cube` to enable.
+ */
+async function resolveColorGradeLut(grade: ColorGrade | undefined): Promise<string | undefined> {
+  if (!grade) return undefined;
+  const lutFile = path.join(process.cwd(), "public", "luts", `${grade}.cube`);
+  try {
+    await fs.access(lutFile);
+    return lutFile;
+  } catch {
+    console.warn(`[composer] colorGrade="${grade}" requested but ${lutFile} not found — skipping LUT.`);
+    return undefined;
+  }
+}
+
+/** Escape a path for ffmpeg filter graphs (mainly the Windows-drive-style colon). */
+function escapeFilterPath(p: string): string {
+  return p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "'\\''");
+}
