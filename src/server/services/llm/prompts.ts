@@ -1,5 +1,5 @@
 /** Machine-checked prompt rules / status: see `prompt-contract.ts` + `image-spec.ts`. */
-import { generateText as aiGenerateText, Output } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
@@ -118,7 +118,7 @@ Return exactly ${scenes.length} scenes.`;
   const frameTaskPrompt = `Create imageSpec for each frame:\n\n${scenesContext}`;
   const visionParts = assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
-  const { output } = await aiGenerateText({
+  const { output } = await generateText({
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: framePromptsLlmOutputSchema }),
     system: systemPrompt,

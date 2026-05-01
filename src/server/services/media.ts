@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import { MEDIA, LLM } from "@/lib/constants";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 
@@ -50,13 +50,6 @@ function compositionSuffix(ar: AspectRatio): string {
   return "Vertical 9:16 composition";
 }
 
-function klingOmniPlaceholders(promptWithElements: string, elementCount: number): string {
-  let p = promptWithElements;
-  for (let i = 1; i <= elementCount; i++) {
-    p = p.replace(new RegExp(`@Element${i}\\b`, "g"), `<<<image_${i}>>>`);
-  }
-  return p;
-}
 export async function generateImageDallE3(
   prompt: string,
   aspectRatio: AspectRatio = "9:16"
@@ -145,6 +138,100 @@ export async function generateImageGptImage15(
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   return generateOpenAiGptImageModel("gpt-image-1.5", prompt, aspectRatio);
+}
+
+async function base64ImageToUploadable(
+  img: { base64: string; mimeType: string },
+  filename: string,
+) {
+  const buf = Buffer.from(img.base64, "base64");
+  return toFile(buf, filename, { type: img.mimeType });
+}
+
+/**
+ * Image API edits for `gpt-image-2` (supports multiple input images for refs + annotated workflow).
+ * Returns a signed storage URL for the edited image.
+ */
+export async function editImageViaGptImage2(
+  editPrompt: string,
+  aspectRatio: AspectRatio,
+  sourceImg: { base64: string; mimeType: string },
+  options?: {
+    annotatedImg?: { base64: string; mimeType: string } | null;
+    referenceImages?: Array<{ base64: string; mimeType: string }>;
+  },
+): Promise<string | null> {
+  try {
+    const refs = (options?.referenceImages ?? []).slice(0, 4);
+    const annotated = options?.annotatedImg ?? null;
+
+    const imageParts: Awaited<ReturnType<typeof base64ImageToUploadable>>[] = [];
+    let prompt = "";
+
+    if (refs.length > 0) {
+      prompt += `Here ${refs.length === 1 ? "is a reference image" : `are ${refs.length} reference images`} from other frames for visual context.\n\n`;
+      for (let i = 0; i < refs.length; i++) {
+        imageParts.push(
+          await base64ImageToUploadable(refs[i], `ref-${i}.jpg`),
+        );
+      }
+    }
+
+    if (annotated) {
+      prompt +=
+        "The next image has colored highlights/markers showing exactly which areas to edit.\n\n";
+      prompt +=
+        "The image after that is the clean original to edit.\n\n";
+      prompt += `Edit ONLY the highlighted areas from the reference image above. Apply this change to the clean image: ${editPrompt}. Keep everything outside the highlighted areas exactly the same. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks. Do NOT include any highlights, markers, or selection rectangles in the output.`;
+      imageParts.push(
+        await base64ImageToUploadable(annotated, "annotated.jpg"),
+      );
+      imageParts.push(
+        await base64ImageToUploadable(sourceImg, "source.jpg"),
+      );
+    } else {
+      prompt +=
+        refs.length > 0
+          ? `Edit the main frame (last image in this request): ${editPrompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks. Use earlier images only as visual reference when helpful.`
+          : `Edit this image: ${editPrompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks.`;
+      imageParts.push(
+        await base64ImageToUploadable(sourceImg, "source.jpg"),
+      );
+    }
+
+    const response = await openai.images.edit({
+      model: "gpt-image-1.5",
+      image: imageParts,
+      prompt,
+      n: 1,
+      size: gptImage15Size(aspectRatio),
+      quality: "medium",
+    });
+
+    console.log(response);
+
+
+    const item = response.data?.[0];
+    const b64 = item?.b64_json;
+    if (b64) {
+      const buffer = Buffer.from(b64, "base64");
+      const key = `generated/gpt-image-2-edit_${Date.now()}.png`;
+      await uploadFile(key, buffer, "image/png");
+      return getSignedDownloadUrl(key);
+    }
+
+    const remoteUrl = item?.url;
+    if (remoteUrl) {
+      return remoteUrl;
+    }
+
+    return null;
+  } catch (err) {
+    console.warn(
+      `gpt-image-2 edit failed: ${err instanceof Error ? err.message : JSON.stringify(err)}`,
+    );
+    return null;
+  }
 }
 
 export interface CharacterRef {

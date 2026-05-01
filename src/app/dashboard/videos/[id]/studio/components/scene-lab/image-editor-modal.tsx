@@ -53,6 +53,7 @@ interface ImageEditorModalProps {
 const EDIT_MODELS = [
   { id: "nano-banana-2", label: "Nano Banana 2" },
   { id: "nano-banana-pro", label: "Nano Banana Pro" },
+  { id: "gpt-image-2", label: "GPT Image 2" },
 ] as const;
 
 // ── Helpers ──

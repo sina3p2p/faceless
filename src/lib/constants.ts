@@ -132,6 +132,17 @@ export const VIDEO_MODELS: readonly TVideoModelEntry[] = [
     endFrame: true,
   },
   {
+    id: "kling-v2.5-turbo-pro",
+    label: "Kling V2.5 Turbo Pro",
+    falEndpoint: "fal-ai/kling-video/v2.6/pro/image-to-video",
+    replicateModel: "kwaivgi/kling-v2.5-turbo-pro",
+    supportedResolution: [],
+    description: "Kling V2.5 Turbo Pro on Fal — higher quality; 5s / 10s",
+    durations: [5, 10],
+    generateAudio: false,
+    endFrame: true,
+  },
+  {
     id: "runway-gen4-turbo",
     label: "Runway Gen-4 Turbo",
     falEndpoint: "fal-ai/luma-dream-machine/ray-2-flash/image-to-video",

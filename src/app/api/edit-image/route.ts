@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
-import { type AspectRatio } from "@/server/services/media";
+import { editImageViaGptImage2, type AspectRatio } from "@/server/services/media";
 import { getSignedDownloadUrl, uploadFile } from "@/lib/storage";
 import { LLM } from "@/lib/constants";
 import { z } from "zod";
@@ -10,7 +10,9 @@ const bodySchema = z.object({
   annotatedImageUrl: z.string().optional(),
   referenceImageUrls: z.array(z.string()).optional(),
   editPrompt: z.string().min(1),
-  model: z.enum(["nano-banana-2", "nano-banana-pro"]).default("nano-banana-2"),
+  model: z
+    .enum(["nano-banana-2", "nano-banana-pro", "gpt-image-2"])
+    .default("nano-banana-2"),
   aspectRatio: z.enum(["16:9", "9:16", "1:1"]).default("9:16"),
 });
 
@@ -94,6 +96,28 @@ export async function POST(req: NextRequest) {
       for (const r of results) {
         if (r) refImages.push(r);
       }
+    }
+
+    if (model === "gpt-image-2") {
+      const editedUrl = await editImageViaGptImage2(
+        editPrompt,
+        aspectRatio as AspectRatio,
+        sourceImg,
+        {
+          annotatedImg: annotatedImg,
+          referenceImages: refImages.length > 0 ? refImages : undefined,
+        },
+      );
+      if (!editedUrl) {
+        return NextResponse.json(
+          {
+            error:
+              "Image editing failed. Try again or use a different model.",
+          },
+          { status: 422 },
+        );
+      }
+      return NextResponse.json({ url: editedUrl });
     }
 
     const contentParts: Array<
