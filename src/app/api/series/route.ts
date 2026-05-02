@@ -12,7 +12,7 @@ const createSeriesSchema = z.object({
   style: z.string().default("cinematic"),
   defaultVoiceId: z.string().optional(),
   llmModel: z.string().default("anthropic/claude-opus-4.6"),
-  imageModel: z.string().default("dall-e-3"),
+  imageModel: z.string().default("gpt-image-1.5"),
   videoModel: z.string().default("kling-3-standard"),
   videoSize: z.string().default("9:16"),
   captionStyle: z.string().default("none"),

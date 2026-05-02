@@ -8,7 +8,6 @@ const MODEL_TAGS = ["Fast", "Cheap", "Quality", "Consistent"] as const;
 type ModelTag = (typeof MODEL_TAGS)[number];
 
 const MODEL_META: Record<string, { icon: string; color: string; tags: ModelTag[] }> = {
-  "dall-e-3": { icon: "D", color: "bg-emerald-500", tags: ["Quality"] },
   "gpt-image-1.5": { icon: "1", color: "bg-sky-600", tags: ["Quality"] },
   "gpt-image-2": { icon: "2", color: "bg-cyan-600", tags: ["Quality"] },
   "kling-image-v3": { icon: "K", color: "bg-blue-500", tags: ["Quality", "Consistent"] },
@@ -146,7 +145,7 @@ export function ModelPicker({
                 className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${activeTag === tag
                   ? "bg-gray-900 text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
+                  }`}
               >
                 {tag}
               </button>
@@ -169,7 +168,7 @@ export function ModelPicker({
                   className={`w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${isSelected
                     ? "bg-violet-50"
                     : "hover:bg-gray-50"
-                  }`}
+                    }`}
                 >
                   <div className={`w-10 h-10 rounded-xl ${meta.color} flex items-center justify-center shrink-0 mt-0.5`}>
                     <span className="text-white text-[14px] font-bold">{meta.icon}</span>

@@ -18,7 +18,6 @@ import type { MotionSkillHints } from "@/types/motion-skill-hints";
 import type { ResultMeta } from "@/server/services/llm/prompt-contract";
 import type { ModelSettings } from "@/types/llm-common";
 import { PipelineConfig } from "@/types/pipeline";
-import { generateSeed } from "@/lib/seed";
 
 // ── Enums ──
 
@@ -147,7 +146,7 @@ export const series = pgTable("series", {
   style: text("style").default("cinematic").notNull(),
   defaultVoiceId: text("default_voice_id"),
   llmModel: text("llm_model").default("anthropic/claude-opus-4.6"),
-  imageModel: text("image_model").default("dall-e-3"),
+  imageModel: text("image_model").default("gpt-image-1.5"),
   videoModel: text("video_model").default("kling-3-standard"),
   language: text("language").default("en").notNull(),
   captionStyle: text("caption_style").default("none").notNull(),
@@ -173,7 +172,7 @@ export const videoProjects = pgTable("video_projects", {
   outputUrl: text("output_url"),
   thumbnailUrl: text("thumbnail_url"),
   llmModel: text("llm_model").default("anthropic/claude-opus-4.6"),
-  imageModel: text("image_model").default("dall-e-3"),
+  imageModel: text("image_model").default("gpt-image-1.5"),
   videoModel: text("video_model").default("kling-3-standard"),
   modelSettings: json("model_settings").$type<ModelSettings>(),
   videoSize: text("video_size"),

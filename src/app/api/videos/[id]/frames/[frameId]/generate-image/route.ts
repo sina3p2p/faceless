@@ -41,7 +41,7 @@ export async function POST(
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) return badRequest(parsed.error.message);
 
-  const imageModel = parsed.data.imageModel || video.imageModel || "dall-e-3";
+  const imageModel = parsed.data.imageModel || video.imageModel || "gpt-image-1.5";
   const sizeConfig = getVideoSize(video.videoSize);
   const aspectRatio = sizeConfig.id as AspectRatio;
 

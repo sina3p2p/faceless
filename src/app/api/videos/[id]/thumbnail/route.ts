@@ -11,7 +11,7 @@ import { IMAGE_MODELS } from "@/lib/constants";
 
 const bodySchema = z.object({
   prompt: z.string().optional(),
-  imageModel: z.enum(IMAGE_MODELS.map((m) => m.id) as [string, ...string[]]).default("dall-e-3"),
+  imageModel: z.enum(IMAGE_MODELS.map((m) => m.id) as [string, ...string[]]).default("gpt-image-1.5"),
 });
 
 export async function POST(

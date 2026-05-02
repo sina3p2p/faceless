@@ -40,7 +40,7 @@ export function InspectorPanel({
   onDownload: () => void;
 }) {
   const currentPhase = phase.phases.find((p) => p.id === phase.activePhaseId);
-  const imageModel = video?.series?.imageModel || "dall-e-3";
+  const imageModel = video?.imageModel;
 
   return (
     <aside className="w-72 shrink-0 border-l border-white/5 bg-black/30 flex flex-col overflow-hidden">

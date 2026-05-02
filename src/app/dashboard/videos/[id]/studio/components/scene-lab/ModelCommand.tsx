@@ -7,7 +7,6 @@ const MODEL_TAGS = ["Fast", "Cheap", "Quality", "Consistent"] as const;
 type ModelTag = (typeof MODEL_TAGS)[number];
 
 const MODEL_META: Record<string, { icon: string; color: string; tags: ModelTag[] }> = {
-  "dall-e-3": { icon: "D", color: "bg-emerald-500", tags: ["Quality"] },
   "gpt-image-1.5": { icon: "1", color: "bg-sky-600", tags: ["Quality"] },
   "gpt-image-2": { icon: "2", color: "bg-cyan-600", tags: ["Quality"] },
   "kling-image-v3": { icon: "K", color: "bg-blue-500", tags: ["Quality", "Consistent"] },
@@ -88,7 +87,7 @@ export function ModelCommand({
               className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-colors ${activeTag === tag
                 ? "bg-violet-500/20 text-violet-300 border border-violet-500/30"
                 : "bg-white/5 text-gray-400 border border-white/5 hover:bg-white/10 hover:text-white"
-              }`}
+                }`}
             >
               {tag}
             </button>
@@ -112,7 +111,7 @@ export function ModelCommand({
                 className={`w-full flex items-center gap-3.5 px-3 py-3 rounded-xl text-left transition-colors ${isFocused
                   ? "bg-violet-500/15"
                   : "hover:bg-white/5"
-                }`}
+                  }`}
               >
                 <div className={`w-10 h-10 rounded-xl ${meta.color} flex items-center justify-center shrink-0`}>
                   <span className="text-white text-[15px] font-bold">{meta.icon}</span>

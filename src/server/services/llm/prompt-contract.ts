@@ -509,7 +509,7 @@ export interface BuildFramePromptContractInput {
   imagePrompt: string;
   subjectFocus: string;
   characterRegistry: CharacterEntry[];
-  /** e.g. model id or "kling" / "dall-e" for tracing */
+  /** e.g. model id or "kling" / "nano-banana" for tracing */
   providerProfile: string;
   /** When true, upstream-only fallback was attempted after primary prompt failed contract. */
   fallbackAttempted?: boolean;

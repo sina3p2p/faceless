@@ -14,18 +14,6 @@ export interface MediaAsset {
 
 export type AspectRatio = "9:16" | "16:9" | "1:1";
 
-function dalleSize(ar: AspectRatio): "1024x1792" | "1792x1024" | "1024x1024" {
-  if (ar === "16:9") return "1792x1024";
-  if (ar === "1:1") return "1024x1024";
-  return "1024x1792";
-}
-
-function dalleDimensions(ar: AspectRatio): { width: number; height: number } {
-  if (ar === "16:9") return { width: 1792, height: 1024 };
-  if (ar === "1:1") return { width: 1024, height: 1024 };
-  return { width: 1024, height: 1792 };
-}
-
 function gptImage15Size(ar: AspectRatio): "1024x1536" | "1536x1024" | "1024x1024" {
   if (ar === "16:9") return "1536x1024";
   if (ar === "1:1") return "1024x1024";
@@ -48,34 +36,6 @@ function compositionSuffix(ar: AspectRatio): string {
   if (ar === "16:9") return "Landscape 16:9 composition";
   if (ar === "1:1") return "Square 1:1 composition";
   return "Vertical 9:16 composition";
-}
-
-export async function generateImageDallE3(
-  prompt: string,
-  aspectRatio: AspectRatio = "9:16"
-): Promise<MediaAsset | null> {
-  try {
-    const dims = dalleDimensions(aspectRatio);
-    const response = await openai.images.generate({
-      model: "dall-e-3",
-      prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`,
-      n: 1,
-      size: dalleSize(aspectRatio),
-    });
-
-    const url = response.data?.[0]?.url;
-    if (!url) return null;
-
-    return {
-      url,
-      type: "image",
-      source: "openai",
-      width: dims.width,
-      height: dims.height,
-    };
-  } catch {
-    return null;
-  }
 }
 
 type OpenAiGptImageModelId = "gpt-image-1.5" | "gpt-image-2";
@@ -468,7 +428,7 @@ export async function editImageViaGemini(
 
 export async function generateImage(
   prompt: string,
-  imageModel = "dall-e-3",
+  imageModel = "gpt-image-1.5",
   characterRefs?: CharacterRef[],
   aspectRatio: AspectRatio = "9:16"
 ): Promise<MediaAsset> {
@@ -477,7 +437,6 @@ export async function generateImage(
     "nano-banana-pro": () => generateViaOpenRouter(prompt, 'google/gemini-3-pro-image-preview', characterRefs, aspectRatio),
     "gpt-image-1.5": () => generateImageGptImage15(prompt, aspectRatio),
     "gpt-image-2": () => generateOpenAiGptImageModel("gpt-image-2", prompt, aspectRatio),
-    "dall-e-3": () => generateImageDallE3(prompt, aspectRatio),
   }
 
   const result = await models[imageModel as keyof typeof models]?.();
