@@ -180,10 +180,6 @@ export const videoProjects = pgTable("video_projects", {
   voiceId: text("voice_id"),
   idea: text("prompt"),
   style: text("style").default("cinematic").notNull(),
-  /** Master seed for deterministic re-rolls. Per-stage subseeds derived in pipeline.
-   *  Auto-generated on insert so every new project gets one without each call
-   *  site having to remember. Nullable for back-compat with rows created before
-   *  this column existed. */
   seed: integer("seed").default(0).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
