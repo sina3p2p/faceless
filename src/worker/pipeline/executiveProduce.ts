@@ -5,7 +5,6 @@ import type { RenderJobData } from "@/lib/queue";
 import { resolveDuration, type DurationPreference } from "@/types/pipeline";
 import { generateCreativeBrief } from "@/server/services/llm";
 import { getAgentModels, mergeProjectConfig } from "./shared";
-import { generateSeed } from "@/lib/seed";
 
 export async function executiveProduceJob(job: Job<RenderJobData>) {
   const { videoProjectId } = job.data;
@@ -17,18 +16,6 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
     if (!video) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "PRODUCING");
-
-    // Lock a master seed for this project so subsequent re-rolls are deterministic.
-    // If the user hasn't supplied one (e.g. via API at creation), generate now.
-    if (video.seed == null) {
-      const seed = generateSeed();
-      await db
-        .update(schema.videoProjects)
-        .set({ seed })
-        .where(eq(schema.videoProjects.id, videoProjectId));
-      video.seed = seed;
-      console.log(`[executive-produce] Locked seed=${seed} for video=${videoProjectId}`);
-    }
 
     const config = video.config ?? {};
 

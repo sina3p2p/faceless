@@ -18,6 +18,7 @@ import type { MotionSkillHints } from "@/types/motion-skill-hints";
 import type { ResultMeta } from "@/server/services/llm/prompt-contract";
 import type { ModelSettings } from "@/types/llm-common";
 import { PipelineConfig } from "@/types/pipeline";
+import { generateSeed } from "@/lib/seed";
 
 // ── Enums ──
 
@@ -179,8 +180,11 @@ export const videoProjects = pgTable("video_projects", {
   voiceId: text("voice_id"),
   idea: text("prompt"),
   style: text("style").default("cinematic").notNull(),
-  /** Master seed for deterministic re-rolls. Per-stage subseeds derived in pipeline. */
-  seed: integer("seed"),
+  /** Master seed for deterministic re-rolls. Per-stage subseeds derived in pipeline.
+   *  Auto-generated on insert so every new project gets one without each call
+   *  site having to remember. Nullable for back-compat with rows created before
+   *  this column existed. */
+  seed: integer("seed").$defaultFn(() => generateSeed()),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
