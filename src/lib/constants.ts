@@ -132,7 +132,7 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   "kling-v2.5-turbo-pro": {
     id: "kling-v2.5-turbo-pro",
     label: "Kling V2.5 Turbo Pro",
-    endpoint: "fal-ai/kling-video/v2.6/pro/image-to-video",
+    endpoint: "kwaivgi/kling-v2.5-turbo-pro",
     provider: "replicate",
     supportedResolution: [],
     description: "Kling V2.5 Turbo Pro on Fal — higher quality; 5s / 10s",

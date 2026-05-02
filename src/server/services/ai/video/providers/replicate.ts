@@ -55,7 +55,6 @@ export class ReplicateVideoProvider implements IVideoProvider {
   }
   async generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult> {
     const input = this.generateInput(model, req);
-    console.log('body', { input, version: VIDEO_MODELS[model].endpoint });
     const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
     const predictionId = prediction.data.id;
     let status = 'pending';
