@@ -30,7 +30,6 @@ export async function GET(
           },
         },
       },
-      series: { columns: { userId: true } },
     },
   });
 
