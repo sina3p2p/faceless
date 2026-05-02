@@ -1,17 +1,6 @@
-import { renderJobs, videoProjects, videoStatusEnum } from "@/server/db/schema";
-import { ModelSettings } from "./llm-common";
+import { media, renderJobs, videoProjects } from "@/server/db/schema";
 
 export interface MediaVersion {
-  id: string;
-  type: string;
-  url: string;
-  key: string;
-  prompt: string | null;
-  modelUsed: string | null;
-  createdAt: string;
-}
-
-export interface Media {
   id: string;
   type: string;
   url: string;
@@ -26,7 +15,7 @@ export interface FrameVariant {
   type: string;
   url: string;
   prompt: string | null;
-  modelUsed: string | null;
+  modelUsed: string;
   createdAt: string;
 }
 
@@ -50,10 +39,7 @@ export interface SceneFrame {
   visualDescription: string | null;
   imageUrl: string | null;
   videoUrl: string | null;
-  modelUsed?: string | null;
   media?: FrameVariant[];
-  imageGeneratedAt?: string | null;
-  videoGeneratedAt?: string | null;
   motionGeneratedAt?: string | null;
   imageMediaId?: string | null;
   videoMediaId?: string | null;
@@ -91,6 +77,8 @@ export interface StoryAssetItem {
 export type RenderJob = typeof renderJobs.$inferSelect;
 
 export type VideoDetail = typeof videoProjects.$inferSelect & { renderJobs?: RenderJob[] };
+
+export type Media = typeof media.$inferSelect & { modelUsed: TVideoModelId | TImageModelId };
 
 export interface ChatMsg {
   role: "user" | "assistant";

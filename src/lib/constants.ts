@@ -2,7 +2,7 @@
 // Central configuration — all settings and env vars in one place
 // ─────────────────────────────────────────────────────────
 
-import type { TVideoModelEntry, TVideoProviderId } from "@/types/video-provider";
+import type { TVideoModel, TVideoProviderId } from "@/types/video-provider";
 
 export const env = (key: string, fallback = "") => process.env[key] || fallback;
 
@@ -38,10 +38,10 @@ export const LLM = {
   defaultModel: "anthropic/claude-opus-4.6",
   fallbackModel: "openai/gpt-4.1",
   visionModel: "google/gemini-2.5-pro",
-  producerModel: "anthropic/claude-sonnet-4",
+  producerModel: "anthropic/claude-opus-4.6",
   storyModel: "anthropic/claude-opus-4.6",
   directorModel: "anthropic/claude-opus-4.6",
-  supervisorModel: "anthropic/claude-sonnet-4",
+  supervisorModel: "anthropic/claude-opus-4.6",
   cinematographerModel: "openai/gpt-5.4",
   storyboardModel: "openai/gpt-4.1-mini",
   promptModel: "openai/gpt-5.4",
@@ -106,118 +106,124 @@ export const MUSIC = {
   sunoModel: "V5" as const,
 } as const;
 
-const SEEDANCE2_DURATIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] as const;
+const SEEDANCE2_DURATIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
-export const VIDEO_MODELS: readonly TVideoModelEntry[] = [
-  {
+export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
+  "seedance-2-pro": {
     id: "seedance-2-pro",
     label: "Seedance 2 Pro",
-    falEndpoint: "bytedance/seedance-2.0/image-to-video",
-    replicateModel: "bytedance/seedance-2.0",
+    endpoint: "bytedance/seedance-2.0",
+    provider: "replicate",
     supportedResolution: ["480p", "720p", "1080p"],
     description: "ByteDance Seedance 2.0 i2v on Fal (4–15s, optional last frame, up to 1080p)",
     durations: SEEDANCE2_DURATIONS,
-    generateAudio: false,
-    endFrame: true,
+    endFrameSupported: true,
   },
-  {
+  "seedance-2-fast": {
     id: "seedance-2-fast",
     label: "Seedance 2 Fast",
-    falEndpoint: "bytedance/seedance-2.0/fast/image-to-video",
-    replicateModel: "bytedance/seedance-2.0-fast",
+    endpoint: "bytedance/seedance-2.0/fast/image-to-video",
+    provider: "replicate",
     supportedResolution: ["480p", "720p"],
     description: "Seedance 2.0 Fast on Fal — lower latency; 480p/720p only on API",
     durations: SEEDANCE2_DURATIONS,
-    generateAudio: false,
-    endFrame: true,
+    endFrameSupported: true,
   },
-  {
+  "kling-v2.5-turbo-pro": {
     id: "kling-v2.5-turbo-pro",
     label: "Kling V2.5 Turbo Pro",
-    falEndpoint: "fal-ai/kling-video/v2.6/pro/image-to-video",
-    replicateModel: "kwaivgi/kling-v2.5-turbo-pro",
+    endpoint: "fal-ai/kling-video/v2.6/pro/image-to-video",
+    provider: "replicate",
     supportedResolution: [],
     description: "Kling V2.5 Turbo Pro on Fal — higher quality; 5s / 10s",
     durations: [5, 10],
-    generateAudio: false,
-    endFrame: true,
+    endFrameSupported: true,
   },
-  {
+  "runway-gen4-turbo": {
     id: "runway-gen4-turbo",
     label: "Runway Gen-4 Turbo",
-    falEndpoint: "fal-ai/luma-dream-machine/ray-2-flash/image-to-video",
+    endpoint: "fal-ai/luma-dream-machine/ray-2-flash/image-to-video",
+    provider: "fal",
     supportedResolution: ["540p", "720p", "1080p"],
     description: "Strong motion quality (via Fal — Luma Ray 2), 5s or 9s",
     durations: [5, 9],
-    endFrame: false,
+    endFrameSupported: false,
   },
-  {
+  "runway-gen4.5": {
     id: "runway-gen4.5",
     label: "Runway Gen-4.5",
-    falEndpoint: "fal-ai/luma-dream-machine/ray-2/image-to-video",
+    endpoint: "fal-ai/luma-dream-machine/ray-2/image-to-video",
+    provider: "fal",
     supportedResolution: ["540p", "720p", "1080p"],
     description: "Premium motion (via Fal — Luma Ray 2 @ 1080p), 5s or 9s",
     durations: [5, 9],
-    endFrame: false,
+    endFrameSupported: false,
   },
-  {
+  "grok-imagine": {
     id: "grok-imagine",
     label: "Grok Imagine Video",
-    falEndpoint: "xai/grok-imagine-video/image-to-video",
+    endpoint: "xai/grok-imagine-video/image-to-video",
+    provider: "fal",
     supportedResolution: ["480p", "720p"],
     description: "xAI Grok Imagine i2v with audio (via Fal), 1–15s",
     durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    endFrame: false,
+    endFrameSupported: false,
   },
-  {
+  "veo-31-lite": {
     id: "veo-31-lite",
     label: "Veo 3.1 Lite",
-    falEndpoint: "fal-ai/veo3.1/image-to-video",
+    endpoint: "fal-ai/veo3.1/image-to-video",
+    provider: "fal",
     supportedResolution: ["720p", "1080p", "4k"],
     description: "Google Veo 3.1 i2v (via Fal), 720p, 4s / 6s / 8s",
     durations: [4, 6, 8],
-    endFrame: false,
+    endFrameSupported: false,
   },
-  {
+  "veo-31-fast": {
     id: "veo-31-fast",
     label: "Veo 3.1 Fast",
-    falEndpoint: "fal-ai/veo3.1/fast/image-to-video",
+    endpoint: "fal-ai/veo3.1/fast/image-to-video",
+    provider: "fal",
     supportedResolution: ["720p", "1080p", "4k"],
     description: "Google Veo 3.1 i2v (via Fal), 1080p, 4s / 6s / 8s",
     durations: [4, 6, 8],
-    endFrame: false,
+    endFrameSupported: false,
   },
-  {
+  "kling-3-standard": {
     id: "kling-3-standard",
     label: "Kling 3.0 Standard",
-    falEndpoint: "fal-ai/kling-video/v3/standard/image-to-video",
+    endpoint: "fal-ai/kling-video/v3/standard/image-to-video",
+    provider: "fal",
     supportedResolution: [],
     description: "Kling i2v with optional last frame (via Fal — v1.6 pro)",
     durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    endFrame: true,
+    endFrameSupported: true,
   },
-  {
+  "kling-3-pro": {
     id: "kling-3-pro",
     label: "Kling 3.0 Pro",
-    falEndpoint: "fal-ai/kling-video/v3/pro/image-to-video",
+    endpoint: "fal-ai/kling-video/v3/pro/image-to-video",
+    provider: "fal",
     supportedResolution: [],
     description: "Kling master-quality i2v (via Fal — v2.1 master)",
     durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
-    endFrame: false,
+    endFrameSupported: false,
   },
-];
+};
+
+export const VIDEO_MODEL_IDS = Object.keys(VIDEO_MODELS) as TVideoModelId[];
 
 export const DEFAULT_VIDEO_MODEL = "kling-3-standard";
 
 export function videoModelsForProvider(p: TVideoProviderId) {
-  if (p === "replicate") return VIDEO_MODELS.filter((m) => m.replicateModel);
-  return [...VIDEO_MODELS];
+  const models = Object.values(VIDEO_MODELS);
+  if (p === "replicate") return models.filter((m) => m.provider === "replicate");
+  return models;
 }
 
 export const IMAGE_MODELS = [
   { id: "gpt-image-1.5", label: "GPT Image 1.5", description: "Best OpenAI image model, instruction-following (OpenAI)" },
   { id: "gpt-image-2", label: "GPT Image 2", description: "State-of-the-art OpenAI image generation, text and editing (OpenAI)" },
-  { id: "kling-image-v3", label: "Kling Image V3", description: "Excellent quality, character refs, ~$0.028/image" },
   { id: "nano-banana-2", label: "Nano Banana 2", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
   { id: "nano-banana-pro", label: "Nano Banana Pro", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
 ] as const;
@@ -271,7 +277,7 @@ export const VIDEO_SIZES = [
   { id: "9:16", label: "Shorts / Reels (9:16)", width: 1080, height: 1920, orientation: "portrait" as const, dalleSize: "1024x1792" as const },
   { id: "16:9", label: "YouTube (16:9)", width: 1920, height: 1080, orientation: "landscape" as const, dalleSize: "1792x1024" as const },
   { id: "1:1", label: "Square (1:1)", width: 1080, height: 1080, orientation: "portrait" as const, dalleSize: "1024x1024" as const },
-] as const;
+];
 
 export const DEFAULT_VIDEO_SIZE = "9:16";
 

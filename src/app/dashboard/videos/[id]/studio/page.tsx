@@ -4,17 +4,14 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { DragEndEvent } from "@dnd-kit/core";
-
 import { useVideoActions } from "../hooks/use-video-actions";
 import { useVideoPhase, type StudioPhaseId } from "../hooks/use-video-phase";
 import { InspectorPanel, ScriptChatPanel, StudioTopBar } from "../components";
 import type { Scene, SceneFrame } from "@/types/video-detail";
-
 import { PhaseRail } from "./components/phase-rail";
 import { StudioCanvas } from "./components/studio-canvas";
 import { BottomDock } from "./components/bottom-dock";
 import { CanvasOverlay } from "./components/canvas-overlay";
-import { CompareWall } from "./components/compare-wall";
 import { SceneLab } from "./components/scene-lab";
 import { ModelCommand } from "./components/scene-lab/ModelCommand";
 import { IMAGE_MODELS } from "@/lib/constants";
@@ -45,7 +42,6 @@ export default function StudioPage() {
   const [regenerating, setRegenerating] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [comparingFrame, setComparingFrame] = useState<{ frame: SceneFrame; frameIndex: number; type: "image" | "video" } | null>(null);
   const [labSceneId, setLabSceneId] = useState<string | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<import("./context/StudioContext").SelectedMedia | null>(null);
   const [variantFrameId, setVariantFrameId] = useState<string | null>(null);
@@ -246,14 +242,6 @@ export default function StudioPage() {
               onStartRendering={handleStartRendering}
               onRecompose={handleRecompose}
               onDownload={handleDownload}
-              canCompare={canCompare}
-              onCompare={() => {
-                if (comparableFrame) {
-                  const frameIndex = selectedScene?.frames?.indexOf(comparableFrame) ?? 0;
-                  const type = comparableFrame.media?.some(m => m.type === "image") ? "image" as const : "video" as const;
-                  setComparingFrame({ frame: comparableFrame, frameIndex, type });
-                }
-              }}
               isLabMode={isLabMode}
               onExitLab={() => setLabSceneId(null)}
               hasLabFrames={!!(selectedScene?.frames && selectedScene.frames.length > 0)}
@@ -295,24 +283,6 @@ export default function StudioPage() {
                   setVariantFrameId(null);
                 }}
                 onClose={() => setVariantFrameId(null)}
-              />
-            )}
-
-            {/* Compare Wall overlay */}
-            {comparingFrame && (
-              <CompareWall
-                frame={comparingFrame.frame}
-                frameIndex={comparingFrame.frameIndex}
-                type={comparingFrame.type}
-                onSelect={(frameId, variantId, type) => {
-                  handleSelectFrameVariant(frameId, variantId, type);
-                  setComparingFrame(null);
-                }}
-                onRegenerate={(frameId) => {
-                  handleGenerateFrameImage(frameId);
-                  setComparingFrame(null);
-                }}
-                onClose={() => setComparingFrame(null)}
               />
             )}
           </div>

@@ -1,57 +1,33 @@
 import * as fs from "fs/promises";
 import axios from "axios";
-import { DEFAULT_VIDEO_MODEL, VIDEO_I2V_PROVIDER } from "@/lib/constants";
-import { dispatchI2v } from "./registry";
 import { pickBestDuration } from "./pick-duration";
-import { resolveModel } from "./resolve-model";
 import type { VideoResult } from "@/types/video-provider";
+import { VIDEO_MODELS } from "@/lib/constants";
+import { ReplicateVideoProvider } from "./providers/replicate";
 
 export type { VideoResult } from "@/types/video-provider";
 
+const replicate = new ReplicateVideoProvider();
+
 export async function generateVideoFromImage(
-  imageUrl: string,
+  startImageUrl: string,
   prompt: string,
   desiredDuration: number = 5,
-  videoModelKey?: string,
+  videoModelId: TVideoModelId,
   endImageUrl?: string,
-  aspectRatio: string = "9:16"
+  aspectRatio: TAspectRatio = "9:16"
 ): Promise<VideoResult> {
-  const resolved = resolveModel(videoModelKey);
-  const apiDuration = pickBestDuration(desiredDuration, resolved.durations);
+  const duration = pickBestDuration(desiredDuration, VIDEO_MODELS[videoModelId].durations);
 
   const req = {
-    imageUrl,
-    prompt,
-    apiDuration,
-    endFrame: resolved.endFrame,
+    startImageUrl,
     endImageUrl,
+    prompt,
+    duration,
     aspectRatio,
   };
 
-  return dispatchI2v(req, resolved);
-}
-
-export async function getAIVideoForScene(
-  imageUrl: string,
-  prompt: string,
-  desiredDuration: number = 5,
-  videoModelKey?: string,
-  endImageUrl?: string,
-  aspectRatio: string = "9:16"
-): Promise<VideoResult> {
-  const modelLabel = videoModelKey || DEFAULT_VIDEO_MODEL;
-  const p = VIDEO_I2V_PROVIDER;
-  console.log(
-    `[ai-video] provider=${p} model=${modelLabel} desired=${desiredDuration}s${endImageUrl ? " with end frame" : ""} for: "${prompt.slice(0, 60)}..."`
-  );
-  return await generateVideoFromImage(
-    imageUrl,
-    prompt,
-    desiredDuration,
-    videoModelKey,
-    endImageUrl,
-    aspectRatio
-  );
+  return replicate.generateFromImage(req, videoModelId);
 }
 
 export async function downloadAIVideo(videoUrl: string, destPath: string): Promise<void> {

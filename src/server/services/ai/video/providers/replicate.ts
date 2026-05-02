@@ -1,18 +1,14 @@
-import { AI_VIDEO } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, ResolvedVideoModel, VideoResult } from "@/types/video-provider";
+import { AI_VIDEO, VIDEO_MODELS } from "@/lib/constants";
+import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
+import { sleep } from "@/lib/utils";
+import axios, { AxiosInstance } from "axios";
 
 const REPLICATE_API = "https://api.replicate.com/v1";
-
-const versionCache = new Map<string, string>();
 
 /** Serialize POST /v1/predictions so we never issue parallel creates (Replicate throttles burst=1 in low-balance mode). */
 let createPostQueue: Promise<unknown> = Promise.resolve();
 
 const CREATE_PREDICTION_MAX_ATTEMPTS = 15;
-
-function sleep(ms: number) {
-  return new Promise<void>((r) => setTimeout(r, ms));
-}
 
 function parseReplicateCreateError(body: string): { retryAfterSec: number } | null {
   try {
@@ -72,13 +68,6 @@ async function postPredictionCreate(
   });
 }
 
-function mapAspectSeedance(ar: string): "auto" | "21:9" | "16:9" | "4:3" | "1:1" | "3:4" | "9:16" {
-  if (ar === "21:9" || ar === "16:9" || ar === "4:3" || ar === "1:1" || ar === "3:4" || ar === "9:16") {
-    return ar;
-  }
-  return "auto";
-}
-
 function extractOutputUrl(out: unknown): string {
   if (typeof out === "string" && (out.startsWith("http://") || out.startsWith("https://"))) {
     return out;
@@ -92,46 +81,6 @@ function extractOutputUrl(out: unknown): string {
   throw new Error("Replicate returned no video URL in output");
 }
 
-function buildSeedanceInput(
-  modelId: string,
-  req: I2vRequest,
-  resolved: ResolvedVideoModel
-): Record<string, unknown> {
-  const { resolution, generateAudio } = resolved;
-  const useEnd = req.endFrame && !!req.endImageUrl;
-  const input: Record<string, unknown> = {
-    image: req.imageUrl,
-    prompt: req.prompt,
-    duration: req.apiDuration,
-    aspect_ratio: mapAspectSeedance(req.aspectRatio),
-    resolution: resolution ?? "720p",
-    generate_audio: generateAudio ?? false,
-  };
-  if (modelId === "seedance-2-pro" || modelId === "seedance-2-fast") {
-    if (useEnd && req.endImageUrl) input.last_frame_image = req.endImageUrl;
-  }
-  return input;
-}
-
-async function getLatestVersionId(
-  modelRef: `${string}/${string}`,
-  token: string
-): Promise<string> {
-  const c = versionCache.get(modelRef);
-  if (c) return c;
-  const r = await fetch(`${REPLICATE_API}/models/${modelRef}`, {
-    headers: { Authorization: `Token ${token}` },
-  });
-  if (!r.ok) {
-    const t = await r.text();
-    throw new Error(`Replicate: failed to read model ${modelRef}: ${r.status} ${t.slice(0, 200)}`);
-  }
-  const j = (await r.json()) as { latest_version?: { id: string } };
-  const v = j.latest_version?.id;
-  if (!v) throw new Error(`Replicate: no latest_version for ${modelRef}`);
-  versionCache.set(modelRef, v);
-  return v;
-}
 
 async function createAndWaitPrediction(
   versionId: string,
@@ -159,24 +108,42 @@ async function createAndWaitPrediction(
   return p.output;
 }
 
+function generateInput(model: TVideoModelId, req: I2vRequest): Record<string, unknown> {
+  switch (model) {
+    case "seedance-2-pro":
+    case "seedance-2-fast":
+      return {
+        image: req.startImageUrl,
+        prompt: req.prompt,
+        duration: req.duration,
+        aspect_ratio: req.aspectRatio,
+        resolution: VIDEO_MODELS[model].supportedResolution[0],
+        generate_audio: false,
+      };
+    default:
+      throw new Error(`Replicate: video model ${model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);
+  }
+}
+
 export class ReplicateVideoProvider implements IVideoProvider {
-  async generateFromImage(req: I2vRequest, resolved: ResolvedVideoModel): Promise<VideoResult> {
+  readonly client: AxiosInstance;
+  constructor() {
     const token = AI_VIDEO.replicateToken;
     if (!token) {
       throw new Error("REPLICATE_API_TOKEN is not set (required for Replicate video generation)");
     }
-    const { replicateModel, modelId } = resolved;
-    if (!replicateModel) {
-      throw new Error("Replicate: model is not bound to a Replicate id (replicateModel). Pick Seedance 2 on Replicate or use Fal.");
+    this.client = axios.create({
+      baseURL: REPLICATE_API,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  }
+  async generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult> {
+    return {
+      videoUrl: "",
+      durationSeconds: 0,
     }
-    if (modelId === "seedance-2-pro" || modelId === "seedance-2-fast") {
-      const versionId = await getLatestVersionId(replicateModel, token);
-      const input = buildSeedanceInput(modelId, req, resolved);
-      const output = await createAndWaitPrediction(versionId, input, token);
-      return { videoUrl: extractOutputUrl(output), durationSeconds: req.apiDuration };
-    }
-    throw new Error(
-      `Replicate: video model ${modelId} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`
-    );
+    // const input = generateInput(model, req);
+    // const output = await createAndWaitPrediction(replicateModel, input, token);
+    // return { videoUrl: extractOutputUrl(output), durationSeconds: req.apiDuration };
   }
 }

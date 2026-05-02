@@ -1,7 +1,12 @@
+import { AxiosInstance } from "axios";
+
 /** User-selectable i2v backend. Fal = fal.ai. Replicate = same catalog entries where `replicateModel` is set (Seedance, etc.). */
 export type TVideoProviderId = "fal" | "replicate";
 
 export type TVideoModelEndpoint =
+  | "bytedance/seedance-2.0"
+  | "kwaivgi/kling-v2.5-turbo-pro"
+  | "kwaivgi/kling-v2.6"
   | "bytedance/seedance-2.0/image-to-video"
   | "bytedance/seedance-2.0/fast/image-to-video"
   | "fal-ai/luma-dream-machine/ray-2/image-to-video"
@@ -19,38 +24,25 @@ export interface VideoResult {
 }
 
 export interface I2vRequest {
-  imageUrl: string;
-  prompt: string;
-  apiDuration: number;
-  endFrame: boolean;
+  startImageUrl: string;
   endImageUrl?: string;
-  aspectRatio: string;
+  prompt: string;
+  duration: number;
+  aspectRatio: TAspectRatio;
 }
 
-export type TVideoModelEntry = {
-  id: string;
+export type TVideoModel = {
+  id: TVideoModelId;
   label: string;
   description: string;
-  falEndpoint: TVideoModelEndpoint;
-  /** When set, this model can be run on Replicate using this `owner/model` id (https://replicate.com). */
-  replicateModel?: `${string}/${string}`;
-  durations: readonly number[];
-  endFrame: boolean;
-  generateAudio?: boolean;
-  supportedResolution: readonly ("480p" | "540p" | "720p" | "1080p" | "4k")[];
+  provider: TVideoProviderId;
+  endpoint?: TVideoModelEndpoint;
+  durations: number[];
+  supportedResolution: ("480p" | "540p" | "720p" | "1080p" | "4k")[];
+  endFrameSupported: boolean;
 };
 
-export interface ResolvedVideoModel {
-  modelId: string;
-  provider: TVideoProviderId;
-  falEndpoint: TVideoModelEntry['falEndpoint'];
-  replicateModel?: TVideoModelEntry['replicateModel'];
-  resolution: TVideoModelEntry['supportedResolution'][number] | undefined;
-  generateAudio: TVideoModelEntry['generateAudio'];
-  durations: TVideoModelEntry['durations'];
-  endFrame: boolean;
-}
-
 export interface IVideoProvider {
-  generateFromImage(req: I2vRequest, resolved: ResolvedVideoModel): Promise<VideoResult>;
+  readonly client: AxiosInstance;
+  generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult>;
 }

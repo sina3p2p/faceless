@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { VIDEO_MODELS } from "@/lib/constants";
 import type { Media, SceneFrame } from "@/types/video-detail";
 import type { VideoPhase } from "../../../hooks/use-video-phase";
@@ -9,7 +9,7 @@ import { useStudioContext } from "../../context/StudioContext";
 
 export type MotionNodeData = {
     frame: SceneFrame;
-    media: Media;
+    media?: Media;
     frameIndex: number;
     phase: VideoPhase;
     videoSize: string | null;
@@ -36,14 +36,17 @@ export function MotionNode({ data }: NodeProps) {
         onUpdateMotion,
     } = data as MotionNodeData;
 
-    const { selectedMedia } = useStudioContext();
-    const isSelected = selectedMedia?.mediaId === media.id;
+    const { selectedMedia, video } = useStudioContext();
+    const isSelected = selectedMedia?.mediaId === media?.id;
 
     const serverMotion = frame.visualDescription || "";
     const [draft, setDraft] = useState<string | null>(null);
     const motionText = draft !== null ? draft : serverMotion;
 
-    const aspectRatio = videoSize?.includes("9:16") ? "9:16" : "16:9";
+    const modelUsed = useMemo(() => {
+        const m = media?.modelUsed as TVideoModelId;
+        return VIDEO_MODELS[m]?.label ?? video.modelSettings.videoModel ?? "-";
+    }, [media?.modelUsed, video.modelSettings.videoModel]);
 
     return (
         <>
@@ -57,7 +60,7 @@ export function MotionNode({ data }: NodeProps) {
                             <VideoIcon className="w-3.5 h-3.5 text-emerald-400/80" />
                             <span className="text-[12px] font-medium text-gray-300">Motion → video</span>
                         </div>
-                        <span className="text-[11px] text-gray-500">{VIDEO_MODELS.find(m => m.id === (media.modelUsed ?? frame.modelUsed))?.label || media.modelUsed || frame.modelUsed || "—"}</span>
+                        <span className="text-[11px] text-gray-500">{modelUsed}</span>
                     </div>
 
                     <div className="px-3">
@@ -110,7 +113,7 @@ export function MotionNode({ data }: NodeProps) {
                     </div>
 
                     <div className="flex items-center gap-3 px-4 py-2 border-t border-white/5">
-                        <span className="text-[10px] text-gray-600 font-mono">{aspectRatio}</span>
+                        <span className="text-[10px] text-gray-600 font-mono">{videoSize}</span>
                     </div>
                 </div>
             </div>

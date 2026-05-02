@@ -21,10 +21,10 @@ function DockButton({ tool }: { tool: DockTool }) {
       onClick={tool.onClick}
       disabled={tool.disabled || tool.loading}
       className={`w-9 h-9 rounded-xl flex items-center justify-center relative group transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${tool.variant === "primary"
-          ? "text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
-          : tool.variant === "danger"
-            ? "text-gray-500 hover:text-red-400 hover:bg-red-500/10"
-            : "text-gray-500 hover:text-white hover:bg-white/10"
+        ? "text-violet-400 hover:text-violet-300 hover:bg-violet-500/10"
+        : tool.variant === "danger"
+          ? "text-gray-500 hover:text-red-400 hover:bg-red-500/10"
+          : "text-gray-500 hover:text-white hover:bg-white/10"
         }`}
     >
       {tool.loading ? (
@@ -140,8 +140,6 @@ export function BottomDock({
   onStartRendering,
   onRecompose,
   onDownload,
-  canCompare,
-  onCompare,
   isLabMode,
   onExitLab,
   hasLabFrames,
@@ -173,8 +171,6 @@ export function BottomDock({
   onStartRendering: () => void;
   onRecompose: () => void;
   onDownload: () => void;
-  canCompare: boolean;
-  onCompare: () => void;
   isLabMode: boolean;
   onExitLab: () => void;
   hasLabFrames: boolean;
@@ -310,14 +306,6 @@ export function BottomDock({
         onClick: onOpenLab,
       });
     }
-    if (canCompare) {
-      sceneTools.push({
-        id: "compare",
-        icon: icons.compare,
-        label: "Compare Variants",
-        onClick: onCompare,
-      });
-    }
     sceneTools.push({
       id: "edit-scene",
       icon: icons.edit,
@@ -349,12 +337,6 @@ export function BottomDock({
       icon: icons.addVariant,
       label: "Generate Variant",
       onClick: () => onGenerateVariant(selectedMedia.frameId),
-    });
-    mediaTools.push({
-      id: "compare-media",
-      icon: icons.compare,
-      label: "Compare Variants",
-      onClick: onCompare,
     });
     mediaTools.push({
       id: "delete-media",

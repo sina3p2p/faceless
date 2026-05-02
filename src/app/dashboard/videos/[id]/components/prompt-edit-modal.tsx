@@ -106,7 +106,7 @@ export function PromptEditModal({
                       className={`relative shrink-0 rounded-lg overflow-hidden border-2 transition-all hover:opacity-100 ${isCurrent
                         ? "border-violet-500 ring-1 ring-violet-500/30 opacity-100"
                         : "border-white/10 opacity-60 hover:border-white/30"
-                      }`}
+                        }`}
                       title={`${m.modelUsed || "Unknown model"} — ${new Date(m.createdAt).toLocaleTimeString()}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -156,7 +156,7 @@ export function PromptEditModal({
                   className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${selectedModel === m.id
                     ? "bg-violet-600 text-white"
                     : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-                  }`}
+                    }`}
                 >
                   {m.label}
                 </button>
@@ -182,7 +182,7 @@ export function PromptEditModal({
               />
               <div className="flex items-center justify-between mt-2 mb-4">
                 <span className="text-xs text-gray-600">{regenPrompt.length} chars</span>
-                {(selectedModel === "nano-banana-2" || selectedModel === "kling-image-v3") && (
+                {(selectedModel === "nano-banana-2") && (
                   <span className="text-xs text-gray-600">Type @ to reference another scene</span>
                 )}
               </div>

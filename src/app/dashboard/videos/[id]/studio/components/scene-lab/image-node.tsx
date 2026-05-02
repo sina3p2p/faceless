@@ -47,7 +47,7 @@ export function ImageNode({ data }: NodeProps) {
               <ImageIcon className="w-3.5 h-3.5 text-gray-400" />
               <span className="text-[12px] font-medium text-gray-300">Image</span>
             </div>
-            <span className="text-[11px] text-gray-500">{IMAGE_MODELS.find(m => m.id === (frame.modelUsed))?.label || frame.modelUsed}</span>
+            <span className="text-[11px] text-gray-500">{media?.modelUsed ? IMAGE_MODELS.find(m => m.id === (media.modelUsed))?.label || video.modelSettings.imageModel : "-"}</span>
           </div>
 
           {/* Image preview */}

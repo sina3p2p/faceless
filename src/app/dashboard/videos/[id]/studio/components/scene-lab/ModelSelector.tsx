@@ -15,12 +15,12 @@ export function ModelSelector({
   onCancel: () => void;
 }) {
   const models = type === "image" ? IMAGE_MODELS : VIDEO_MODELS;
-  const [selected, setSelected] = useState(defaultModel || models[0]?.id || "");
+  const [selected, setSelected] = useState(defaultModel || Object.keys(models)[0] || "");
 
   return (
     <div className="mt-1.5 rounded-lg bg-black/60 border border-white/10 p-2 space-y-1.5">
       <div className="flex flex-wrap gap-1">
-        {models.map((m) => (
+        {Object.values(models).map((m) => (
           <button
             key={m.id}
             type="button"
@@ -28,7 +28,7 @@ export function ModelSelector({
             className={`px-2 py-0.5 rounded text-[9px] font-medium transition-colors ${selected === m.id
               ? "bg-violet-600 text-white"
               : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-            }`}
+              }`}
             title={m.description}
           >
             {m.label}

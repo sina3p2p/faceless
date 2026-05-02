@@ -45,7 +45,7 @@ export async function POST(
         if (frame.imageMediaId) {
           await db
             .update(sceneFrames)
-            .set({ imageMediaId: null, modelUsed: null })
+            .set({ imageMediaId: null })
             .where(eq(sceneFrames.id, frame.id));
         }
       }

@@ -18,7 +18,7 @@ import type { VideoPhase } from "../../hooks/use-video-phase";
 
 export type VideoNodeData = {
   frame: SceneFrame;
-  media?: Media | { prompt?: string | null };
+  media?: Media;
   frameIndex: number;
   defaultVideoModel?: string;
   generatingVideo?: boolean;

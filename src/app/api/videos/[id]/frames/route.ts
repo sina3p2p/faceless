@@ -64,10 +64,7 @@ export async function GET(
             motionSpec: frame.motionSpec,
             visualDescription: frame.visualDescription,
             assetRefs: frame.assetRefs,
-            modelUsed: frame.modelUsed,
             media: signedMedia,
-            imageGeneratedAt: frame.imageGeneratedAt?.toISOString() ?? null,
-            videoGeneratedAt: frame.videoGeneratedAt?.toISOString() ?? null,
             imageMediaId: frame.imageMediaId,
             videoMediaId: frame.videoMediaId,
           };

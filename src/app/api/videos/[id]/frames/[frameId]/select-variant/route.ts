@@ -50,7 +50,6 @@ export async function POST(
       .set({
         imageMediaId: selected.id,
         imagePrompt: selected.prompt ?? frame.imagePrompt,
-        modelUsed: selected.modelUsed,
       })
       .where(eq(sceneFrames.id, frameId));
   } else {

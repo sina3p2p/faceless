@@ -3,13 +3,14 @@ import { db } from "@/server/db";
 import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { getAIVideoForScene } from "@/server/services/ai/video";
+import { generateVideoFromImage } from "@/server/services/ai/video";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { z } from "zod";
+import { VIDEO_MODEL_IDS } from "@/lib/constants";
 
 const bodySchema = z.object({
   visualDescription: z.string().optional(),
-  videoModel: z.string().optional(),
+  videoModel: z.enum(VIDEO_MODEL_IDS).optional(),
   duration: z.number().min(3).max(15).optional(),
 });
 
@@ -62,7 +63,7 @@ export async function POST(
       ? imageKey
       : await getSignedDownloadUrl(imageKey);
 
-    const result = await getAIVideoForScene(signedImageUrl, prompt, duration, videoModel);
+    const result = await generateVideoFromImage(signedImageUrl, prompt, duration, videoModel);
 
     const videoResponse = await fetch(result.videoUrl);
     if (!videoResponse.ok) throw new Error("Failed to download generated video");
@@ -72,6 +73,7 @@ export async function POST(
     await uploadFile(key, buffer, "video/mp4");
 
     const [newMedia] = await db.insert(media).values({
+      userId: user.id,
       frameId,
       type: "video",
       url: key,
@@ -82,7 +84,7 @@ export async function POST(
 
     await db
       .update(sceneFrames)
-      .set({ videoMediaId: newMedia.id, videoGeneratedAt: new Date() })
+      .set({ videoMediaId: newMedia.id })
       .where(eq(sceneFrames.id, frameId));
 
     const signedUrl = await getSignedDownloadUrl(key);

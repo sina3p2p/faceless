@@ -1,6 +1,6 @@
 import { db, schema, eq, updateVideoStatus } from "../shared";
 import { renderQueue } from "@/lib/queue";
-import { VIDEO_MODELS, DEFAULT_VIDEO_MODEL, LLM } from "@/lib/constants";
+import { VIDEO_MODELS, LLM } from "@/lib/constants";
 import { type PipelineConfig } from "@/types/pipeline";
 import type { ModelSettings } from "@/types/llm-common";
 import type { AgentModels } from "@/types/worker-pipeline";
@@ -34,9 +34,8 @@ function getPipelineMode(config: unknown): "manual" | "auto" {
   return "manual";
 }
 
-export function getModelDurationsArray(videoModel?: string | null): number[] {
-  const entry = VIDEO_MODELS.find((m) => m.id === (videoModel || DEFAULT_VIDEO_MODEL));
-  return (entry?.durations as number[]) ?? [5, 10];
+export function getModelDurationsArray(videoModel: TVideoModelId): number[] {
+  return VIDEO_MODELS[videoModel].durations;
 }
 
 export function getAgentModels(

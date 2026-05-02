@@ -13,6 +13,7 @@ export interface StoryAsset {
 }
 
 export interface ModelSettings {
+  producerModel: string;
   storyModel: string;
   directorModel: string;
   supervisorModel: string;
@@ -21,5 +22,5 @@ export interface ModelSettings {
   promptModel: string;
   motionModel: string;
   imageModel: string;
-  videoModel: string;
+  videoModel: TVideoModelId;
 }

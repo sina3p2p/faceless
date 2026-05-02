@@ -94,6 +94,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
         await uploadFile(key, buffer, "image/jpeg");
 
         const [newMedia] = await db.insert(schema.media).values({
+          userId: videoProject.userId,
           frameId: frame.id,
           type: "image",
           url: key,
@@ -103,7 +104,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
         await db
           .update(schema.sceneFrames)
-          .set({ imageMediaId: newMedia.id, modelUsed: imageModel })
+          .set({ imageMediaId: newMedia.id })
           .where(eq(schema.sceneFrames.id, frame.id));
 
         previousFrameSignedUrl = await getSignedDownloadUrl(key);

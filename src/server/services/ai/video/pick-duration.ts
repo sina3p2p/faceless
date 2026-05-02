@@ -4,7 +4,7 @@
  * Otherwise pick the closest supported value that is >= requested (so the
  * composer can trim rather than stretch). Falls back to the largest available.
  */
-export function pickBestDuration(requested: number, supported: readonly number[]): number {
+export function pickBestDuration(requested: number, supported: number[]): number {
   if (supported.includes(requested)) return requested;
   const candidates = supported.filter((d) => d >= requested);
   if (candidates.length > 0) return Math.min(...candidates);

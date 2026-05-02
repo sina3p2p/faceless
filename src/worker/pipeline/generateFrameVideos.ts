@@ -1,9 +1,8 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
-import { getVideoSize, VIDEO_I2V_PROVIDER, WORKER } from "@/lib/constants";
-import { getAIVideoForScene } from "@/server/services/ai/video";
-import { resolveModel } from "@/server/services/ai/video/resolve-model";
+import { VIDEO_I2V_PROVIDER, WORKER } from "@/lib/constants";
+import { generateVideoFromImage } from "@/server/services/ai/video";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { autoChainOrReview } from "./shared";
 import { and, isNotNull } from "drizzle-orm";
@@ -33,14 +32,13 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     const targets = timeline.filter((frame) => !frame.videoMediaId && frame.imageMediaId);
 
-    const videoModelKey = videoProject.modelSettings?.videoModel;
-    const { endFrame: modelSupportsEndFrame } = resolveModel(videoModelKey);
-    const aspectRatio = getVideoSize(videoProject.videoSize).id;
+    const videoModelId = videoProject.modelSettings.videoModel;
+    const aspectRatio = videoProject.videoSize;
 
     const indexById = new Map(timeline.map((f, i) => [f.id, i] as const));
 
     console.log(
-      `[generate-frame-videos] Generating ${targets.length} video clips (endFrame support=${modelSupportsEndFrame ? "yes" : "no"})`
+      `[generate-frame-videos] Generating ${targets.length} video clips`
     );
 
     /** Replicate: run one i2v at a time; create requests are also serialized+retried in the Replicate client. */
@@ -60,8 +58,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
             let endImageUrl: string | undefined = undefined;
             if (
-              modelSupportsEndFrame
-              && frameIdx !== undefined
+              frameIdx !== undefined
               && frameIdx < timeline.length - 1
             ) {
               const next = timeline[frameIdx + 1];
@@ -74,15 +71,13 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
               console.log(
                 `[generate-frame-videos] Frame ${frame.id}: ${desiredDuration}s clip → next frame ${timeline[frameIdx + 1]!.id}`
               );
-            } else {
-              console.log(`[generate-frame-videos] Frame ${frame.id}: ${desiredDuration}s clip`);
             }
 
-            const videoResult = await getAIVideoForScene(
+            const videoResult = await generateVideoFromImage(
               imageSignedUrl,
               videoPrompt,
               desiredDuration,
-              videoModelKey,
+              videoModelId,
               endImageUrl,
               aspectRatio
             );
@@ -95,11 +90,12 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
             await uploadFile(key, videoBuffer, "video/mp4");
 
             const [newMedia] = await db.insert(schema.media).values({
+              userId: videoProject.userId,
               frameId: frame.id,
               type: "video",
               url: key,
               prompt: videoPrompt,
-              modelUsed: videoModelKey || "kling-3-standard",
+              modelUsed: videoModelId,
             }).returning();
 
             await db

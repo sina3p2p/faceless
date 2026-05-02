@@ -54,6 +54,7 @@ export async function POST(
     const [newMedia] = await db
       .insert(media)
       .values({
+        userId: user.id,
         frameId,
         type: "image",
         url: key,
@@ -66,8 +67,6 @@ export async function POST(
       .update(sceneFrames)
       .set({
         imageMediaId: newMedia.id,
-        modelUsed: parsed.data.model || "edit",
-        imageGeneratedAt: new Date(),
       })
       .where(eq(sceneFrames.id, frameId));
 

@@ -1,6 +1,6 @@
 "use client";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { VIDEO_MODELS } from "@/lib/constants";
 import { useStudioContext } from "../../context/StudioContext";
 import type { VideoNodeData } from "../scene-lab";
@@ -42,6 +42,15 @@ export function VideoNode({ data }: NodeProps) {
     await onRegenerateVideo(frame.id, defaultVideoModel || undefined);
   };
 
+
+  const modelUsed = useMemo(() => {
+    if (media?.modelUsed) {
+      return VIDEO_MODELS[media.modelUsed as TVideoModelId]?.label || "-";
+    }
+    return video.modelSettings.videoModel || "-";
+  }, [media?.modelUsed, video.modelSettings.videoModel]);
+
+
   const aspectRatio = video.videoSize?.includes("9:16") ? "9:16" : "16:9";
 
   return (
@@ -58,7 +67,7 @@ export function VideoNode({ data }: NodeProps) {
               <VideoIcon className="w-3.5 h-3.5 text-gray-400" />
               <span className="text-[12px] font-medium text-gray-300">Video</span>
             </div>
-            <span className="text-[11px] text-gray-500">{VIDEO_MODELS.find(m => m.id === (frame.modelUsed))?.label || frame.modelUsed}</span>
+            <span className="text-[11px] text-gray-500">{modelUsed}</span>
           </div>
 
           {/* View preview */}

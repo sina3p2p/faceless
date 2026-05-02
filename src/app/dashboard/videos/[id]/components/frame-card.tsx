@@ -62,9 +62,8 @@ export function FrameCard({
   // the video is based on a previous image and is stale.
   const isVideoStale = !!(
     frame.videoUrl &&
-    frame.imageGeneratedAt &&
-    frame.videoGeneratedAt &&
-    frame.imageGeneratedAt > frame.videoGeneratedAt
+    frame.imageMediaId &&
+    frame.videoMediaId
   );
   const isMotionStale = isVideoStale;
 
@@ -74,9 +73,6 @@ export function FrameCard({
         <span className="text-[10px] uppercase tracking-wider text-violet-500 font-medium">Frame {frameIndex + 1}</span>
         {frame.clipDuration && (
           <span className="text-[10px] text-gray-600 font-mono">{frame.clipDuration}s</span>
-        )}
-        {frame.modelUsed && (
-          <span className="text-[9px] text-gray-700 ml-auto">{frame.modelUsed}</span>
         )}
         {generating && (
           <div className="animate-spin w-3 h-3 border border-violet-400 border-t-transparent rounded-full ml-auto" />
@@ -404,7 +400,7 @@ function VideoModelSelector({
             className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${selectedModel === m.id
               ? "bg-violet-600 text-white"
               : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-            }`}
+              }`}
             title={m.description}
           >
             {m.label}

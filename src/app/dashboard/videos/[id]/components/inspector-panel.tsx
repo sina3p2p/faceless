@@ -290,7 +290,7 @@ function SceneEditor({
           />
           <div className="flex items-center justify-between mt-1">
             <span className="text-[9px] text-gray-700">{regenPrompt.length} chars</span>
-            {(selectedModel === "nano-banana-2" || selectedModel === "kling-image-v3") && (
+            {(selectedModel === "nano-banana-2") && (
               <span className="text-[9px] text-gray-700">@ to ref scenes</span>
             )}
           </div>

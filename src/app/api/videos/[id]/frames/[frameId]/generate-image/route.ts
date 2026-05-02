@@ -98,6 +98,7 @@ export async function POST(
     await uploadFile(key, buffer, "image/jpeg");
 
     const [newMedia] = await db.insert(media).values({
+      userId: user.id,
       frameId,
       type: "image",
       url: key,
@@ -107,8 +108,6 @@ export async function POST(
 
     const updates: Record<string, unknown> = {
       imageMediaId: newMedia.id,
-      modelUsed: imageModel,
-      imageGeneratedAt: new Date(),
     };
     if (parsed.data.imagePrompt) {
       updates.imagePrompt = parsed.data.imagePrompt;

@@ -2,75 +2,22 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import * as fs from "fs/promises";
 import * as path from "path";
-
-export const execAsync = promisify(exec);
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { eq, and, ne, desc, asc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
-import { DATABASE, VIDEO_MODELS, DEFAULT_VIDEO_MODEL, WORKER } from "@/lib/constants";
+import { DATABASE, WORKER } from "@/lib/constants";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
 import { getSignedDownloadUrl } from "@/lib/storage";
-import { downloadFile } from "@/server/services/composer";
 import { env } from "@/lib/constants";
-import type { PreApproved, StoryAssetInput } from "@/types/worker";
+import type { StoryAssetInput } from "@/types/worker";
 import { storyAssets, videoStoryAssets } from "@/server/db/schema";
 
 const client = postgres(DATABASE.url);
 export const db = drizzle(client, { schema });
 export { schema, eq, and, ne, desc };
 
-export async function insertMedia(
-  {
-    sceneId,
-    frameId,
-  }: { sceneId?: string; frameId?: string },
-  type: "image" | "video",
-  url: string,
-  prompt?: string | null,
-  modelUsed?: string | null,
-  metadata?: Record<string, unknown> | null
-) {
-  await db.insert(schema.media).values({
-    sceneId: sceneId ?? undefined,
-    frameId: frameId ?? undefined,
-    type,
-    url,
-    prompt: prompt ?? undefined,
-    modelUsed: modelUsed ?? undefined,
-    metadata: metadata ?? undefined,
-  });
-}
-
-export function getModelDurations(videoModel?: string | null): number[] | undefined {
-  const entry = VIDEO_MODELS.find((m) => m.id === (videoModel || DEFAULT_VIDEO_MODEL));
-  return entry?.durations as number[] | undefined;
-}
-
-export async function getPreviousTopics(seriesId: string, currentVideoId: string): Promise<string[]> {
-  const prev = await db.query.videoProjects.findMany({
-    where: and(
-      eq(schema.videoProjects.seriesId, seriesId),
-      ne(schema.videoProjects.id, currentVideoId)
-    ),
-    columns: { title: true },
-    orderBy: desc(schema.videoProjects.createdAt),
-    limit: 50,
-  });
-  return prev.map((v) => v.title).filter((t): t is string => !!t);
-}
-
-export async function updateJobStep(
-  videoProjectId: string,
-  step: typeof schema.renderStepEnum.enumValues[number],
-  status: typeof schema.jobStatusEnum.enumValues[number],
-  progress: number
-) {
-  await db
-    .update(schema.renderJobs)
-    .set({ step, status, progress })
-    .where(eq(schema.renderJobs.videoProjectId, videoProjectId));
-}
+export const execAsync = promisify(exec);
 
 export async function updateVideoStatus(
   videoProjectId: string,
@@ -147,44 +94,6 @@ export async function generateTTSParallel(
   }
 
   return { audioPaths, ttsResults };
-}
-
-export async function reusePreApprovedAssets(
-  scenes: Array<{ imageUrl?: string | null; videoUrl?: string | null; assetUrl?: string | null; assetType?: string | null }>,
-  workDir: string
-): Promise<{ images: PreApproved; videos: PreApproved }> {
-  const images: PreApproved = new Map();
-  const videos: PreApproved = new Map();
-  await Promise.all(
-    scenes.map(async (scene, i) => {
-      const videoKey = scene.videoUrl;
-      if (videoKey) {
-        try {
-          const signedUrl = await getSignedDownloadUrl(videoKey);
-          const localPath = path.join(workDir, `media_${i}.mp4`);
-          await downloadFile(signedUrl, localPath);
-          videos.set(i, { path: localPath, type: "video", url: signedUrl });
-          console.log(`Scene ${i}: Reusing existing video clip`);
-        } catch (err) {
-          console.warn(`Scene ${i}: Could not reuse video, will regenerate:`, err);
-        }
-      }
-
-      const imageKey = scene.imageUrl || (scene.assetType !== "video" ? scene.assetUrl : null);
-      if (imageKey) {
-        try {
-          const signedUrl = await getSignedDownloadUrl(imageKey);
-          const localPath = path.join(workDir, `img_${i}.jpg`);
-          await downloadFile(signedUrl, localPath);
-          images.set(i, { path: localPath, type: "image", url: signedUrl });
-          if (!videoKey) console.log(`Scene ${i}: Reusing existing image`);
-        } catch (err) {
-          console.warn(`Scene ${i}: Could not reuse image, will regenerate:`, err);
-        }
-      }
-    })
-  );
-  return { images, videos };
 }
 
 export async function failJob(videoProjectId: string, error: unknown) {
