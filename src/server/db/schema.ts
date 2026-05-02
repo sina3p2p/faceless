@@ -310,6 +310,10 @@ export const sceneFrames = pgTable("scene_frames", {
   motionSpec: json("motion_spec").$type<FrameMotionSpec | null>(),
   /** Optional per-frame skill pack (hook, camera, music, vertical) for motion LLM. */
   motionSkillHints: json("motion_skill_hints").$type<MotionSkillHints | null>(),
+  /** Storyboard-chosen transition INTO this frame. One of TransitionType. Null = legacy hard cut. */
+  transitionIn: text("transition_in"),
+  /** Storyboard-suggested SFX cue at the start of this frame. Null = no cue. */
+  sfxHint: text("sfx_hint"),
   visualDescription: text("visual_description"),
   imageMediaId: text("image_media_id"),
   videoMediaId: text("video_media_id"),

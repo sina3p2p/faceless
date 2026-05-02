@@ -6,6 +6,7 @@ import type { MotionDirectorInput } from "@/types/pipeline";
 import {
   buildMotionSkillContext,
   resolveEffectiveMotionPolicy,
+  resolveCameraGrammar,
 } from "@/server/prompts/skill-packs";
 
 // ── Structured motion (LLM output) ──
@@ -15,6 +16,17 @@ export const frameMotionSpecSchema = z.object({
     .string()
     .describe(
       "ONE dominant motion beat for the clip — what happens, in vivid physical language. No second unrelated action."
+    ),
+  /**
+   * Optional second beat. Only emitted when the system prompt explicitly
+   * permits it (high-energy intents on long clips). Short, flows out of the
+   * primary action — never an unrelated event.
+   */
+  secondaryAction: z
+    .string()
+    .optional()
+    .describe(
+      "Optional follow-up beat that flows naturally from primaryAction (e.g. a reaction or recoil). Leave blank unless explicitly permitted."
     ),
   cameraMove: z
     .string()
@@ -43,13 +55,20 @@ export type FrameMotionSpec = z.infer<typeof frameMotionSpecSchema>;
 /** Turn structured motion into one dense prompt for text-native video models. */
 export function compileMotionPrompt(spec: FrameMotionSpec): string {
   const pa = spec.primaryAction.trim();
+  const sa = (spec.secondaryAction ?? "").trim();
   const sd = spec.subjectDynamics.trim();
   const cm = spec.cameraMove.trim();
   const es = spec.endState.trim();
   const neg = spec.negativeMotion.trim();
 
   const parts: string[] = [];
-  if (pa) parts.push(pa);
+  if (pa && sa) {
+    parts.push(`${pa}; followed by ${sa}`);
+  } else if (pa) {
+    parts.push(pa);
+  } else if (sa) {
+    parts.push(sa);
+  }
   if (sd) parts.push(sd);
   if (cm) parts.push(`Camera: ${cm}`);
   if (es) parts.push(`Ending: ${es}`);
@@ -107,6 +126,24 @@ export async function generateSingleFrameMotion(
     ? `\n\nMOTION CRAFT (follow — compressed rules from editors; do not restate the whole image description):\n${skillProse}\n`
     : "";
 
+  const grammarHint = resolveCameraGrammar({
+    narrativeIntent: input.narrativeIntent,
+    musicSectionId: input.skillHints?.musicSectionId,
+  });
+  const grammarBlock = grammarHint
+    ? `\n\nCAMERA GRAMMAR (STRONGLY PREFER unless cameraPhysics conflicts):\n→ ${grammarHint}\n`
+    : "";
+
+  // Inverse-correlate motion intensity with VO density. Only inject when we
+  // have a real signal (music videos have no VO words and pass 0).
+  const wps = input.voTempoWps ?? 0;
+  let tempoBlock = "";
+  if (wps >= 3.0) {
+    tempoBlock = `\n\nVO TEMPO: dense narration (~${wps.toFixed(1)} words/sec) — prefer simpler/slower camera moves and a single contained gesture; the audio is doing the work.\n`;
+  } else if (wps > 0 && wps <= 1.5) {
+    tempoBlock = `\n\nVO TEMPO: sparse narration (~${wps.toFixed(1)} words/sec) — push camera and subject motion harder so the frame stays alive.\n`;
+  }
+
   const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and a single compiled text prompt. You output STRUCTURED fields that will be assembled into that prompt.
 
 CORE PRINCIPLE: AI video models execute ONE action well. Multiple unrelated primary actions produce garbled, morphing artifacts.
@@ -115,13 +152,21 @@ TEMPORAL READ: The output must describe motion that READS AS VIDEO across the wh
 
 MOTION POLICY: ${effectivePolicy.toUpperCase()}${basePolicy !== effectivePolicy ? ` (refined from base ${basePolicy} via section/intent rules)` : ""}
 ${motionIntensity[effectivePolicy] ?? motionIntensity.moderate}
-${cameraConstraint}${materialConstraint}${skillBlock}
+${cameraConstraint}${materialConstraint}${grammarBlock}${tempoBlock}${skillBlock}
 
+${(() => {
+  const allowSecondary =
+    (input.narrativeIntent === "climax" || input.narrativeIntent === "react") &&
+    input.clipDuration >= 8;
+  return allowSecondary
+    ? `SECONDARY ACTION (PERMITTED for this frame — ${input.narrativeIntent} on ${input.clipDuration}s clip):\nYou MAY emit a brief secondaryAction that flows naturally out of primaryAction (e.g. a recoil, a reaction beat, a settle). Keep it to one short clause; never an unrelated event. Leave blank if the primary action fully fills the clip.\n`
+    : `SECONDARY ACTION: Do NOT output secondaryAction (leave it empty). One beat only.\n`;
+})()}
 FIELD GUIDANCE (dense physical language in each — no filler):
 - primaryAction: ONE dominant beat. Specific directions, speeds, body parts. "lifts left hand to forehead, fingers spread, elbow rising to shoulder height" not "raises hand".
 - cameraMove: One move only — type, direction, speed (e.g. "slow pan left", "locked tripod", "gentle handheld drift right").
 - subjectDynamics: Mechanics, weight, timing, follow-through, plus secondary motion that naturally results from primaryAction (hair, cloth, props).
-- endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${nextImageUrl ? ` If the next frame is similar, end moving toward that composition; if very different, settle naturally without a second action.` : ` Natural deceleration — no new action at the end.`}
+- endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${nextImageUrl ? ` REQUIRED: name the composition of the NEXT frame (subject placement, camera angle) and describe how this clip arrives at it, so the cut/xfade reads as one continuous beat. If the angles are too different to bridge, settle naturally and explicitly state why (no second action).` : ` Natural deceleration — no new action at the end.`}
 - negativeMotion: List what must NOT happen (extra actions, morphing, wrong camera grammar for the medium, dialogue text on screen).
 
 QUALITY RULES:

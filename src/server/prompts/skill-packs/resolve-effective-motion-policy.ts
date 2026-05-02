@@ -41,3 +41,39 @@ export function resolveEffectiveMotionPolicy(
   }
   return basePolicy;
 }
+
+/**
+ * Suggests a default camera-move grammar keyed off the storyboard's narrative
+ * intent (with a music-section override when available). Returned as a short
+ * phrase the Motion Director system prompt can soft-bias toward; the LLM may
+ * still choose otherwise when `cameraPhysics` constraints conflict.
+ */
+const CAMERA_GRAMMAR_BY_INTENT: Record<NarrativeIntent, string> = {
+  introduce: "push-in slow OR handheld drift forward — invite the viewer in",
+  build: "lock-off or slow lateral track — let subject motion carry tension",
+  climax: "dolly-in, orbit, or wide arc — camera as active participant",
+  react: "push to close-up or rack focus to the reacting subject",
+  resolve: "pull-out or slow tilt-up — release the held energy",
+  transition: "whip or match motion that hands the eye to the next frame",
+};
+
+const CAMERA_GRAMMAR_BY_MUSIC_SECTION: Partial<Record<MusicSectionId, string>> = {
+  intro: "push-in slow OR locked drift — settle the viewer",
+  build: "rising track — accelerate camera energy with the music",
+  drop: "snap-zoom, whip, or aggressive dolly — match the impact",
+  chorus: "dolly-in, orbit, or arc — keep the energy continuous",
+  outro: "pull-out or slow tilt — release",
+};
+
+export function resolveCameraGrammar(opts: {
+  narrativeIntent?: NarrativeIntent;
+  musicSectionId?: MusicSectionId;
+}): string | null {
+  const m = opts.musicSectionId;
+  if (m && CAMERA_GRAMMAR_BY_MUSIC_SECTION[m]) {
+    return CAMERA_GRAMMAR_BY_MUSIC_SECTION[m]!;
+  }
+  const n = opts.narrativeIntent;
+  if (n) return CAMERA_GRAMMAR_BY_INTENT[n] ?? null;
+  return null;
+}
