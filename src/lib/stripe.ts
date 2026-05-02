@@ -6,7 +6,7 @@ let _stripe: Stripe | null = null;
 export function getStripe(): Stripe {
   if (!_stripe) {
     _stripe = new Stripe(STRIPE.secretKey, {
-      apiVersion: "2025-03-31.basil",
+      apiVersion: "2026-04-22.dahlia",
     });
   }
   return _stripe;

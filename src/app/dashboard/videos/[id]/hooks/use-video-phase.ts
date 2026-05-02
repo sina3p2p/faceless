@@ -53,9 +53,9 @@ export interface VideoPhase {
   showFrameVideo: boolean;
 }
 
-export function useVideoPhase(video: VideoDetail | null): VideoPhase {
+export function useVideoPhase(video: VideoDetail): VideoPhase {
   const status = video?.status || "";
-  const isMusicVideo = video?.series?.videoType === "music_video";
+  const isMusicVideo = video?.videoType === "music_video";
 
   const isVisualReview = status === "REVIEW_VISUAL";
   const isMotionReview = isVisualReview && !isMusicVideo;

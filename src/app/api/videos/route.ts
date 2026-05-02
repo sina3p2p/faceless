@@ -83,29 +83,38 @@ export async function POST(req: NextRequest) {
   if (parsed.data.pipelineMode) config.pipelineMode = parsed.data.pipelineMode;
   if (parsed.data.webResearch === true) config.webResearch = true;
 
-  const [videoProject] = await db
-    .insert(videoProjects)
-    .values({
-      seriesId: seriesRecord.id,
-      status: "PENDING",
-      config: Object.keys(config).length > 0 ? config : undefined,
-      llmModel: seriesRecord.llmModel,
-      imageModel: seriesRecord.imageModel,
-      videoModel: seriesRecord.videoModel,
-      videoSize: seriesRecord.videoSize,
-      language: seriesRecord.language,
-      style: seriesRecord.style,
-      videoType: seriesRecord.videoType,
-    })
-    .returning();
+  // TODO: Implement
+  // const [videoProject] = await db
+  //   .insert(videoProjects)
+  //   .values({
+  //     seriesId: seriesRecord.id,
+  //     status: "PENDING",
+  //     modelSettings: {
+  //       storyModel: seriesRecord.llmModel,
+  //       directorModel: seriesRecord.llmModel,
+  //       supervisorModel: seriesRecord.llmModel,
+  //       cinematographerModel: seriesRecord.llmModel,
+  //       storyboardModel: seriesRecord.llmModel,
+  //       promptModel: seriesRecord.llmModel,
+  //       motionModel: seriesRecord.llmModel,
+  //       imageModel: seriesRecord.imageModel,
+  //       videoModel: seriesRecord.videoModel,
+  //     },
+  //     config: Object.keys(config).length > 0 ? config : undefined,
+  //     videoSize: seriesRecord.videoSize,
+  //     language: seriesRecord.language,
+  //     style: seriesRecord.style,
+  //     videoType: seriesRecord.videoType,
+  //   })
+  //   .returning();
 
-  await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
+  // await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
-  await renderQueue.add("executive-produce", {
-    videoProjectId: videoProject.id,
-    seriesId: seriesRecord.id,
-    userId: user.id,
-  });
+  // await renderQueue.add("executive-produce", {
+  //   videoProjectId: videoProject.id,
+  //   seriesId: seriesRecord.id,
+  //   userId: user.id,
+  // });
 
-  return NextResponse.json(videoProject, { status: 201 });
+  // return NextResponse.json(videoProject, { status: 201 });
 }

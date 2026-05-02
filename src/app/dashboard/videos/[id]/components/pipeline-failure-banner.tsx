@@ -10,17 +10,13 @@ import {
   pipelineJobDisplayName,
 } from "@/lib/pipeline-resume";
 
-type VideoWithJobs = VideoDetail & {
-  renderJobs?: Array<{ error: string | null; status?: string }>;
-};
-
 export function PipelineFailureBanner({
   video,
   scenes,
   onResume,
   resuming,
 }: {
-  video: VideoWithJobs;
+  video: VideoDetail;
   scenes: Scene[];
   onResume: () => void;
   resuming: boolean;

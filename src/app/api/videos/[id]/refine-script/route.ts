@@ -64,6 +64,7 @@ export async function POST(
 
   const { message, chatHistory } = parsed.data;
   const isMusic = video.videoType === "music_video";
+  const storyModel = video.modelSettings.storyModel;
 
   try {
     if (video.status === "REVIEW_STORY") {
@@ -76,7 +77,7 @@ export async function POST(
             parsed,
             message,
             chatHistory as ChatMessage[],
-            video.llmModel || undefined,
+            storyModel,
             video.language || "en"
           );
           const next = JSON.stringify(refined);
@@ -100,7 +101,7 @@ export async function POST(
         message,
         chatHistory as ChatMessage[],
         video.language || "en",
-        video.llmModel || undefined
+        storyModel
       );
 
       const titleMatch = refined.match(/^#\s+(.+)$/m);
@@ -125,7 +126,7 @@ export async function POST(
         current,
         message,
         chatHistory as ChatMessage[],
-        video.llmModel || undefined,
+        storyModel,
         video.language || "en"
       );
 
@@ -169,7 +170,7 @@ export async function POST(
         currentScript,
         message,
         chatHistory as ChatMessage[],
-        video.llmModel || undefined,
+        storyModel,
         video.language || "en"
       );
 
@@ -209,7 +210,7 @@ export async function POST(
         currentScript,
         message,
         chatHistory as ChatMessage[],
-        video.llmModel || undefined,
+        storyModel,
         video.language || "en"
       );
 

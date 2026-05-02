@@ -18,7 +18,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "IMAGE_GENERATION");
 
-    const imageModel = videoProject.imageModel;
+    const imageModel = videoProject.modelSettings.imageModel;
     const sizeConfig = getVideoSize(videoProject.videoSize);
     const ar = sizeConfig.id as AspectRatio;
 

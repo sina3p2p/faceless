@@ -25,7 +25,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
     });
 
     const duration = existingScenes.reduce((acc, s) => acc + (s.duration ?? 0), 0);
-    const supportedDurations = getModelDurationsArray(videoProject.videoModel);
+    const supportedDurations = getModelDurationsArray(videoProject.modelSettings?.videoModel);
 
     const scenesInput = existingScenes.map((s) => ({
       sceneTitle: s.sceneTitle || "",

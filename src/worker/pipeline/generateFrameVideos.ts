@@ -33,7 +33,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     const targets = timeline.filter((frame) => !frame.videoMediaId && frame.imageMediaId);
 
-    const videoModelKey = videoProject.videoModel || undefined;
+    const videoModelKey = videoProject.modelSettings?.videoModel;
     const { endFrame: modelSupportsEndFrame } = resolveModel(videoModelKey);
     const aspectRatio = getVideoSize(videoProject.videoSize).id;
 

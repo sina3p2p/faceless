@@ -1,4 +1,5 @@
-import { videoStatusEnum } from "@/server/db/schema";
+import { renderJobs, videoProjects, videoStatusEnum } from "@/server/db/schema";
+import { ModelSettings } from "./llm-common";
 
 export interface MediaVersion {
   id: string;
@@ -87,59 +88,9 @@ export interface StoryAssetItem {
   voiceId?: string;
 }
 
-export interface VideoDetail {
-  id: string;
-  seriesId: string;
-  videoType: 'standalone' | 'music_video';
-  title: string | null;
-  status: (typeof videoStatusEnum.enumValues)[number];
-  renderJobs?: Array<{
-    error: string | null;
-    step?: string | null;
-    status?: string;
-    progress?: number;
-  }>;
-  duration: number | null;
-  script: string | null;
-  outputUrl: string | null;
-  llmModel: string | null;
-  videoModel: string | null;
-  imageModel: string | null;
-  videoSize: string | null;
-  config: {
-    pipelineMode?: "manual" | "auto";
-    visualStyleGuide?: {
-      global: { medium: string; materialLanguage: string; colorPalette: string[]; cameraPhysics: string; defaultLighting: string };
-      promptRegions: { subjectPrefix: string; cameraPrefix: string; lightingPrefix: string; backgroundPrefix: string };
-      perScene: Array<{ sceneIndex: number; lightingOverride: string | null; paletteOverride: string[] | null; environmentMood: string }>;
-    };
-    frameBreakdown?: {
-      scenes: Array<{
-        frames: Array<{
-          clipDuration: number;
-          shotType: string;
-          narrativeIntent: string;
-          motionPolicy: string;
-          transitionIn: string;
-          subjectFocus: string;
-          pacingNote: string;
-        }>;
-      }>;
-    };
-    continuityNotes?: {
-      characterRegistry: Array<{ canonicalName: string; aliases: string[]; appearance: { clothing: string; hair: string; distinguishingFeatures: string }; firstScene: number; presentInScenes: number[] }>;
-      locationRegistry: Array<{ canonicalName: string; description: string; timeOfDay: string; lighting: string; presentInScenes: number[] }>;
-    };
-    creativeBrief?: {
-      concept: string;
-      tone: string;
-      targetAudience: string;
-      visualMood: string;
-      narrativeArc: string;
-    };
-  } | null;
-  series: { name: string; niche: string; imageModel: string | null; videoModel: string | null; videoSize: string | null; videoType: string; storyAssets?: StoryAssetItem[] };
-}
+export type RenderJob = typeof renderJobs.$inferSelect;
+
+export type VideoDetail = typeof videoProjects.$inferSelect & { renderJobs?: RenderJob[] };
 
 export interface ChatMsg {
   role: "user" | "assistant";

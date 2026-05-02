@@ -31,7 +31,7 @@ export function StudioCanvas({
   onDragEnd,
 }: {
   scenes: Scene[];
-  video: VideoDetail | null;
+  video: VideoDetail;
   selectedSceneId: string | null;
   generatingSceneIds: Set<string>;
   generatingFrameIds: Set<string>;
@@ -52,7 +52,7 @@ export function StudioCanvas({
 
   const contentRef = useRef<HTMLDivElement>(null);
 
-  const videoSize = video?.series?.videoSize || "9:16";
+  const videoSize = video.videoSize || "9:16";
 
   function handleFitView() {
     const el = contentRef.current;
@@ -122,9 +122,8 @@ export function StudioCanvas({
                   />
                   {i < scenes.length - 1 && (
                     <div
-                      className={`w-5 h-px shrink-0 transition-colors ${
-                        isAdjacent ? "bg-violet-500/40" : "bg-white/10"
-                      }`}
+                      className={`w-5 h-px shrink-0 transition-colors ${isAdjacent ? "bg-violet-500/40" : "bg-white/10"
+                        }`}
                     />
                   )}
                 </Fragment>

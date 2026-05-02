@@ -40,10 +40,10 @@ export default function ReviewPage() {
     downloadUrl, downloading, loadData,
     handleUpdateScene, handleUpdateAssetRefs, handleDeleteScene, handleUploadImage,
     handleGenerateFrameImage,
-    handleGenerateAllFrameImages, handleUpdateFramePrompt,     handleUpdateFrameMotion,
+    handleGenerateAllFrameImages, handleUpdateFramePrompt, handleUpdateFrameMotion,
     handleRegenerateFrameVideo, handleRegenerateFrameMotion, handleGenerateMotion,
     handleApprove, handleSaveStory, handleStartRendering, handleSelectMedia,
-    handleSelectFrameVariant, handleRecompose, handleDownload,     handleTogglePipelineMode, handleApplyRefinedScript,
+    handleSelectFrameVariant, handleRecompose, handleDownload, handleTogglePipelineMode, handleApplyRefinedScript,
     handleResumePipeline, resumingPipeline,
   } = actions;
 
@@ -56,7 +56,7 @@ export default function ReviewPage() {
   const [undoing, setUndoing] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
 
-  const isMusicVideo = video?.series?.videoType === "music_video";
+  const isMusicVideo = video.videoType === "music_video";
 
   // Follow active phase when it changes
   useEffect(() => {
@@ -523,7 +523,7 @@ function CenterPanel({
           <Card className="mb-6">
             <CardContent className="py-6">
               {(() => {
-                const vs = video.series?.videoSize || "9:16";
+                const vs = video.videoSize || "9:16";
                 const arCss = vs === "16:9" ? "16/9" : vs === "1:1" ? "1/1" : "9/16";
                 const maxW = vs === "16:9" ? "max-w-2xl" : vs === "1:1" ? "max-w-md" : "max-w-xs";
                 return downloadUrl ? (
@@ -641,8 +641,9 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
               onUpdateAssetRefs={(refs) => onUpdateAssetRefs(scene.id, refs)}
               generatingImage={generatingSceneIds.has(scene.id) || (scene.frames ?? []).some((f) => generatingFrameIds.has(f.id))}
               isMusicVideo={isMusicVideo}
-              isDialogue={video?.series?.videoType === "dialogue"}
-              storyAssets={video?.series?.storyAssets ?? []}
+              isDialogue={video?.videoType === "dialogue"}
+              // TODO: Implement
+              storyAssets={[]}
               showMotionEdit={phase.showMotionEdit}
               showDirectorNote={phase.showDirectorNote}
               showAudioPlayer={phase.showAudioPlayer}
@@ -659,7 +660,7 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
               showFrameActions={phase.showFrameActions}
               showFrameMotion={phase.showFrameMotion}
               showFrameVideo={phase.showFrameVideo}
-              defaultVideoModel={video?.videoModel || video?.series?.videoModel || undefined}
+              defaultVideoModel={video?.modelSettings?.videoModel}
             />
           ))}
         </div>

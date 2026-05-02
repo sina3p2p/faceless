@@ -74,8 +74,8 @@ function buildGraph(
   const edges: Edge[] = [];
 
   const frames = scene.frames ?? [];
-  const defaultImageModel = video?.series?.imageModel || "gpt-image-1.5";
-  const defaultVideoModel = video?.videoModel || video?.series?.videoModel || "";
+  const defaultImageModel = video?.modelSettings.imageModel;
+  const defaultVideoModel = video?.modelSettings.videoModel;
 
   let x = 0;
 
@@ -208,7 +208,7 @@ function buildGraph(
           phase,
           defaultImageModel,
           defaultVideoModel,
-          videoSize: video?.series?.videoSize ?? null,
+          videoSize: video?.videoSize ?? null,
           generatingImage: generatingFrameIds.has(frame.id),
           generatingVideo: generatingFrameVideoIds.has(frame.id),
           generatingMotion: generatingFrameMotionIds.has(frame.id),

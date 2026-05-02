@@ -150,9 +150,6 @@ export async function POST(req: NextRequest) {
     .values({
       status: "PENDING",
       modelSettings,
-      llmModel: modelSettings.storyModel,
-      imageModel: modelSettings.imageModel,
-      videoModel: modelSettings.videoModel,
       videoSize: data.videoSize,
       language: data.language,
       videoType: data.videoType,

@@ -30,7 +30,7 @@ export function CanvasOverlay({
 }: {
   selectedPhaseId: StudioPhaseId;
   phase: VideoPhase;
-  video: VideoDetail | null;
+  video: VideoDetail;
   scenes: Scene[];
   setVideo: React.Dispatch<React.SetStateAction<VideoDetail>>;
   onSaveStory: (markdown: string) => void;
@@ -121,7 +121,7 @@ export function CanvasOverlay({
 
   // Final — video player
   if (selectedPhaseId === "final" && status === "COMPLETED") {
-    const vs = video?.series?.videoSize || "9:16";
+    const vs = video?.videoSize || "9:16";
     const arCss = vs === "16:9" ? "16/9" : vs === "1:1" ? "1/1" : "9/16";
     const maxW = vs === "16:9" ? "max-w-lg" : vs === "1:1" ? "max-w-xs" : "max-w-[200px]";
 

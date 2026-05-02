@@ -24,7 +24,7 @@ export function InspectorPanel({
   downloading,
   onDownload,
 }: {
-  video: VideoDetail | null;
+  video: VideoDetail;
   phase: VideoPhase;
   editingScene: Scene | null;
   scenes: Scene[];
@@ -40,7 +40,7 @@ export function InspectorPanel({
   onDownload: () => void;
 }) {
   const currentPhase = phase.phases.find((p) => p.id === phase.activePhaseId);
-  const imageModel = video?.imageModel;
+  const imageModel = video.modelSettings.imageModel;
 
   return (
     <aside className="w-72 shrink-0 border-l border-white/5 bg-black/30 flex flex-col overflow-hidden">
@@ -75,12 +75,12 @@ export function InspectorPanel({
           <InfoRow
             label="Video"
             value={
-              [video?.videoModel || video?.series?.videoModel, VIDEO_I2V_PROVIDER === "replicate" ? "Replicate" : "Fal"]
+              [video.modelSettings.videoModel, VIDEO_I2V_PROVIDER === "replicate" ? "Replicate" : "Fal"]
                 .filter(Boolean)
                 .join(" · ") || "—"
             }
           />
-          <InfoRow label="Size" value={video?.series?.videoSize || "9:16"} />
+          <InfoRow label="Size" value={video.videoSize || "9:16"} />
         </div>
       </div>
 
@@ -114,9 +114,8 @@ export function InspectorPanel({
       {/* ── Footer ── */}
       <div className="px-4 py-2.5 border-t border-white/5 shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-gray-600 truncate">{video?.series?.niche}</span>
           <span className="text-[10px] text-gray-700">·</span>
-          <span className="text-[10px] text-gray-600 truncate">{video?.series?.name}</span>
+          <span className="text-[10px] text-gray-600 truncate">{video.title}</span>
         </div>
       </div>
     </aside>

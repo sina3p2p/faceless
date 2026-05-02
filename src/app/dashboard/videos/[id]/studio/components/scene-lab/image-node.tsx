@@ -92,7 +92,7 @@ export function ImageNode({ data }: NodeProps) {
               placeholder="Describe the image..."
             />
             <button
-              onClick={() => onGenerateImage(frame.id, undefined, video.imageModel!)}
+              onClick={() => onGenerateImage(frame.id, undefined, video.modelSettings.imageModel)}
               className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white text-black text-[11px] font-semibold hover:bg-gray-200 transition-colors"
             >
               Re-generate

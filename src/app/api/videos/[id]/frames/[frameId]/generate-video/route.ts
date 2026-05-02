@@ -53,7 +53,7 @@ export async function POST(
 
   const duration = parsed.data.duration || Math.max(3, Math.round(frame.clipDuration ?? 5));
   const motionPrompt = parsed.data.visualDescription || frame.visualDescription || "Cinematic motion";
-  const videoModel = parsed.data.videoModel || video.videoModel || undefined;
+  const videoModel = parsed.data.videoModel || video.modelSettings.videoModel;
   const prompt = motionPrompt;
 
   try {
