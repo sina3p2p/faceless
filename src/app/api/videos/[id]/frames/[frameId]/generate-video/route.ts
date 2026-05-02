@@ -78,7 +78,7 @@ export async function POST(
       type: "video",
       url: key,
       prompt,
-      modelUsed: videoModel || "kling-3-standard",
+      modelUsed: videoModel,
       metadata: { duration: result.durationSeconds },
     }).returning();
 
@@ -92,7 +92,7 @@ export async function POST(
     return NextResponse.json({
       videoUrl: signedUrl,
       videoKey: key,
-      videoModel: videoModel || "kling-3-standard",
+      videoModel: videoModel,
       duration: result.durationSeconds,
     });
   } catch (err) {

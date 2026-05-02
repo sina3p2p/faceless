@@ -7,8 +7,6 @@ import { ReplicateVideoProvider } from "./providers/replicate";
 
 export type { VideoResult } from "@/types/video-provider";
 
-const replicate = new ReplicateVideoProvider();
-
 export async function generateVideoFromImage(
   startImageUrl: string,
   prompt: string,
@@ -17,6 +15,8 @@ export async function generateVideoFromImage(
   endImageUrl?: string,
   aspectRatio: TAspectRatio = "9:16"
 ): Promise<VideoResult> {
+  const replicate = new ReplicateVideoProvider();
+
   const duration = pickBestDuration(desiredDuration, VIDEO_MODELS[videoModelId].durations);
 
   const req = {
