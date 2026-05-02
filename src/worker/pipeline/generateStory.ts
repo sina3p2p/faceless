@@ -5,6 +5,7 @@ import type { RenderJobData } from "@/lib/queue";
 import { generateStory, generateMusicLyrics } from "@/server/services/llm";
 import { getResearchPackForVideo } from "@/server/db/research";
 import { getAgentModels } from "./shared";
+import { deriveSubseed } from "@/lib/seed";
 
 export async function generateStoryJob(job: Job<RenderJobData>) {
   const { videoProjectId } = job.data;
@@ -36,6 +37,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
     }
 
     const isMusic = video.videoType === "music_video";
+    const storySeed = video.seed != null ? deriveSubseed(video.seed, "story") : undefined;
 
     let title: string;
     let scriptPayload: string;
@@ -61,7 +63,8 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
         video.language,
         agents.storyModel,
         config.creativeBrief,
-        researchPack
+        researchPack,
+        storySeed
       );
       const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
       title = titleMatch ? titleMatch[1].trim() : "Untitled";

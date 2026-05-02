@@ -9,9 +9,9 @@ import { formatResearchEvidence } from "./research-evidence";
 export async function generateText(
   systemPrompt: string,
   userPrompt: string,
-  options: { maxOutputTokens?: number; temperature?: number; model?: string } = {}
+  options: { maxOutputTokens?: number; temperature?: number; model?: string; seed?: number } = {}
 ): Promise<string> {
-  const { maxOutputTokens, temperature = 0.7, model } = options;
+  const { maxOutputTokens, temperature = 0.7, model, seed } = options;
   const primaryModel = model || LLM.defaultModel;
 
   const { text } = await aiGenerateText({
@@ -20,6 +20,7 @@ export async function generateText(
     prompt: userPrompt,
     temperature,
     ...(maxOutputTokens && { maxOutputTokens }),
+    ...(seed !== undefined && { seed }),
   });
 
   return text;
@@ -33,7 +34,8 @@ export async function generateStory(
   language = "en",
   model?: string,
   brief?: CreativeBrief,
-  researchPack?: ResearchPackWithClaims | null
+  researchPack?: ResearchPackWithClaims | null,
+  seed?: number
 ): Promise<string> {
   const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
@@ -73,7 +75,7 @@ CREATIVE BRIEF (follow these constraints):
 
   const userPrompt = `Write a compelling story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.`;
 
-  return generateText(systemPrompt, userPrompt, { model: primaryModel, temperature: 0.85 });
+  return generateText(systemPrompt, userPrompt, { model: primaryModel, temperature: 0.85, seed });
 }
 
 // ── Story Refinement ──

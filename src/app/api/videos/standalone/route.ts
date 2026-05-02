@@ -8,6 +8,7 @@ import { checkUsageLimit } from "@/lib/usage";
 import { DEFAULT_LLM_MODEL, DEFAULT_IMAGE_MODEL, DEFAULT_VIDEO_MODEL } from "@/lib/constants";
 import type { ModelSettings } from "@/types/llm-common";
 import { z } from "zod/v4";
+import { generateSeed } from "@/lib/seed";
 
 const modelId = z.string().min(1);
 const textModelOpt = z.string().min(1).optional();
@@ -160,6 +161,7 @@ export async function POST(req: NextRequest) {
       idea: data.prompt,
       voiceId: data.voiceId,
       config: hasConfig ? config : undefined,
+      seed: generateSeed()
     })
     .returning();
 
