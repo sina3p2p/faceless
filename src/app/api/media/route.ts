@@ -7,18 +7,6 @@ import { getSignedDownloadUrl } from "@/lib/storage";
 
 const PAGE_SIZE = 20;
 
-interface MediaItem {
-  id: string;
-  type: "video" | "image" | "audio";
-  url: string;
-  videoTitle: string | null;
-  seriesName: string;
-  sceneIndex: number;
-  prompt: string | null;
-  model: string | null;
-  createdAt: string;
-}
-
 const resolveUrl = async (key: string | null) => {
   if (!key) return null;
   if (key.startsWith("http")) return key;
@@ -30,18 +18,16 @@ export async function GET(req: NextRequest) {
   if (!user) return unauthorized();
 
   const { searchParams } = new URL(req.url);
-  const tab = (searchParams.get("tab") || "images") as "videos" | "images" | "audio";
+  const tab = (searchParams.get("tab") || "image") as "video" | "image" | "audio";
   const page = Number(searchParams.get("page")) || 0;
   const limit = Math.min(Number(searchParams.get("limit")) || PAGE_SIZE, 50);
 
-  const userCondition = eq(media.userId, user.id);
-  const condition = tab ? and(eq(media.type, tab), userCondition) : userCondition;
-  const [result] = await db.select({ count: count() }).from(media).where(condition);
+  const where = and(eq(media.type, tab), eq(media.userId, user.id));
+  const [result] = await db.select({ count: count() }).from(media).where(where);
   const total = result?.count ?? 0;
 
   const mediaItems = await db.query.media.findMany({
-    where: condition,
-    columns: { id: true, type: true, url: true, prompt: true, modelUsed: true, createdAt: true },
+    where,
     orderBy: desc(media.createdAt),
     limit: limit,
     offset: page * limit,

@@ -14,11 +14,11 @@ interface MediaItem {
   createdAt: string;
 }
 
-type Tab = "videos" | "images" | "audio";
+type Tab = "video" | "image" | "audio";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
-    id: "videos",
+    id: "video",
     label: "Videos",
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -27,7 +27,7 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
     ),
   },
   {
-    id: "images",
+    id: "image",
     label: "Images",
     icon: (
       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -106,7 +106,7 @@ function MediaCard({
       className="group relative rounded-xl border border-white/5 bg-white/2 overflow-hidden cursor-pointer hover:border-white/15 transition-all"
     >
       <div className="aspect-4/3 relative bg-black/30">
-        {type === "videos" ? (
+        {type === "video" ? (
           <video
             src={item.url}
             className="w-full h-full object-cover"
@@ -132,7 +132,7 @@ function MediaCard({
           <p className="text-[10px] text-gray-300 truncate">{label} · {item.seriesName}</p>
         </div>
 
-        {type === "videos" && (
+        {type === "video" && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             <div className="w-10 h-10 rounded-full bg-black/50 backdrop-blur flex items-center justify-center">
               <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
@@ -253,7 +253,7 @@ function MediaGrid({ items, type, loading, hasMore, sentinelRef }: {
 }
 
 export default function MediaPage() {
-  const [tab, setTab] = useState<Tab>("images");
+  const [tab, setTab] = useState<Tab>("image");
   const [items, setItems] = useState<MediaItem[]>([]);
   const [total, setTotal] = useState(0);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -328,11 +328,10 @@ export default function MediaPage() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              tab === t.id
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id
                 ? "bg-violet-600 text-white"
                 : "text-gray-400 hover:text-white hover:bg-white/5"
-            }`}
+              }`}
           >
             {t.icon}
             {t.label}
