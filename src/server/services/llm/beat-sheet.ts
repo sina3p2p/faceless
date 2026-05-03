@@ -25,7 +25,7 @@ const beatSchema = z.object({
     "unease",
     "warmth",
   ]).describe("Dominant emotional tone of this beat — must differ from the immediately preceding beat."),
-  stakeLevel: z.number().min(1).max(5).describe("Stakes/intensity 1-5. The arc must escalate overall, but include at least one drop (false victory or quiet beat)."),
+  stakeLevel: z.number().describe("Stakes/intensity as an integer from 1 (low) to 5 (peak). Use only the values 1, 2, 3, 4, or 5. The arc must escalate overall, but include at least one drop (false victory or quiet beat)."),
   isReversal: z.boolean().describe("True if this beat overturns an expectation set up by an earlier beat."),
 });
 
@@ -93,6 +93,9 @@ OUTPUT LANGUAGE:
   }
   if (output.beats.length > 9) {
     output.beats = output.beats.slice(0, 9);
+  }
+  for (const b of output.beats) {
+    b.stakeLevel = Math.min(5, Math.max(1, Math.round(b.stakeLevel)));
   }
 
   const hasReversal = output.beats.some((b) => b.isReversal);
