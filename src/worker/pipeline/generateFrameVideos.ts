@@ -42,7 +42,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
     );
 
     /** Replicate: run one i2v at a time; create requests are also serialized+retried in the Replicate client. */
-    const BATCH_SIZE = VIDEO_I2V_PROVIDER === "replicate" ? 1 : WORKER.parallelVideos;
+    const BATCH_SIZE = WORKER.parallelVideos;
 
     for (let i = 0; i < targets.length; i += BATCH_SIZE) {
       const batch = targets.slice(i, i + BATCH_SIZE);
