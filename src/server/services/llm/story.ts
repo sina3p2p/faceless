@@ -1,8 +1,9 @@
 import { generateText as aiGenerateText } from "ai";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter, type ChatMessage } from "./index";
-import type { CreativeBrief, ResearchPackWithClaims } from "@/types/pipeline";
+import type { BeatSheet, CreativeBrief, ResearchPackWithClaims } from "@/types/pipeline";
 import { formatResearchEvidence } from "./research-evidence";
+import { formatBeatSheetForPrompt } from "./beat-sheet";
 
 // ── Generic text generation (for non-structured calls) ──
 
@@ -35,16 +36,18 @@ export async function generateStory(
   model?: string,
   brief?: CreativeBrief,
   researchPack?: ResearchPackWithClaims | null,
-  seed?: number
+  seed?: number,
+  beatSheet?: BeatSheet,
 ): Promise<string> {
   const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
   const researchBlock = researchPack?.claims?.length ? `\n\n${formatResearchEvidence(researchPack)}` : "";
+  const beatSheetBlock = beatSheet ? `\n\n${formatBeatSheetForPrompt(beatSheet)}` : "";
 
-  const systemPrompt = `You are an elite storyteller. Write a COMPLETE story as flowing prose in markdown format.
+  const systemPrompt = `You are an elite storyteller. Static stories die in the first three seconds. Your job is to make this one MOVE.
 
 OUTPUT FORMAT:
-- Start with a # Title (the story's title — SEO-optimized, emotionally compelling)
+- Start with a # Title (SEO-optimized, emotionally compelling)
 - Then write the full narration as flowing prose paragraphs
 - No scene breaks, no bullet points, no structural formatting beyond paragraphs
 - No word limits — write as much as the story needs to be told properly
@@ -53,13 +56,19 @@ OUTPUT LANGUAGE (CRITICAL):
 - The title and ALL narration MUST be written in ${langName}.
 - This rule overrides everything else.
 
+DYNAMICS — non-negotiable (a story without these is a static story):
+- AT LEAST ONE REVERSAL: somewhere mid-to-late, the reader's expectation must flip. Set something up early, then break it. If the beat sheet marks a beat as REVERSAL, that's the one — land it hard.
+- TONAL SHIFTS BETWEEN PARAGRAPHS: do not stay in one register. Move between tension and relief, dread and warmth, intrigue and humor. A flat tone is the #1 cause of "boring".
+- SENSORY VARIATION: don't lean on the same sense twice in a row. Sight → sound → smell → touch. Avoid stacking adjectives — pick one specific sensory hit per beat and let it land.
+- A REAL VOICE: the narrator must have a stance — opinions, contradictions, asides, a perspective. "Neutral observer" is forbidden. If a beat sheet voice is provided, channel it.
+- ESCALATING SPECIFICITY: each beat should reveal something concrete (a name, a number, an object, a turn) — not just "things get worse".
+- AT LEAST ONE QUIET BEAT before the climax: a moment where things slow down, breathe, or look briefly OK. The next escalation lands harder because of it.
+
 STORYTELLING RULES:
 - Open with a line that makes scrolling IMPOSSIBLE (pattern interrupt, shocking claim, mystery)
-- Build with specific details — dates, numbers, sensory descriptions, escalating stakes
-- Every paragraph must either reveal new information or build tension
-- End with something that makes viewers comment, follow, or share
-- Write like you're telling a secret to a friend, not giving a lecture
-- The story should have a complete arc: hook → build-up → climax → resolution
+- Every paragraph must either reveal new information, shift the tone, or build tension — never all three at once, never none of them
+- End with a punch, an open question, or a pivot — never a recap
+- Write like you're telling a secret to a friend who's about to interrupt you, not giving a lecture
 ${brief ? `
 CREATIVE BRIEF (follow these constraints):
 - Concept: ${brief.concept}
@@ -71,9 +80,9 @@ CREATIVE BRIEF (follow these constraints):
 - Opening hook: ${brief.formatConstraints.openingHook === "question" ? "Open with a provocative question" : brief.formatConstraints.openingHook === "claim" ? "Open with a bold, surprising claim" : brief.formatConstraints.openingHook === "mystery" ? "Open by withholding key information — create mystery" : "Open mid-action — drop the reader into the middle of something happening"}
 - Dialogue density: ${brief.formatConstraints.dialogueDensity}
 - Resolution: ${brief.formatConstraints.resolutionType === "closed" ? "Complete, satisfying ending" : brief.formatConstraints.resolutionType === "open" ? "Ambiguous, thought-provoking ending" : "Unresolved tension — leave them wanting more"}
-` : ""}${researchBlock}`;
+` : ""}${beatSheetBlock ? `\nEXECUTE THE BEAT SHEET BELOW. Each beat is a movement, not a paragraph — give big beats more room, small beats less. The reversal beat must actually overturn an expectation set up earlier in the prose. Do not skip beats; do not invent new ones.${beatSheetBlock}` : ""}${researchBlock}`;
 
-  const userPrompt = `Write a compelling story about: ${topicIdea}. The intended visual style is ${style}. Make it impossible to stop reading.`;
+  const userPrompt = `Write the story for this idea: ${topicIdea}. The intended visual style is ${style}. Execute the beat sheet if provided. Make it impossible to stop reading — and impossible to predict.`;
 
   return generateText(systemPrompt, userPrompt, { model: primaryModel, temperature: 0.85, seed });
 }

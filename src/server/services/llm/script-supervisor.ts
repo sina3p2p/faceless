@@ -35,10 +35,22 @@ const sceneCarryOverSchema = z.object({
   changedElements: z.array(z.string()).describe("Elements that change: 'daylight -> dusk', 'calm -> panicked'"),
 });
 
+const sceneFunctionEnum = z.enum([
+  "setup",
+  "escalate",
+  "reveal",
+  "reversal",
+  "quiet-beat",
+  "climax",
+  "resolve",
+]);
+
 const correctedSceneSchema = z.object({
   sceneTitle: z.string(),
   text: z.string().describe("The corrected narration text — names fixed, pacing adjusted"),
-  directorNote: z.string().describe("The corrected director note — names fixed, appearance locked to registry"),
+  sceneFunction: sceneFunctionEnum.describe("Dramatic function of this scene. Preserve the director's tag if it exists ([Scene function: X] in the input directorNote). If a scene reveals nothing new and is not a quiet-beat, either flag it via surpriseInjection or re-tag it after restructuring."),
+  directorNote: z.string().describe("The corrected director note — names fixed, appearance locked to registry. DO NOT include the [Scene function: ...] tag here; the sceneFunction field carries that. Lighting and color palette MAY shift between scenes to reflect emotional state, even when wardrobe/hair/features are locked."),
+  surpriseInjection: z.string().nullable().describe("If this scene reveals nothing new (no fresh fact, image, turn, or tonal shift) AND is not intentionally tagged 'quiet-beat', describe in one sentence what concrete element to inject — a small revelation, a contradicting detail, a sensory turn. Otherwise null."),
 });
 
 const supervisorOutputSchema = z.object({
@@ -101,9 +113,16 @@ DURATION ENFORCEMENT:
 - If word count is ABOVE ${brief.durationGuidance.wordBudgetMax}: trim verbose scenes, cut redundant sentences
 - If within range: leave narration length as-is
 
-APPEARANCE LOCK:
-- In scene 0's directorNote, find each character's clothing, hair, and distinguishing features
-- Lock those values — if scene 3 says "now wearing a blue jacket" but scene 0 said "red coat", fix scene 3 to say "red coat" UNLESS the story explicitly describes a costume change
+APPEARANCE LOCK (what to lock vs. what to let breathe):
+- LOCKED across all scenes: clothing, hair, distinguishing features. If scene 3 says "now wearing a blue jacket" but scene 0 said "red coat", fix scene 3 — UNLESS the story explicitly describes a costume change.
+- INTENTIONALLY NOT LOCKED: lighting, color palette, weather, time-of-day mood. These SHOULD shift between scenes to reflect emotional state — that's how cinema conveys change without redressing the character. Do not "correct" lighting or palette differences; treat them as deliberate.
+- The cinematographer downstream will use those mood shifts. Your job is to preserve them, not flatten them.
+
+SURPRISE / DYNAMICS CHECK (this is what stops the video from feeling static):
+- For every scene, ask: "What does the viewer learn, feel, or see for the first time here?"
+- A scene that reveals NOTHING new (no fresh fact, no new image, no tonal shift, no turn) is dead weight UNLESS it is intentionally a 'quiet-beat' before a high-stakes scene.
+- For each dead-weight scene, populate surpriseInjection with a concrete one-sentence note for the visual team — a small revelation, a contradicting detail, a sensory turn — that the downstream prompt architect can render. Do NOT invent new plot; pull from what is implied or under-shown.
+- The sequence of sceneFunctions across scenes must VARY. Forbidden: two scenes in a row sharing the same sceneFunction. If you find a violation, either restructure (merge / split / re-tag) or note it via surpriseInjection.
 ${assetList}
 
 FORMAT CONSTRAINTS FROM BRIEF:

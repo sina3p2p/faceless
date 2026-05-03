@@ -61,6 +61,46 @@ export interface CreativeBrief {
   formatConstraints: FormatConstraints;
 }
 
+// ── Story Architect → BeatSheet ──
+
+export type BeatTonalShift =
+  | "intrigue"
+  | "tension"
+  | "relief"
+  | "dread"
+  | "wonder"
+  | "humor"
+  | "grief"
+  | "triumph"
+  | "unease"
+  | "warmth";
+
+export interface StoryBeat {
+  name: string;
+  purpose: string;
+  contentSummary: string;
+  tonalShift: BeatTonalShift;
+  stakeLevel: number;
+  isReversal: boolean;
+}
+
+export interface BeatSheet {
+  premiseLine: string;
+  voice: string;
+  beats: StoryBeat[];
+}
+
+// ── Director / Supervisor → SceneFunction ──
+
+export type SceneFunction =
+  | "setup"
+  | "escalate"
+  | "reveal"
+  | "reversal"
+  | "quiet-beat"
+  | "climax"
+  | "resolve";
+
 // ── Script Supervisor → ContinuityNotes ──
 
 export interface CharacterEntry {
@@ -265,6 +305,7 @@ export interface PipelineConfig {
   musicGenre?: string;
   duration?: DurationPreference;
   creativeBrief?: CreativeBrief;
+  beatSheet?: BeatSheet;
   continuityNotes?: ContinuityNotes;
   visualStyleGuide?: VisualStyleGuide;
   frameBreakdown?: FrameBreakdown;

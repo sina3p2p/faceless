@@ -3,15 +3,28 @@ import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
 import { openrouter, type StoryAsset } from "./index";
-import type { CreativeBrief } from "@/types/pipeline";
+import type { CreativeBrief, SceneFunction } from "@/types/pipeline";
 
 // ── Director Agent Schemas ──
+
+const sceneFunctionEnum = z.enum([
+  "setup",
+  "escalate",
+  "reveal",
+  "reversal",
+  "quiet-beat",
+  "climax",
+  "resolve",
+]);
 
 const directorSceneSchema = z.object({
   sceneTitle: z.string().describe("Short descriptive title for this scene (2-5 words), like a chapter heading"),
   text: z.string().describe("The narration text chunk for this scene — extracted from the story prose. This is what the viewer HEARS."),
+  sceneFunction: sceneFunctionEnum.describe("The DRAMATIC function this scene serves: 'setup' (establish), 'escalate' (raise stakes), 'reveal' (deliver new info), 'reversal' (overturn expectation), 'quiet-beat' (slow down before a punch), 'climax' (peak), 'resolve' (land the ending). Across the full sequence the functions MUST vary — never two of the same in a row, and the sequence must contain at least one 'quiet-beat' and either a 'reversal' or a 'reveal'."),
   directorNote: z.string().describe("Concrete creative brief for the visual team. Be specific — every detail must be physically renderable. Describe: SETTING (exact location, time period, weather, architecture, materials), SUBJECTS (appearance by consistent name, clothing, posture, expression, age), ACTION (visual progression — 2-3 sequential beats), MOOD (physical elements only — lighting, weather, posture), CAMERA (angle, framing, constrained to the visual style's medium). VISUAL CONTINUITY: maintain consistent subject names and appearance across scenes. Write as if briefing a cinematographer on a film set."),
 });
+
+export type DirectorSceneFunction = SceneFunction;
 
 const directorOutputSchema = z.object({
   scenes: z.array(directorSceneSchema),
@@ -78,6 +91,10 @@ export async function splitStoryIntoScenes(
   RENDERABILITY RULE:
   - ONLY describe things that can be physically photographed or painted: people, objects, places, weather, light.
   - NEVER use abstract concepts as visuals. Translate them into concrete imagery.
+
+  SCENE FUNCTION TAGGING (required field, even for music videos):
+  - Verses → 'setup' or 'escalate'. Pre-chorus → 'escalate'. Chorus → 'climax'. Bridge → 'quiet-beat' or 'reversal'. Outro → 'resolve'.
+  - Pick the tag that best fits the section's role in the song's arc.
   ${briefConstraints}
   LANGUAGE RULE:
   - sceneTitle and text MUST be in ${langName}
@@ -90,6 +107,13 @@ SCENE SPLITTING RULES:
 - NEVER cram multiple actions into one scene
 - Each scene's text should be 1-3 sentences from the original story (preserve the original wording as much as possible)
 - The text field is what the viewer HEARS as voiceover narration
+
+SCENE FUNCTION (CRITICAL — this is what stops the video from feeling static):
+- Tag every scene with a sceneFunction. The sequence of sceneFunctions across the video must VARY.
+- Forbidden: two scenes in a row with the same sceneFunction.
+- Required across the whole sequence: at least one 'quiet-beat' (a slower, lower-stakes moment placed before a high-stakes scene so the next punch lands), and at least one of 'reversal' or 'reveal'.
+- 'setup' and 'escalate' are common — but if you tag every scene 'escalate', the result is a flat, droning video. Use them sparingly.
+- The scene function should drive visual choices: 'quiet-beat' = stiller framing, softer light, more negative space; 'reversal' = a visual contradiction (the same place, different); 'climax' = peak motion and tightest framing.
 
 DIRECTOR NOTE RULES (CRITICAL — this is what makes the video look amazing):
 - Be maximally specific and concrete. Every detail you write must be physically visible on screen — if a camera cannot photograph it, do not include it.

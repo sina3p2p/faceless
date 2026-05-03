@@ -2,9 +2,9 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
-import { generateStory, generateMusicLyrics } from "@/server/services/llm";
+import { generateStory, generateMusicLyrics, generateBeatSheet } from "@/server/services/llm";
 import { getResearchPackForVideo } from "@/server/db/research";
-import { getAgentModels } from "./shared";
+import { getAgentModels, mergeProjectConfig } from "./shared";
 import { deriveSubseed } from "@/lib/seed";
 
 export async function generateStoryJob(job: Job<RenderJobData>) {
@@ -57,6 +57,21 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       scriptPayload = song.lyrics;
       console.log(`[generate-story] Music lyrics ready: "${title}" (${scriptPayload.length} chars body)`);
     } else {
+      let beatSheet = config.beatSheet;
+      if (!beatSheet && config.creativeBrief) {
+        console.log(`[generate-story] Designing beat sheet for video=${videoProjectId}`);
+        beatSheet = await generateBeatSheet(
+          topicIdea,
+          video.style,
+          config.creativeBrief,
+          video.language || "en",
+          researchPack,
+          agents.storyModel,
+        );
+        await mergeProjectConfig(videoProjectId, { beatSheet });
+        console.log(`[generate-story] Beat sheet: ${beatSheet.beats.length} beats, voice="${beatSheet.voice}"`);
+      }
+
       const storyMarkdown = await generateStory(
         video.style,
         topicIdea,
@@ -64,7 +79,8 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
         agents.storyModel,
         config.creativeBrief,
         researchPack,
-        storySeed
+        storySeed,
+        beatSheet,
       );
       const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
       title = titleMatch ? titleMatch[1].trim() : "Untitled";

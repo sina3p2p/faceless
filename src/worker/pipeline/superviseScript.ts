@@ -39,13 +39,17 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
 
     await db.delete(schema.videoScenes).where(eq(schema.videoScenes.videoProjectId, videoProjectId));
 
-    await db.insert(schema.videoScenes).values(result.scenes.map((s, i) => ({
-      videoProjectId,
-      sceneOrder: i,
-      sceneTitle: s.sceneTitle,
-      directorNote: s.directorNote,
-      text: s.text,
-    })));
+    await db.insert(schema.videoScenes).values(result.scenes.map((s, i) => {
+      const baseNote = s.directorNote.replace(/^\[Scene function:[^\]]*\]\s*/i, "");
+      const surpriseLine = s.surpriseInjection ? `\n[Surprise injection: ${s.surpriseInjection}]` : "";
+      return {
+        videoProjectId,
+        sceneOrder: i,
+        sceneTitle: s.sceneTitle,
+        directorNote: `[Scene function: ${s.sceneFunction}]\n${baseNote}${surpriseLine}`,
+        text: s.text,
+      };
+    }));
 
     await mergeProjectConfig(videoProjectId, { continuityNotes: result.continuityNotes });
 

@@ -48,7 +48,7 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
         videoProjectId,
         sceneOrder: i,
         sceneTitle: s.sceneTitle,
-        directorNote: s.directorNote,
+        directorNote: `[Scene function: ${s.sceneFunction}]\n${s.directorNote}`,
         text: s.text,
       }))
     );
