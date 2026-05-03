@@ -36,6 +36,7 @@ export interface SceneFrame {
     endState: string;
     negativeMotion: string;
     endFramePolicy?: "anchor" | "freeform";
+    endFramePolicyReason?: string;
   } | null;
   visualDescription: string | null;
   imageUrl: string | null;
