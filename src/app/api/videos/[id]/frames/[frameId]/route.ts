@@ -10,6 +10,7 @@ const updateSchema = z.object({
   visualDescription: z.string().optional(),
   clipDuration: z.number().min(1).max(30).optional(),
   assetRefs: z.array(z.string()).optional(),
+  endFramePolicy: z.enum(["anchor", "freeform"]).optional(),
 });
 
 export async function PATCH(
@@ -40,6 +41,21 @@ export async function PATCH(
   }
   if (parsed.data.clipDuration !== undefined) updates.clipDuration = parsed.data.clipDuration;
   if (parsed.data.assetRefs !== undefined) updates.assetRefs = parsed.data.assetRefs;
+
+  // Merge endFramePolicy into existing motionSpec JSON without clearing the
+  // other structured fields. If the user is also editing visualDescription in
+  // the same request, motionSpec is being cleared above and the policy update
+  // is moot — skip in that case.
+  if (parsed.data.endFramePolicy !== undefined && parsed.data.visualDescription === undefined) {
+    const existing = await db.query.sceneFrames.findFirst({
+      where: eq(sceneFrames.id, frameId),
+      columns: { motionSpec: true },
+    });
+    if (!existing?.motionSpec) {
+      return badRequest("Cannot set endFramePolicy: frame has no motionSpec yet. Generate motion first.");
+    }
+    updates.motionSpec = { ...existing.motionSpec, endFramePolicy: parsed.data.endFramePolicy };
+  }
 
   if (Object.keys(updates).length === 0) {
     return badRequest("No updates provided");

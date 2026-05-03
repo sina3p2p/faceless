@@ -166,6 +166,18 @@ export function useVideoActions(id: string) {
     });
   }
 
+  async function handleUpdateFrameEndFramePolicy(
+    frameId: string,
+    endFramePolicy: "anchor" | "freeform"
+  ) {
+    const res = await fetch(`/api/videos/${id}/frames/${frameId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endFramePolicy }),
+    });
+    if (res.ok) await loadData();
+  }
+
   async function handleRegenerateFrameVideo(frameId: string, videoModel?: string) {
     setGeneratingFrameVideoIds((prev) => new Set(prev).add(frameId));
     try {
@@ -356,6 +368,7 @@ export function useVideoActions(id: string) {
     handleGenerateAllFrameImages,
     handleUpdateFramePrompt,
     handleUpdateFrameMotion,
+    handleUpdateFrameEndFramePolicy,
     handleRegenerateFrameVideo,
     handleRegenerateFrameMotion,
     handleGenerateMotion,

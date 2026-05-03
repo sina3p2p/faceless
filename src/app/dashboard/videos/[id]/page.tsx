@@ -41,6 +41,7 @@ export default function ReviewPage() {
     handleUpdateScene, handleUpdateAssetRefs, handleDeleteScene, handleUploadImage,
     handleGenerateFrameImage,
     handleGenerateAllFrameImages, handleUpdateFramePrompt, handleUpdateFrameMotion,
+    handleUpdateFrameEndFramePolicy,
     handleRegenerateFrameVideo, handleRegenerateFrameMotion, handleGenerateMotion,
     handleApprove, handleSaveStory, handleStartRendering, handleSelectMedia,
     handleSelectFrameVariant, handleRecompose, handleDownload, handleTogglePipelineMode, handleApplyRefinedScript,
@@ -208,6 +209,7 @@ export default function ReviewPage() {
               onGenerateFrameImage={handleGenerateFrameImage}
               onUpdateFramePrompt={handleUpdateFramePrompt}
               onUpdateFrameMotion={handleUpdateFrameMotion}
+              onUpdateFrameEndFramePolicy={handleUpdateFrameEndFramePolicy}
               onRegenerateFrameVideo={handleRegenerateFrameVideo}
               onRegenerateFrameMotion={handleRegenerateFrameMotion}
               onSelectFrameVariant={handleSelectFrameVariant}
@@ -274,7 +276,7 @@ function CenterPanel({
   generatingSceneIds, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds,
   onDragEnd, onUpdateScene, onUpdateAssetRefs, onDeleteScene, onUploadImage,
   onGenerateAllFrameImages, onGenerateFrameImage,
-  onUpdateFramePrompt, onUpdateFrameMotion, onRegenerateFrameVideo, onRegenerateFrameMotion,
+  onUpdateFramePrompt, onUpdateFrameMotion, onUpdateFrameEndFramePolicy, onRegenerateFrameVideo, onRegenerateFrameMotion,
   onSelectFrameVariant, onGenerateMotion, onApprove, onSaveStory, onStartRendering, onRecompose, onDownload,
 }: {
   selectedPhaseId: StudioPhaseId;
@@ -309,6 +311,7 @@ function CenterPanel({
   onGenerateFrameImage: (frameId: string, prompt?: string) => void;
   onUpdateFramePrompt: (frameId: string, prompt: string) => void;
   onUpdateFrameMotion: (frameId: string, motion: string) => void;
+  onUpdateFrameEndFramePolicy: (frameId: string, policy: "anchor" | "freeform") => void;
   onRegenerateFrameVideo: (frameId: string, videoModel?: string) => void;
   onRegenerateFrameMotion: (frameId: string) => void;
   onSelectFrameVariant: (frameId: string, variantId: string, type: "image" | "video") => void;
@@ -374,6 +377,7 @@ function CenterPanel({
             onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
             onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
             onUpdateFrameMotion={onUpdateFrameMotion}
+            onUpdateFrameEndFramePolicy={onUpdateFrameEndFramePolicy}
             onRegenerateFrameVideo={onRegenerateFrameVideo}
             onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
           />
@@ -417,6 +421,7 @@ function CenterPanel({
               onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
               onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
               onUpdateFrameMotion={onUpdateFrameMotion}
+              onUpdateFrameEndFramePolicy={onUpdateFrameEndFramePolicy}
               onRegenerateFrameVideo={onRegenerateFrameVideo}
               onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
             />
@@ -470,6 +475,7 @@ function CenterPanel({
             onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
             onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
             onUpdateFrameMotion={onUpdateFrameMotion}
+            onUpdateFrameEndFramePolicy={onUpdateFrameEndFramePolicy}
             onRegenerateFrameVideo={onRegenerateFrameVideo}
             onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
           />
@@ -562,6 +568,7 @@ function CenterPanel({
                 onDeleteScene={onDeleteScene} onUploadImage={onUploadImage}
                 onGenerateFrameImage={onGenerateFrameImage} onUpdateFramePrompt={onUpdateFramePrompt}
                 onUpdateFrameMotion={onUpdateFrameMotion}
+                onUpdateFrameEndFramePolicy={onUpdateFrameEndFramePolicy}
                 onRegenerateFrameVideo={onRegenerateFrameVideo}
                 onRegenerateFrameMotion={onRegenerateFrameMotion} onSelectFrameVariant={onSelectFrameVariant}
               />
@@ -598,7 +605,7 @@ function StatusBanner({ color, icon, children }: { color: string; icon?: "spinne
   );
 }
 
-function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEditingScene, isMusicVideo, video, phase, generatingSceneIds, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds, onDragEnd, onUpdateScene, onUpdateAssetRefs, onDeleteScene, onUploadImage, onGenerateFrameImage, onUpdateFramePrompt, onUpdateFrameMotion, onRegenerateFrameVideo, onRegenerateFrameMotion, onSelectFrameVariant }: {
+function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEditingScene, isMusicVideo, video, phase, generatingSceneIds, generatingFrameIds, generatingFrameVideoIds, generatingFrameMotionIds, onDragEnd, onUpdateScene, onUpdateAssetRefs, onDeleteScene, onUploadImage, onGenerateFrameImage, onUpdateFramePrompt, onUpdateFrameMotion, onUpdateFrameEndFramePolicy, onRegenerateFrameVideo, onRegenerateFrameMotion, onSelectFrameVariant }: {
   scenes: Scene[];
   sensors: ReturnType<typeof useSensors>;
   selectedSceneId: string | null;
@@ -619,6 +626,7 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
   onGenerateFrameImage: (frameId: string, prompt?: string) => void;
   onUpdateFramePrompt: (frameId: string, prompt: string) => void;
   onUpdateFrameMotion: (frameId: string, motion: string) => void;
+  onUpdateFrameEndFramePolicy: (frameId: string, policy: "anchor" | "freeform") => void;
   onRegenerateFrameVideo: (frameId: string, videoModel?: string) => void;
   onRegenerateFrameMotion: (frameId: string) => void;
   onSelectFrameVariant?: (frameId: string, variantId: string, type: "image" | "video") => void;
@@ -651,6 +659,7 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
               onGenerateFrameImage={onGenerateFrameImage}
               onUpdateFramePrompt={onUpdateFramePrompt}
               onUpdateFrameMotion={onUpdateFrameMotion}
+              onUpdateFrameEndFramePolicy={onUpdateFrameEndFramePolicy}
               onRegenerateFrameVideo={onRegenerateFrameVideo}
               onRegenerateFrameMotion={onRegenerateFrameMotion}
               onSelectFrameVariant={onSelectFrameVariant}

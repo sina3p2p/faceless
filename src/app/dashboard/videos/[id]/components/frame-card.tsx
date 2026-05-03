@@ -16,6 +16,7 @@ export function FrameCard({
   onGenerateImage,
   onUpdatePrompt,
   onUpdateMotion,
+  onUpdateEndFramePolicy,
   onRegenerateMotion,
   onRegenerateVideo,
   onSelectVariant,
@@ -32,6 +33,7 @@ export function FrameCard({
   onGenerateImage?: (frameId: string, prompt?: string) => void;
   onUpdatePrompt?: (frameId: string, prompt: string) => void;
   onUpdateMotion?: (frameId: string, motion: string) => void;
+  onUpdateEndFramePolicy?: (frameId: string, policy: "anchor" | "freeform") => void;
   onRegenerateMotion?: (frameId: string) => void;
   onRegenerateVideo?: (frameId: string, videoModel?: string) => void;
   onSelectVariant?: (frameId: string, variantId: string, type: "image" | "video") => void;
@@ -199,6 +201,33 @@ export function FrameCard({
             >
               {frame.visualDescription || "Click to add motion description..."}
             </p>
+          )}
+          {frame.motionSpec && onUpdateEndFramePolicy && (
+            <div className="mt-1 flex items-center gap-1.5">
+              <label
+                htmlFor={`end-frame-policy-${frame.id}`}
+                className="text-[10px] uppercase tracking-wider text-emerald-700 font-medium"
+                title="Whether the i2v model should be anchored to the next frame's image. Use 'freeform' when anchoring would morph (different subject, hard cut)."
+              >
+                End frame
+              </label>
+              <select
+                id={`end-frame-policy-${frame.id}`}
+                value={frame.motionSpec.endFramePolicy ?? "anchor"}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  const next = e.target.value as "anchor" | "freeform";
+                  if (next !== (frame.motionSpec?.endFramePolicy ?? "anchor")) {
+                    onUpdateEndFramePolicy(frame.id, next);
+                  }
+                }}
+                className="bg-black/40 border border-emerald-500/20 rounded px-1.5 py-0.5 text-[10px] text-emerald-200 hover:border-emerald-500/40 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+              >
+                <option value="anchor">Anchor to next frame</option>
+                <option value="freeform">Freeform (no end image)</option>
+              </select>
+            </div>
           )}
         </div>
       )}

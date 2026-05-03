@@ -28,6 +28,7 @@ export function SortableSceneCard({
   onGenerateFrameImage,
   onUpdateFramePrompt,
   onUpdateFrameMotion,
+  onUpdateFrameEndFramePolicy,
   onRegenerateFrameVideo,
   onRegenerateFrameMotion,
   onSelectFrameVariant,
@@ -59,6 +60,7 @@ export function SortableSceneCard({
   onGenerateFrameImage?: (frameId: string, prompt?: string) => void;
   onUpdateFramePrompt?: (frameId: string, prompt: string) => void;
   onUpdateFrameMotion?: (frameId: string, motion: string) => void;
+  onUpdateFrameEndFramePolicy?: (frameId: string, policy: "anchor" | "freeform") => void;
   onRegenerateFrameVideo?: (frameId: string, videoModel?: string) => void;
   onRegenerateFrameMotion?: (frameId: string) => void;
   onSelectFrameVariant?: (frameId: string, variantId: string, type: "image" | "video") => void;
@@ -246,6 +248,7 @@ export function SortableSceneCard({
                   onGenerateImage={onGenerateFrameImage}
                   onUpdatePrompt={onUpdateFramePrompt}
                   onUpdateMotion={onUpdateFrameMotion}
+                  onUpdateEndFramePolicy={onUpdateFrameEndFramePolicy}
                   onRegenerateMotion={onRegenerateFrameMotion}
                   generatingMotion={generatingFrameMotionIds?.has(frame.id) ?? false}
                   onRegenerateVideo={onRegenerateFrameVideo}
