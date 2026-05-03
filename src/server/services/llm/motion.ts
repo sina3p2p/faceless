@@ -48,6 +48,18 @@ export const frameMotionSpecSchema = z.object({
     .describe(
       "Motions and failures to avoid: extra primary actions, morphing, face warping, illegal camera moves for the medium, text overlays, etc. Short phrases, comma-separated."
     ),
+  /**
+   * Whether the i2v model should be anchored to the next frame's image as
+   * `end_image`. Only consulted when a next frame exists. "anchor" is the
+   * legacy behavior (interpolate to the next frame); "freeform" omits the
+   * end image and lets the model resolve naturally — use when interpolating
+   * would produce a morph/transformer artifact.
+   */
+  endFramePolicy: z
+    .enum(["anchor", "freeform"])
+    .describe(
+      "anchor = send next frame as end_image (continuous beat across the cut). freeform = omit end_image (next frame is a hard cut, different subject/location, or large angle change that would morph)."
+    ),
 });
 
 export type FrameMotionSpec = z.infer<typeof frameMotionSpecSchema>;
@@ -166,8 +178,12 @@ FIELD GUIDANCE (dense physical language in each — no filler):
 - primaryAction: ONE dominant beat. Specific directions, speeds, body parts. "lifts left hand to forehead, fingers spread, elbow rising to shoulder height" not "raises hand".
 - cameraMove: One move only — type, direction, speed (e.g. "slow pan left", "locked tripod", "gentle handheld drift right").
 - subjectDynamics: Mechanics, weight, timing, follow-through, plus secondary motion that naturally results from primaryAction (hair, cloth, props).
-- endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${nextImageUrl ? ` REQUIRED: name the composition of the NEXT frame (subject placement, camera angle) and describe how this clip arrives at it, so the cut/xfade reads as one continuous beat. If the angles are too different to bridge, settle naturally and explicitly state why (no second action).` : ` Natural deceleration — no new action at the end.`}
+- endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${nextImageUrl ? ` When endFramePolicy is "anchor", name the composition of the NEXT frame (subject placement, camera angle) and describe how this clip arrives at it, so the cut/xfade reads as one continuous beat. When "freeform", settle naturally without referencing the next frame.` : ` Natural deceleration — no new action at the end.`}
 - negativeMotion: List what must NOT happen (extra actions, morphing, wrong camera grammar for the medium, dialogue text on screen).
+${nextImageUrl ? `- endFramePolicy: Decide whether the i2v model should be ANCHORED to the next frame.
+    • Choose "anchor" ONLY when the next frame is a natural continuation of this one: same subject identity, same location, similar framing/lens, and a plausible bridge motion exists between them.
+    • Choose "freeform" when ANY of these are true: different subject or character, scene/location change, large camera-angle jump, very different lighting/composition, or transitionIn is a hard "cut". Anchoring across these gaps produces a morph/"transformer" interpolation that looks bad.
+    • When in doubt, prefer "freeform" — a clean settle reads better than a forced morph.` : `- endFramePolicy: Set to "freeform" (no next frame to anchor to).`}
 
 QUALITY RULES:
 - Directional and speed-specific language throughout; tie beats to clip duration (build, peak, settle — not instant snap unless frenetic)

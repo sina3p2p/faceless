@@ -56,9 +56,16 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
             const desiredDuration = frame.clipDuration;
             const frameIdx = indexById.get(frame.id);
 
+            // Default to "anchor" when the motion director didn't emit a
+            // policy (legacy rows). The motion director is responsible for
+            // choosing "freeform" when interpolation across the cut would
+            // produce a morph/transformer artifact.
+            const endFramePolicy = frame.motionSpec?.endFramePolicy ?? "anchor";
+
             let endImageUrl: string | undefined = undefined;
             if (
-              frameIdx !== undefined
+              endFramePolicy === "anchor"
+              && frameIdx !== undefined
               && frameIdx < timeline.length - 1
             ) {
               const next = timeline[frameIdx + 1];
@@ -67,9 +74,10 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
               }
             }
 
-            if (endImageUrl && frameIdx !== undefined) {
+            if (frameIdx !== undefined && frameIdx < timeline.length - 1) {
+              const nextId = timeline[frameIdx + 1]!.id;
               console.log(
-                `[generate-frame-videos] Frame ${frame.id}: ${desiredDuration}s clip → next frame ${timeline[frameIdx + 1]!.id}`
+                `[generate-frame-videos] Frame ${frame.id}: ${desiredDuration}s clip → next ${nextId} (endFramePolicy=${endFramePolicy}${endImageUrl ? ", anchored" : ", freeform"})`
               );
             }
 
