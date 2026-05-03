@@ -32,7 +32,7 @@ const beatSchema = z.object({
 const beatSheetSchema = z.object({
   premiseLine: z.string().describe("One-sentence logline for the story (subject + conflict + stake)."),
   voice: z.string().describe("The narrator's stance/voice in 6-12 words. E.g. 'wry skeptic who's been burned before', 'awed witness reluctant to name it'."),
-  beats: z.array(beatSchema).min(5).max(7),
+  beats: z.array(beatSchema).describe("5 to 7 beats. Fewer is too thin; more is sprawl."),
 });
 
 export async function generateBeatSheet(
