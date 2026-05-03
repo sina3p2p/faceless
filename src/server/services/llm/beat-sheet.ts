@@ -32,7 +32,7 @@ const beatSchema = z.object({
 const beatSheetSchema = z.object({
   premiseLine: z.string().describe("One-sentence logline for the story (subject + conflict + stake)."),
   voice: z.string().describe("The narrator's stance/voice in 6-12 words. E.g. 'wry skeptic who's been burned before', 'awed witness reluctant to name it'."),
-  beats: z.array(beatSchema).min(5).max(7),
+  beats: z.array(beatSchema).describe("5 to 7 beats. Fewer is too thin; more is sprawl."),
 });
 
 export async function generateBeatSheet(
@@ -87,6 +87,13 @@ OUTPUT LANGUAGE:
     temperature: 0.85,
   });
   if (!output) throw new Error("Failed to generate beat sheet");
+
+  if (output.beats.length < 3) {
+    throw new Error(`Beat sheet has only ${output.beats.length} beats (need at least 3)`);
+  }
+  if (output.beats.length > 9) {
+    output.beats = output.beats.slice(0, 9);
+  }
 
   const hasReversal = output.beats.some((b) => b.isReversal);
   if (!hasReversal && output.beats.length >= 4) {
