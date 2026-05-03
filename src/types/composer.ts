@@ -13,6 +13,18 @@ export interface ComposerScene {
   wordTimestamps: WordTimestamp[];
 }
 
+/**
+ * Sound-effect cue. `type` matches a file under `public/sfx/{type}.mp3`. The
+ * cue plays for `durationS` starting at `atSeconds` from the start of the
+ * final video. Missing asset files are skipped with a warning, so this is
+ * safe to wire ahead of shipping the audio assets themselves.
+ */
+export interface SfxCue {
+  type: string;
+  atSeconds: number;
+  durationS: number;
+}
+
 export interface ComposerOptions {
   scenes: ComposerScene[];
   captionStyle: string;
@@ -25,4 +37,6 @@ export interface ComposerOptions {
   qualityTier?: QualityTier;
   /** Optional color grade. Applied as a 3D LUT if the matching file exists under public/luts/. */
   colorGrade?: ColorGrade;
+  /** Optional SFX cues mixed under the final audio track. Missing assets are skipped. */
+  sfx?: SfxCue[];
 }

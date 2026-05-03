@@ -92,6 +92,8 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
           imageSpec: sceneFrames[j].imageSpec,
           promptContractMeta: assessment.resultMeta,
           assetRefs: sceneFrames[j].assetRefs,
+          transitionIn: frameSpec?.transitionIn ?? null,
+          sfxHint: frameSpec?.sfxHint ?? null,
         });
         totalFrames++;
       }

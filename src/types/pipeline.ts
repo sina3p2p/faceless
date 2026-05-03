@@ -155,6 +155,8 @@ export type TransitionType =
   | "match-cut"
   | "whip-pan";
 
+export type SfxHint = "whoosh" | "impact" | "hit" | "riser" | "none";
+
 export interface FrameSpec {
   clipDuration: number;
   shotType: ShotType;
@@ -163,6 +165,7 @@ export interface FrameSpec {
   transitionIn: TransitionType;
   subjectFocus: string;
   pacingNote: string;
+  sfxHint?: SfxHint;
 }
 
 export interface FrameBreakdown {
@@ -191,6 +194,12 @@ export interface MotionDirectorInput {
    * When true, this frame is the default “hook” slot (e.g. first in scene) unless `skillHints.isHookFrame === false`.
    */
   isDefaultHookSlot?: boolean;
+  /**
+   * Voiceover words-per-second over this frame's window. Used by the Motion
+   * Director to inverse-correlate motion intensity with VO density. 0 (or
+   * absent) means no signal — typical for music videos.
+   */
+  voTempoWps?: number;
 }
 
 // ── Web research (DB: research_packs + research_claims) ──
@@ -243,6 +252,12 @@ export interface ResearchPackWithClaims {
 export interface PipelineConfig {
   /** When true, run `web-research` after creative brief and before story. */
   webResearch?: boolean;
+  /**
+   * When true, the composer mixes per-frame SFX cues from `public/sfx/{type}.mp3`.
+   * Defaults to false; missing asset files are skipped with a warning so this
+   * is safe to flip on before the asset library lands.
+   */
+  enableSfx?: boolean;
   pipelineMode?: "manual" | "auto";
   /** Per-pipeline-step OpenRouter model ids; stored when user customizes in create flow. */
   agentModels?: Partial<AgentModels>;

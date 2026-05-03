@@ -5,7 +5,7 @@ import * as path from "path";
 import * as os from "os";
 import { v4 as uuid } from "uuid";
 import { VIDEO_DEFAULTS } from "@/lib/constants";
-import type { ColorGrade, ComposerOptions, ComposerScene, QualityTier } from "@/types/composer";
+import type { ColorGrade, ComposerOptions, ComposerScene, QualityTier, SfxCue } from "@/types/composer";
 import type { WordTimestamp } from "@/types/tts";
 import { groupWordsByPauses } from "./captions";
 
@@ -199,6 +199,7 @@ export async function composeVideo(
     videoHeight,
     qualityTier,
     colorGrade,
+    sfx,
   } = options;
   const workDir = path.join(os.tmpdir(), `faceless-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
@@ -347,7 +348,7 @@ export async function composeVideo(
     }
 
     if (backgroundMusicPath) {
-      const finalOutput = path.join(workDir, "final.mp4");
+      const withMusic = path.join(workDir, "with_music.mp4");
       // Sidechain compression: VO drives the compressor on the music bus, so
       // the music ducks under speech and rebounds during pauses. Replaces a
       // flat 10% bed mix that buried the music outside speech and still fought
@@ -361,9 +362,14 @@ export async function composeVideo(
       await execAsync(
         `ffmpeg -y -i "${currentVideo}" -i "${backgroundMusicPath}" ` +
         `-filter_complex "${duckFilter}" ` +
-        `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${finalOutput}"`
+        `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${withMusic}"`
       );
-      return finalOutput;
+      currentVideo = withMusic;
+    }
+
+    if (sfx && sfx.length > 0) {
+      const mixed = await mixSfxCues(currentVideo, sfx, workDir);
+      if (mixed) currentVideo = mixed;
     }
 
     return currentVideo;
@@ -396,4 +402,47 @@ async function resolveColorGradeLut(grade: ColorGrade | undefined): Promise<stri
 /** Escape a path for ffmpeg filter graphs (mainly the Windows-drive-style colon). */
 function escapeFilterPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "'\\''");
+}
+
+/**
+ * Mix SFX cues onto an existing audio track. Each cue is sourced from
+ * `public/sfx/{cue.type}.mp3`; missing files are warned and dropped (mirrors
+ * the LUT pattern from Wave 1, so the option can be wired before the asset
+ * library lands). Returns the new path on success, or null when no usable
+ * cues were resolved (caller should keep the prior video).
+ */
+async function mixSfxCues(
+  currentVideo: string,
+  sfx: SfxCue[],
+  workDir: string
+): Promise<string | null> {
+  const resolved: Array<{ cue: SfxCue; file: string }> = [];
+  for (const cue of sfx) {
+    if (!cue.type || cue.type === "none") continue;
+    const candidate = path.join(process.cwd(), "public", "sfx", `${cue.type}.mp3`);
+    try {
+      await fs.access(candidate);
+      resolved.push({ cue, file: candidate });
+    } catch {
+      console.warn(`[composer] SFX asset missing: ${candidate} — skipping cue.`);
+    }
+  }
+  if (resolved.length === 0) return null;
+
+  const out = path.join(workDir, "with_sfx.mp4");
+  const inputArgs = resolved.map((r) => `-i "${r.file}"`).join(" ");
+  // adelay is per-channel; "ms|ms" delays both channels of a stereo cue.
+  const delayClauses = resolved.map((r, i) => {
+    const ms = Math.max(0, Math.round(r.cue.atSeconds * 1000));
+    return `[${i + 1}:a]adelay=${ms}|${ms}[sfx${i}]`;
+  });
+  const sfxLabels = resolved.map((_, i) => `[sfx${i}]`).join("");
+  const mixSpec = `[0:a]${sfxLabels}amix=inputs=${resolved.length + 1}:duration=first:dropout_transition=0[outa]`;
+  const filter = `${delayClauses.join(";")};${mixSpec}`;
+  await execAsync(
+    `ffmpeg -y -i "${currentVideo}" ${inputArgs} ` +
+      `-filter_complex "${filter}" ` +
+      `-map 0:v -map "[outa]" -c:v copy -c:a aac -b:a 192k "${out}"`
+  );
+  return out;
 }

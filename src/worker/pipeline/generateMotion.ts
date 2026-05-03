@@ -5,6 +5,8 @@ import { WORKER } from "@/lib/constants";
 import { generateSingleFrameMotion } from "@/server/services/llm";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { getAgentModels, autoChainOrReview } from "./shared";
+import { computeFrameWps } from "@/server/services/frame-tempo";
+import type { WordTimestamp } from "@/types/tts";
 
 export async function generateMotionJob(job: Job<RenderJobData>) {
   const { videoProjectId } = job.data;
@@ -39,6 +41,24 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       return a.frameOrder - b.frameOrder;
     });
 
+    // Per-frame VO tempo: walk frames in (scene, frameOrder) order and
+    // accumulate start times within each scene so we can slice the scene's
+    // word-timestamps into a per-frame WPS.
+    const frameStartByFrameId = new Map<string, number>();
+    {
+      let lastSceneId: string | null = null;
+      let cursor = 0;
+      for (const f of frames) {
+        const sceneId = f.scene?.id ?? null;
+        if (sceneId !== lastSceneId) {
+          cursor = 0;
+          lastSceneId = sceneId;
+        }
+        frameStartByFrameId.set(f.id, cursor);
+        cursor += f.clipDuration ?? 5;
+      }
+    }
+
     const allFrameData = await Promise.all(frames.map(async (frame) => {
       let signedUrl = "";
       if (frame.imageMedia?.url) {
@@ -46,13 +66,18 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
           signedUrl = await getSignedDownloadUrl(frame.imageMedia.url);
         } catch { /* skip */ }
       }
+      const captionData = (frame.scene?.captionData as WordTimestamp[] | null) ?? null;
+      const frameStartS = frameStartByFrameId.get(frame.id) ?? 0;
+      const clipDuration = frame.clipDuration ?? 5;
+      const voTempoWps = computeFrameWps(captionData, frameStartS, clipDuration);
       return {
         frameId: frame.id,
-        clipDuration: frame.clipDuration ?? 5,
+        clipDuration,
         sceneText: frame.scene?.text ?? "",
         imageUrl: signedUrl,
         motionSkillHints: frame.motionSkillHints ?? null,
         assetRefs: frame.assetRefs,
+        voTempoWps,
       };
     }));
 
@@ -117,6 +142,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
                 narrativeIntent: frameSpec?.narrativeIntent,
                 assetRefCount: frameData.assetRefs?.length ?? 0,
                 isDefaultHookSlot: fi === 0,
+                voTempoWps: frameData.voTempoWps,
               },
               currentImageUrl,
               nextImageUrl,

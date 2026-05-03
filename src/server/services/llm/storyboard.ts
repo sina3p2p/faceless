@@ -23,6 +23,7 @@ const frameSpecSchema = z.object({
   transitionIn: z.enum(["cut", "dissolve", "fade", "match-cut", "whip-pan"]),
   subjectFocus: z.string().describe("Who/what dominates this frame — use a canonical character name from continuity, or describe the object"),
   pacingNote: z.string().describe("Brief note on timing feel: 'hold for impact', 'quick cut to maintain energy'"),
+  sfxHint: z.enum(["whoosh", "impact", "hit", "riser", "none"]).optional().describe("Optional sound-effect cue at the START of this frame. Use sparingly — only on climax beats, big transitions, or true emphasis moments."),
 });
 
 const frameBreakdownSchema = z.object({
@@ -97,7 +98,12 @@ RULES:
    - "whip-pan": high energy transitions only
 7. First frame of the video should use "fade" transitionIn
 8. You MUST produce exactly ${scenes.length} scene entries, one per input scene
-9. If the total duration would exceed ${duration}s, reduce frame count in later scenes`;
+9. If the total duration would exceed ${duration}s, reduce frame count in later scenes
+10. SHOT VARIETY (the cut should breathe — never lock into one focal length):
+    - Any scene with ≥3 frames MUST contain at least one "establishing" or "wide" shot
+    - Across the whole video, include at least one "close-up", "extreme-close-up", or "detail" shot every 5 frames (so the audience gets emotional anchors)
+    - Avoid more than 2 consecutive "medium" shots — vary the rhythm
+11. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".`;
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
@@ -108,5 +114,83 @@ RULES:
   });
   if (!output) throw new Error("Failed to generate frame breakdown");
 
+  const violations = validateShotBudget(output);
+  if (violations.length === 0) return output;
+
+  console.warn(
+    `[storyboard] Shot-budget violations on first pass: ${violations.join("; ")}. Re-prompting once.`
+  );
+
+  const fixupNote = `Your previous breakdown violated shot-variety rule 10:\n- ${violations.join("\n- ")}\nPlease fix these violations while keeping the same scene count, narrative intent, and durations.`;
+
+  try {
+    const { output: retry } = await aiGenerateText({
+      model: openrouter.chat(primaryModel),
+      output: Output.object({ schema: frameBreakdownSchema }),
+      system: systemPrompt,
+      prompt: `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}\n\n${fixupNote}`,
+      temperature: 0.5,
+    });
+    if (retry) {
+      const retryViolations = validateShotBudget(retry);
+      if (retryViolations.length > 0) {
+        console.warn(
+          `[storyboard] Shot-budget violations remain after retry: ${retryViolations.join("; ")}. Accepting anyway.`
+        );
+      }
+      return retry;
+    }
+  } catch (err) {
+    console.warn(`[storyboard] Shot-budget retry failed (${err instanceof Error ? err.message : err}); accepting first pass.`);
+  }
   return output;
+}
+
+/**
+ * Deterministic post-LLM validator for the storyboarder's shot variety rules.
+ * Returns one short message per violation; an empty array means the breakdown
+ * passes. Designed to be cheap and side-effect free so callers can use it in
+ * tests and at runtime.
+ */
+export function validateShotBudget(breakdown: FrameBreakdown): string[] {
+  const violations: string[] = [];
+
+  const wideish = new Set(["establishing", "wide"]);
+  const closeish = new Set(["close-up", "extreme-close-up", "detail"]);
+
+  // Rule: any scene with ≥3 frames must include at least one establishing/wide shot.
+  for (let s = 0; s < breakdown.scenes.length; s++) {
+    const frames = breakdown.scenes[s]?.frames ?? [];
+    if (frames.length >= 3 && !frames.some((f) => wideish.has(f.shotType))) {
+      violations.push(`scene ${s} (${frames.length} frames) lacks an establishing/wide shot`);
+    }
+  }
+
+  // Flatten to a global frame list for sliding-window rules.
+  const flat = breakdown.scenes.flatMap((scene, sceneIdx) =>
+    (scene?.frames ?? []).map((f, frameIdx) => ({ ...f, sceneIdx, frameIdx }))
+  );
+
+  // Rule: at least one close-up/extreme-close-up/detail every 5 frames.
+  for (let i = 0; i + 5 <= flat.length; i++) {
+    const window = flat.slice(i, i + 5);
+    if (!window.some((f) => closeish.has(f.shotType))) {
+      violations.push(`frames ${i}-${i + 4} contain no close-up/detail shot`);
+    }
+  }
+
+  // Rule: no more than 2 consecutive "medium" shots.
+  let mediumRun = 0;
+  for (let i = 0; i < flat.length; i++) {
+    if (flat[i].shotType === "medium") {
+      mediumRun++;
+      if (mediumRun === 3) {
+        violations.push(`three consecutive medium shots starting at frame ${i - 2}`);
+      }
+    } else {
+      mediumRun = 0;
+    }
+  }
+
+  return violations;
 }
