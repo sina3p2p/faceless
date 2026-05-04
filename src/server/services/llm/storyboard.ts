@@ -75,35 +75,36 @@ KNOWN LOCATIONS: ${locationNames.join(", ") || "none"}
 
 RULES:
 1. clipDuration MUST be from [${durationsList}] — no other values
-2. Each scene's frames should sum to at least the scene's audio duration; when pacing allows, prefer FEWER frames with LONGER clipDuration over many short clips — tiny clips read as a slideshow of stills; longer clips let motion register as video
-3. narrativeIntent must match the story moment:
+2. ONE ACTION PER FRAME (STRICT): each frame holds exactly one motion beat. When a story moment contains multiple distinct actions (e.g. a jet banks, a missile launches, smoke trails curve, an explosion blooms, debris tumbles), SPLIT them across consecutive frames — one beat per frame — instead of packing them into a single longer clip. AI video models render compound actions as morphing artifacts; the cure is more frames, not denser prompts.
+3. NO ARTIFICIAL FRAME-COUNT CAP: do not minimise frame count for its own sake. Action density drives frame count. A scene with five distinct beats needs five frames, not one. Each scene's frames should sum to at least that scene's audio duration; when the moment is dense, add more frames at the SHORTEST supported clipDuration that still lets a single beat register as motion (build-in, peak, settle). Avoid the absolute minimum only when a beat genuinely needs build-up.
+4. narrativeIntent must match the story moment:
    - "introduce": first appearance of character or setting
    - "build": rising tension, adding detail
    - "climax": peak emotional/dramatic moment
    - "react": character's response to an event
    - "transition": bridging between scenes or beats
    - "resolve": conclusion, settling
-4. motionPolicy must match the narrative moment:
+5. motionPolicy must match the narrative moment:
    - "static": establishing shots, somber moments, still environments
    - "subtle": quiet character moments, emotional beats, breathing
    - "moderate": normal actions, walking, talking
    - "dynamic": action sequences, dramatic reveals, fast movement
    - "frenetic": chase scenes, fights, extreme urgency
-5. subjectFocus must be a canonicalName from the character/location registry, or a specific described object
-6. transitionIn:
+6. subjectFocus must be a canonicalName from the character/location registry, or a specific described object
+7. transitionIn:
    - "cut": default, for maintaining energy
    - "dissolve": time passing, dreamlike
    - "fade": scene boundaries, emotional weight
    - "match-cut": visual/thematic linking between shots
    - "whip-pan": high energy transitions only
-7. First frame of the video should use "fade" transitionIn
-8. You MUST produce exactly ${scenes.length} scene entries, one per input scene
-9. If the total duration would exceed ${duration}s, reduce frame count in later scenes
-10. SHOT VARIETY (the cut should breathe — never lock into one focal length):
+8. First frame of the video should use "fade" transitionIn
+9. You MUST produce exactly ${scenes.length} scene entries, one per input scene
+10. If the total duration would exceed ${duration}s, prefer SHORTENING individual clipDurations (within supported values) over removing frames; only drop frames as a last resort, and never to evade rule 2 by re-packing two beats into one clip
+11. SHOT VARIETY (the cut should breathe — never lock into one focal length):
     - Any scene with ≥3 frames MUST contain at least one "establishing" or "wide" shot
     - Across the whole video, include at least one "close-up", "extreme-close-up", or "detail" shot every 5 frames (so the audience gets emotional anchors)
     - Avoid more than 2 consecutive "medium" shots — vary the rhythm
-11. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".`;
+12. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".`;
 
   const { output } = await aiGenerateText({
     model: openrouter.chat(primaryModel),
