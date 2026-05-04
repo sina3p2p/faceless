@@ -203,7 +203,7 @@ export function FrameCard({
             </p>
           )}
           {frame.motionSpec && onUpdateEndFramePolicy && (
-            <div className="mt-1 flex items-center gap-1.5">
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
               <label
                 htmlFor={`end-frame-policy-${frame.id}`}
                 className="text-[10px] uppercase tracking-wider text-emerald-700 font-medium"
@@ -227,6 +227,14 @@ export function FrameCard({
                 <option value="anchor">Anchor to next frame</option>
                 <option value="freeform">Freeform (no end image)</option>
               </select>
+              {frame.motionSpec.endFramePolicyReason && (
+                <span
+                  className="text-[10px] text-emerald-700/70 italic truncate max-w-[60%]"
+                  title={frame.motionSpec.endFramePolicyReason}
+                >
+                  — {frame.motionSpec.endFramePolicyReason}
+                </span>
+              )}
             </div>
           )}
         </div>

@@ -54,7 +54,11 @@ export async function PATCH(
     if (!existing?.motionSpec) {
       return badRequest("Cannot set endFramePolicy: frame has no motionSpec yet. Generate motion first.");
     }
-    updates.motionSpec = { ...existing.motionSpec, endFramePolicy: parsed.data.endFramePolicy };
+    updates.motionSpec = {
+      ...existing.motionSpec,
+      endFramePolicy: parsed.data.endFramePolicy,
+      endFramePolicyReason: "manual override",
+    };
   }
 
   if (Object.keys(updates).length === 0) {

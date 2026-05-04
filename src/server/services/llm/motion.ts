@@ -60,6 +60,17 @@ export const frameMotionSpecSchema = z.object({
     .describe(
       "anchor = send next frame as end_image (continuous beat across the cut). freeform = omit end_image (next frame is a hard cut, different subject/location, or large angle change that would morph)."
     ),
+  /**
+   * Short free-text justification for the chosen `endFramePolicy`. Stored as
+   * metadata only — never compiled into the video model prompt — so it can be
+   * inspected from the review UI without affecting i2v output.
+   */
+  endFramePolicyReason: z
+    .string()
+    .optional()
+    .describe(
+      "Brief reason for the endFramePolicy choice (e.g. 'same subject, near-identical framing, hand-raise bridges cleanly' or 'different framing, would morph the face'). Metadata only — does not affect the video prompt."
+    ),
 });
 
 export type FrameMotionSpec = z.infer<typeof frameMotionSpecSchema>;
@@ -178,12 +189,13 @@ FIELD GUIDANCE (dense physical language in each — no filler):
 - primaryAction: ONE dominant beat. Specific directions, speeds, body parts. "lifts left hand to forehead, fingers spread, elbow rising to shoulder height" not "raises hand".
 - cameraMove: One move only — type, direction, speed (e.g. "slow pan left", "locked tripod", "gentle handheld drift right").
 - subjectDynamics: Mechanics, weight, timing, follow-through, plus secondary motion that naturally results from primaryAction (hair, cloth, props).
-- endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${nextImageUrl ? ` When endFramePolicy is "anchor", name the composition of the NEXT frame (subject placement, camera angle) and describe how this clip arrives at it, so the cut/xfade reads as one continuous beat. When "freeform", settle naturally without referencing the next frame.` : ` Natural deceleration — no new action at the end.`}
+- endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${nextImageUrl ? ` If you choose to anchor (see endFramePolicy), name the composition of the NEXT frame and describe how this clip arrives at it as one continuous beat. Otherwise, settle naturally without referencing the next frame.` : ` Natural deceleration — no new action at the end.`}
 - negativeMotion: List what must NOT happen (extra actions, morphing, wrong camera grammar for the medium, dialogue text on screen).
-${nextImageUrl ? `- endFramePolicy: Decide whether the i2v model should be ANCHORED to the next frame.
-    • Choose "anchor" ONLY when the next frame is a natural continuation of this one: same subject identity, same location, similar framing/lens, and a plausible bridge motion exists between them.
-    • Choose "freeform" when ANY of these are true: different subject or character, scene/location change, large camera-angle jump, very different lighting/composition, or transitionIn is a hard "cut". Anchoring across these gaps produces a morph/"transformer" interpolation that looks bad.
-    • When in doubt, prefer "freeform" — a clean settle reads better than a forced morph.` : `- endFramePolicy: Set to "freeform" (no next frame to anchor to).`}
+${nextImageUrl ? `- endFramePolicy: Anchoring the i2v model to the next frame forces it to interpolate between the two images. When the frames are visually close enough that interpolation produces real motion, this looks great and gives a continuous beat across the cut. When they are too far apart, it produces a face/body warp that looks like a morphing transformer — the failure you must avoid.
+    Look at both images carefully. Silently judge: if I asked the model to start at the first and arrive at the second, would the in-between motion read as a believable physical action, or would it have to invent a morph to bridge them? Pick "anchor" only if the answer is the former. Pick "freeform" otherwise.
+    Do not pick "anchor" as a default or to play it safe — an unjustified anchor is the main source of the morph artifact.
+- endFramePolicyReason: One short clause justifying the choice based on what you see in the two images (e.g. "same subject, near-identical framing, hand-raise bridges cleanly" or "different framing, would morph the face"). Required when a next frame is shown.` : `- endFramePolicy: Set to "freeform" (no next frame to anchor to).
+- endFramePolicyReason: Leave empty.`}
 
 QUALITY RULES:
 - Directional and speed-specific language throughout; tie beats to clip duration (build, peak, settle — not instant snap unless frenetic)
