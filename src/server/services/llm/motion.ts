@@ -15,18 +15,7 @@ export const frameMotionSpecSchema = z.object({
   primaryAction: z
     .string()
     .describe(
-      "ONE dominant motion beat for the clip — what happens, in vivid physical language. No second unrelated action."
-    ),
-  /**
-   * Optional second beat. Only emitted when the system prompt explicitly
-   * permits it (high-energy intents on long clips). Short, flows out of the
-   * primary action — never an unrelated event.
-   */
-  secondaryAction: z
-    .string()
-    .optional()
-    .describe(
-      "Optional follow-up beat that flows naturally from primaryAction (e.g. a reaction or recoil). Leave blank unless explicitly permitted."
+      "THE ONLY motion beat for the clip — what happens, in vivid physical language. Exactly one beat; if the story moment contains multiple actions, describe only the one that belongs to this frame and assume the others live in adjacent frames."
     ),
   cameraMove: z
     .string()
@@ -78,20 +67,13 @@ export type FrameMotionSpec = z.infer<typeof frameMotionSpecSchema>;
 /** Turn structured motion into one dense prompt for text-native video models. */
 export function compileMotionPrompt(spec: FrameMotionSpec): string {
   const pa = spec.primaryAction.trim();
-  const sa = (spec.secondaryAction ?? "").trim();
   const sd = spec.subjectDynamics.trim();
   const cm = spec.cameraMove.trim();
   const es = spec.endState.trim();
   const neg = spec.negativeMotion.trim();
 
   const parts: string[] = [];
-  if (pa && sa) {
-    parts.push(`${pa}; followed by ${sa}`);
-  } else if (pa) {
-    parts.push(pa);
-  } else if (sa) {
-    parts.push(sa);
-  }
+  if (pa) parts.push(pa);
   if (sd) parts.push(sd);
   if (cm) parts.push(`Camera: ${cm}`);
   if (es) parts.push(`Ending: ${es}`);
@@ -177,16 +159,14 @@ MOTION POLICY: ${effectivePolicy.toUpperCase()}${basePolicy !== effectivePolicy 
 ${motionIntensity[effectivePolicy] ?? motionIntensity.moderate}
 ${cameraConstraint}${materialConstraint}${grammarBlock}${tempoBlock}${skillBlock}
 
-${(() => {
-  const allowSecondary =
-    (input.narrativeIntent === "climax" || input.narrativeIntent === "react") &&
-    input.clipDuration >= 8;
-  return allowSecondary
-    ? `SECONDARY ACTION (PERMITTED for this frame — ${input.narrativeIntent} on ${input.clipDuration}s clip):\nYou MAY emit a brief secondaryAction that flows naturally out of primaryAction (e.g. a recoil, a reaction beat, a settle). Keep it to one short clause; never an unrelated event. Leave blank if the primary action fully fills the clip.\n`
-    : `SECONDARY ACTION: Do NOT output secondaryAction (leave it empty). One beat only.\n`;
-})()}
+ONE ACTION PER FRAME (STRICT): primaryAction must contain exactly one motion beat with one acting subject. If the story moment contains several actions (e.g. a jet banks, a missile launches, an explosion blooms), assume each beat lives in its own frame — describe ONLY the beat that belongs to THIS clip.
+- BANNED in primaryAction: connectors that join a SECOND beat or a NEW acting subject — "then", "and then", "followed by", "while", "as", "meanwhile", "while also", "; ", and ", " when it introduces a new subject (e.g. "...banks right, missile streaks away" stitches two beats — pick one).
+- ALLOWED in primaryAction: clauses elaborating ONE beat with the SAME subject — "banks hard right, rolling fifteen degrees, dropping the nose toward the horizon" describes one bank from one subject. "Banks right while the missile launches" introduces a second subject and is forbidden.
+- endState is a settle, not a new beat. Do NOT use it to smuggle in a fresh action (no "explosion blooms in the distance", no "debris tumbles", no "fireball balloons" unless the explosion IS this clip's primaryAction). Natural deceleration only.
+The storyboard splits dense action across consecutive frames so individual clips stay clean; do not undo that split here.
+
 FIELD GUIDANCE (dense physical language in each — no filler):
-- primaryAction: ONE dominant beat. Specific directions, speeds, body parts. "lifts left hand to forehead, fingers spread, elbow rising to shoulder height" not "raises hand".
+- primaryAction: THE ONE beat for this clip. Specific directions, speeds, body parts. "lifts left hand to forehead, fingers spread, elbow rising to shoulder height" not "raises hand". No compound actions.
 - cameraMove: One move only — type, direction, speed (e.g. "slow pan left", "locked tripod", "gentle handheld drift right").
 - subjectDynamics: Mechanics, weight, timing, follow-through, plus secondary motion that naturally results from primaryAction (hair, cloth, props).
 - endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${nextImageUrl ? ` If you choose to anchor (see endFramePolicy), name the composition of the NEXT frame and describe how this clip arrives at it as one continuous beat. Otherwise, settle naturally without referencing the next frame.` : ` Natural deceleration — no new action at the end.`}
