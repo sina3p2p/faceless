@@ -1,4 +1,4 @@
-import { generateText as aiGenerateText, Output } from "ai";
+import { generateText, Output } from "ai";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "./index";
@@ -7,13 +7,7 @@ import type {
   ContinuityNotes,
   FrameBreakdown,
 } from "@/types/pipeline";
-
-export interface StoryboardSceneInput {
-  sceneTitle: string;
-  text: string;
-  directorNote: string;
-  ttsDuration: number;
-}
+import type { TVideoScene } from "@/types/video";
 
 const frameSpecSchema = z.object({
   clipDuration: z.number().describe("Duration in seconds — must be one of the supported values"),
@@ -35,7 +29,7 @@ const frameBreakdownSchema = z.object({
 });
 
 export async function generateFrameBreakdown(
-  scenes: StoryboardSceneInput[],
+  scenes: TVideoScene[],
   supportedClipDurations: number[],
   brief: CreativeBrief,
   duration: number,
@@ -54,7 +48,7 @@ export async function generateFrameBreakdown(
     const chars = continuity.characterRegistry
       .filter((c) => c.presentInScenes.includes(i))
       .map((c) => c.canonicalName);
-    return `Scene ${i} — "${s.sceneTitle}" (audio: ${s.ttsDuration}s):\n  "${s.text}"\n  Director: ${s.directorNote}\n  Characters present: ${chars.join(", ") || "none"}`;
+    return `Scene ${i} — "${s.sceneTitle}" (audio: ${s.duration}s):\n  "${s.text}"\n  Director: ${s.directorNote}\n  Characters present: ${chars.join(", ") || "none"}`;
   }).join("\n\n");
 
   const systemPrompt = `You are a Storyboard Agent planning the frame-by-frame breakdown for a video production.
@@ -65,8 +59,8 @@ DURATION CONSTRAINTS (from generated audio — TTS or final song):
 - Target total duration: ${duration}s
 - GOAL: keep the sum of all clipDurations as close to ${duration}s as allowed clip lengths permit, without going far over
 - The sum of all clipDurations across all scenes must approximate that total; per-scene frame sums must still cover each scene's audio below
-- Per-scene audio length (sum these for a cross-check: ${scenes.map((s) => s.ttsDuration + "s").join(" + ")} = ${scenes.reduce((a, s) => a + s.ttsDuration, 0)}s)
-- Each scene's frames' clipDurations should sum to at least that scene's audio seconds (${scenes.map((s) => s.ttsDuration + "s").join(", ")})
+- Per-scene audio length (sum these for a cross-check: ${scenes.map((s) => s.duration + "s").join(" + ")} = ${scenes.reduce((a, s) => a + s.duration, 0)}s)
+- Each scene's frames' clipDurations should sum to at least that scene's audio seconds (${scenes.map((s) => s.duration + "s").join(", ")})
 
 PACING STRATEGY: ${brief.pacingStrategy}
 
@@ -107,7 +101,7 @@ RULES:
     - Avoid more than 2 consecutive "medium" shots — vary the rhythm
 12. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".`;
 
-  const { output } = await aiGenerateText({
+  const { output } = await generateText({
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: frameBreakdownSchema }),
     system: systemPrompt,
@@ -126,7 +120,7 @@ RULES:
   const fixupNote = `Your previous breakdown violated shot-variety rule 10:\n- ${violations.join("\n- ")}\nPlease fix these violations while keeping the same scene count, narrative intent, and durations.`;
 
   try {
-    const { output: retry } = await aiGenerateText({
+    const { output: retry } = await generateText({
       model: openrouter.chat(primaryModel),
       output: Output.object({ schema: frameBreakdownSchema }),
       system: systemPrompt,

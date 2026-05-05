@@ -19,29 +19,21 @@ export async function storyboardJob(job: Job<RenderJobData>) {
     if (!config.creativeBrief) throw new Error("No creative brief found");
     if (!config.continuityNotes) throw new Error("No continuity notes found");
 
-    const existingScenes = await db.query.videoScenes.findMany({
+    const scenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    const duration = existingScenes.reduce((acc, s) => acc + (s.duration ?? 0), 0);
+    const duration = scenes.reduce((acc, s) => acc + (s.duration ?? 0), 0);
     const supportedDurations = getModelDurationsArray(videoProject.modelSettings.videoModel);
-
-    const scenesInput = existingScenes.map((s) => ({
-      sceneTitle: s.sceneTitle || "",
-      text: s.text,
-      directorNote: s.directorNote || "",
-      ttsDuration: s.duration ?? 5,
-    }));
-
     const agents = getAgentModels(videoProject);
 
     console.log(
-      `[storyboard] Generating frame breakdown for ${videoProjectId} (${scenesInput.length} scenes, audio total ${duration}s, clip sizes ${JSON.stringify(supportedDurations)})`
+      `[storyboard] Generating frame breakdown for ${videoProjectId} (${scenes.length} scenes, audio total ${duration}s, clip sizes ${JSON.stringify(supportedDurations)})`
     );
 
     const breakdown = await generateFrameBreakdown(
-      scenesInput,
+      scenes,
       supportedDurations,
       config.creativeBrief,
       duration,
