@@ -54,6 +54,7 @@ async function generateOpenAiGptImageModel(
       n: 1,
       size: gptImage15Size(aspectRatio),
       quality: "medium",
+      moderation: "low"
     });
 
     const item = response.data?.[0];
