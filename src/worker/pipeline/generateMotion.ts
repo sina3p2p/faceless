@@ -93,6 +93,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
     console.log(`[generate-motion] Generating motion for ${framesToProcess.length} frames across ${existingScenes.length} scenes`);
 
     const agents = getAgentModels(videoProject);
+    const videoModelId = videoProject.modelSettings.videoModel;
     const BATCH_SIZE = WORKER.parallelImages;
 
     let globalFrameIdx = 0;
@@ -146,7 +147,8 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
               },
               currentImageUrl,
               nextImageUrl,
-              agents.motionModel
+              agents.motionModel,
+              videoModelId,
             );
 
             await db
