@@ -165,6 +165,12 @@ ONE ACTION PER FRAME (STRICT): primaryAction must contain exactly one motion bea
 - endState is a settle, not a new beat. Do NOT use it to smuggle in a fresh action (no "explosion blooms in the distance", no "debris tumbles", no "fireball balloons" unless the explosion IS this clip's primaryAction). Natural deceleration only.
 The storyboard splits dense action across consecutive frames so individual clips stay clean; do not undo that split here.
 
+ONE BEAT ≠ SMALL BEAT (READ THIS): the cure for staticness is INTENSITY within the single beat, not adding beats. A frame that holds only the missile launch should still feel explosive. Carry kinetic energy through:
+- cameraMove: be aggressive when the beat warrants it — fast push-in, hard arc, whip-pan, snap zoom, rapid handheld. A locked tripod on a single dynamic beat is the #1 cause of "static" feel. Match camera speed to beat intensity.
+- subjectDynamics: layer secondary physics RICHLY (vapor cones, heat shimmer, smoke billow, recoil flutter, cloth whip, debris drift, dust kick). These are NOT separate beats — they are reactive physics caused by the one primaryAction. Pile them on.
+- Within-beat pacing: when motionPolicy is dynamic or frenetic, the single beat should snap, thrust, or whip — not unfold gently. Build → peak → settle compresses to peak → settle → cut.
+Do not downgrade the kineticism of primaryAction just because it's the only beat. "One" is a count, not a volume knob.
+
 FIELD GUIDANCE (dense physical language in each — no filler):
 - primaryAction: THE ONE beat for this clip. Specific directions, speeds, body parts. "lifts left hand to forehead, fingers spread, elbow rising to shoulder height" not "raises hand". No compound actions.
 - cameraMove: One move only — type, direction, speed (e.g. "slow pan left", "locked tripod", "gentle handheld drift right").

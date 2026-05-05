@@ -90,6 +90,7 @@ RULES:
    - "moderate": normal actions, walking, talking
    - "dynamic": action sequences, dramatic reveals, fast movement
    - "frenetic": chase scenes, fights, extreme urgency
+   ENERGY DOES NOT DROP WHEN BEATS SPLIT: judge each frame's policy by the intensity of THAT single beat in isolation. A missile-launch frame is "frenetic" even though the launch is its only beat; a vapor-cone frame is still "dynamic". Do NOT bias toward "subtle"/"moderate" because rule 2 limits each frame to one action — that's a count, not an intensity. Action sequences should produce strings of "dynamic"/"frenetic" frames, not strings of "moderate" ones.
 6. subjectFocus must be a canonicalName from the character/location registry, or a specific described object
 7. transitionIn:
    - "cut": default, for maintaining energy
