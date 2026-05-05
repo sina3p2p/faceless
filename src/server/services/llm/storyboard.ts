@@ -75,7 +75,7 @@ KNOWN LOCATIONS: ${locationNames.join(", ") || "none"}
 
 RULES:
 1. clipDuration MUST be from [${durationsList}] — no other values
-2. ONE ACTION PER FRAME (STRICT): each frame holds exactly one motion beat. When a story moment contains multiple distinct actions (e.g. a jet banks, a missile launches, smoke trails curve, an explosion blooms, debris tumbles), SPLIT them across consecutive frames — one beat per frame — instead of packing them into a single longer clip. AI video models render compound actions as morphing artifacts; the cure is more frames, not denser prompts.
+2. ONE ACTION PER FRAME (STRICT): each frame holds exactly one motion beat. When a story moment contains multiple distinct actions, SPLIT them across consecutive frames — one beat per frame — instead of packing them into a single longer clip. This applies to every genre: dialogue (a glance / a turn / a reply are three frames), action (a draw / an aim / a fire are three frames), environment (wind rises / leaves swirl / a door slams are three frames), performance (a strum / a step / a head-toss are three frames). AI video models render compound actions as morphing artifacts; the cure is more frames, not denser prompts.
 3. NO ARTIFICIAL FRAME-COUNT CAP: do not minimise frame count for its own sake. Action density drives frame count. A scene with five distinct beats needs five frames, not one. Each scene's frames should sum to at least that scene's audio duration; when the moment is dense, add more frames at the SHORTEST supported clipDuration that still lets a single beat register as motion (build-in, peak, settle). Avoid the absolute minimum only when a beat genuinely needs build-up.
 4. narrativeIntent must match the story moment:
    - "introduce": first appearance of character or setting
@@ -90,7 +90,7 @@ RULES:
    - "moderate": normal actions, walking, talking
    - "dynamic": action sequences, dramatic reveals, fast movement
    - "frenetic": chase scenes, fights, extreme urgency
-   ENERGY DOES NOT DROP WHEN BEATS SPLIT: judge each frame's policy by the intensity of THAT single beat in isolation. A missile-launch frame is "frenetic" even though the launch is its only beat; a vapor-cone frame is still "dynamic". Do NOT bias toward "subtle"/"moderate" because rule 2 limits each frame to one action — that's a count, not an intensity. Action sequences should produce strings of "dynamic"/"frenetic" frames, not strings of "moderate" ones.
+   ENERGY DOES NOT DROP WHEN BEATS SPLIT: judge each frame's policy by the intensity of THAT single beat in isolation, not by how many beats sit alongside it. A punch-landing frame is "frenetic" even though it's the only beat; a head-snap reaction is "dynamic" even alone; a held breath before the kiss is "subtle" because the beat is small, not because there's only one. Do NOT bias toward "subtle"/"moderate" because rule 2 limits each frame to one action — that's a count, not an intensity. High-energy moments should produce strings of "dynamic"/"frenetic" frames; quiet moments should produce strings of "subtle" ones.
 6. subjectFocus must be a canonicalName from the character/location registry, or a specific described object
 7. transitionIn:
    - "cut": default, for maintaining energy
