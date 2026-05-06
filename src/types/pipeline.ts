@@ -138,6 +138,28 @@ export interface ContinuityNotes {
   sceneCarryOver: SceneCarryOver[];
 }
 
+// ── Hero Asset Extractor ──
+
+export type HeroAssetType = "character" | "location" | "prop";
+
+/** One entity the extractor decided needs a locked visual reference. */
+export interface HeroAssetPlanEntry {
+  name: string;
+  type: HeroAssetType;
+  description: string;
+  appearance: string;
+  sheetPromptHints: string;
+  rationale: string;
+  /** Storage url or signed url of the generated/uploaded sheet image; populated after generation. */
+  sheetUrl?: string;
+  /** Story-asset id once persisted; used by storyboard/frame stages to lock identity. */
+  assetRef?: string;
+}
+
+export interface HeroAssetPlan {
+  entries: HeroAssetPlanEntry[];
+}
+
 // ── Cinematographer → VisualStyleGuide ──
 
 export interface VisualStyleGuide {
@@ -308,6 +330,10 @@ export interface PipelineConfig {
   beatSheet?: BeatSheet;
   continuityNotes?: ContinuityNotes;
   visualStyleGuide?: VisualStyleGuide;
+  /** Hero asset plan + refs produced by the extract-hero-assets agent. */
+  heroAssetPlan?: HeroAssetPlan;
+  /** name (lowercased) → storyAssets.id, populated for all hero entries that aren't already in characterRegistry/locationRegistry. */
+  heroAssetRefs?: Record<string, string>;
   frameBreakdown?: FrameBreakdown;
   songUrl?: string;
   alignedSections?: unknown;

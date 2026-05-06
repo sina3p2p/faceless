@@ -5,6 +5,7 @@ export { splitScenesJob } from "./splitScenes";
 export { superviseScriptJob } from "./superviseScript";
 export { generateTTSJob } from "./generateTTS";
 export { cinematographyJob } from "./cinematography";
+export { extractHeroAssetsJob } from "./extractHeroAssets";
 export { storyboardJob } from "./storyboard";
 export { generatePromptsJob } from "./generatePrompts";
 export { generateFrameImagesJob } from "./generateFrameImages";

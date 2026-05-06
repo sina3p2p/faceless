@@ -108,6 +108,7 @@ export * from "./executive-producer";
 export * from "./beat-sheet";
 export * from "./script-supervisor";
 export * from "./cinematographer";
+export * from "./hero-asset-extractor";
 export * from "./storyboard";
 export * from "./prompt-contract";
 export * from "./image-spec";

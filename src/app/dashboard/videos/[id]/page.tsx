@@ -25,7 +25,7 @@ import { useVideoPhase, type StudioPhaseId, type VideoPhase } from "./hooks/use-
 import {
   SortableSceneCard, ScriptChatPanel, FullStoryView,
   PhaseSidebar, StudioTopBar, InspectorPanel, ActivityFeed,
-  PipelineFailureBanner,
+  PipelineFailureBanner, HeroAssetsReview,
 } from "./components";
 import type { Scene, VideoDetail, SceneUpdates } from "@/types/video-detail";
 export default function ReviewPage() {
@@ -396,8 +396,12 @@ function CenterPanel({
   if (selectedPhaseId === "pre-production") {
     return (
       <>
-        {phase.isProcessing && ["TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD"].includes(video?.status || "") && (
+        {phase.isProcessing && ["TTS_GENERATION", "CINEMATOGRAPHY", "HERO_ASSET_EXTRACTION", "STORYBOARD"].includes(video?.status || "") && (
           <ActivityFeed currentStatus={video?.status || ""} scenes={scenes} />
+        )}
+
+        {phase.isHeroAssetsReview && video && (
+          <HeroAssetsReview videoId={video.id} approving={approving} onApprove={onApprove} />
         )}
 
         {phase.isPreProductionReview && video && (

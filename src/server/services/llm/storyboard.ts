@@ -6,6 +6,7 @@ import type {
   CreativeBrief,
   ContinuityNotes,
   FrameBreakdown,
+  HeroAssetPlan,
 } from "@/types/pipeline";
 import type { TVideoScene } from "@/types/video";
 
@@ -34,7 +35,8 @@ export async function generateFrameBreakdown(
   brief: CreativeBrief,
   duration: number,
   continuity: ContinuityNotes,
-  model?: string
+  model?: string,
+  heroAssetPlan?: HeroAssetPlan
 ): Promise<FrameBreakdown> {
   const primaryModel = model || LLM.storyboardModel;
 
@@ -43,6 +45,12 @@ export async function generateFrameBreakdown(
 
   const characterNames = continuity.characterRegistry.map((c) => c.canonicalName);
   const locationNames = continuity.locationRegistry.map((l) => l.canonicalName);
+  const lockedHeroEntities = (heroAssetPlan?.entries ?? []).filter((e) => e.assetRef);
+  const lockedHeroSection = lockedHeroEntities.length > 0
+    ? `\nLOCKED HERO ENTITIES (these have approved reference images — use the EXACT name in subjectFocus when the entity is on screen, do NOT redescribe their appearance):\n${lockedHeroEntities
+        .map((e) => `  - ${e.name} (${e.type}): ${e.description}`)
+        .join("\n")}`
+    : "";
 
   const sceneSummary = scenes.map((s, i) => {
     const chars = continuity.characterRegistry
@@ -65,7 +73,7 @@ DURATION CONSTRAINTS (from generated audio — TTS or final song):
 PACING STRATEGY: ${brief.pacingStrategy}
 
 KNOWN CHARACTERS: ${characterNames.join(", ") || "none"}
-KNOWN LOCATIONS: ${locationNames.join(", ") || "none"}
+KNOWN LOCATIONS: ${locationNames.join(", ") || "none"}${lockedHeroSection}
 
 RULES:
 1. clipDuration MUST be from [${durationsList}] — no other values

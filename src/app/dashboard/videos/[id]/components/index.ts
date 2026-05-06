@@ -3,6 +3,7 @@ export { PipelineFailureBanner } from "./pipeline-failure-banner";
 export { AssetRefPills } from "./asset-ref-pills";
 export { FrameCard } from "./frame-card";
 export { FullStoryView } from "./full-story-view";
+export { HeroAssetsReview } from "./hero-assets-review";
 export { InspectorPanel } from "./inspector-panel";
 export { PhaseSidebar } from "./phase-sidebar";
 export { SceneRefTextarea } from "./scene-ref-textarea";
