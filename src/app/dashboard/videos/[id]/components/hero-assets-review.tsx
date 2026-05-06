@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ImageEditorModal } from "../studio/components/scene-lab/image-editor-modal";
 
 export interface HeroAsset {
   id: string;
@@ -23,11 +24,18 @@ interface Props {
   onApprove: (endpoint: string) => void;
 }
 
+const ASPECT_BY_TYPE: Record<HeroAsset["type"], "9:16" | "16:9" | "1:1"> = {
+  character: "9:16",
+  location: "16:9",
+  prop: "1:1",
+};
+
 export function HeroAssetsReview({ videoId, approving, onApprove }: Props) {
   const [assets, setAssets] = useState<HeroAsset[] | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [tweakById, setTweakById] = useState<Record<string, string>>({});
   const [tweakOpenId, setTweakOpenId] = useState<string | null>(null);
+  const [editingAsset, setEditingAsset] = useState<HeroAsset | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -114,6 +122,22 @@ export function HeroAssetsReview({ videoId, approving, onApprove }: Props) {
     fd.append("type", type);
     const res = await fetch(`/api/videos/${videoId}/hero-assets`, { method: "POST", body: fd });
     if (res.ok) await load();
+  }
+
+  async function persistEdit(asset: HeroAsset, newImageUrl: string) {
+    setBusy(asset.id, true);
+    try {
+      await fetch(`/api/videos/${videoId}/hero-assets/${asset.id}/save-edit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: newImageUrl }),
+      });
+    } catch {
+      /* best effort */
+    } finally {
+      setBusy(asset.id, false);
+      await load();
+    }
   }
 
   if (!assets) {
@@ -212,6 +236,14 @@ export function HeroAssetsReview({ videoId, approving, onApprove }: Props) {
                     </Button>
                     <Button
                       size="sm"
+                      variant="outline"
+                      onClick={() => setEditingAsset(a)}
+                      disabled={busy || !a.sheetUrl}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
                       variant="ghost"
                       onClick={() => deleteOne(a.id)}
                       disabled={busy}
@@ -276,6 +308,19 @@ export function HeroAssetsReview({ videoId, approving, onApprove }: Props) {
           Approve all &amp; continue to storyboard
         </Button>
       </div>
+
+      {editingAsset?.sheetUrl && (
+        <ImageEditorModal
+          imageUrl={editingAsset.sheetUrl}
+          aspectRatio={ASPECT_BY_TYPE[editingAsset.type]}
+          onClose={() => setEditingAsset(null)}
+          onSave={async (newImageUrl) => {
+            const target = editingAsset;
+            setEditingAsset(null);
+            await persistEdit(target, newImageUrl);
+          }}
+        />
+      )}
     </div>
   );
 }
