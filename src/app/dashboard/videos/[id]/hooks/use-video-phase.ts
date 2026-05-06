@@ -3,7 +3,7 @@ import { hasPipelineRenderFailure } from "@/lib/pipeline-resume";
 
 const PROCESSING_STATUSES = [
   "PRODUCING", "RESEARCH", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION",
-  "TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD",
+  "TTS_GENERATION", "CINEMATOGRAPHY", "HERO_ASSET_EXTRACTION", "STORYBOARD",
   "PROMPT_GENERATION", "MOTION_GENERATION", "IMAGE_GENERATION",
   "VIDEO_GENERATION", "RENDERING",
 ];
@@ -21,6 +21,7 @@ export interface VideoPhase {
   phases: PhaseInfo[];
   // New pipeline review gates
   isStoryReview: boolean;
+  isHeroAssetsReview: boolean;
   isPreProductionReview: boolean;
   isImagesReview: boolean;
   isProductionReview: boolean;
@@ -63,6 +64,7 @@ export function useVideoPhase(video: VideoDetail): VideoPhase {
   const isNarrationReview = status === "REVIEW_SCRIPT" && !isMusicVideo;
 
   const isStoryReview = status === "REVIEW_STORY";
+  const isHeroAssetsReview = status === "REVIEW_HERO_ASSETS";
   const isPreProductionReview = status === "REVIEW_PRE_PRODUCTION";
   const isImagesReview = status === "REVIEW_IMAGES";
   const isProductionReview = status === "REVIEW_PRODUCTION";
@@ -86,6 +88,7 @@ export function useVideoPhase(video: VideoDetail): VideoPhase {
     SCRIPT_SUPERVISION: "Script Supervisor is enforcing continuity...",
     TTS_GENERATION: "Generating audio narration...",
     CINEMATOGRAPHY: "Cinematographer is designing the visual style...",
+    HERO_ASSET_EXTRACTION: "Production Designer is generating hero asset sheets...",
     STORYBOARD: "Storyboard Agent is planning frame breakdown...",
     PROMPT_GENERATION: "Prompt Architect is creating image prompts...",
     MOTION_GENERATION: "Motion Director is designing motion for each frame...",
@@ -97,25 +100,27 @@ export function useVideoPhase(video: VideoDetail): VideoPhase {
   const headerTitle = video?.title ?? (
     isFailed ? "Generation failed" :
       isStoryReview ? "Review Story" :
-        isPreProductionReview ? "Review Pre-Production" :
-          isImagesReview ? "Review Images" :
-            isProductionReview ? "Review Production" :
-              isScenesReview ? "Review Scenes" :
-                isTTSReview ? "Review Audio" :
-                  isPromptsReview ? "Review Image Prompts" :
-                    isNewMotionReview ? "Review Motion" :
-                      isVideoReview ? "Review Video Clips" :
-                        isMotionReview ? "Review Motion" :
-                          isVisualReview ? "Review Visuals" :
-                            isProcessing ? "Processing..." :
-                              "Review"
+        isHeroAssetsReview ? "Review Hero Assets" :
+          isPreProductionReview ? "Review Pre-Production" :
+            isImagesReview ? "Review Images" :
+              isProductionReview ? "Review Production" :
+                isScenesReview ? "Review Scenes" :
+                  isTTSReview ? "Review Audio" :
+                    isPromptsReview ? "Review Image Prompts" :
+                      isNewMotionReview ? "Review Motion" :
+                        isVideoReview ? "Review Video Clips" :
+                          isMotionReview ? "Review Motion" :
+                            isVisualReview ? "Review Visuals" :
+                              isProcessing ? "Processing..." :
+                                "Review"
   );
 
   const headerDescription =
     isFailed
       ? "The pipeline stopped with an error. Review the message below, then resume from the failed step or start over from the series page."
       : isStoryReview ? "Review creative brief, story, scenes, and continuity. Then approve to generate audio." :
-        isPreProductionReview ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images." :
+        isHeroAssetsReview ? "Lock in your characters, vehicles, props, and signature locations. Approve each sheet so every later frame stays visually consistent." :
+          isPreProductionReview ? "Review audio durations, visual style guide, and frame breakdown. Then approve to generate images." :
           isImagesReview ? "Review the generated images below. Regenerate any you don't like, then approve to generate video clips." :
             isProductionReview ? "Review the generated video clips below. Then approve to compose the final video." :
               isScenesReview ? "Review the scene breakdown and director's notes, then generate audio." :
@@ -129,7 +134,7 @@ export function useVideoPhase(video: VideoDetail): VideoPhase {
 
   // Phase categorization for sidebar
   const STORY_STATUSES = ["PENDING", "PRODUCING", "RESEARCH", "STORY", "SCENE_SPLIT", "SCRIPT_SUPERVISION", "REVIEW_STORY", "REVIEW_SCENES", "REVIEW_SCRIPT"];
-  const PREPROD_STATUSES = ["TTS_GENERATION", "CINEMATOGRAPHY", "STORYBOARD", "REVIEW_PRE_PRODUCTION", "TTS_REVIEW", "REVIEW_PROMPTS"];
+  const PREPROD_STATUSES = ["TTS_GENERATION", "CINEMATOGRAPHY", "HERO_ASSET_EXTRACTION", "REVIEW_HERO_ASSETS", "STORYBOARD", "REVIEW_PRE_PRODUCTION", "TTS_REVIEW", "REVIEW_PROMPTS"];
   const PRODUCTION_STATUSES = ["PROMPT_GENERATION", "IMAGE_GENERATION", "REVIEW_IMAGES", "MOTION_GENERATION", "VIDEO_GENERATION", "REVIEW_PRODUCTION", "IMAGE_REVIEW", "REVIEW_VISUAL", "REVIEW_MOTION", "REVIEW_VIDEO"];
   const FINAL_STATUSES = ["RENDERING", "COMPLETED"];
 
@@ -180,6 +185,7 @@ export function useVideoPhase(video: VideoDetail): VideoPhase {
     phases,
     isFailed,
     isStoryReview,
+    isHeroAssetsReview,
     isPreProductionReview,
     isImagesReview,
     isProductionReview,

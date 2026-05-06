@@ -8,6 +8,7 @@ import {
   superviseScriptJob,
   generateTTSJob,
   cinematographyJob,
+  extractHeroAssetsJob,
   storyboardJob,
   generatePromptsJob,
   generateFrameImagesJob,
@@ -44,6 +45,8 @@ const worker = new Worker(
       await generateTTSJob(job);
     } else if (job.name === "cinematography") {
       await cinematographyJob(job);
+    } else if (job.name === "extract-hero-assets") {
+      await extractHeroAssetsJob(job);
     } else if (job.name === "storyboard") {
       await storyboardJob(job);
     } else if (job.name === "generate-prompts") {

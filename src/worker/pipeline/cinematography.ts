@@ -49,7 +49,7 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
 
     console.log(`[cinematography] Style guide ready: medium="${styleGuide.global.medium}", ${styleGuide.perScene.length} scene overrides`);
 
-    await renderQueue.add("storyboard", { videoProjectId });
+    await renderQueue.add("extract-hero-assets", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[cinematography] Failed for ${videoProjectId}:`, msg);
