@@ -1,7 +1,7 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
-import { VIDEO_I2V_PROVIDER, WORKER } from "@/lib/constants";
+import { WORKER } from "@/lib/constants";
 import { generateVideoFromImage } from "@/server/services/ai/video";
 import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
 import { autoChainOrReview } from "./shared";
