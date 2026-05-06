@@ -18,7 +18,7 @@ export async function POST(
 
   const video = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoId),
-    columns: { id: true, userId: true, config: true },
+    columns: { id: true, userId: true, config: true, modelSettings: true },
     with: {
       series: { columns: { userId: true, style: true } },
     },
@@ -114,6 +114,8 @@ export async function POST(
       },
       currentImageUrl,
       nextImageUrl,
+      undefined,
+      video.modelSettings?.videoModel,
     );
 
     await db

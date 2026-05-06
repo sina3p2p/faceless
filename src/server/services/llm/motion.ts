@@ -8,6 +8,7 @@ import {
   resolveEffectiveMotionPolicy,
   resolveCameraGrammar,
 } from "@/server/prompts/skill-packs";
+import { getMotionModelProfile, buildTargetModelBlock } from "./motion-model-profiles";
 
 // ── Structured motion (LLM output) ──
 
@@ -95,9 +96,20 @@ export async function generateSingleFrameMotion(
   input: MotionDirectorInput,
   currentImageUrl: string,
   nextImageUrl: string | null,
-  model?: string
+  model?: string,
+  videoModelId?: TVideoModelId | null
 ): Promise<SingleFrameMotionResult> {
   const primaryModel = model || LLM.motionModel;
+
+  const targetModelProfile = getMotionModelProfile(videoModelId);
+  const targetModelBlock = buildTargetModelBlock(videoModelId);
+  // Some i2v models cannot accept an end-image (Veo, Luma, Grok, Kling 3 Pro).
+  // When the next frame can never be sent, we hard-clamp the policy to
+  // "freeform" so the agent doesn't waste tokens reasoning about anchoring,
+  // and so the output never claims an anchor that the renderer will silently
+  // drop.
+  const anchoringAvailable = nextImageUrl !== null
+    && (targetModelProfile?.endFrameSupported ?? true);
 
   const basePolicy = input.motionPolicy;
   const effectivePolicy = resolveEffectiveMotionPolicy(basePolicy, {
@@ -157,7 +169,7 @@ TEMPORAL READ: The output must describe motion that READS AS VIDEO across the wh
 
 MOTION POLICY: ${effectivePolicy.toUpperCase()}${basePolicy !== effectivePolicy ? ` (refined from base ${basePolicy} via section/intent rules)` : ""}
 ${motionIntensity[effectivePolicy] ?? motionIntensity.moderate}
-${cameraConstraint}${materialConstraint}${grammarBlock}${tempoBlock}${skillBlock}
+${targetModelBlock}${cameraConstraint}${materialConstraint}${grammarBlock}${tempoBlock}${skillBlock}
 
 SUBJECT MUST MOVE NATURALLY — NOT JUST THE CAMERA: primaryAction describes the SUBJECT'S OWN motion through world space, with believable physics. If the subject holds a pose and only the camera moves around it, the result feels like a 3D pan over a still photo. This is the most common cause of "static" output, even when a frame nominally has a "dynamic" policy.
 - Translation through space: name where the subject travels — "drifts forward and crosses the field of view, background streaming past" not "is in flight, banked". For people: "pushes off and accelerates left-to-right across the lane" not "mid-stride".
@@ -184,12 +196,12 @@ FIELD GUIDANCE (dense physical language in each — no filler):
 - primaryAction: THE ONE beat for this clip. Lead with a verb of motion describing what the SUBJECT does in world space. Specific directions, speeds, body parts, displacement. "pushes off the blocks and accelerates two body-lengths down the lane, arms pumping" not "is running". For vehicles/objects: name translation, rotation, and internal motion (wheels, exhaust, trail). No compound actions, no static poses.
 - cameraMove: One move only — type, direction, speed (e.g. "slow pan left", "locked tripod", "gentle handheld drift right"). Do not use cameraMove to compensate for a still subject.
 - subjectDynamics: Mechanics, weight, timing, follow-through, plus reactive secondary physics (hair, cloth, dust, smoke, ripples, debris) caused by primaryAction.
-- endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${nextImageUrl ? ` If you choose to anchor (see endFramePolicy), name the composition of the NEXT frame and describe how this clip arrives at it as one continuous beat. Otherwise, settle naturally without referencing the next frame.` : ` Natural deceleration — no new action at the end.`}
+- endState: Where bodies and camera rest at the end — supports hard cuts and transitions.${anchoringAvailable ? ` If you choose to anchor (see endFramePolicy), name the composition of the NEXT frame and describe how this clip arrives at it as one continuous beat. Otherwise, settle naturally without referencing the next frame.` : ` Natural deceleration — no new action at the end.`}
 - negativeMotion: List what must NOT happen (extra actions, morphing, wrong camera grammar for the medium, dialogue text on screen).
-${nextImageUrl ? `- endFramePolicy: Anchoring the i2v model to the next frame forces it to interpolate between the two images. When the frames are visually close enough that interpolation produces real motion, this looks great and gives a continuous beat across the cut. When they are too far apart, it produces a face/body warp that looks like a morphing transformer — the failure you must avoid.
+${anchoringAvailable ? `- endFramePolicy: Anchoring the i2v model to the next frame forces it to interpolate between the two images. When the frames are visually close enough that interpolation produces real motion, this looks great and gives a continuous beat across the cut. When they are too far apart, it produces a face/body warp that looks like a morphing transformer — the failure you must avoid.
     Look at both images carefully. Silently judge: if I asked the model to start at the first and arrive at the second, would the in-between motion read as a believable physical action, or would it have to invent a morph to bridge them? Pick "anchor" only if the answer is the former. Pick "freeform" otherwise.
     Do not pick "anchor" as a default or to play it safe — an unjustified anchor is the main source of the morph artifact.
-- endFramePolicyReason: One short clause justifying the choice based on what you see in the two images (e.g. "same subject, near-identical framing, hand-raise bridges cleanly" or "different framing, would morph the face"). Required when a next frame is shown.` : `- endFramePolicy: Set to "freeform" (no next frame to anchor to).
+- endFramePolicyReason: One short clause justifying the choice based on what you see in the two images (e.g. "same subject, near-identical framing, hand-raise bridges cleanly" or "different framing, would morph the face"). Required when a next frame is shown.` : `- endFramePolicy: Set to "freeform"${nextImageUrl && targetModelProfile && !targetModelProfile.endFrameSupported ? ` (target model does not support end-frame anchoring — every clip must self-resolve)` : ` (no next frame to anchor to)`}.
 - endFramePolicyReason: Leave empty.`}
 
 QUALITY RULES:
@@ -206,7 +218,10 @@ TARGET: Compiled prompt ~55–130 words total across fields; include enough temp
   contentParts.push({ type: "image", image: new URL(currentImageUrl) });
 
   if (nextImageUrl) {
-    contentParts.push({ type: "text", text: "\nNEXT FRAME — when angles are similar, end toward this state:" });
+    const nextFrameCaption = anchoringAvailable
+      ? "\nNEXT FRAME — when angles are similar, end toward this state:"
+      : "\nNEXT FRAME — for context only (target model cannot be anchored to it). Use this to settle the cut naturally; do NOT try to morph into it:";
+    contentParts.push({ type: "text", text: nextFrameCaption });
     contentParts.push({ type: "image", image: new URL(nextImageUrl) });
   }
 
