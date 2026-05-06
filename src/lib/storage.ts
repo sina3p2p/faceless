@@ -21,6 +21,19 @@ const s3 = new S3Client({
 const BUCKET = STORAGE.bucket;
 const R2_PUBLIC_URL = STORAGE.r2PublicUrl;
 
+// Stable, sync proxy URL for assets stored in object storage. Pass through any
+// value that is already an absolute URL. Use this for anything served to the
+// browser — the proxy at /api/media/[...key] handles signing on demand.
+// For server-to-third-party calls (image/video providers) keep using
+// getSignedDownloadUrl: those need a real, externally-fetchable URL.
+export function mediaUrl(keyOrUrl: string): string;
+export function mediaUrl(keyOrUrl: string | null | undefined): string | null;
+export function mediaUrl(keyOrUrl: string | null | undefined): string | null {
+  if (!keyOrUrl) return null;
+  if (/^https?:\/\//i.test(keyOrUrl)) return keyOrUrl;
+  return `/api/media/${keyOrUrl.replace(/^\/+/, "")}`;
+}
+
 export async function uploadFile(
   key: string,
   body: Buffer | Uint8Array,

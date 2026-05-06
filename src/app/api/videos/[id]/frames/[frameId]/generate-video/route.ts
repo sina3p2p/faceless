@@ -4,7 +4,7 @@ import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { generateVideoFromImage } from "@/server/services/ai/video";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, getSignedDownloadUrl, mediaUrl } from "@/lib/storage";
 import { z } from "zod";
 import { VIDEO_MODEL_IDS } from "@/lib/constants";
 
@@ -87,10 +87,8 @@ export async function POST(
       .set({ videoMediaId: newMedia.id })
       .where(eq(sceneFrames.id, frameId));
 
-    const signedUrl = await getSignedDownloadUrl(key);
-
     return NextResponse.json({
-      videoUrl: signedUrl,
+      videoUrl: mediaUrl(key),
       videoKey: key,
       videoModel: videoModel,
       duration: result.durationSeconds,

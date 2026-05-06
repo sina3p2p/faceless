@@ -5,7 +5,7 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { and, eq } from "drizzle-orm";
 import { listStoryAssetsForSeries, listStoryAssetsForVideo } from "@/server/db/story-assets";
 import { generateImage, generateViaOpenRouter } from "@/server/services/media";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, getSignedDownloadUrl, mediaUrl } from "@/lib/storage";
 import { z } from "zod/v4";
 import { IMAGE_MODELS } from "@/lib/constants";
 
@@ -137,9 +137,7 @@ export async function POST(
       .set({ thumbnailUrl: key, updatedAt: new Date() })
       .where(eq(videoProjects.id, id));
 
-    const publicUrl = await getSignedDownloadUrl(key);
-
-    return NextResponse.json({ thumbnailUrl: key, url: publicUrl });
+    return NextResponse.json({ thumbnailUrl: key, url: mediaUrl(key) });
   } catch (err) {
     console.error(`Thumbnail generation failed for video ${id}:`, err);
     return NextResponse.json(

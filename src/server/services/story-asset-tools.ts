@@ -2,7 +2,7 @@ import { generateText, ImagePart, TextPart, UserContent } from "ai";
 import { openrouter } from "@/server/services/llm";
 import { generateViaOpenRouter, type CharacterRef } from "@/server/services/media";
 import type { StoryAsset } from "@/types/llm-common";
-import { getSignedDownloadUrl, uploadFile } from "@/lib/storage";
+import { getSignedDownloadUrl, uploadFile, mediaUrl } from "@/lib/storage";
 
 const VISION_MODEL = "openai/gpt-4.1";
 
@@ -115,6 +115,5 @@ export async function generateStoryAssetSheetToStorage(params: {
   if (!imageResponse.ok) throw new Error("Failed to download generated sheet");
   const buffer = Buffer.from(await imageResponse.arrayBuffer());
   await uploadFile(params.storageKey, buffer, "image/jpeg");
-  const previewUrl = await getSignedDownloadUrl(params.storageKey);
-  return { sheetUrl: params.storageKey, previewUrl };
+  return { sheetUrl: params.storageKey, previewUrl: mediaUrl(params.storageKey) };
 }

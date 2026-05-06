@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { storyAssets, videoStoryAssets } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { and, eq } from "drizzle-orm";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, getSignedDownloadUrl, mediaUrl } from "@/lib/storage";
 import { assertUserOwnsVideo } from "@/server/db/story-assets";
 import { z } from "zod";
 
@@ -71,8 +71,7 @@ export async function POST(
         )
       );
 
-    const signedUrl = await getSignedDownloadUrl(key);
-    return NextResponse.json({ success: true, sheetUrl: signedUrl });
+    return NextResponse.json({ success: true, sheetUrl: mediaUrl(key) });
   } catch (err) {
     console.error(`Save hero-asset edit failed for ${storyAssetId}:`, err);
     return NextResponse.json(

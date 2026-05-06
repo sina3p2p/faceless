@@ -3,15 +3,9 @@ import { db } from "@/server/db";
 import { media } from "@/server/db/schema";
 import { getAuthUser, unauthorized } from "@/lib/api-utils";
 import { eq, desc, and, count } from "drizzle-orm";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 
 const PAGE_SIZE = 20;
-
-const resolveUrl = async (key: string | null) => {
-  if (!key) return null;
-  if (key.startsWith("http")) return key;
-  return getSignedDownloadUrl(key);
-};
 
 export async function GET(req: NextRequest) {
   const user = await getAuthUser();
@@ -33,14 +27,14 @@ export async function GET(req: NextRequest) {
     offset: page * limit,
   });
 
-  const items = await Promise.all(mediaItems.map(async (item) => ({
+  const items = mediaItems.map((item) => ({
     id: item.id,
     type: item.type,
-    url: await resolveUrl(item.url),
+    url: mediaUrl(item.url),
     prompt: item.prompt,
     model: item.modelUsed,
     createdAt: item.createdAt.toISOString(),
-  })));
+  }));
 
   return NextResponse.json({ items, total, page, limit });
 }

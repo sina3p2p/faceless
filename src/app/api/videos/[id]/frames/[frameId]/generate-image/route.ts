@@ -5,7 +5,7 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { eq } from "drizzle-orm";
 import { generateImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
 import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt-contract";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, getSignedDownloadUrl, mediaUrl } from "@/lib/storage";
 import { getVideoSize, IMAGE_MODELS } from "@/lib/constants";
 import { z } from "zod";
 import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
@@ -118,9 +118,7 @@ export async function POST(
       .set(updates)
       .where(eq(sceneFrames.id, frameId));
 
-    const signedUrl = await getSignedDownloadUrl(key);
-
-    return NextResponse.json({ imageUrl: key, signedUrl, imageModel });
+    return NextResponse.json({ imageUrl: key, signedUrl: mediaUrl(key), imageModel });
   } catch (err) {
     console.error(`Frame image generation failed for ${frameId}:`, err);
     return NextResponse.json(
