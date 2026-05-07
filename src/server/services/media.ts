@@ -1,6 +1,6 @@
 import OpenAI, { toFile } from "openai";
 import { MEDIA, LLM } from "@/lib/constants";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
@@ -66,9 +66,8 @@ async function generateOpenAiGptImageModel(
       const buffer = Buffer.from(b64, "base64");
       const key = `generated/${storagePrefix}_${Date.now()}.png`;
       await uploadFile(key, buffer, "image/png");
-      const signedUrl = await getSignedDownloadUrl(key);
       return {
-        url: signedUrl,
+        url: mediaUrl(key),
         type: "image",
         source: "openai",
         width: dims.width,
@@ -178,7 +177,7 @@ export async function editImageViaGptImage2(
       const buffer = Buffer.from(b64, "base64");
       const key = `generated/gpt-image-2-edit_${Date.now()}.png`;
       await uploadFile(key, buffer, "image/png");
-      return getSignedDownloadUrl(key);
+      return mediaUrl(key);
     }
 
     const remoteUrl = item?.url;
@@ -321,7 +320,7 @@ export async function generateViaOpenRouter(
       const buffer = Buffer.from(base64Match[2], "base64");
       const key = `generated/gemini_${Date.now()}.jpg`;
       await uploadFile(key, buffer, base64Match[1]);
-      imageDataUrl = await getSignedDownloadUrl(key);
+      imageDataUrl = mediaUrl(key);
     }
 
     return {
@@ -411,7 +410,7 @@ export async function editImageViaGemini(
       const buffer = Buffer.from(base64Match[2], "base64");
       const key = `generated/gemini_edit_${Date.now()}.jpg`;
       await uploadFile(key, buffer, base64Match[1]);
-      imageDataUrl = await getSignedDownloadUrl(key);
+      imageDataUrl = mediaUrl(key);
     }
 
     return {

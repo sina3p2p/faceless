@@ -3,7 +3,7 @@ import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { WORKER } from "@/lib/constants";
 import { generateVideoFromImage } from "@/server/services/ai/video";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { autoChainOrReview } from "./shared";
 import { and, isNotNull } from "drizzle-orm";
 
@@ -50,7 +50,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
       await Promise.all(
         batch.map(async (frame) => {
           try {
-            const imageSignedUrl = await getSignedDownloadUrl(frame.imageMedia!.url);
+            const imageSignedUrl = mediaUrl(frame.imageMedia!.url);
             const videoPrompt = frame.visualDescription
               || `Cinematic motion, smooth camera movement.`;
             const desiredDuration = frame.clipDuration;
@@ -70,7 +70,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
             ) {
               const next = timeline[frameIdx + 1];
               if (next?.imageMedia?.url) {
-                endImageUrl = await getSignedDownloadUrl(next.imageMedia.url);
+                endImageUrl = mediaUrl(next.imageMedia.url);
               }
             }
 

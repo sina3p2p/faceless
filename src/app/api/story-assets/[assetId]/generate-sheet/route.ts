@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import type { CharacterRef } from "@/server/services/media";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 import { generateStoryAssetSheetToStorage } from "@/server/services/story-asset-tools";
 import { getStoryAssetForUser } from "@/server/db/story-assets";
 
@@ -20,9 +20,8 @@ export async function POST(
   if (!asset) return notFound("Asset not found");
 
   try {
-    const originalUrl = asset.url.startsWith("http") ? asset.url : await getSignedDownloadUrl(asset.url);
     const ref: CharacterRef = {
-      url: originalUrl,
+      url: mediaUrl(asset.url),
       description: asset.description,
       name: asset.name,
       type: asset.type,

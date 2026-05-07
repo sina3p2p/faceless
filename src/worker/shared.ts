@@ -8,7 +8,7 @@ import { eq, and, ne, desc, asc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE, WORKER } from "@/lib/constants";
 import { generateSpeech, type TTSResult } from "@/server/services/tts";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 import { env } from "@/lib/constants";
 import type { StoryAssetInput } from "@/types/worker";
 import { storyAssets, videoStoryAssets } from "@/server/db/schema";
@@ -40,17 +40,12 @@ export async function resolveStoryAssets(
     .where(eq(videoStoryAssets.videoProjectId, videoProjectId))
     .orderBy(asc(videoStoryAssets.sortOrder));
 
-  return Promise.all(
-    rows.map(async (a) => ({
-      ...a.asset,
-      url: a.asset.url.startsWith("http") ? a.asset.url : await getSignedDownloadUrl(a.asset.url),
-      sheetUrl: a.asset.sheetUrl
-        ? (a.asset.sheetUrl.startsWith("http") ? a.asset.sheetUrl : await getSignedDownloadUrl(a.asset.sheetUrl))
-        : undefined,
-      voiceId: a.asset.voiceId ?? undefined,
-    }))
-  );
-
+  return rows.map((a) => ({
+    ...a.asset,
+    url: mediaUrl(a.asset.url),
+    sheetUrl: a.asset.sheetUrl ? mediaUrl(a.asset.sheetUrl) : undefined,
+    voiceId: a.asset.voiceId ?? undefined,
+  }));
 }
 
 export function filterAssetsByRefs(

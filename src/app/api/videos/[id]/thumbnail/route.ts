@@ -5,7 +5,7 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { and, eq } from "drizzle-orm";
 import { listStoryAssetsForSeries, listStoryAssetsForVideo } from "@/server/db/story-assets";
 import { generateImage, generateViaOpenRouter } from "@/server/services/media";
-import { uploadFile, getSignedDownloadUrl, mediaUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { z } from "zod/v4";
 import { IMAGE_MODELS } from "@/lib/constants";
 
@@ -96,14 +96,12 @@ export async function POST(
 
   if (imageModel === "nano-banana-2") {
     if (storyAssets.length > 0) {
-      charRefs = await Promise.all(
-        storyAssets.map(async (a) => ({
-          url: a.url.startsWith("http") ? a.url : await getSignedDownloadUrl(a.url),
-          description: `${a.name}: ${a.description}`,
-          name: a.name,
-          type: a.type,
-        }))
-      );
+      charRefs = storyAssets.map((a) => ({
+        url: mediaUrl(a.url),
+        description: `${a.name}: ${a.description}`,
+        name: a.name,
+        type: a.type,
+      }));
     }
   }
 

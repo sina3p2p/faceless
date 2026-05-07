@@ -4,7 +4,7 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { STORAGE } from "@/lib/constants";
+import { STORAGE, APP } from "@/lib/constants";
 
 const endpoint = STORAGE.endpoint;
 
@@ -21,17 +21,19 @@ const s3 = new S3Client({
 const BUCKET = STORAGE.bucket;
 const R2_PUBLIC_URL = STORAGE.r2PublicUrl;
 
-// Stable, sync proxy URL for assets stored in object storage. Pass through any
-// value that is already an absolute URL. Use this for anything served to the
-// browser — the proxy at /api/media/[...key] handles signing on demand.
-// For server-to-third-party calls (image/video providers) keep using
-// getSignedDownloadUrl: those need a real, externally-fetchable URL.
+// Stable, public, sync URL for assets stored in object storage. Returns an
+// absolute URL so the same value works for <img> tags AND for sending to
+// third-party image/video providers. The proxy at /api/media/[...key] signs
+// the underlying R2 request on demand and 302-redirects.
+//
+// Pass-through is provided for values that are already absolute URLs.
 export function mediaUrl(keyOrUrl: string): string;
 export function mediaUrl(keyOrUrl: string | null | undefined): string | null;
 export function mediaUrl(keyOrUrl: string | null | undefined): string | null {
   if (!keyOrUrl) return null;
   if (/^https?:\/\//i.test(keyOrUrl)) return keyOrUrl;
-  return `/api/media/${keyOrUrl.replace(/^\/+/, "")}`;
+  const base = APP.url.replace(/\/$/, "");
+  return `${base}/api/media/${keyOrUrl.replace(/^\/+/, "")}`;
 }
 
 export async function uploadFile(

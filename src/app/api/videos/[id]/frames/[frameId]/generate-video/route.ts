@@ -4,7 +4,7 @@ import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { generateVideoFromImage } from "@/server/services/ai/video";
-import { uploadFile, getSignedDownloadUrl, mediaUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { z } from "zod";
 import { VIDEO_MODEL_IDS } from "@/lib/constants";
 
@@ -58,12 +58,7 @@ export async function POST(
   const prompt = motionPrompt;
 
   try {
-    const imageKey = frame.imageMedia.url;
-    const signedImageUrl = imageKey.startsWith("http")
-      ? imageKey
-      : await getSignedDownloadUrl(imageKey);
-
-    const result = await generateVideoFromImage(signedImageUrl, prompt, duration, videoModel);
+    const result = await generateVideoFromImage(mediaUrl(frame.imageMedia.url), prompt, duration, videoModel);
 
     const videoResponse = await fetch(result.videoUrl);
     if (!videoResponse.ok) throw new Error("Failed to download generated video");

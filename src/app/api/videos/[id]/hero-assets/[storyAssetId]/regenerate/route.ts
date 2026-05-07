@@ -75,7 +75,7 @@ export async function POST(
   const refs: CharacterRef[] = [];
   if (body.referenceImageUrl) {
     refs.push({
-      url: body.referenceImageUrl,
+      url: mediaUrl(body.referenceImageUrl),
       description: `User-supplied reference for ${asset.name}; preserve identity.`,
       name: asset.name,
       type: asset.type,
