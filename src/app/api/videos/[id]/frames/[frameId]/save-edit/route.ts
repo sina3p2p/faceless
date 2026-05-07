@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -40,11 +40,7 @@ export async function POST(
   if (!parsed.success) return badRequest(parsed.error.message);
 
   try {
-    const sourceUrl = parsed.data.imageUrl.startsWith("http")
-      ? parsed.data.imageUrl
-      : await getSignedDownloadUrl(parsed.data.imageUrl);
-
-    const imageResponse = await fetch(sourceUrl);
+    const imageResponse = await fetch(mediaUrl(parsed.data.imageUrl));
     if (!imageResponse.ok) throw new Error("Failed to download edited image");
     const buffer = Buffer.from(await imageResponse.arrayBuffer());
 

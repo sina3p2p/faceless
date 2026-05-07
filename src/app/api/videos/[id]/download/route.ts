@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 import { eq } from "drizzle-orm";
 
 export async function GET(
@@ -22,7 +22,5 @@ export async function GET(
   if (!video || video.userId !== user.id) return notFound("Video not found");
   if (!video.outputUrl) return badRequest("Video not ready for download");
 
-  const url = await getSignedDownloadUrl(video.outputUrl);
-
-  return NextResponse.json({ url });
+  return NextResponse.json({ url: mediaUrl(video.outputUrl) });
 }

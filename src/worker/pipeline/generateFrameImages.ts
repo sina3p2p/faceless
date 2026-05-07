@@ -3,7 +3,7 @@ import { db, schema, eq, updateVideoStatus, resolveStoryAssets, filterAssetsByRe
 import { getVideoSize } from "@/lib/constants";
 import type { RenderJobData } from "@/lib/queue";
 import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt-contract";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { generateImage, type AspectRatio } from "@/server/services/media";
 import { autoChainOrReview } from "./shared";
 
@@ -57,7 +57,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     if (firstTargetIdx > 0) {
       const prevFrame = allFrames[firstTargetIdx - 1].frame;
       if (prevFrame.imageMedia?.url) {
-        try { previousFrameSignedUrl = await getSignedDownloadUrl(prevFrame.imageMedia.url); } catch { /* skip */ }
+        previousFrameSignedUrl = mediaUrl(prevFrame.imageMedia.url);
       }
     }
 
@@ -107,7 +107,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
           .set({ imageMediaId: newMedia.id })
           .where(eq(schema.sceneFrames.id, frame.id));
 
-        previousFrameSignedUrl = await getSignedDownloadUrl(key);
+        previousFrameSignedUrl = mediaUrl(key);
 
         console.log(`[generate-frame-images] Frame ${i + 1}/${targets.length} (scene ${sceneIdx}) done`);
       } catch (err) {

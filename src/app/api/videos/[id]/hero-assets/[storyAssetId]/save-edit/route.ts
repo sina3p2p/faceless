@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { storyAssets, videoStoryAssets } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { and, eq } from "drizzle-orm";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { assertUserOwnsVideo } from "@/server/db/story-assets";
 import { z } from "zod";
 
@@ -44,11 +44,7 @@ export async function POST(
   if (!parsed.success) return badRequest(parsed.error.message);
 
   try {
-    const sourceUrl = parsed.data.imageUrl.startsWith("http")
-      ? parsed.data.imageUrl
-      : await getSignedDownloadUrl(parsed.data.imageUrl);
-
-    const imageResponse = await fetch(sourceUrl);
+    const imageResponse = await fetch(mediaUrl(parsed.data.imageUrl));
     if (!imageResponse.ok) throw new Error("Failed to download edited image");
     const buffer = Buffer.from(await imageResponse.arrayBuffer());
 
@@ -71,8 +67,7 @@ export async function POST(
         )
       );
 
-    const signedUrl = await getSignedDownloadUrl(key);
-    return NextResponse.json({ success: true, sheetUrl: signedUrl });
+    return NextResponse.json({ success: true, sheetUrl: mediaUrl(key) });
   } catch (err) {
     console.error(`Save hero-asset edit failed for ${storyAssetId}:`, err);
     return NextResponse.json(

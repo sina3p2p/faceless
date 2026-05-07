@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import type { CharacterRef } from "@/server/services/media";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 import { generateStoryAssetSheetToStorage } from "@/server/services/story-asset-tools";
 
 const bodySchema = z.object({
@@ -27,9 +27,8 @@ export async function POST(req: NextRequest) {
   const { imageUrl, description, name, type } = parsed.data;
 
   try {
-    const signedUrl = imageUrl.startsWith("http") ? imageUrl : await getSignedDownloadUrl(imageUrl);
     const ref: CharacterRef = {
-      url: signedUrl,
+      url: mediaUrl(imageUrl),
       description,
       name,
       type,

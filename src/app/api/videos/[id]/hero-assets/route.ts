@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { storyAssets, videoStoryAssets } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { and, asc, eq } from "drizzle-orm";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { assertUserOwnsVideo } from "@/server/db/story-assets";
 
 export async function GET(
@@ -26,24 +26,18 @@ export async function GET(
     .where(eq(videoStoryAssets.videoProjectId, id))
     .orderBy(asc(videoStoryAssets.sortOrder));
 
-  const heroAssets = await Promise.all(
-    rows.map(async (r) => ({
-      id: r.asset.id,
-      type: r.asset.type,
-      name: r.asset.name,
-      description: r.asset.description,
-      url: r.asset.url.startsWith("http") ? r.asset.url : await getSignedDownloadUrl(r.asset.url),
-      sheetUrl: r.asset.sheetUrl
-        ? r.asset.sheetUrl.startsWith("http")
-          ? r.asset.sheetUrl
-          : await getSignedDownloadUrl(r.asset.sheetUrl)
-        : null,
-      approvalStatus: r.link.approvalStatus,
-      approvedAt: r.link.approvedAt,
-      sortOrder: r.link.sortOrder,
-      generated: !!r.link.generatedByJobId,
-    }))
-  );
+  const heroAssets = rows.map((r) => ({
+    id: r.asset.id,
+    type: r.asset.type,
+    name: r.asset.name,
+    description: r.asset.description,
+    url: mediaUrl(r.asset.url),
+    sheetUrl: mediaUrl(r.asset.sheetUrl),
+    approvalStatus: r.link.approvalStatus,
+    approvedAt: r.link.approvedAt,
+    sortOrder: r.link.sortOrder,
+    generated: !!r.link.generatedByJobId,
+  }));
 
   return NextResponse.json({ heroAssets });
 }

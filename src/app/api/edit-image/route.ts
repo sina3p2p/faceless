@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { editImageViaGptImage2, type AspectRatio } from "@/server/services/media";
-import { getSignedDownloadUrl, uploadFile } from "@/lib/storage";
+import { mediaUrl, uploadFile } from "@/lib/storage";
 import { LLM } from "@/lib/constants";
 import { z } from "zod";
 
@@ -27,11 +27,6 @@ function compositionSuffix(ar: AspectRatio): string {
   if (ar === "16:9") return "Landscape 16:9 composition";
   if (ar === "1:1") return "Square 1:1 composition";
   return "Vertical 9:16 composition";
-}
-
-async function resolveUrl(urlOrKey: string): Promise<string> {
-  if (urlOrKey.startsWith("http")) return urlOrKey;
-  return getSignedDownloadUrl(urlOrKey);
 }
 
 async function fetchImageAsBase64(
@@ -67,8 +62,7 @@ export async function POST(req: NextRequest) {
   } = parsed.data;
 
   try {
-    const resolvedUrl = await resolveUrl(sourceImageUrl);
-    const sourceImg = await fetchImageAsBase64(resolvedUrl);
+    const sourceImg = await fetchImageAsBase64(mediaUrl(sourceImageUrl));
 
     if (!sourceImg) {
       return NextResponse.json(
@@ -80,18 +74,14 @@ export async function POST(req: NextRequest) {
     const hasAnnotations = !!annotatedImageUrl;
     let annotatedImg: { base64: string; mimeType: string } | null = null;
     if (hasAnnotations) {
-      const resolvedAnnotated = await resolveUrl(annotatedImageUrl);
-      annotatedImg = await fetchImageAsBase64(resolvedAnnotated);
+      annotatedImg = await fetchImageAsBase64(mediaUrl(annotatedImageUrl));
     }
 
     // Fetch reference images (from @mentions)
     const refImages: Array<{ base64: string; mimeType: string }> = [];
     if (referenceImageUrls?.length) {
       const results = await Promise.all(
-        referenceImageUrls.slice(0, 4).map(async (url) => {
-          const resolved = await resolveUrl(url);
-          return fetchImageAsBase64(resolved);
-        }),
+        referenceImageUrls.slice(0, 4).map((url) => fetchImageAsBase64(mediaUrl(url))),
       );
       for (const r of results) {
         if (r) refImages.push(r);
@@ -243,7 +233,7 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(base64Match[2], "base64");
       const key = `generated/edit_${Date.now()}.jpg`;
       await uploadFile(key, buffer, base64Match[1]);
-      imageDataUrl = await getSignedDownloadUrl(key);
+      imageDataUrl = mediaUrl(key);
     }
 
     return NextResponse.json({ url: imageDataUrl });

@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { storyAssets, videoStoryAssets, videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest, serverError } from "@/lib/api-utils";
 import { and, eq } from "drizzle-orm";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { generateImage, type CharacterRef } from "@/server/services/media";
 import {
   buildHeroAssetSheetPrompt,
@@ -75,7 +75,7 @@ export async function POST(
   const refs: CharacterRef[] = [];
   if (body.referenceImageUrl) {
     refs.push({
-      url: body.referenceImageUrl,
+      url: mediaUrl(body.referenceImageUrl),
       description: `User-supplied reference for ${asset.name}; preserve identity.`,
       name: asset.name,
       type: asset.type,
@@ -118,6 +118,5 @@ export async function POST(
       )
     );
 
-  const signedUrl = await getSignedDownloadUrl(storedKey);
-  return NextResponse.json({ success: true, sheetUrl: signedUrl });
+  return NextResponse.json({ success: true, sheetUrl: mediaUrl(storedKey) });
 }

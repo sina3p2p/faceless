@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq, asc, desc } from "drizzle-orm";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 
 export async function GET(
   _req: NextRequest,
@@ -26,41 +26,29 @@ export async function GET(
 
   if (!video || video.userId !== user.id) return notFound("Video not found");
 
-  const scenesWithUrls = await Promise.all(
-    video.scenes.map(async (scene) => {
-      const audioUrl = scene.audioUrl
-        ? await getSignedDownloadUrl(scene.audioUrl)
-        : null;
-
-      const mediaItems = await Promise.all(
-        (scene.media || []).map(async (m) => ({
-          id: m.id,
-          type: m.type,
-          url: await getSignedDownloadUrl(m.url),
-          key: m.url,
-          prompt: m.prompt,
-          modelUsed: m.modelUsed,
-          createdAt: m.createdAt.toISOString(),
-        }))
-      );
-
-      return {
-        id: scene.id,
-        sceneOrder: scene.sceneOrder,
-        text: scene.text,
-        imagePrompt: scene.imagePrompt,
-        visualDescription: scene.visualDescription,
-        searchQuery: scene.searchQuery,
-        duration: scene.duration,
-        wordTimestamps: scene.captionData || [],
-        audioUrl,
-        assetUrl: null,
-        imageUrl: null,
-        videoUrl: null,
-        media: mediaItems,
-      };
-    })
-  );
+  const scenesWithUrls = video.scenes.map((scene) => ({
+    id: scene.id,
+    sceneOrder: scene.sceneOrder,
+    text: scene.text,
+    imagePrompt: scene.imagePrompt,
+    visualDescription: scene.visualDescription,
+    searchQuery: scene.searchQuery,
+    duration: scene.duration,
+    wordTimestamps: scene.captionData || [],
+    audioUrl: mediaUrl(scene.audioUrl),
+    assetUrl: null,
+    imageUrl: null,
+    videoUrl: null,
+    media: (scene.media || []).map((m) => ({
+      id: m.id,
+      type: m.type,
+      url: mediaUrl(m.url),
+      key: m.url,
+      prompt: m.prompt,
+      modelUsed: m.modelUsed,
+      createdAt: m.createdAt.toISOString(),
+    })),
+  }));
 
   return NextResponse.json({ scenes: scenesWithUrls });
 }

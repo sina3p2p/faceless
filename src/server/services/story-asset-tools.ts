@@ -2,7 +2,7 @@ import { generateText, ImagePart, TextPart, UserContent } from "ai";
 import { openrouter } from "@/server/services/llm";
 import { generateViaOpenRouter, type CharacterRef } from "@/server/services/media";
 import type { StoryAsset } from "@/types/llm-common";
-import { getSignedDownloadUrl, uploadFile } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 
 const VISION_MODEL = "openai/gpt-4.1";
 
@@ -32,8 +32,7 @@ Keep it concise but thorough (2-4 sentences). Plain descriptive language only, n
 };
 
 export async function imageUrlToVisionDataUrl(imageUrl: string): Promise<string> {
-  const signedUrl = imageUrl.startsWith("http") ? imageUrl : await getSignedDownloadUrl(imageUrl);
-  const imgRes = await fetch(signedUrl);
+  const imgRes = await fetch(mediaUrl(imageUrl));
   if (!imgRes.ok) throw new Error("Could not fetch image");
   const buffer = Buffer.from(await imgRes.arrayBuffer());
   const mime = (imgRes.headers.get("content-type") || "image/jpeg").split(";")[0];
@@ -47,20 +46,13 @@ export async function imageUrlToVisionDataUrl(imageUrl: string): Promise<string>
 export async function buildStoryAssetVisionContentParts(
   assets: StoryAsset[]
 ): Promise<(ImagePart | TextPart)[]> {
-  const messages = await Promise.all(
-    assets.map(async (a) => {
-      const url = await getSignedDownloadUrl(a.url, 3600);
-      return [
-        { type: "image", image: url },
-        {
-          type: "text",
-          text: `Story asset (${a.type}) "${a.name}": ${a.description.trim() || "—"}`,
-        }
-      ] as [ImagePart, TextPart];
-    })
-  );
-
-  return messages.flat()
+  return assets.flatMap((a) => [
+    { type: "image", image: mediaUrl(a.url) },
+    {
+      type: "text",
+      text: `Story asset (${a.type}) "${a.name}": ${a.description.trim() || "—"}`,
+    },
+  ] as [ImagePart, TextPart]);
 }
 
 export async function describeStoryAssetFromVision(params: {
@@ -115,6 +107,5 @@ export async function generateStoryAssetSheetToStorage(params: {
   if (!imageResponse.ok) throw new Error("Failed to download generated sheet");
   const buffer = Buffer.from(await imageResponse.arrayBuffer());
   await uploadFile(params.storageKey, buffer, "image/jpeg");
-  const previewUrl = await getSignedDownloadUrl(params.storageKey);
-  return { sheetUrl: params.storageKey, previewUrl };
+  return { sheetUrl: params.storageKey, previewUrl: mediaUrl(params.storageKey) };
 }

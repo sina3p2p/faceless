@@ -6,7 +6,7 @@ import { v4 as uuid } from "uuid";
 import { db, schema, eq, updateVideoStatus, failJob, execAsync } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { getVideoSize } from "@/lib/constants";
-import { uploadFile, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 import { downloadFile, composeVideo, type ComposerScene } from "@/server/services/composer";
 import { buildXfadeFilterChain, sceneNeedsXfade } from "@/server/services/composer/xfade";
 import type { TransitionType } from "@/types/pipeline";
@@ -40,9 +40,8 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
 
       let audioPath: string | undefined;
       if (scene.audioUrl) {
-        const audioSignedUrl = await getSignedDownloadUrl(scene.audioUrl);
         audioPath = path.join(workDir, `audio_${i}.mp3`);
-        await downloadFile(audioSignedUrl, audioPath);
+        await downloadFile(mediaUrl(scene.audioUrl), audioPath);
       }
 
       const frames = await db.query.sceneFrames.findMany({
@@ -58,9 +57,8 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
       for (let j = 0; j < frames.length; j++) {
         const frame = frames[j];
         if (frame.videoMedia?.url) {
-          const videoSignedUrl = await getSignedDownloadUrl(frame.videoMedia.url);
           const videoPath = path.join(workDir, `scene_${i}_frame_${j}.mp4`);
-          await downloadFile(videoSignedUrl, videoPath);
+          await downloadFile(mediaUrl(frame.videoMedia.url), videoPath);
           frameMediaPaths.push(videoPath);
           frameDurations.push(frame.clipDuration ?? 5);
           frameTransitions.push((frame.transitionIn as TransitionType | null) ?? null);
@@ -134,9 +132,8 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
       const projectConfig = videoProject.config ?? {};
       const songKey = projectConfig.songUrl;
       if (songKey) {
-        const songSignedUrl = await getSignedDownloadUrl(songKey);
         globalAudioPath = path.join(workDir, "global_song.mp3");
-        await downloadFile(songSignedUrl, globalAudioPath);
+        await downloadFile(mediaUrl(songKey), globalAudioPath);
       }
     }
 

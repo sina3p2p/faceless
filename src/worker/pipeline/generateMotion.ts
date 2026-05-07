@@ -3,7 +3,7 @@ import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { WORKER } from "@/lib/constants";
 import { generateSingleFrameMotion } from "@/server/services/llm";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 import { getAgentModels, autoChainOrReview } from "./shared";
 import { computeFrameWps } from "@/server/services/frame-tempo";
 import type { WordTimestamp } from "@/types/tts";
@@ -59,13 +59,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       }
     }
 
-    const allFrameData = await Promise.all(frames.map(async (frame) => {
-      let signedUrl = "";
-      if (frame.imageMedia?.url) {
-        try {
-          signedUrl = await getSignedDownloadUrl(frame.imageMedia.url);
-        } catch { /* skip */ }
-      }
+    const allFrameData = frames.map((frame) => {
       const captionData = (frame.scene?.captionData as WordTimestamp[] | null) ?? null;
       const frameStartS = frameStartByFrameId.get(frame.id) ?? 0;
       const clipDuration = frame.clipDuration ?? 5;
@@ -74,12 +68,12 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
         frameId: frame.id,
         clipDuration,
         sceneText: frame.scene?.text ?? "",
-        imageUrl: signedUrl,
+        imageUrl: frame.imageMedia?.url ? mediaUrl(frame.imageMedia.url) : "",
         motionSkillHints: frame.motionSkillHints ?? null,
         assetRefs: frame.assetRefs,
         voTempoWps,
       };
-    }));
+    });
 
     const config = videoProject.config ?? {};
     const styleGuide = config.visualStyleGuide;

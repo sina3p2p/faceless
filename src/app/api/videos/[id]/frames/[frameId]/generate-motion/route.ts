@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes, sceneFrames } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 import { generateSingleFrameMotion } from "@/server/services/llm";
 import type { PipelineConfig } from "@/types/pipeline";
 
@@ -73,13 +73,8 @@ export async function POST(
     : null;
 
   try {
-    const currentImageUrl = await getSignedDownloadUrl(frame.imageMedia.url);
-    let nextImageUrl: string | null = null;
-    if (nextFrame?.imageMediaUrl) {
-      try {
-        nextImageUrl = await getSignedDownloadUrl(nextFrame.imageMediaUrl);
-      } catch { /* skip */ }
-    }
+    const currentImageUrl = mediaUrl(frame.imageMedia.url);
+    const nextImageUrl: string | null = nextFrame?.imageMediaUrl ? mediaUrl(nextFrame.imageMediaUrl) : null;
 
     const config = (video.config as PipelineConfig) ?? {};
     const styleGuide = config.visualStyleGuide;

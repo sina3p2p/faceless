@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoScenes, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq, asc, desc } from "drizzle-orm";
-import { getSignedDownloadUrl } from "@/lib/storage";
+import { mediaUrl } from "@/lib/storage";
 
 export async function GET(
   _req: NextRequest,
@@ -35,42 +35,32 @@ export async function GET(
 
   if (!video || video.userId !== user.id) return notFound("Video not found");
 
-  const scenesWithFrames = await Promise.all(
-    video.scenes.map(async (scene) => ({
-      sceneId: scene.id,
-      sceneOrder: scene.sceneOrder,
-      sceneTitle: scene.sceneTitle,
-      frames: await Promise.all(
-        scene.frames.map(async (frame) => {
-          const signedMedia = await Promise.all(
-            (frame.media ?? []).map(async (m) => ({
-              id: m.id,
-              type: m.type,
-              url: m.url.startsWith("http") ? m.url : await getSignedDownloadUrl(m.url).catch(() => m.url),
-              prompt: m.prompt,
-              modelUsed: m.modelUsed,
-              createdAt: m.createdAt.toISOString(),
-            }))
-          );
-
-          return {
-            id: frame.id,
-            frameOrder: frame.frameOrder,
-            clipDuration: frame.clipDuration,
-            imagePrompt: frame.imagePrompt,
-            imageSpec: frame.imageSpec,
-            promptContractMeta: frame.promptContractMeta,
-            motionSpec: frame.motionSpec,
-            visualDescription: frame.visualDescription,
-            assetRefs: frame.assetRefs,
-            media: signedMedia,
-            imageMediaId: frame.imageMediaId,
-            videoMediaId: frame.videoMediaId,
-          };
-        })
-      ),
-    }))
-  );
+  const scenesWithFrames = video.scenes.map((scene) => ({
+    sceneId: scene.id,
+    sceneOrder: scene.sceneOrder,
+    sceneTitle: scene.sceneTitle,
+    frames: scene.frames.map((frame) => ({
+      id: frame.id,
+      frameOrder: frame.frameOrder,
+      clipDuration: frame.clipDuration,
+      imagePrompt: frame.imagePrompt,
+      imageSpec: frame.imageSpec,
+      promptContractMeta: frame.promptContractMeta,
+      motionSpec: frame.motionSpec,
+      visualDescription: frame.visualDescription,
+      assetRefs: frame.assetRefs,
+      media: (frame.media ?? []).map((m) => ({
+        id: m.id,
+        type: m.type,
+        url: mediaUrl(m.url),
+        prompt: m.prompt,
+        modelUsed: m.modelUsed,
+        createdAt: m.createdAt.toISOString(),
+      })),
+      imageMediaId: frame.imageMediaId,
+      videoMediaId: frame.videoMediaId,
+    })),
+  }));
 
   return NextResponse.json({ scenes: scenesWithFrames });
 }
