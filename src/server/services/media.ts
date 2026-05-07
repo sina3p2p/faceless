@@ -44,23 +44,71 @@ type OpenAiGptImageModelId = "gpt-image-1.5" | "gpt-image-2";
 async function generateOpenAiGptImageModel(
   model: OpenAiGptImageModelId,
   prompt: string,
-  aspectRatio: AspectRatio = "9:16"
+  aspectRatio: AspectRatio = "9:16",
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset | null> {
   try {
     const dims = gptImage15Dimensions(aspectRatio);
-    const response = await openai.images.generate({
-      model,
-      prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`,
-      n: 1,
-      size: gptImage15Size(aspectRatio),
-      quality: "medium",
-      moderation: "low"
-    });
+    const storagePrefix = model.replace(/\./g, "-");
+    const refs = (characterRefs ?? []).slice(0, 10);
 
-    const item = response.data?.[0];
+    let item: { b64_json?: string; url?: string } | undefined;
+
+    if (refs.length > 0) {
+      const fetched = await Promise.all(
+        refs.map(async (r) => ({ ref: r, img: await fetchImageAsBase64(r.url) }))
+      );
+      const usable = fetched.filter((f): f is { ref: CharacterRef; img: { base64: string; mimeType: string } } => f.img !== null);
+
+      if (usable.length === 0) {
+        // All refs failed to fetch — fall back to plain generate so we don't silently drop them without trying.
+        console.warn(`[${model}] All ${refs.length} reference image(s) failed to fetch; falling back to text-only generation`);
+      } else {
+        const imageParts: Awaited<ReturnType<typeof base64ImageToUploadable>>[] = [];
+        const refLines: string[] = [];
+        for (let i = 0; i < usable.length; i++) {
+          const { ref, img } = usable[i];
+          const typeName = ref.type ? ref.type.charAt(0).toUpperCase() + ref.type.slice(1) : "Character";
+          const label = ref.name || typeName;
+          refLines.push(`Image ${i + 1}: ${typeName} "${label}" — ${ref.description || "use this exact appearance"}.`);
+          imageParts.push(await base64ImageToUploadable(img, `ref-${i}.jpg`));
+        }
+
+        const editPrompt = [
+          `You are given ${usable.length} reference image${usable.length === 1 ? "" : "s"} for visual consistency:`,
+          ...refLines,
+          "",
+          `Generate a NEW scene image based on this prompt: ${prompt}.`,
+          `The character(s), location(s), and prop(s) shown above MUST appear with the SAME face, hair, skin tone, body proportions, clothing, and overall design — do NOT change their appearance.`,
+          `${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, highly detailed, no text or watermarks.`,
+        ].join("\n");
+
+        const response = await openai.images.edit({
+          model,
+          image: imageParts,
+          prompt: editPrompt,
+          n: 1,
+          size: gptImage15Size(aspectRatio),
+          quality: "medium",
+        });
+        item = response.data?.[0];
+      }
+    }
+
+    if (!item) {
+      const response = await openai.images.generate({
+        model,
+        prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`,
+        n: 1,
+        size: gptImage15Size(aspectRatio),
+        quality: "medium",
+        moderation: "low",
+      });
+      item = response.data?.[0];
+    }
+
     const b64 = item?.b64_json;
     const remoteUrl = item?.url;
-    const storagePrefix = model.replace(/\./g, "-");
 
     if (b64) {
       const buffer = Buffer.from(b64, "base64");
@@ -95,9 +143,10 @@ async function generateOpenAiGptImageModel(
 
 export async function generateImageGptImage15(
   prompt: string,
-  aspectRatio: AspectRatio = "9:16"
+  aspectRatio: AspectRatio = "9:16",
+  characterRefs?: CharacterRef[]
 ): Promise<MediaAsset | null> {
-  return generateOpenAiGptImageModel("gpt-image-1.5", prompt, aspectRatio);
+  return generateOpenAiGptImageModel("gpt-image-1.5", prompt, aspectRatio, characterRefs);
 }
 
 async function base64ImageToUploadable(
@@ -435,8 +484,8 @@ export async function generateImage(
   const models = {
     "nano-banana-2": () => generateViaOpenRouter(prompt, 'google/gemini-3.1-flash-image-preview', characterRefs, aspectRatio),
     "nano-banana-pro": () => generateViaOpenRouter(prompt, 'google/gemini-3-pro-image-preview', characterRefs, aspectRatio),
-    "gpt-image-1.5": () => generateImageGptImage15(prompt, aspectRatio),
-    "gpt-image-2": () => generateOpenAiGptImageModel("gpt-image-2", prompt, aspectRatio),
+    "gpt-image-1.5": () => generateImageGptImage15(prompt, aspectRatio, characterRefs),
+    "gpt-image-2": () => generateOpenAiGptImageModel("gpt-image-2", prompt, aspectRatio, characterRefs),
   }
 
   const result = await models[imageModel as keyof typeof models]?.();
