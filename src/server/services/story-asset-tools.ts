@@ -43,9 +43,9 @@ export async function imageUrlToVisionDataUrl(imageUrl: string): Promise<string>
  * Multimodal user-message fragments for vision models (AI SDK format).
  * Skips assets with missing URLs or failed fetch; logs warnings.
  */
-export async function buildStoryAssetVisionContentParts(
+export function buildStoryAssetVisionContentParts(
   assets: StoryAsset[]
-): Promise<(ImagePart | TextPart)[]> {
+): (ImagePart | TextPart)[] {
   return assets.flatMap((a) => [
     { type: "image", image: mediaUrl(a.url) },
     {

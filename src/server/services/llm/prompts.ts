@@ -116,22 +116,18 @@ Return exactly ${scenes.length} scenes.`;
   const framePromptsLlmOutputSchema = buildFramePromptsLlmOutputSchema(strictStructuredOutputs);
 
   const frameTaskPrompt = `Create imageSpec for each frame:\n\n${scenesContext}`;
-  const visionParts = assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
+  const visionParts = buildStoryAssetVisionContentParts(assets);
 
   const { output } = await generateText({
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: framePromptsLlmOutputSchema }),
     system: systemPrompt,
-    ...(visionParts.length > 0
-      ? {
-        messages: [
-          {
-            role: "user" as const,
-            content: [...visionParts, { type: "text" as const, text: frameTaskPrompt }],
-          },
-        ],
-      }
-      : { prompt: frameTaskPrompt }),
+    messages: [
+      {
+        role: "user" as const,
+        content: [...visionParts, { type: "text" as const, text: frameTaskPrompt }],
+      },
+    ],
     temperature: 0.8,
   });
   if (!output) throw new Error("Failed to generate frame prompts");
