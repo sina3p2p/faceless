@@ -1,4 +1,5 @@
 import { generateText, Output } from "ai";
+import { recordAiCall } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
@@ -80,21 +81,30 @@ FORMAT CONSTRAINTS — you must decide:
 Choose these based on the video type, and duration. A 15s video needs different constraints than a 120s video.${topicIdea ? `\n\nTOPIC DIRECTION: ${topicIdea}` : ""}`;
 
   const visionParts = await buildStoryAssetVisionContentParts(assets);
-  const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: creativeBriefSchema }),
-    system: systemPrompt,
-    messages: [
-      {
-        role: "user",
-        content: [
-          ...visionParts,
-          { type: "text", text: "Create the creative brief for this production." },
+  const { output } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.generateCreativeBrief",
+      request: { system: systemPrompt, visionParts, temperature: 0.8, schema: "creativeBriefSchema" },
+    },
+    () =>
+      generateText({
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: creativeBriefSchema }),
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: [
+              ...visionParts,
+              { type: "text", text: "Create the creative brief for this production." },
+            ],
+          },
         ],
-      },
-    ],
-    temperature: 0.8,
-  });
+        temperature: 0.8,
+      }),
+  );
   if (!output) throw new Error("Failed to generate creative brief");
 
   return output;

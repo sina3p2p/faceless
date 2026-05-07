@@ -4,6 +4,7 @@ import { openrouter, type ChatMessage } from "./index";
 import type { BeatSheet, CreativeBrief, ResearchPackWithClaims } from "@/types/pipeline";
 import { formatResearchEvidence } from "./research-evidence";
 import { formatBeatSheetForPrompt } from "./beat-sheet";
+import { recordAiCall } from "@/server/services/ai-audit";
 
 // ── Generic text generation (for non-structured calls) ──
 
@@ -15,14 +16,24 @@ export async function generateText(
   const { maxOutputTokens, temperature = 0.7, model, seed } = options;
   const primaryModel = model || LLM.defaultModel;
 
-  const { text } = await aiGenerateText({
-    model: openrouter.chat(primaryModel),
-    system: systemPrompt,
-    prompt: userPrompt,
-    temperature,
-    ...(maxOutputTokens && { maxOutputTokens }),
-    ...(seed !== undefined && { seed }),
-  });
+  const { text } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.generateText",
+      request: { system: systemPrompt, prompt: userPrompt, temperature, maxOutputTokens, seed },
+      summarize: (r) => ({ length: (r as { text?: string }).text?.length ?? 0 }),
+    },
+    () =>
+      aiGenerateText({
+        model: openrouter.chat(primaryModel),
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature,
+        ...(maxOutputTokens && { maxOutputTokens }),
+        ...(seed !== undefined && { seed }),
+      }),
+  );
 
   return text;
 }
@@ -120,12 +131,22 @@ LANGUAGE RULE:
   }
   messages.push({ role: "user", content: userMessage });
 
-  const { text } = await aiGenerateText({
-    model: openrouter.chat(primaryModel),
-    system: systemPrompt,
-    messages,
-    temperature: 0.7,
-  });
+  const { text } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.refineStory",
+      request: { system: systemPrompt, messages, temperature: 0.7 },
+      summarize: (r) => ({ length: (r as { text?: string }).text?.length ?? 0 }),
+    },
+    () =>
+      aiGenerateText({
+        model: openrouter.chat(primaryModel),
+        system: systemPrompt,
+        messages,
+        temperature: 0.7,
+      }),
+  );
 
   return text;
 }

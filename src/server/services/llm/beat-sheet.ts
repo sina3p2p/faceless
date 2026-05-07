@@ -2,6 +2,7 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter } from "./index";
+import { recordAiCall } from "@/server/services/ai-audit";
 import type {
   BeatSheet,
   CreativeBrief,
@@ -79,13 +80,25 @@ OUTPUT LANGUAGE:
 
   const userPrompt = `Design the beat sheet for this story idea: ${topicIdea}\n\nVisual style context: ${style}.`;
 
-  const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: beatSheetSchema }),
-    system: systemPrompt,
-    prompt: userPrompt,
-    temperature: 0.85,
-  });
+  const { output } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.generateBeatSheet",
+      request: { system: systemPrompt, prompt: userPrompt, temperature: 0.85, schema: "beatSheetSchema" },
+      summarize: (r) => ({
+        beats: (r as { output?: { beats?: unknown[] } }).output?.beats?.length ?? 0,
+      }),
+    },
+    () =>
+      generateText({
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: beatSheetSchema }),
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: 0.85,
+      }),
+  );
   if (!output) throw new Error("Failed to generate beat sheet");
 
   if (output.beats.length < 3) {

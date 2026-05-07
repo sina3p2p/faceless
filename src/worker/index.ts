@@ -19,6 +19,7 @@ import {
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
 import { REDIS, WORKER } from "@/lib/constants";
+import { withAiAuditContext } from "@/server/services/ai-audit";
 
 process.env.SERVICE_NAME = "faceless-worker";
 
@@ -31,37 +32,46 @@ const worker = new Worker(
   async (job) => {
     const startTime = Date.now();
     logger.info("Job started", { jobId: job.id, jobName: job.name, data: job.data });
-    if (job.name === "executive-produce") {
-      await executiveProduceJob(job);
-    } else if (job.name === "web-research") {
-      await webResearchJob(job);
-    } else if (job.name === "generate-story") {
-      await generateStoryJob(job);
-    } else if (job.name === "split-scenes") {
-      await splitScenesJob(job);
-    } else if (job.name === "supervise-script") {
-      await superviseScriptJob(job);
-    } else if (job.name === "generate-tts") {
-      await generateTTSJob(job);
-    } else if (job.name === "cinematography") {
-      await cinematographyJob(job);
-    } else if (job.name === "extract-hero-assets") {
-      await extractHeroAssetsJob(job);
-    } else if (job.name === "storyboard") {
-      await storyboardJob(job);
-    } else if (job.name === "generate-prompts") {
-      await generatePromptsJob(job);
-    } else if (job.name === "generate-frame-images") {
-      await generateFrameImagesJob(job);
-    } else if (job.name === "generate-pipeline-motion") {
-      await pipelineGenerateMotionJob(job);
-    } else if (job.name === "generate-frame-videos") {
-      await generateFrameVideosJob(job);
-    } else if (job.name === "compose-final") {
-      await composeFinalJob(job);
-    } else {
-      logger.warn("Skipping unknown/removed job", { jobName: job.name, jobId: job.id });
-    }
+    const videoProjectId =
+      typeof (job.data as { videoProjectId?: unknown })?.videoProjectId === "string"
+        ? ((job.data as { videoProjectId: string }).videoProjectId)
+        : undefined;
+    await withAiAuditContext(
+      { videoProjectId, bullmqJobId: job.id ? String(job.id) : undefined },
+      async () => {
+        if (job.name === "executive-produce") {
+          await executiveProduceJob(job);
+        } else if (job.name === "web-research") {
+          await webResearchJob(job);
+        } else if (job.name === "generate-story") {
+          await generateStoryJob(job);
+        } else if (job.name === "split-scenes") {
+          await splitScenesJob(job);
+        } else if (job.name === "supervise-script") {
+          await superviseScriptJob(job);
+        } else if (job.name === "generate-tts") {
+          await generateTTSJob(job);
+        } else if (job.name === "cinematography") {
+          await cinematographyJob(job);
+        } else if (job.name === "extract-hero-assets") {
+          await extractHeroAssetsJob(job);
+        } else if (job.name === "storyboard") {
+          await storyboardJob(job);
+        } else if (job.name === "generate-prompts") {
+          await generatePromptsJob(job);
+        } else if (job.name === "generate-frame-images") {
+          await generateFrameImagesJob(job);
+        } else if (job.name === "generate-pipeline-motion") {
+          await pipelineGenerateMotionJob(job);
+        } else if (job.name === "generate-frame-videos") {
+          await generateFrameVideosJob(job);
+        } else if (job.name === "compose-final") {
+          await composeFinalJob(job);
+        } else {
+          logger.warn("Skipping unknown/removed job", { jobName: job.name, jobId: job.id });
+        }
+      },
+    );
     logger.info("Job completed", {
       jobId: job.id,
       durationMs: Date.now() - startTime,

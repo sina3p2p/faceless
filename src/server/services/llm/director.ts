@@ -4,6 +4,7 @@ import { LLM, getLanguageName } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
 import { openrouter, type StoryAsset } from "./index";
 import type { CreativeBrief, SceneFunction } from "@/types/pipeline";
+import { recordAiCall } from "@/server/services/ai-audit";
 
 // ── Director Agent Schemas ──
 
@@ -149,18 +150,37 @@ LANGUAGE RULE:
   const userStoryPrompt = `Split this story into scenes and write director's notes:\n\n${storyMarkdown}`;
   const visionParts = assets && assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
-  const { output } = await aiGenerateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: directorOutputSchema }),
-    system: (isMusic ? musicInstruction : storyInstruction) + assetSys,
-    messages: [
-      {
-        role: "user",
-        content: [...visionParts, { type: "text", text: userStoryPrompt }],
+  const systemPromptResolved = (isMusic ? musicInstruction : storyInstruction) + assetSys;
+  const { output } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.splitStoryIntoScenes",
+      request: {
+        system: systemPromptResolved,
+        userStoryPrompt,
+        visionParts,
+        temperature: 0.7,
+        schema: "directorOutputSchema",
       },
-    ],
-    temperature: 0.7,
-  });
+      summarize: (r) => ({
+        sceneCount: (r as { output?: { scenes?: unknown[] } }).output?.scenes?.length ?? 0,
+      }),
+    },
+    () =>
+      aiGenerateText({
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: directorOutputSchema }),
+        system: systemPromptResolved,
+        messages: [
+          {
+            role: "user",
+            content: [...visionParts, { type: "text", text: userStoryPrompt }],
+          },
+        ],
+        temperature: 0.7,
+      }),
+  );
   if (!output) throw new Error("Failed to split story into scenes");
 
   return output;

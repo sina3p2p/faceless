@@ -385,6 +385,56 @@ export const usageEntries = pgTable("usage_entries", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+/**
+ * Full request/response audit log for every call to an external AI model
+ * (LLM, image, video, audio). Captures who/what/when so a generation can be
+ * traced back to the exact prompt, model, and provider response that produced
+ * it. Large binary outputs (base64 image bytes) are redacted with a marker —
+ * the persisted media URL is recorded in `responseSummary` instead.
+ */
+export const aiAuditLogs = pgTable(
+  "ai_audit_logs",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    /** Wall-clock time the call was started. */
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    /** "openai" | "openrouter" | "fal" | "suno" — the upstream service. */
+    provider: text("provider").notNull(),
+    /** Model identifier exactly as sent to the provider (e.g. "gpt-image-1.5", "anthropic/claude-opus-4.6"). */
+    model: text("model").notNull(),
+    /** Logical operation: "generateText", "generateObject", "image.generate", "image.edit", "audio.transcribe", "music.generate", etc. */
+    operation: text("operation").notNull(),
+    /** "success" | "error". */
+    status: text("status").notNull(),
+    /** Wall-clock duration of the call. */
+    durationMs: integer("duration_ms"),
+    /** Error message when status="error". */
+    errorMessage: text("error_message"),
+    /** Resolved user ID (from AsyncLocalStorage context). */
+    userId: text("user_id"),
+    /** Resolved video project ID (the "video id" the user wants to filter by). */
+    videoProjectId: text("video_project_id"),
+    /** Resolved scene/frame/render-job IDs when in scope. */
+    sceneId: text("scene_id"),
+    frameId: text("frame_id"),
+    renderJobId: text("render_job_id"),
+    bullmqJobId: text("bullmq_job_id"),
+    /** Full request payload (system prompt, messages, temperature, etc.). */
+    request: json("request").notNull(),
+    /** Full response payload (text, structured object, image URL, etc.). Base64 blobs are redacted. */
+    response: json("response"),
+    /** Compact summary of the response, e.g. {url, width, height, durationMs, taskId}. Useful for quick listing without parsing the full JSON. */
+    responseSummary: json("response_summary"),
+    /** Token usage / cost reported by the provider, when available. */
+    usage: json("usage"),
+  },
+  (t) => [
+    index("ai_audit_logs_video_project_id_idx").on(t.videoProjectId),
+    index("ai_audit_logs_created_at_idx").on(t.createdAt),
+    index("ai_audit_logs_provider_model_idx").on(t.provider, t.model),
+  ],
+);
+
 // ── Relations ──
 
 export const usersRelations = relations(users, ({ many }) => ({

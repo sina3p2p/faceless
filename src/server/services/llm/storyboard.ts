@@ -1,4 +1,5 @@
 import { generateText, Output } from "ai";
+import { recordAiCall } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "./index";
@@ -109,13 +110,23 @@ RULES:
     - Avoid more than 2 consecutive "medium" shots — vary the rhythm
 12. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".`;
 
-  const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: frameBreakdownSchema }),
-    system: systemPrompt,
-    prompt: `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}`,
-    temperature: 0.5,
-  });
+  const userPrompt = `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}`;
+  const { output } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.generateFrameBreakdown",
+      request: { system: systemPrompt, prompt: userPrompt, temperature: 0.5, schema: "frameBreakdownSchema" },
+    },
+    () =>
+      generateText({
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: frameBreakdownSchema }),
+        system: systemPrompt,
+        prompt: userPrompt,
+        temperature: 0.5,
+      }),
+  );
   if (!output) throw new Error("Failed to generate frame breakdown");
 
   const violations = validateShotBudget(output);
@@ -128,13 +139,23 @@ RULES:
   const fixupNote = `Your previous breakdown violated shot-variety rule 10:\n- ${violations.join("\n- ")}\nPlease fix these violations while keeping the same scene count, narrative intent, and durations.`;
 
   try {
-    const { output: retry } = await generateText({
-      model: openrouter.chat(primaryModel),
-      output: Output.object({ schema: frameBreakdownSchema }),
-      system: systemPrompt,
-      prompt: `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}\n\n${fixupNote}`,
-      temperature: 0.5,
-    });
+    const retryPrompt = `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}\n\n${fixupNote}`;
+    const { output: retry } = await recordAiCall(
+      {
+        provider: "openrouter",
+        model: primaryModel,
+        operation: "llm.generateFrameBreakdown.retry",
+        request: { system: systemPrompt, prompt: retryPrompt, temperature: 0.5, schema: "frameBreakdownSchema" },
+      },
+      () =>
+        generateText({
+          model: openrouter.chat(primaryModel),
+          output: Output.object({ schema: frameBreakdownSchema }),
+          system: systemPrompt,
+          prompt: retryPrompt,
+          temperature: 0.5,
+        }),
+    );
     if (retry) {
       const retryViolations = validateShotBudget(retry);
       if (retryViolations.length > 0) {
