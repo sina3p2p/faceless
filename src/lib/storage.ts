@@ -52,17 +52,30 @@ export async function uploadFile(
   return key;
 }
 
+// Resolve an R2 download URL plus the unix timestamp at which it expires.
+// Bucketed signing: signingDate is rounded down to the nearest bucket
+// boundary so all callers within the same window get the *same* URL — which
+// makes the proxy's redirect cache-friendly at the browser/CDN layer.
 export async function getSignedDownloadUrl(
   key: string,
-  expiresIn = 3600
-): Promise<string> {
+  bucketSizeSec = 3600
+): Promise<{ url: string; expiresAt: number }> {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const bucketStart = Math.floor(nowSec / bucketSizeSec) * bucketSizeSec;
+  const expiresAt = bucketStart + bucketSizeSec;
+
   if (R2_PUBLIC_URL) {
     const base = R2_PUBLIC_URL.replace(/\/$/, "");
-    return `${base}/${key}`;
+    // Public URL never expires — use the next bucket boundary anyway so
+    // callers can set a sensible Cache-Control max-age.
+    return { url: `${base}/${key}`, expiresAt };
   }
 
   const command = new GetObjectCommand({ Bucket: BUCKET, Key: key });
-  const url = await getSignedUrl(s3, command, { expiresIn });
+  const url = await getSignedUrl(s3, command, {
+    expiresIn: bucketSizeSec,
+    signingDate: new Date(bucketStart * 1000),
+  });
 
   if (endpoint && url.includes("s3.amazonaws.com")) {
     const parsed = new URL(url);
@@ -70,8 +83,8 @@ export async function getSignedDownloadUrl(
     parsed.hostname = r2.hostname;
     parsed.protocol = r2.protocol;
     parsed.port = r2.port;
-    return parsed.toString();
+    return { url: parsed.toString(), expiresAt };
   }
 
-  return url;
+  return { url, expiresAt };
 }
