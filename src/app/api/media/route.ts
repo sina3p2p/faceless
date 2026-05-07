@@ -36,5 +36,5 @@ export async function GET(req: NextRequest) {
     createdAt: item.createdAt.toISOString(),
   }));
 
-  return NextResponse.json({ items, total, page, limit });
+  return NextResponse.json({ items, total, totalPages: Math.ceil(total / limit), page, limit });
 }

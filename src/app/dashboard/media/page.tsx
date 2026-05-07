@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useEffect, useState, useRef } from "react";
 
 interface MediaItem {
   id: string;
@@ -204,16 +205,16 @@ function Lightbox({ item, onClose }: { item: MediaItem; onClose: () => void }) {
   );
 }
 
-function MediaGrid({ items, type, loading, hasMore, sentinelRef }: {
+function MediaGrid({ items, type, isFetchingNextPage, hasNextPage, sentinelRef }: {
   items: MediaItem[];
   type: Tab;
-  loading: boolean;
-  hasMore: boolean;
+  isFetchingNextPage: boolean;
+  hasNextPage: boolean;
   sentinelRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const [lightbox, setLightbox] = useState<MediaItem | null>(null);
 
-  if (!loading && items.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="text-center py-20 text-gray-500">
         <p className="text-lg mb-1">No {type} yet</p>
@@ -233,15 +234,15 @@ function MediaGrid({ items, type, loading, hasMore, sentinelRef }: {
         ))}
       </div>
 
-      {loading && (
+      {isFetchingNextPage && (
         <div className="flex items-center justify-center py-8">
           <div className="animate-spin w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full" />
         </div>
       )}
 
-      {hasMore && !loading && <div ref={sentinelRef} className="h-10" />}
+      {hasNextPage && !isFetchingNextPage && <div ref={sentinelRef} className="h-10" />}
 
-      {!hasMore && items.length > 0 && (
+      {!hasNextPage && items.length > 0 && (
         <p className="text-center text-xs text-gray-600 py-6">All {items.length} items loaded</p>
       )}
 
@@ -252,59 +253,55 @@ function MediaGrid({ items, type, loading, hasMore, sentinelRef }: {
   );
 }
 
+type MediaApiPage = {
+  items: MediaItem[];
+  total: number;
+  totalPages: number;
+  page: number;
+  limit: number;
+};
+
 export default function MediaPage() {
   const [tab, setTab] = useState<Tab>("image");
-  const [items, setItems] = useState<MediaItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [initialLoad, setInitialLoad] = useState(true);
   const sentinelRef = useRef<HTMLDivElement | null>(null);
-  const fetchingRef = useRef(false);
 
-  const fetchPage = useCallback(async (activeTab: Tab, pageCursor: string | null, reset: boolean) => {
-    if (fetchingRef.current) return;
-    fetchingRef.current = true;
-    setLoading(true);
-
-    try {
-      const params = new URLSearchParams({ tab: activeTab, limit: "20" });
-      if (pageCursor) params.set("cursor", pageCursor);
-
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isPending,
+    isFetchingNextPage,
+    isError,
+  } = useInfiniteQuery({
+    queryKey: ["media", tab],
+    queryFn: async ({ pageParam }): Promise<MediaApiPage> => {
+      const params = new URLSearchParams({
+        tab,
+        limit: "20",
+        page: String(pageParam),
+      });
       const res = await fetch(`/api/media?${params}`);
-      if (!res.ok) return;
+      if (!res.ok) throw new Error("Failed to load media");
+      return res.json();
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const next = lastPage.page + 1;
+      return next < lastPage.totalPages ? next : undefined;
+    },
+  });
 
-      const data = await res.json();
-      const newItems: MediaItem[] = data.items;
-
-      setItems((prev) => reset ? newItems : [...prev, ...newItems]);
-      setCursor(data.nextCursor);
-      setHasMore(!!data.nextCursor);
-      setTotal(data.total);
-    } finally {
-      setLoading(false);
-      setInitialLoad(false);
-      fetchingRef.current = false;
-    }
-  }, []);
-
-  useEffect(() => {
-    setItems([]);
-    setCursor(null);
-    setHasMore(true);
-    setInitialLoad(true);
-    fetchPage(tab, null, true);
-  }, [tab, fetchPage]);
+  const items = data?.pages.flatMap((p) => p.items) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
 
   useEffect(() => {
     const el = sentinelRef.current;
-    if (!el) return;
+    if (!el || !hasNextPage || isFetchingNextPage) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !fetchingRef.current) {
-          fetchPage(tab, cursor, false);
+        if (entries[0]?.isIntersecting) {
+          void fetchNextPage();
         }
       },
       { rootMargin: "200px" }
@@ -312,7 +309,7 @@ export default function MediaPage() {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [tab, cursor, hasMore, fetchPage]);
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage, items.length]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -329,13 +326,13 @@ export default function MediaPage() {
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id
-                ? "bg-violet-600 text-white"
-                : "text-gray-400 hover:text-white hover:bg-white/5"
+              ? "bg-violet-600 text-white"
+              : "text-gray-400 hover:text-white hover:bg-white/5"
               }`}
           >
             {t.icon}
             {t.label}
-            {!initialLoad && tab === t.id && (
+            {!isPending && tab === t.id && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-white/20 text-white">
                 {total}
               </span>
@@ -344,16 +341,20 @@ export default function MediaPage() {
         ))}
       </div>
 
-      {initialLoad ? (
+      {isPending ? (
         <div className="flex items-center justify-center py-20">
           <div className="animate-spin w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full" />
+        </div>
+      ) : isError ? (
+        <div className="text-center py-20 text-red-400 text-sm">
+          Could not load media. Refresh and try again.
         </div>
       ) : (
         <MediaGrid
           items={items}
           type={tab}
-          loading={loading}
-          hasMore={hasMore}
+          isFetchingNextPage={isFetchingNextPage}
+          hasNextPage={hasNextPage ?? false}
           sentinelRef={sentinelRef}
         />
       )}

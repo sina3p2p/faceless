@@ -23,8 +23,11 @@ const R2_PUBLIC_URL = STORAGE.r2PublicUrl;
 
 // Stable, public, sync URL for assets stored in object storage. Returns an
 // absolute URL so the same value works for <img> tags AND for sending to
-// third-party image/video providers. The proxy at /api/media/[...key] signs
-// the underlying R2 request on demand and 302-redirects.
+// third-party image/video providers.
+//
+// When R2_PUBLIC_URL is set, keys resolve straight to that origin (scales with
+// R2/CDN; no Next hop). Otherwise the proxy at /api/media/[...key] signs (or
+// redirects) on demand.
 //
 // Pass-through is provided for values that are already absolute URLs.
 export function mediaUrl(keyOrUrl: string): string;
@@ -32,8 +35,13 @@ export function mediaUrl(keyOrUrl: string | null | undefined): string | null;
 export function mediaUrl(keyOrUrl: string | null | undefined): string | null {
   if (!keyOrUrl) return null;
   if (/^https?:\/\//i.test(keyOrUrl)) return keyOrUrl;
+  const key = keyOrUrl.replace(/^\/+/, "");
+  if (R2_PUBLIC_URL) {
+    const base = R2_PUBLIC_URL.replace(/\/$/, "");
+    return `${base}/${key}`;
+  }
   const base = APP.url.replace(/\/$/, "");
-  return `${base}/api/media/${keyOrUrl.replace(/^\/+/, "")}`;
+  return `${base}/api/media/${key}`;
 }
 
 export async function uploadFile(
