@@ -3,6 +3,7 @@ import { LLM, getLanguageName } from "@/lib/constants";
 import type { ChatMessage } from "@/types/llm-common";
 import { narrationScriptSchema, type NarrationScript } from "@/types/narration-schemas";
 import { openrouter } from "./openrouter-client";
+import { recordAiCall } from "@/server/services/ai-audit";
 
 export async function refineNarrationScript(
   currentScript: NarrationScript,
@@ -43,13 +44,22 @@ LANGUAGE RULE (CRITICAL):
   }
   messages.push({ role: "user", content: userMessage });
 
-  const { output } = await aiGenerateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: narrationScriptSchema }),
-    system: systemPrompt,
-    messages,
-    temperature: 0.7,
-  });
+  const { output } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.refineNarrationScript",
+      request: { system: systemPrompt, messages, temperature: 0.7, schema: "narrationScriptSchema" },
+    },
+    () =>
+      aiGenerateText({
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: narrationScriptSchema }),
+        system: systemPrompt,
+        messages,
+        temperature: 0.7,
+      }),
+  );
   if (!output) throw new Error("Failed to refine narration script");
 
   return output;

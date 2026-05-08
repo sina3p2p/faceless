@@ -1,6 +1,7 @@
 import OpenAI, { toFile } from "openai";
 import { MEDIA, LLM } from "@/lib/constants";
 import { uploadFile, mediaUrl } from "@/lib/storage";
+import { recordAiCall } from "@/server/services/ai-audit";
 
 const openai = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
@@ -48,14 +49,28 @@ async function generateOpenAiGptImageModel(
 ): Promise<MediaAsset | null> {
   try {
     const dims = gptImage15Dimensions(aspectRatio);
-    const response = await openai.images.generate({
-      model,
-      prompt: `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`,
-      n: 1,
-      size: gptImage15Size(aspectRatio),
-      quality: "medium",
-      moderation: "low"
-    });
+    const finalPrompt = `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`;
+    const size = gptImage15Size(aspectRatio);
+    const response = await recordAiCall(
+      {
+        provider: "openai",
+        model,
+        operation: "image.generate",
+        request: { model, prompt: finalPrompt, n: 1, size, quality: "medium", moderation: "low", aspectRatio },
+        summarize: (r) => {
+          const item = (r as { data?: Array<{ url?: string; b64_json?: string }> }).data?.[0];
+          return { hasUrl: !!item?.url, hasB64: !!item?.b64_json, dims };
+        },
+      },
+      () => openai.images.generate({
+        model,
+        prompt: finalPrompt,
+        n: 1,
+        size,
+        quality: "medium",
+        moderation: "low"
+      }),
+    );
 
     const item = response.data?.[0];
     const b64 = item?.b64_json;
@@ -144,14 +159,37 @@ async function generateOpenAiGptImageWithRefs(
       `Generate a NEW scene following this prompt: ${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`;
 
     const dims = gptImage15Dimensions(aspectRatio);
-    const response = await openai.images.edit({
-      model: "gpt-image-1.5",
-      image: imageParts,
-      prompt: composedPrompt,
-      n: 1,
-      size: gptImage15Size(aspectRatio),
-      quality: "medium",
-    });
+    const editSize = gptImage15Size(aspectRatio);
+    const response = await recordAiCall(
+      {
+        provider: "openai",
+        model: "gpt-image-1.5",
+        operation: "image.editWithRefs",
+        request: {
+          model: "gpt-image-1.5",
+          requestedModel,
+          prompt: composedPrompt,
+          n: 1,
+          size: editSize,
+          quality: "medium",
+          aspectRatio,
+          refCount: imageParts.length,
+          refs: usable.map(({ ref }) => ({ url: ref.url, name: ref.name, type: ref.type, description: ref.description })),
+        },
+        summarize: (r) => {
+          const item = (r as { data?: Array<{ url?: string; b64_json?: string }> }).data?.[0];
+          return { hasUrl: !!item?.url, hasB64: !!item?.b64_json, dims };
+        },
+      },
+      () => openai.images.edit({
+        model: "gpt-image-1.5",
+        image: imageParts,
+        prompt: composedPrompt,
+        n: 1,
+        size: editSize,
+        quality: "medium",
+      }),
+    );
 
     const item = response.data?.[0];
     const b64 = item?.b64_json;
@@ -248,14 +286,37 @@ export async function editImageViaGptImage2(
       );
     }
 
-    const response = await openai.images.edit({
-      model: "gpt-image-1.5",
-      image: imageParts,
-      prompt,
-      n: 1,
-      size: gptImage15Size(aspectRatio),
-      quality: "medium",
-    });
+    const editPromptSize = gptImage15Size(aspectRatio);
+    const response = await recordAiCall(
+      {
+        provider: "openai",
+        model: "gpt-image-1.5",
+        operation: "image.edit.gptImage2",
+        request: {
+          model: "gpt-image-1.5",
+          prompt,
+          n: 1,
+          size: editPromptSize,
+          quality: "medium",
+          aspectRatio,
+          hasAnnotated: !!annotated,
+          refCount: refs.length,
+          editPromptUser: editPrompt,
+        },
+        summarize: (r) => {
+          const item = (r as { data?: Array<{ url?: string; b64_json?: string }> }).data?.[0];
+          return { hasUrl: !!item?.url, hasB64: !!item?.b64_json };
+        },
+      },
+      () => openai.images.edit({
+        model: "gpt-image-1.5",
+        image: imageParts,
+        prompt,
+        n: 1,
+        size: editPromptSize,
+        quality: "medium",
+      }),
+    );
 
     console.log(response);
 
@@ -360,22 +421,39 @@ export async function generateViaOpenRouter(
       image_config: { aspect_ratio: aspectRatio },
     };
 
-    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${LLM.apiKey}`,
+    const data = await recordAiCall(
+      {
+        provider: "openrouter",
+        model,
+        operation: "image.generate.gemini",
+        request: { ...body, refCount: characterRefs?.length ?? 0, aspectRatio, prompt },
+        summarize: (r) => {
+          const msg = (r as { choices?: Array<{ message?: { images?: Array<unknown> } }> })
+            .choices?.[0]?.message;
+          return { hasImages: !!msg?.images?.length };
+        },
       },
-      body: JSON.stringify(body),
+      async () => {
+        const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${LLM.apiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const errBody = await res.text();
+          throw new Error(`Gemini image generation failed (${res.status}): ${errBody}`);
+        }
+        return res.json();
+      },
+    ).catch((err) => {
+      console.warn(`Gemini image generation failed:`, err instanceof Error ? err.message : err);
+      return null;
     });
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.warn(`Gemini image generation failed (${res.status}):`, errBody);
-      return null;
-    }
-
-    const data = await res.json();
+    if (!data) return null;
     const message = data.choices?.[0]?.message;
 
     // Extract base64 image from response
@@ -457,22 +535,39 @@ export async function editImageViaGemini(
       image_config: { aspect_ratio: aspectRatio },
     };
 
-    const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${LLM.apiKey}`,
+    const data = await recordAiCall(
+      {
+        provider: "openrouter",
+        model: body.model,
+        operation: "image.edit.gemini",
+        request: { ...body, aspectRatio, editPrompt, sourceImageUrl },
+        summarize: (r) => {
+          const msg = (r as { choices?: Array<{ message?: { images?: Array<unknown> } }> })
+            .choices?.[0]?.message;
+          return { hasImages: !!msg?.images?.length };
+        },
       },
-      body: JSON.stringify(body),
+      async () => {
+        const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${LLM.apiKey}`,
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const errBody = await res.text();
+          throw new Error(`Gemini image edit failed (${res.status}): ${errBody}`);
+        }
+        return res.json();
+      },
+    ).catch((err) => {
+      console.warn(`Gemini image edit failed:`, err instanceof Error ? err.message : err);
+      return null;
     });
 
-    if (!res.ok) {
-      const errBody = await res.text();
-      console.warn(`Gemini image edit failed (${res.status}):`, errBody);
-      return null;
-    }
-
-    const data = await res.json();
+    if (!data) return null;
     const message = data.choices?.[0]?.message;
 
     let imageDataUrl: string | null = null;

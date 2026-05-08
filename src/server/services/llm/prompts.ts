@@ -1,5 +1,6 @@
 /** Machine-checked prompt rules / status: see `prompt-contract.ts` + `image-spec.ts`. */
 import { generateText, Output } from "ai";
+import { recordAiCall } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
@@ -118,18 +119,33 @@ Return exactly ${scenes.length} scenes.`;
   const frameTaskPrompt = `Create imageSpec for each frame:\n\n${scenesContext}`;
   const visionParts = buildStoryAssetVisionContentParts(assets);
 
-  const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: framePromptsLlmOutputSchema }),
-    system: systemPrompt,
-    messages: [
-      {
-        role: "user" as const,
-        content: [...visionParts, { type: "text" as const, text: frameTaskPrompt }],
+  const { output } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.generateFramePrompts",
+      request: {
+        system: systemPrompt,
+        frameTaskPrompt,
+        visionParts,
+        temperature: 0.8,
+        schema: "framePromptsLlmOutputSchema",
       },
-    ],
-    temperature: 0.8,
-  });
+    },
+    () =>
+      generateText({
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: framePromptsLlmOutputSchema }),
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user" as const,
+            content: [...visionParts, { type: "text" as const, text: frameTaskPrompt }],
+          },
+        ],
+        temperature: 0.8,
+      }),
+  );
   if (!output) throw new Error("Failed to generate frame prompts");
 
   const scenesOut: FramePromptsOutput["scenes"] = output.scenes.map((scene, si) => {

@@ -3,6 +3,7 @@ import { openrouter } from "@/server/services/llm";
 import { generateViaOpenRouter, type CharacterRef } from "@/server/services/media";
 import type { StoryAsset } from "@/types/llm-common";
 import { uploadFile, mediaUrl } from "@/lib/storage";
+import { recordAiCall } from "@/server/services/ai-audit";
 
 const VISION_MODEL = "openai/gpt-4.1";
 
@@ -67,21 +68,39 @@ export async function describeStoryAssetFromVision(params: {
         ? "Describe this location in detail for AI image generation consistency."
         : "Describe this prop or object in detail for AI image generation consistency.";
 
-  const { text } = await generateText({
-    model: openrouter.chat(VISION_MODEL),
-    system,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", image: new URL(params.dataUrl) },
-          { type: "text", text: userLine },
-        ],
+  const { text } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: VISION_MODEL,
+      operation: "llm.describeStoryAssetFromVision",
+      request: {
+        system,
+        userLine,
+        assetType: params.assetType,
+        // dataUrl can be a multi-MB base64 — sanitize() will redact it
+        dataUrl: params.dataUrl,
+        maxOutputTokens: 300,
+        temperature: 0.3,
       },
-    ],
-    maxOutputTokens: 300,
-    temperature: 0.3,
-  });
+      summarize: (r) => ({ length: (r as { text?: string }).text?.length ?? 0 }),
+    },
+    () =>
+      generateText({
+        model: openrouter.chat(VISION_MODEL),
+        system,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", image: new URL(params.dataUrl) },
+              { type: "text", text: userLine },
+            ],
+          },
+        ],
+        maxOutputTokens: 300,
+        temperature: 0.3,
+      }),
+  );
 
   return text.trim();
 }

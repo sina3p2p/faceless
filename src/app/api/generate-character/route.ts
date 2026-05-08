@@ -6,6 +6,7 @@ import { generateViaOpenRouter } from "@/server/services/media";
 import { editImageViaGemini } from "@/server/services/media";
 import { uploadFile } from "@/lib/storage";
 import { z } from "zod";
+import { recordAiCall, withAiAuditContext } from "@/server/services/ai-audit";
 
 const MODEL = "openai/gpt-4.1";
 
@@ -213,7 +214,15 @@ export async function POST(req: NextRequest) {
   try {
     const userId = user.id;
 
-    const result = await generateText({
+    const result = await withAiAuditContext({ userId }, () => recordAiCall(
+      {
+        provider: "openrouter",
+        model: MODEL,
+        operation: "llm.generateCharacter.chat",
+        request: { system: systemPrompt, messages: plainMessages, temperature: 0.5, assetType: parsed.data.assetType },
+        context: { userId },
+      },
+      () => generateText({
       model: openrouter.chat(MODEL),
       system: systemPrompt,
       messages: plainMessages,
@@ -265,7 +274,8 @@ export async function POST(req: NextRequest) {
       },
       stopWhen: stepCountIs(2),
       temperature: 0.5,
-    });
+    }),
+    ));
 
     const toolCalls: ToolCallData[] = [];
     for (const step of result.steps) {

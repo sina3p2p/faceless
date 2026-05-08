@@ -6,6 +6,7 @@ import OpenAI, { toFile } from "openai";
 import { MUSIC, MEDIA } from "@/lib/constants";
 import type { WordTimestamp } from "@/types/tts";
 import { type TVideoScene } from "@/types/video";
+import { recordAiCall } from "@/server/services/ai-audit";
 
 const whisperClient = new OpenAI({ apiKey: MEDIA.openaiApiKey });
 
@@ -114,37 +115,53 @@ export async function generateSong(
 
   console.log(`[suno] Generating song: "${title}" (${genre}), ${l.length} chars of lyrics`);
 
-  const response = await sunoFetch<SunoGenerateResponse>("/api/v1/generate", {
-    method: "POST",
-    body: JSON.stringify({
-      customMode: true,
-      instrumental: false,
-      prompt: lyrics,
-      style: genre.slice(0, 1000),
-      title: title.slice(0, 100),
-      model: MUSIC.sunoModel,
-      callBackUrl: "https://localhost/noop",
-    }),
-  });
-
-  if (response.code !== 200) {
-    throw new Error(`Suno generate failed: ${response.msg}`);
-  }
-
-  const taskId = response.data.taskId;
-  console.log(`[suno] Task created: ${taskId}, waiting for completion...`);
-
-  const tracks = await pollForCompletion(taskId);
-
-  const best = tracks.reduce((a, b) => (b.duration > a.duration ? b : a), tracks[0]);
-
-  console.log(`[suno] Song ready: "${best.title}" (${best.duration}s)`);
-
-  return {
-    audioUrl: best.audioUrl,
-    duration: best.duration,
-    coverUrl: best.imageUrl,
+  const requestBody = {
+    customMode: true,
+    instrumental: false,
+    prompt: lyrics,
+    style: genre.slice(0, 1000),
+    title: title.slice(0, 100),
+    model: MUSIC.sunoModel,
+    callBackUrl: "https://localhost/noop",
   };
+
+  return recordAiCall(
+    {
+      provider: "suno",
+      model: MUSIC.sunoModel,
+      operation: "music.generate",
+      request: { ...requestBody, targetDurationSec },
+      summarize: (r) => ({
+        audioUrl: (r as MusicResult).audioUrl,
+        duration: (r as MusicResult).duration,
+      }),
+    },
+    async () => {
+      const response = await sunoFetch<SunoGenerateResponse>("/api/v1/generate", {
+        method: "POST",
+        body: JSON.stringify(requestBody),
+      });
+
+      if (response.code !== 200) {
+        throw new Error(`Suno generate failed: ${response.msg}`);
+      }
+
+      const taskId = response.data.taskId;
+      console.log(`[suno] Task created: ${taskId}, waiting for completion...`);
+
+      const tracks = await pollForCompletion(taskId);
+
+      const best = tracks.reduce((a, b) => (b.duration > a.duration ? b : a), tracks[0]);
+
+      console.log(`[suno] Song ready: "${best.title}" (${best.duration}s)`);
+
+      return {
+        audioUrl: best.audioUrl,
+        duration: best.duration,
+        coverUrl: best.imageUrl,
+      };
+    },
+  );
 }
 
 async function getAudioDurationMs(filePath: string): Promise<number> {
@@ -215,12 +232,29 @@ export async function transcribeSong(audioUrl: string): Promise<WhisperWord[]> {
   const buffer = Buffer.from(audioRes.data);
   const file = await toFile(buffer, "song.mp3", { type: "audio/mpeg" });
 
-  const tr = await whisperClient.audio.transcriptions.create({
-    file,
-    model: "whisper-1",
-    response_format: "verbose_json",
-    timestamp_granularities: ["word"],
-  });
+  const tr = await recordAiCall(
+    {
+      provider: "openai",
+      model: "whisper-1",
+      operation: "audio.transcribe",
+      request: {
+        model: "whisper-1",
+        audioUrl,
+        bytes: buffer.length,
+        response_format: "verbose_json",
+        timestamp_granularities: ["word"],
+      },
+      summarize: (r) => ({
+        wordCount: (r as { words?: Array<unknown> }).words?.length ?? 0,
+      }),
+    },
+    () => whisperClient.audio.transcriptions.create({
+      file,
+      model: "whisper-1",
+      response_format: "verbose_json",
+      timestamp_granularities: ["word"],
+    }),
+  );
 
   const words: WhisperWord[] = (tr.words ?? [])
     .filter((w) => w.start != null && w.end != null && w.word)

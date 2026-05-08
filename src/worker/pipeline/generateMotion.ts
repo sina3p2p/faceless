@@ -3,6 +3,7 @@ import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { WORKER } from "@/lib/constants";
 import { generateSingleFrameMotion } from "@/server/services/llm";
+import { withAiAuditContext } from "@/server/services/ai-audit";
 import { mediaUrl } from "@/lib/storage";
 import { getAgentModels, autoChainOrReview } from "./shared";
 import { computeFrameWps } from "@/server/services/frame-tempo";
@@ -66,6 +67,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
       const voTempoWps = computeFrameWps(captionData, frameStartS, clipDuration);
       return {
         frameId: frame.id,
+        sceneId: frame.scene?.id ?? null,
         clipDuration,
         sceneText: frame.scene?.text ?? "",
         imageUrl: frame.imageMedia?.url ? mediaUrl(frame.imageMedia.url) : "",
@@ -124,25 +126,29 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
           const fi = mapping?.frameIdx ?? 0;
 
           try {
-            const result = await generateSingleFrameMotion(
-              {
-                clipDuration: frameData.clipDuration,
-                motionPolicy: frameSpec?.motionPolicy ?? "moderate",
-                transitionIn: frameSpec?.transitionIn ?? "cut",
-                isLastFrame: globalIdx === allFrameData.length - 1,
-                sceneText: frameData.sceneText,
-                cameraPhysics,
-                materialLanguage,
-                skillHints: frameData.motionSkillHints,
-                narrativeIntent: frameSpec?.narrativeIntent,
-                assetRefCount: frameData.assetRefs?.length ?? 0,
-                isDefaultHookSlot: fi === 0,
-                voTempoWps: frameData.voTempoWps,
-              },
-              currentImageUrl,
-              nextImageUrl,
-              agents.motionModel,
-              videoModelId,
+            const result = await withAiAuditContext(
+              { frameId: frameData.frameId, sceneId: frameData.sceneId ?? undefined },
+              () =>
+                generateSingleFrameMotion(
+                  {
+                    clipDuration: frameData.clipDuration,
+                    motionPolicy: frameSpec?.motionPolicy ?? "moderate",
+                    transitionIn: frameSpec?.transitionIn ?? "cut",
+                    isLastFrame: globalIdx === allFrameData.length - 1,
+                    sceneText: frameData.sceneText,
+                    cameraPhysics,
+                    materialLanguage,
+                    skillHints: frameData.motionSkillHints,
+                    narrativeIntent: frameSpec?.narrativeIntent,
+                    assetRefCount: frameData.assetRefs?.length ?? 0,
+                    isDefaultHookSlot: fi === 0,
+                    voTempoWps: frameData.voTempoWps,
+                  },
+                  currentImageUrl,
+                  nextImageUrl,
+                  agents.motionModel,
+                  videoModelId,
+                ),
             );
 
             await db

@@ -1,4 +1,5 @@
 import { generateText, Output } from "ai";
+import { recordAiCall } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
@@ -90,18 +91,33 @@ ${assets.length > 0 ? `\nSTORY ASSET REFERENCES: When images are attached in the
   const stylePrompt = `Design the visual style guide for these ${scenes.length} scenes:\n\n${sceneSummary}`;
   const visionParts = assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
-  const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: visualStyleGuideSchema }),
-    system: systemPrompt,
-    messages: [
-      {
-        role: "user",
-        content: [...visionParts, { type: "text", text: stylePrompt }],
+  const { output } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.generateVisualStyleGuide",
+      request: {
+        system: systemPrompt,
+        stylePrompt,
+        visionParts,
+        temperature: 0.7,
+        schema: "visualStyleGuideSchema",
       },
-    ],
-    temperature: 0.7,
-  });
+    },
+    () =>
+      generateText({
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: visualStyleGuideSchema }),
+        system: systemPrompt,
+        messages: [
+          {
+            role: "user",
+            content: [...visionParts, { type: "text", text: stylePrompt }],
+          },
+        ],
+        temperature: 0.7,
+      }),
+  );
   if (!output) throw new Error("Failed to generate visual style guide");
 
   return output;

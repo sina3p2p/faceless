@@ -1,4 +1,5 @@
 import { generateText as aiGenerateText, Output } from "ai";
+import { recordAiCall } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { RESEARCH, getLanguageName } from "@/lib/constants";
 import { openrouter } from "@/server/services/llm/openrouter-client";
@@ -81,13 +82,22 @@ Video type: ${videoType}. Creative concept from brief: ${brief.concept}
 Topic / user idea: ${topicIdea}
 Language for the final video: ${langName} (queries may still be in English for better search results).`;
 
-  const { output: queryOut } = await aiGenerateText({
-    model: openrouter.chat(primaryModel),
-    output: Output.object({ schema: researchQueriesSchema }),
-    system: querySystem,
-    prompt: "Return only the queries array.",
-    temperature: 0.4,
-  });
+  const { output: queryOut } = await recordAiCall(
+    {
+      provider: "openrouter",
+      model: primaryModel,
+      operation: "llm.research.planQueries",
+      request: { system: querySystem, prompt: "Return only the queries array.", temperature: 0.4, schema: "researchQueriesSchema" },
+    },
+    () =>
+      aiGenerateText({
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: researchQueriesSchema }),
+        system: querySystem,
+        prompt: "Return only the queries array.",
+        temperature: 0.4,
+      }),
+  );
   if (!queryOut?.queries?.length) throw new Error("Research query planning produced no queries");
 
   const perQuery: TavilySearchResult[][] = [];
