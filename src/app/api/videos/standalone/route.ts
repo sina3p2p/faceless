@@ -20,6 +20,7 @@ const standaloneSchema = z.object({
   /** English style string for AI music generation when `videoType` is music_video. */
   musicGenre: z.string().min(1).max(500).optional(),
   style: z.string().default("cinematic"),
+  timelapse: z.boolean().optional().default(false),
   videoSize: z.enum(["9:16", "16:9", "1:1"]).default("9:16"),
   voiceId: z.string().optional(),
   language: z.string().default("en"),
@@ -120,6 +121,7 @@ export async function POST(req: NextRequest) {
       language: data.language,
       videoType: data.videoType,
       style: data.style,
+      timelapse: data.timelapse,
       userId: user.id,
       idea: data.prompt,
       voiceId: data.voiceId,

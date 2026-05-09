@@ -60,7 +60,8 @@ export async function generateVisualStyleGuide(
   style: string,
   videoType: string,
   model?: string,
-  assets: StoryAsset[] = []
+  assets: StoryAsset[] = [],
+  timelapse: boolean = false
 ): Promise<VisualStyleGuide> {
   const primaryModel = model || LLM.cinematographerModel;
 
@@ -71,6 +72,17 @@ export async function generateVisualStyleGuide(
   const styleConstraint =
     STYLE_CONSTRAINTS[style] ??
     `Style "${style}": follow the spirit of the named style; choose camera physics, medium, and material language that fit it.`;
+
+  const timelapseBlock = timelapse ? `
+
+TIMELAPSE MODE (overlays on top of the medium constraints above — does NOT replace them):
+- Each shot represents COMPRESSED TIME: minutes-to-days play out in seconds. Subject motion is implicit (sun arcing, clouds streaking, crowds blurring into ribbons, shadows sweeping, flowers opening, light cycling).
+- global.cameraPhysics MUST be "static tripod or imperceptible slow drift only — no handheld, no whips, no fast tracking, no rack focus." This overrides any camera latitude the medium would normally allow.
+- global.materialLanguage MUST include long-exposure language adapted to the medium: motion trails / streaks / multiple-exposure stacking / blurred ribbons of motion (cars, crowds, water). Stay faithful to the medium (e.g. anime → speedline-stacked trails; claymation → time-lapsed clay figures with implied frame-jitter; photoreal → long-exposure light trails).
+- global.defaultLighting should evoke shifting time-of-day where it fits (golden-hour-to-blue-hour sweeps, sun arcs, dawn-to-dusk gradients).
+- promptRegions.cameraPrefix MUST start with "Locked-off long-exposure shot, " (or the medium-faithful equivalent — keep "locked-off").
+- promptRegions.subjectPrefix and backgroundPrefix should bake in temporal compression cues where natural (e.g. "sun arcs across the sky behind ", "crowds blur past ", "clouds streak overhead while ").
+- Per-scene overrides may still vary lighting/palette but MUST NOT relax the static-camera rule.` : "";
 
   const systemPrompt = `You are a Cinematographer designing the visual language for a video production.
 
@@ -101,6 +113,7 @@ PROMPT REGION RULES:
 
 STYLE-SPECIFIC CONSTRAINTS (only the rules for the selected style — apply them):
 ${styleConstraint}
+${timelapseBlock}
 
 PER-SCENE OVERRIDES:
 - Only override when the narrative demands it (night scene, flashback, emotional shift)

@@ -10,6 +10,7 @@ const createSeriesSchema = z.object({
   name: z.string().min(1).max(100),
   niche: z.string().min(1),
   style: z.string().default("cinematic"),
+  timelapse: z.boolean().optional().default(false),
   defaultVoiceId: z.string().optional(),
   llmModel: z.string().default("anthropic/claude-opus-4.6"),
   imageModel: z.string().default("gpt-image-1.5"),
