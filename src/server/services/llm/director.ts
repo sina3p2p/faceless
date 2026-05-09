@@ -21,7 +21,7 @@ const sceneFunctionEnum = z.enum([
 const directorSceneSchema = z.object({
   sceneTitle: z.string().describe("Short descriptive title for this scene (2-5 words), like a chapter heading"),
   text: z.string().describe("The narration text chunk for this scene — extracted from the story prose. This is what the viewer HEARS."),
-  sceneFunction: sceneFunctionEnum.describe("The DRAMATIC function this scene serves: 'setup' (establish), 'escalate' (raise stakes), 'reveal' (deliver new info), 'reversal' (overturn expectation), 'quiet-beat' (slow down before a punch), 'climax' (peak), 'resolve' (land the ending). Across the full sequence the functions MUST vary — never two of the same in a row, and the sequence must contain at least one 'quiet-beat' and either a 'reversal' or a 'reveal'."),
+  sceneFunction: sceneFunctionEnum.describe("The DRAMATIC function this scene serves: 'setup' (establish), 'escalate' (raise stakes), 'reveal' (deliver new info), 'reversal' (overturn expectation), 'quiet-beat' (slow down before a punch), 'climax' (peak), 'resolve' (land the ending)."),
   directorNote: z.string().describe("Concrete creative brief for the visual team. Be specific — every detail must be physically renderable. Describe: SETTING (exact location, time period, weather, architecture, materials), SUBJECTS (appearance by consistent name, clothing, posture, expression, age), ACTION (visual progression — 2-3 sequential beats), MOOD (physical elements only — lighting, weather, posture), CAMERA (angle, framing, constrained to the visual style's medium). VISUAL CONTINUITY: maintain consistent subject names and appearance across scenes. Write as if briefing a cinematographer on a film set."),
 });
 
@@ -110,7 +110,7 @@ SCENE SPLITTING RULES:
 - The text field is what the viewer HEARS as voiceover narration
 
 SCENE FUNCTION (CRITICAL — this is what stops the video from feeling static):
-- Tag every scene with a sceneFunction. The sequence of sceneFunctions across the video must VARY.
+- Tag every scene with a sceneFunction. The sequence across the video must VARY.
 - Forbidden: two scenes in a row with the same sceneFunction.
 - Required across the whole sequence: at least one 'quiet-beat' (a slower, lower-stakes moment placed before a high-stakes scene so the next punch lands), and at least one of 'reversal' or 'reveal'.
 - 'setup' and 'escalate' are common — but if you tag every scene 'escalate', the result is a flat, droning video. Use them sparingly.
