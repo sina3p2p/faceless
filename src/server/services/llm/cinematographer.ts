@@ -12,6 +12,24 @@ export interface CinematographerSceneInput {
   directorNote: string;
 }
 
+const STYLE_CONSTRAINTS: Record<string, string> = {
+  cinematic: `Realistic / cinematic: full camera range available — dolly, crane, handheld, rack focus, drone all on the table. Photographic medium with real-world lighting physics.`,
+  pixar: `Pixar / 3D render: full virtual camera range. Stylized but physically grounded materials (subsurface scattering on skin, soft global illumination). Lean into expressive proportions and exaggerated key-light shaping; avoid photoreal-uncanny territory.`,
+  anime: `Anime / cel-shaded: compositional framing, no physical camera constraints. Flat colors, ink outlines, cel shading. Use anime vocabulary (key animation, speedlines, screen tones) — not photographic terms.`,
+  watercolor: `Watercolor: painterly medium. No camera physics — describe compositions like a painting (vignette, washes, paper grain, bleed edges). Avoid photographic lighting jargon.`,
+  cartoon: `Cartoon / 2D animation: bold ink outlines, flat colors, no rendered DOF. Compositional framing, not physical camera. Avoid realistic lighting setups.`,
+  minimal: `Minimal: limited palette (2–4 colors), generous negative space, geometric shapes. Treat camera as compositional framing, not physical.`,
+  dark: `Dark & moody photoreal: full camera range. Strongly directional, low-key lighting; deep shadows; restrained desaturated palette. Avoid flat lighting.`,
+  claymation: `Stop-motion claymation: NO drone shots, NO handheld shake, NO rack focus, NO fast tracking. Static tripod, slow pans only. Sculpted clay/plasticine medium with visible fingerprints, matte finish.`,
+  "gothic-clay": `Stop-motion gothic claymation: NO drone shots, NO handheld shake, NO rack focus, NO fast tracking. Static tripod, slow pans only. Dark sculpted clay/plasticine with cracked, weathered surfaces; cold key, deep shadows.`,
+  lego: `Lego (Lego Movie aesthetic): hybrid world — only diegetic objects are brick-built; the natural world is NOT. Bake this into the actual fields:
+  * global.medium → e.g. "Lego Movie style — brick-built minifigures, vehicles, and architecture set in a photoreal/painterly natural world (non-brick sky, sun, clouds, water, fire, smoke, atmospheric haze)"
+  * global.materialLanguage → describe ABS plastic studs/tubes/clutch power for built objects, AND explicitly call out that sky, sun, clouds, water, fire, smoke, dust, sparks, lens flares, and lighting effects render as photographic/painterly — never as bricks or studs
+  * global.cameraPhysics → cinematic virtual camera is fine (dolly, crane, pan, push-in); the films use full camera language. Avoid only the obvious stop-motion tropes.
+  * promptRegions.subjectPrefix → "Lego minifigure / brick-built" applies to the SUBJECT only
+  * promptRegions.backgroundPrefix → must explicitly state that sky, sun, clouds, and weather are NOT made of bricks (e.g. "Brick-built set pieces against a photoreal sky with a real (non-brick) sun and natural clouds,")`,
+};
+
 const perSceneSchema = z.object({
   sceneIndex: z.number(),
   lightingOverride: z.string().nullable().describe("Override the global default lighting for this scene, or null to keep default. Use for night scenes, flashbacks, dramatic shifts."),
@@ -50,6 +68,10 @@ export async function generateVisualStyleGuide(
     `Scene ${i} — "${s.sceneTitle}": ${s.directorNote}`
   ).join("\n");
 
+  const styleConstraint =
+    STYLE_CONSTRAINTS[style] ??
+    `Style "${style}": follow the spirit of the named style; choose camera physics, medium, and material language that fit it.`;
+
   const systemPrompt = `You are a Cinematographer designing the visual language for a video production.
 
 Your output is a VISUAL STYLE GUIDE that the Prompt Architect and Motion Director will follow exactly. Every image prompt will be assembled using your promptRegions — so they must be precise and concatenation-ready.
@@ -77,16 +99,8 @@ PROMPT REGION RULES:
 - lightingPrefix should set the baseline: "Soft diffused studio lighting," or "Harsh directional sunlight,"
 - backgroundPrefix should include material: "Miniature clay diorama set," or "Photorealistic environment,"
 
-STYLE-SPECIFIC CONSTRAINTS:
-- Stop-motion / claymation: NO drone shots, NO handheld shake, NO rack focus, NO fast tracking. Static tripod, slow pans only.
-- Lego (Lego Movie aesthetic): hybrid world — only diegetic objects are brick-built; the natural world is NOT. Bake this into the actual fields:
-  * global.medium → e.g. "Lego Movie style — brick-built minifigures, vehicles, and architecture set in a photoreal/painterly natural world (non-brick sky, sun, clouds, water, fire, smoke, atmospheric haze)"
-  * global.materialLanguage → describe ABS plastic studs/tubes/clutch power for built objects, AND explicitly call out that sky, sun, clouds, water, fire, smoke, dust, sparks, lens flares, and lighting effects render as photographic/painterly — never as bricks or studs
-  * global.cameraPhysics → cinematic virtual camera is fine (dolly, crane, pan, push-in); the films use full camera language. Avoid only the obvious stop-motion tropes.
-  * promptRegions.subjectPrefix → "Lego minifigure / brick-built" applies to the SUBJECT only
-  * promptRegions.backgroundPrefix → must explicitly state that sky, sun, clouds, and weather are NOT made of bricks (e.g. "Brick-built set pieces against a photoreal sky with a real (non-brick) sun and natural clouds,")
-- Realistic / cinematic: full camera range available
-- Anime / illustration: compositional framing, no physical camera constraints
+STYLE-SPECIFIC CONSTRAINTS (only the rules for the selected style — apply them):
+${styleConstraint}
 
 PER-SCENE OVERRIDES:
 - Only override when the narrative demands it (night scene, flashback, emotional shift)
