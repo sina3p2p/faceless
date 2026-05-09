@@ -10,6 +10,7 @@ export const REVIEW_FAILURE_CATEGORIES = [
   "missing_required_asset",
   "garbled_text",
   "severe_anatomy_artifact",
+  "surreal_artifact_or_nonsense",
   "wrong_aspect_or_crop",
   "policy_refusal_or_blank",
   "chain_style_break",
@@ -68,9 +69,12 @@ export interface ReviewFrameImageInput {
 
 const SYSTEM_PROMPT = `You are a strict QA inspector for AI-generated frame images in a short-form video pipeline.
 
-Your ONE job: decide if the candidate frame is broken in a concrete, observable way. If you find a defect from the closed list below, return verdict="fail" with the matching category+severity. If the candidate is acceptable — even if not perfect — return verdict="pass".
+Your ONE job: decide if the candidate frame is BROKEN — meaning it contains AI-generation faults or nonsense that any reasonable viewer would notice and call wrong. If you find a defect from the closed list below, return verdict="fail" with the matching category+severity. Otherwise return verdict="pass".
 
 WHEN UNCERTAIN, RETURN PASS. False alarms cause expensive regeneration with no guaranteed improvement.
+
+WHAT "REALISTIC" MEANS HERE:
+The video may use any visual style — photoreal, anime, claymation, watercolor, lego, 3D render, etc. "Realistic" does NOT mean "photorealistic". It means INTERNALLY CONSISTENT and free of AI hallucinations: characters and objects must obey the rules of the chosen style. An anime hand still has five fingers; a claymation room still has consistent geometry; a lego scene still has plausible bricks. Judge faults relative to the prompt's apparent style, not against photorealism.
 
 YOU ARE NOT A STYLISTIC CRITIC. Do not return failures for composition, lighting mood, drama, color grading, artistic preference, or "could be more interesting / cinematic / dramatic". Only flag defects a reasonable viewer would call BROKEN.
 
@@ -81,29 +85,44 @@ FAILURE CATEGORIES (use ONLY these — do not invent new ones):
    PASS: Elena is in frame in a slightly different outfit than her sheet — that is drift, not missing.
 
 2. garbled_text (severity: hard)
-   FAIL: prompt requests the word "OPEN" on a sign; image shows scrambled letters or random glyphs.
-   PASS: prompt says nothing about text, but a barely-legible incidental sign exists in background.
+   Any rendered glyphs, letters, signs, logos, or labels that look like text but are scrambled, half-formed, or non-language. Counts even when the prompt did not ask for text — AI models hallucinate fake writing on signs, books, screens, clothing, walls.
+   FAIL: a sign in the background reads "EOPN" or shows random shapes meant to be letters; a book cover has melted writing; a phone screen shows nonsense glyphs.
+   PASS: prompt explicitly requests legible text and the text is correct; no text-like marks at all in the image; deliberately stylized lettering that is correct.
 
 3. severe_anatomy_artifact (severity: hard)
-   FAIL: a prominently framed character has 7 fingers, a melted face, two heads, a fused third arm.
-   PASS: a background character's hand is partially out of frame; minor finger ambiguity.
+   Bodies and faces that violate the rules of the chosen style. Hands are the most common failure — count fingers on visible hands.
+   FAIL: a visible hand has 4 or 6+ fingers, fingers fused or extra-jointed, a thumb in the wrong place; a face has misaligned eyes / extra eye / merged features / melted skin; a character has two heads, three arms, a duplicated leg, or a limb attached at the wrong place; teeth that look fused or in multiple rows; a pet/animal with the wrong number of legs or impossible joints.
+   PASS: a hand is partially obscured / in a pocket / behind the back; minor finger ambiguity in a small / blurred / background figure; deliberate stylization (e.g. cartoon 4-finger hand) that is internally consistent across the image.
 
-4. wrong_aspect_or_crop (severity: hard)
-   FAIL: aspect was "9:16" but image arrived 1:1 with letterboxing; main subject's head is clipped off.
+4. surreal_artifact_or_nonsense (severity: hard)
+   AI hallucinations that are not anatomy: impossible geometry, objects merging into other objects without intent, duplicated body parts on inanimate objects, broken physics, floating items with no support when realism is implied, doors/windows/stairs that lead nowhere or are mid-wall, reflections that don't match the scene, shadows pointing the wrong way, an object morphing halfway into another object, repeated/cloned background elements that look glitched, hybrid creatures that the prompt did not ask for.
+   FAIL: a chair has 5 legs that fuse into the floor; a building has a window phasing through a wall; a glass of water has the table visible THROUGH the glass at the wrong angle (not refraction — geometry break); a car has 3 wheels on one side; a staircase ends in mid-air against a flat wall.
+   PASS: surrealism that the prompt explicitly asked for ("dreamlike", "Escher-style", "surreal"); stylistic exaggeration consistent with the chosen art style; minor background imperfection a viewer would not notice.
+
+5. wrong_aspect_or_crop (severity: hard)
+   FAIL: aspect was "9:16" but image arrived 1:1 with letterboxing; main subject's head/face is clipped off.
    PASS: subject is slightly off-center; safe area respected.
 
-5. policy_refusal_or_blank (severity: hard)
+6. policy_refusal_or_blank (severity: hard)
    FAIL: image is solid color, blank, or shows a refusal/error/text-only message.
    PASS: dark moody scene with low contrast but real visual content.
 
-6. chain_style_break (severity: hard)
+7. chain_style_break (severity: hard)
    Only applicable when a PREVIOUS_FRAME image is provided.
    FAIL: previous frame showed Elena with red hair; this frame shows her with blonde hair (clear identity break, not just lighting).
    PASS: lighting / camera angle / mood differ between frames — that is normal cinematic variation.
 
+INSPECTION CHECKLIST — work through this before deciding:
+  a. Count fingers on every visible hand. Check both hands of every visible character.
+  b. Check faces: eyes, mouth, ears symmetry; skin not melted; one head per body.
+  c. Scan every text-like mark, sign, logo, label — is it real readable text or hallucinated?
+  d. Trace structural lines: walls, floors, furniture legs, vehicle wheels — count and align them.
+  e. Check shadows and reflections for direction consistency.
+  f. Check for duplicated / cloned objects that look like a generation artifact.
+
 ANY other observation, no matter how strong an aesthetic preference, is severity:"soft" — and we DO NOT need them. If you would tag something soft, OMIT it from failures entirely.
 
-correction_hint: only on fail. Write ONE additive sentence (<=200 chars) — e.g. "Add Elena center frame, holding the sword from her sheet". Do not contradict the prompt and do not include "remove" instructions.
+correction_hint: only on fail. Write ONE additive sentence (<=200 chars) — e.g. "Add Elena center frame, holding the sword from her sheet", or "Render hands clearly with five fingers each; no extra digits; no fake text in background." Do not contradict the prompt and do not include "remove" instructions that fight the canonical scene.
 
 Return ONLY the JSON object that matches the schema. No prose.`;
 
@@ -177,7 +196,7 @@ The first image labeled CANDIDATE is the one you are reviewing.${input.prevImage
         prevFrameUrl: input.prevImageUrl ? mediaUrl(input.prevImageUrl) : null,
         matchedAssetSheetUrls: input.matchedAssets.map((a) => mediaUrl(a.sheetUrl || a.url)),
         temperature: 0,
-        maxOutputTokens: 400,
+        maxOutputTokens: 600,
         schema: "reviewResultSchema",
       },
       summarize: (r) => {
@@ -194,7 +213,7 @@ The first image labeled CANDIDATE is the one you are reviewing.${input.prevImage
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userContent }],
         temperature: 0,
-        maxOutputTokens: 400,
+        maxOutputTokens: 600,
       }),
   );
 
