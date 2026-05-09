@@ -27,15 +27,16 @@ const MUSIC_LADDER: Record<MusicSectionId, MotionPolicy> = {
  * Refines `basePolicy` using music section (highest priority when set) or narrative intent.
  * Falls back to `basePolicy` if refinements are absent.
  *
- * `timelapse` takes top priority and clamps the camera to "subtle": in timelapse mode the
- * apparent motion comes from compressed-time subject motion (sun, clouds, crowds), not
- * from camera moves, so music/intent ladders must not override the locked camera.
+ * Note: `timelapse` does NOT clamp motion intensity here — in timelapse mode the
+ * subject is actively transforming across the clip (construction unfolding,
+ * cleaning progressing), which reads as moderate-to-dynamic motion. The
+ * timelapse directive is enforced via the cinematographer's prompt regions
+ * and the motion director's per-frame instructions, not by capping intensity.
  */
 export function resolveEffectiveMotionPolicy(
   basePolicy: MotionPolicy,
-  opts: { narrativeIntent?: NarrativeIntent; musicSectionId?: MusicSectionId; timelapse?: boolean }
+  opts: { narrativeIntent?: NarrativeIntent; musicSectionId?: MusicSectionId }
 ): MotionPolicy {
-  if (opts.timelapse) return "subtle";
   const m = opts.musicSectionId;
   if (m && m !== "none" && m in MUSIC_LADDER) {
     return MUSIC_LADDER[m];
