@@ -203,7 +203,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
               `[generate-frame-images] frame ${frame.id} attempt ${attempt} reviewer error — accepting image:`,
               err instanceof Error ? err.message : err
             );
-            verdict = { verdict: "pass", failures: [] };
+            verdict = { verdict: "pass", failures: [], correction_hint: null };
           }
         }
 

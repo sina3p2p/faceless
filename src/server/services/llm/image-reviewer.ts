@@ -31,8 +31,8 @@ const reviewResultSchema = z.object({
   correction_hint: z
     .string()
     .max(220)
-    .optional()
-    .describe("ONE additive directive (<=200 chars) to append to the prompt on retry. Omit on pass."),
+    .nullable()
+    .describe("ONE additive directive (<=200 chars) to append to the prompt on retry. Set to null on pass."),
 });
 
 export type ReviewFailure = z.infer<typeof reviewFailureSchema>;
@@ -122,7 +122,7 @@ INSPECTION CHECKLIST — work through this before deciding:
 
 ANY other observation, no matter how strong an aesthetic preference, is severity:"soft" — and we DO NOT need them. If you would tag something soft, OMIT it from failures entirely.
 
-correction_hint: only on fail. Write ONE additive sentence (<=200 chars) — e.g. "Add Elena center frame, holding the sword from her sheet", or "Render hands clearly with five fingers each; no extra digits; no fake text in background." Do not contradict the prompt and do not include "remove" instructions that fight the canonical scene.
+correction_hint: only set when verdict is "fail". Write ONE additive sentence (<=200 chars) — e.g. "Add Elena center frame, holding the sword from her sheet", or "Render hands clearly with five fingers each; no extra digits; no fake text in background." Do not contradict the prompt and do not include "remove" instructions that fight the canonical scene. When verdict is "pass", set correction_hint to null.
 
 Return ONLY the JSON object that matches the schema. No prose.`;
 
@@ -221,7 +221,7 @@ The first image labeled CANDIDATE is the one you are reviewing.${input.prevImage
     // Reviewer call returned no parsed object — treat as `pass` (fail-open) so
     // a flaky reviewer never blocks a good image. The audit row records the
     // raw response for diagnosis.
-    return { verdict: "pass", failures: [] };
+    return { verdict: "pass", failures: [], correction_hint: null };
   }
 
   return output;
