@@ -62,10 +62,13 @@ SONGWRITING:
 - Chorus catchy and repeatable; verses build the story.
 - Total song length should fit roughly ${targetDurationSec} seconds (${buildMusicDurationInstruction(targetDurationSec, durations)})
 - Vivid imagery and emotion.${researchBlock}
-GENRE CONSTRAINT:
-- The user chose this production style for the music generator: ${musicGenreStyle}`
+${musicGenreStyle ? `GENRE CONSTRAINT:
+- The user chose this production style for the music generator: ${musicGenreStyle}` : `GENRE CONSTRAINT:
+- No specific genre was chosen — pick a tone that fits the topic and visual style above, and keep lyrics flexible enough that any modern pop/indie production would work.`}`
 
-  const userPrompt = `Write a catchy song about: ${topicIdea}. The music video visual style is ${style}. Target sound: ${musicGenreStyle}.`;
+  const userPrompt = musicGenreStyle
+    ? `Write a catchy song about: ${topicIdea}. The music video visual style is ${style}. Target sound: ${musicGenreStyle}.`
+    : `Write a catchy song about: ${topicIdea}. The music video visual style is ${style}.`;
 
   const { output } = await recordAiCall(
     {
