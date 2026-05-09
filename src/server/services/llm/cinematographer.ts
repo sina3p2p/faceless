@@ -78,7 +78,13 @@ PROMPT REGION RULES:
 - backgroundPrefix should include material: "Miniature clay diorama set," or "Photorealistic environment,"
 
 STYLE-SPECIFIC CONSTRAINTS:
-- Stop-motion / claymation / lego: NO drone shots, NO handheld shake, NO rack focus, NO fast tracking. Static tripod, slow pans only.
+- Stop-motion / claymation: NO drone shots, NO handheld shake, NO rack focus, NO fast tracking. Static tripod, slow pans only.
+- Lego (Lego Movie aesthetic): hybrid world — only diegetic objects are brick-built; the natural world is NOT. Bake this into the actual fields:
+  * global.medium → e.g. "Lego Movie style — brick-built minifigures, vehicles, and architecture set in a photoreal/painterly natural world (non-brick sky, sun, clouds, water, fire, smoke, atmospheric haze)"
+  * global.materialLanguage → describe ABS plastic studs/tubes/clutch power for built objects, AND explicitly call out that sky, sun, clouds, water, fire, smoke, dust, sparks, lens flares, and lighting effects render as photographic/painterly — never as bricks or studs
+  * global.cameraPhysics → cinematic virtual camera is fine (dolly, crane, pan, push-in); the films use full camera language. Avoid only the obvious stop-motion tropes.
+  * promptRegions.subjectPrefix → "Lego minifigure / brick-built" applies to the SUBJECT only
+  * promptRegions.backgroundPrefix → must explicitly state that sky, sun, clouds, and weather are NOT made of bricks (e.g. "Brick-built set pieces against a photoreal sky with a real (non-brick) sun and natural clouds,")
 - Realistic / cinematic: full camera range available
 - Anime / illustration: compositional framing, no physical camera constraints
 
