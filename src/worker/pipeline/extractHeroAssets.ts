@@ -7,7 +7,7 @@ import {
   extractHeroAssetPlan,
   buildHeroAssetSheetPrompt,
   aspectRatioForHeroAsset,
-} from "@/server/services/llm";
+} from "@/server/services/ai/llm";
 import { getAgentModels, mergeProjectConfig } from "./shared";
 import type { HeroAssetPlan, ContinuityNotes } from "@/types/pipeline";
 
@@ -47,7 +47,7 @@ export async function extractHeroAssetsJob(job: Job<RenderJobData>) {
       orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
     });
 
-    const agents = getAgentModels(videoProject);
+    const supervisorModel = getAgentModels(videoProject.modelSettings, 'supervisorModel');
     const imageModel = videoProject.modelSettings.imageModel;
 
     console.log(
@@ -66,7 +66,7 @@ export async function extractHeroAssetsJob(job: Job<RenderJobData>) {
         continuity: config.continuityNotes,
         visualStyleGuide: config.visualStyleGuide,
       },
-      agents.supervisorModel
+      supervisorModel
     );
 
     if (plan.entries.length === 0) {

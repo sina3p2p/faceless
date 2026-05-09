@@ -12,7 +12,7 @@ import {
   type ChatMessage,
   type NarrationScript,
   type MusicLyricsScript,
-} from "@/server/services/llm";
+} from "@/server/services/ai/llm";
 import { z } from "zod";
 
 function buildMusicLyricsFromVideo(video: {

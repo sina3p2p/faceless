@@ -5,7 +5,7 @@ import { linkStoryAssetsToVideo } from "@/server/db/story-assets";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
-import { DEFAULT_LLM_MODEL, VIDEO_MODEL_IDS } from "@/lib/constants";
+import { DEFAULT_LLM_MODEL, LLM, VIDEO_MODEL_IDS } from "@/lib/constants";
 import type { ModelSettings } from "@/types/llm-common";
 import { z } from "zod/v4";
 import { generateSeed } from "@/lib/seed";
@@ -71,6 +71,7 @@ function buildModelSettings(p: ParsedStandalone): ModelSettings {
     motionModel: resolveTextModel(p, "motionModel"),
     imageModel: p.imageModel,
     videoModel: p.videoModel,
+    reviewerModel: LLM.reviewerModel,
   };
 }
 

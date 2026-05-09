@@ -1,7 +1,7 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
-import { generateFrameBreakdown } from "@/server/services/llm";
+import { generateFrameBreakdown } from "@/server/services/ai/llm";
 import { getAgentModels, mergeProjectConfig, autoChainOrReview, getModelDurationsArray } from "./shared";
 
 export async function storyboardJob(job: Job<RenderJobData>) {
@@ -26,7 +26,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
 
     const duration = scenes.reduce((acc, s) => acc + (s.duration ?? 0), 0);
     const supportedDurations = getModelDurationsArray(videoProject.modelSettings.videoModel);
-    const agents = getAgentModels(videoProject);
+    const storyboardModel = getAgentModels(videoProject.modelSettings, 'storyboardModel');
 
     console.log(
       `[storyboard] Generating frame breakdown for ${videoProjectId} (${scenes.length} scenes, audio total ${duration}s, clip sizes ${JSON.stringify(supportedDurations)})`
@@ -38,7 +38,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
       config.creativeBrief,
       duration,
       config.continuityNotes,
-      agents.storyboardModel,
+      storyboardModel,
       config.heroAssetPlan
     );
 

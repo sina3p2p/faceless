@@ -24,4 +24,5 @@ export interface ModelSettings {
   motionModel: string;
   imageModel: string;
   videoModel: TVideoModelId;
+  reviewerModel: string;
 }

@@ -2,7 +2,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
-import { generateVisualStyleGuide } from "@/server/services/llm";
+import { generateVisualStyleGuide } from "@/server/services/ai/llm";
 import { getAgentModels, mergeProjectConfig } from "./shared";
 
 export async function cinematographyJob(job: Job<RenderJobData>) {
@@ -30,7 +30,6 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
       directorNote: s.directorNote || "",
     }));
 
-    const agents = getAgentModels(videoProject);
 
     const assets = await resolveStoryAssets(videoProjectId);
 
@@ -41,7 +40,7 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
       config.creativeBrief,
       videoProject.style,
       videoProject.videoType,
-      agents.cinematographerModel,
+      getAgentModels(videoProject.modelSettings, "cinematographerModel"),
       assets
     );
 

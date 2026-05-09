@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { generateText, tool, stepCountIs } from "ai";
-import { openrouter } from "@/server/services/llm";
+import { openrouter } from "@/server/services/ai/llm";
 import { generateViaOpenRouter } from "@/server/services/media";
 import { editImageViaGemini } from "@/server/services/media";
 import { uploadFile } from "@/lib/storage";
@@ -223,58 +223,58 @@ export async function POST(req: NextRequest) {
         context: { userId },
       },
       () => generateText({
-      model: openrouter.chat(MODEL),
-      system: systemPrompt,
-      messages: plainMessages,
-      tools: {
-        generate_image: tool({
-          description:
-            "Generate an image from scratch. Use for initial generation or when the user wants something completely different.",
-          inputSchema: generateImageSchema,
-          execute: async ({ prompt }) => {
-            const uploaded = await generateAndUpload(prompt, userId, parsed.data.assetType);
-            if (!uploaded) {
+        model: openrouter.chat(MODEL),
+        system: systemPrompt,
+        messages: plainMessages,
+        tools: {
+          generate_image: tool({
+            description:
+              "Generate an image from scratch. Use for initial generation or when the user wants something completely different.",
+            inputSchema: generateImageSchema,
+            execute: async ({ prompt }) => {
+              const uploaded = await generateAndUpload(prompt, userId, parsed.data.assetType);
+              if (!uploaded) {
+                return {
+                  success: false as const,
+                  error: "Image generation failed. Try adjusting the description.",
+                };
+              }
               return {
-                success: false as const,
-                error: "Image generation failed. Try adjusting the description.",
+                success: true as const,
+                r2Key: uploaded.r2Key,
+                previewUrl: uploaded.previewUrl,
+                prompt,
               };
-            }
-            return {
-              success: true as const,
-              r2Key: uploaded.r2Key,
-              previewUrl: uploaded.previewUrl,
-              prompt,
-            };
-          },
-        }),
-        edit_image: tool({
-          description:
-            "Edit an existing character image. Use for small tweaks like changing hair color, adding accessories, adjusting outfit, etc.",
-          inputSchema: editImageSchema,
-          execute: async ({ editPrompt, sourceImageUrl }) => {
-            const uploaded = await editAndUpload(
-              editPrompt,
-              sourceImageUrl,
-              userId
-            );
-            if (!uploaded) {
+            },
+          }),
+          edit_image: tool({
+            description:
+              "Edit an existing character image. Use for small tweaks like changing hair color, adding accessories, adjusting outfit, etc.",
+            inputSchema: editImageSchema,
+            execute: async ({ editPrompt, sourceImageUrl }) => {
+              const uploaded = await editAndUpload(
+                editPrompt,
+                sourceImageUrl,
+                userId
+              );
+              if (!uploaded) {
+                return {
+                  success: false as const,
+                  error: "Image edit failed. Try using generate_image instead.",
+                };
+              }
               return {
-                success: false as const,
-                error: "Image edit failed. Try using generate_image instead.",
+                success: true as const,
+                r2Key: uploaded.r2Key,
+                previewUrl: uploaded.previewUrl,
+                prompt: editPrompt,
               };
-            }
-            return {
-              success: true as const,
-              r2Key: uploaded.r2Key,
-              previewUrl: uploaded.previewUrl,
-              prompt: editPrompt,
-            };
-          },
-        }),
-      },
-      stopWhen: stepCountIs(2),
-      temperature: 0.5,
-    }),
+            },
+          }),
+        },
+        stopWhen: stepCountIs(2),
+        temperature: 0.5,
+      }),
     ));
 
     const toolCalls: ToolCallData[] = [];

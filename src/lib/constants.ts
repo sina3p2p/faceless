@@ -47,7 +47,7 @@ export const LLM = {
   storyboardModel: "openai/gpt-4.1-mini",
   promptModel: "openai/gpt-5.4",
   motionModel: "openai/gpt-5.4",
-  reviewerModel: "openai/gpt-4.1",
+  reviewerModel: "anthropic/claude-opus-4.7",
 } as const;
 
 export const LLM_MODELS = [

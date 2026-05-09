@@ -4,7 +4,7 @@ import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { generateImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
-import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt-contract";
+import { serializeCanonicalForImageProvider } from "@/server/services/ai/llm/prompt-contract";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { getVideoSize, IMAGE_MODELS } from "@/lib/constants";
 import { z } from "zod";
