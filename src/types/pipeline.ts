@@ -321,6 +321,17 @@ export interface PipelineConfig {
    */
   enableSfx?: boolean;
   pipelineMode?: "manual" | "auto";
+  /**
+   * When true (default), each generated frame image is checked by a vision LLM
+   * for concrete defects (missing required asset, garbled text, severe anatomy
+   * artifact, wrong aspect/crop, policy refusal/blank, hard chain-style break)
+   * and regenerated up to `imageReviewMaxRetries` times with a corrective hint.
+   */
+  imageReviewEnabled?: boolean;
+  /** Cap on review-driven regeneration attempts per frame; clamped to [1, 3]. Default 3. */
+  imageReviewMaxRetries?: number;
+  /** Minimum severity that triggers regeneration. Default "hard". */
+  imageReviewSeverityFloor?: "hard" | "soft";
   /** Per-pipeline-step OpenRouter model ids; stored when user customizes in create flow. */
   agentModels?: Partial<AgentModels>;
   /** Music-video production style (English) for the song generator; overrides script `Genre:` line when set. */

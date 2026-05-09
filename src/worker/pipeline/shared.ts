@@ -14,6 +14,7 @@ const LLM_DEFAULT_BY_AGENT: Record<keyof AgentModels, string> = {
   storyboardModel: LLM.storyboardModel,
   promptModel: LLM.promptModel,
   motionModel: LLM.motionModel,
+  reviewerModel: LLM.reviewerModel,
 };
 
 const AGENT_MODEL_KEYS: (keyof AgentModels)[] = [
@@ -25,6 +26,7 @@ const AGENT_MODEL_KEYS: (keyof AgentModels)[] = [
   "storyboardModel",
   "promptModel",
   "motionModel",
+  "reviewerModel",
 ];
 
 function getPipelineMode(config: unknown): "manual" | "auto" {
