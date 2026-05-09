@@ -152,6 +152,7 @@ export default function CreateVideoPage() {
               directorModel: m.directorModel,
               supervisorModel: m.supervisorModel,
               cinematographerModel: m.cinematographerModel,
+              researchModel: m.researchModel,
               storyboardModel: m.storyboardModel,
               promptModel: m.promptModel,
               motionModel: m.motionModel,

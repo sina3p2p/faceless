@@ -34,6 +34,7 @@ export async function webResearchJob(job: Job<RenderJobData>) {
       language: video.language,
       videoType: video.videoType,
       brief: config.creativeBrief,
+      model: video.modelSettings.researchModel,
     });
 
     await replaceResearchPackWithClaims(videoProjectId, built);

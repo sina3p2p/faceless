@@ -43,6 +43,7 @@ export const LLM = {
   directorModel: "anthropic/claude-opus-4.6",
   supervisorModel: "anthropic/claude-opus-4.6",
   cinematographerModel: "openai/gpt-5.4",
+  researchModel: "openai/gpt-4.1-mini",
   storyboardModel: "openai/gpt-4.1-mini",
   promptModel: "openai/gpt-5.4",
   motionModel: "openai/gpt-5.4",

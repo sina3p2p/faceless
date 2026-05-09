@@ -18,6 +18,7 @@ export interface ModelSettings {
   directorModel: string;
   supervisorModel: string;
   cinematographerModel: string;
+  researchModel: string;
   storyboardModel: string;
   promptModel: string;
   motionModel: string;
