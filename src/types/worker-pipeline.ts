@@ -7,4 +7,5 @@ export interface AgentModels {
   storyboardModel?: string;
   promptModel?: string;
   motionModel?: string;
+  reviewerModel?: string;
 }
