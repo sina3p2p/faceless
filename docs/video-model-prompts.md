@@ -144,15 +144,18 @@ template that has worked acceptably across Veo, Kling 3, Runway/Luma, and Grok.
   and trust that the LLM names the subject in it.
 - Sweet spot length: 40–90 words.
 
-### Follow-ups (out of scope for this change)
-- Wire `negative_prompt` through `src/server/services/ai/video/providers/replicate.ts`
-  for Pixverse and Kling. Recommended defaults:
-  - Pixverse: `extra fingers, distorted hands, morphing, warping, deformed face, text, watermark, shaky camera, sudden cuts, fast zoom, jitter, flicker, low quality`.
-  - Kling v2.5: `blur, distortion, warping, extra fingers, jittery motion, low quality, watermark`.
-- Wire Kling's `cfg_scale` (default 0.5; set 0.7 when start-image fidelity
-  matters most for branded character consistency).
-- Map Pixverse `cameraMove` through a whitelist that rejects `pan right`,
-  `whip pan`, `dolly zoom`.
+### Follow-ups
+- **Done:** static `negative_prompt` baselines for Pixverse and Kling v2.5 are
+  threaded through the Replicate provider (`NEGATIVE_PROMPTS` constant in
+  `replicate.ts`). The dynamic `spec.negativeMotion` is intentionally not
+  persisted — adding a frames-table column wasn't justified vs the static
+  baseline, and the motion-director system prompt already steers the spec
+  away from each model's documented failure modes.
+- *Skipped:* Kling `cfg_scale` override (default 0.5 is correct; we have no
+  reliable signal for when to raise to 0.7 for stricter start-frame fidelity).
+- *Skipped:* Pixverse `cameraMove` regex whitelist. The profile's `avoid`
+  block already tells the motion-director LLM to skip `pan right` / `whip
+  pan` / `dolly zoom`; post-hoc regex mangling adds risk for marginal gain.
 
 ### Sources
 - pixverse.ai/en/blog/pixverse-launches-v6-advancing-ai-video-generation
