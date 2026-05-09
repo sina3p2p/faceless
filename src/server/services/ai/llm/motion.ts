@@ -241,6 +241,7 @@ export async function generateSingleFrameMotion(
   const effectivePolicy = resolveEffectiveMotionPolicy(basePolicy, {
     narrativeIntent: input.narrativeIntent,
     musicSectionId: input.skillHints?.musicSectionId,
+    timelapse: input.timelapse,
   });
   const isHookSlot = input.isDefaultHookSlot === true;
   const skillProse = buildMotionSkillContext(input.skillHints, {

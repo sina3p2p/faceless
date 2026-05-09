@@ -143,6 +143,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
                     assetRefCount: frameData.assetRefs?.length ?? 0,
                     isDefaultHookSlot: fi === 0,
                     voTempoWps: frameData.voTempoWps,
+                    timelapse: videoProject.timelapse,
                   },
                   currentImageUrl,
                   nextImageUrl,

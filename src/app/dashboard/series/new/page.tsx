@@ -42,6 +42,7 @@ export default function NewSeriesPage() {
     name: "",
     niche: NICHES[0].id as string,
     style: ART_STYLES[0].id as string,
+    timelapse: false,
     captionStyle: CAPTION_STYLES[0].id as string,
     videoType: "standalone" as string,
     llmModel: DEFAULT_LLM_MODEL as string,
@@ -96,6 +97,7 @@ export default function NewSeriesPage() {
         name: form.name,
         niche: form.niche,
         style: form.style,
+        timelapse: form.timelapse,
         captionStyle: form.captionStyle,
         videoType: form.videoType,
         llmModel: form.llmModel,
@@ -149,6 +151,33 @@ export default function NewSeriesPage() {
             <Select label="Niche" value={form.niche} onChange={(e) => setForm({ ...form, niche: e.target.value })} options={NICHES.map((n) => ({ value: n.id, label: `${n.label} — ${n.description}` }))} />
             <Select label="Script Language" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} options={LANGUAGES.map((l) => ({ value: l.id, label: l.label }))} />
             <Select label="Art Style" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} options={ART_STYLES.map((s) => ({ value: s.id, label: s.label }))} />
+
+            <div
+              onClick={() => setForm({ ...form, timelapse: !form.timelapse })}
+              className={`rounded-xl border p-4 cursor-pointer transition-all ${form.timelapse
+                ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+                : "border-white/10 bg-white/5 hover:border-white/20"
+                }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-white">Timelapse</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Compress time within shots: static camera, racing clouds, sun arcs, motion trails. Layers on top of the chosen art style.
+                  </p>
+                </div>
+                <div
+                  className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${form.timelapse ? "bg-violet-500" : "bg-white/10"
+                    }`}
+                >
+                  <div
+                    className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${form.timelapse ? "translate-x-5" : "translate-x-0"
+                      }`}
+                  />
+                </div>
+              </div>
+            </div>
+
             <Select label="Caption Style" value={form.captionStyle} onChange={(e) => setForm({ ...form, captionStyle: e.target.value })} options={CAPTION_STYLES.map((c) => ({ value: c.id, label: `${c.label} — ${c.description}` }))} />
 
             <div>

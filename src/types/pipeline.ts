@@ -262,6 +262,12 @@ export interface MotionDirectorInput {
    * absent) means no signal — typical for music videos.
    */
   voTempoWps?: number;
+  /**
+   * When true, this video is a timelapse: motion comes from compressed-time
+   * subject motion (sun arcs, cloud streaks, crowd blur), camera stays locked.
+   * Top-priority motion-policy clamp.
+   */
+  timelapse?: boolean;
 }
 
 // ── Web research (DB: research_packs + research_claims) ──
