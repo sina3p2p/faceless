@@ -14,6 +14,7 @@ type TVideoModelId =
     | 'veo-31-lite'
     | 'veo-31-fast'
     | 'kling-3-standard'
-    | 'kling-3-pro';
+    | 'kling-3-pro'
+    | 'pixverse-v6';
 
 type TAspectRatio = "auto" | "21:9" | "16:9" | "4:3" | "1:1" | "3:4" | "9:16";

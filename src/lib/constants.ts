@@ -210,6 +210,16 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
     durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     endFrameSupported: false,
   },
+  "pixverse-v6": {
+    id: "pixverse-v6",
+    label: "Pixverse V6",
+    endpoint: "pixverse/pixverse-v6",
+    provider: "replicate",
+    supportedResolution: ["360p"],
+    description: "Pixverse V6 i2v (via Replicate), 1–15s",
+    durations: [5, 8, 10, 15],
+    endFrameSupported: false,
+  },
 };
 
 export const VIDEO_MODEL_IDS = Object.keys(VIDEO_MODELS) as TVideoModelId[];

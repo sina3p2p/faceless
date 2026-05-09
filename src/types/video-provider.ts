@@ -16,7 +16,8 @@ export type TVideoModelEndpoint =
   | "fal-ai/veo3.1/fast/image-to-video"
   | "fal-ai/kling-video/v3/standard/image-to-video"
   | "fal-ai/kling-video/v3/pro/image-to-video"
-  | "fal-ai/kling-video/v2.6/pro/image-to-video";
+  | "fal-ai/kling-video/v2.6/pro/image-to-video"
+  | "pixverse/pixverse-v6";
 
 export interface VideoResult {
   videoUrl: string;
@@ -38,7 +39,7 @@ export type TVideoModel = {
   provider: TVideoProviderId;
   endpoint?: TVideoModelEndpoint;
   durations: number[];
-  supportedResolution: ("480p" | "540p" | "720p" | "1080p" | "4k")[];
+  supportedResolution: ("360p" | "480p" | "540p" | "720p" | "1080p" | "4k")[];
   endFrameSupported: boolean;
 };
 

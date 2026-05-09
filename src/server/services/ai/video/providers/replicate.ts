@@ -35,6 +35,7 @@ export class ReplicateVideoProvider implements IVideoProvider {
       case "seedance-2-fast":
         return {
           image: req.startImageUrl,
+          last_frame_image: req.endImageUrl,
           prompt: req.prompt,
           duration: req.duration,
           aspect_ratio: req.aspectRatio,
@@ -48,6 +49,15 @@ export class ReplicateVideoProvider implements IVideoProvider {
           prompt: req.prompt,
           duration: req.duration,
           aspect_ratio: req.aspectRatio,
+        };
+      case "pixverse-v6":
+        return {
+          image: req.startImageUrl,
+          last_frame_image: req.endImageUrl,
+          prompt: req.prompt,
+          duration: req.duration,
+          aspect_ratio: req.aspectRatio,
+          quality: VIDEO_MODELS[model].supportedResolution[0],
         };
       default:
         throw new Error(`Replicate: video model ${model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);
