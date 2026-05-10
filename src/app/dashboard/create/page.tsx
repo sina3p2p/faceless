@@ -254,7 +254,7 @@ export default function CreateVideoPage() {
                 <div>
                   <p className="font-medium text-white">Timelapse</p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Compress time within shots: static camera, racing clouds, sun arcs, motion trails. Layers on top of the chosen art style.
+                    Each shot documents a process unfolding — building going up, ship being cleaned, dough rising. Subject visibly transforms across the clip; camera stays observational. Layers on top of the chosen art style.
                   </p>
                 </div>
                 <div
