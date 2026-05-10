@@ -387,6 +387,7 @@ export const VIDEO_TYPES = [
   { id: "standalone", label: "Standalone", description: "Story-driven video with AI-generated visuals and voiceover" },
   { id: "music_video", label: "Music Video", description: "AI-generated song with vocals + cinematic visuals (~$3-4/video)" },
   { id: "dialogue", label: "Dialogue", description: "Conversational story between characters with different voices" },
+  { id: "timelapse", label: "Timelapse", description: "Locked-vantage stage snapshots of a real-world process (construction, cleaning, growth) — one image per stage, animated with ambient motion." },
 ] as const;
 
 /** Preset music genres for music videos — `style` is English text for the AI music generator (e.g. Suno). */

@@ -42,7 +42,6 @@ export async function cinematographyJob(job: Job<RenderJobData>) {
       videoProject.videoType,
       getAgentModels(videoProject.modelSettings, "cinematographerModel"),
       assets,
-      videoProject.timelapse
     );
 
     await mergeProjectConfig(videoProjectId, { visualStyleGuide: styleGuide });

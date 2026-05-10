@@ -75,7 +75,6 @@ export default function CreateVideoPage() {
     videoSize: DEFAULT_VIDEO_SIZE as string,
     language: DEFAULT_LANGUAGE as string,
     webResearch: false,
-    timelapse: false,
     voiceId: "",
     durationPreferred: 30,
     durationPriority: "quality" as "quality" | "duration",
@@ -167,7 +166,6 @@ export default function CreateVideoPage() {
             priority: form.durationPriority,
           },
           webResearch: form.webResearch,
-          timelapse: form.timelapse,
           storyAssetIds: storyAssetIds.length > 0 ? storyAssetIds : undefined,
         }),
       });
@@ -242,32 +240,6 @@ export default function CreateVideoPage() {
                 label: s.label,
               }))}
             />
-
-            <div
-              onClick={() => setForm({ ...form, timelapse: !form.timelapse })}
-              className={`rounded-xl border p-4 cursor-pointer transition-all ${form.timelapse
-                ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                : "border-white/10 bg-white/5 hover:border-white/20"
-                }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-white">Timelapse</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Locked-vantage stage snapshots cut together — camera holds one observational position across every scene; transformation happens in the cuts (excavation, foundation, framing, finished). Each clip shows ambient stage motion only (dust, machinery, workers). Layers on top of the chosen art style.
-                  </p>
-                </div>
-                <div
-                  className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 ${form.timelapse ? "bg-violet-500" : "bg-white/10"
-                    }`}
-                >
-                  <div
-                    className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${form.timelapse ? "translate-x-5" : "translate-x-0"
-                      }`}
-                  />
-                </div>
-              </div>
-            </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
