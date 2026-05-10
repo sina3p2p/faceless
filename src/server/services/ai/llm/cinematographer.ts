@@ -75,14 +75,15 @@ export async function generateVisualStyleGuide(
 
   const timelapseBlock = timelapse ? `
 
-TIMELAPSE MODE (overlays on top of the medium constraints above — does NOT replace them):
-- Each shot represents COMPRESSED TIME: minutes-to-days play out in seconds. Subject motion is implicit (sun arcing, clouds streaking, crowds blurring into ribbons, shadows sweeping, flowers opening, light cycling).
-- global.cameraPhysics MUST be "static tripod or imperceptible slow drift only — no handheld, no whips, no fast tracking, no rack focus." This overrides any camera latitude the medium would normally allow.
-- global.materialLanguage MUST include long-exposure language adapted to the medium: motion trails / streaks / multiple-exposure stacking / blurred ribbons of motion (cars, crowds, water). Stay faithful to the medium (e.g. anime → speedline-stacked trails; claymation → time-lapsed clay figures with implied frame-jitter; photoreal → long-exposure light trails).
-- global.defaultLighting should evoke shifting time-of-day where it fits (golden-hour-to-blue-hour sweeps, sun arcs, dawn-to-dusk gradients).
-- promptRegions.cameraPrefix MUST start with "Locked-off long-exposure shot, " (or the medium-faithful equivalent — keep "locked-off").
-- promptRegions.subjectPrefix and backgroundPrefix should bake in temporal compression cues where natural (e.g. "sun arcs across the sky behind ", "crowds blur past ", "clouds streak overhead while ").
-- Per-scene overrides may still vary lighting/palette but MUST NOT relax the static-camera rule.` : "";
+TIMELAPSE MODE — PROCESS DOCUMENTATION (overlays on top of the medium constraints above; does NOT replace them):
+This video documents a real-world process unfolding over time (e.g. a building being constructed, a ship being cleaned, a meal being cooked, a wound healing, a season changing). EVERY clip must depict VISIBLE TRANSFORMATION across its own duration — the subject's state at the start of the clip is meaningfully different from its state at the end. Static "before/after" frames are wrong; "progress unfolding within the shot" is right.
+- global.medium / materialLanguage: stay faithful to the chosen art style. Within the medium, describe how the subject CHANGES STATE (e.g. "scaffolding rises and walls fill in floor by floor"; "rust flakes loosen and chip away revealing bright metal"; "dough rises and crust browns"). Avoid frozen-tableau language.
+- global.cameraPhysics: camera is mostly OBSERVATIONAL — locked, slow drift, slow push-in, slow orbit, slow tilt. The subject is doing the work; the camera does NOT add fast moves, whips, handheld shake, or aggressive dolly. Slow drift IS allowed and encouraged.
+- global.defaultLighting: prefer time-of-day cycling where it serves the process (sunrise→sunset across construction, overhead-noon for stable cleaning processes). Lighting itself may shift across the clip.
+- promptRegions.subjectPrefix: must front-load process-unfolding language — e.g. "Time-lapse process shot of [subject] visibly transforming as ", "Stage-by-stage timelapse of ".
+- promptRegions.cameraPrefix: lock to observational moves — "Locked observational shot, " or "Slow drifting observational shot, ".
+- promptRegions.backgroundPrefix: background may also evolve with the process (e.g. workers swarm and disperse; tools come and go; weather shifts).
+- Per-scene overrides may vary lighting/palette but the process-transformation rule is global and non-negotiable.` : "";
 
   const systemPrompt = `You are a Cinematographer designing the visual language for a video production.
 

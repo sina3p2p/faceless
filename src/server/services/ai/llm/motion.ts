@@ -241,7 +241,6 @@ export async function generateSingleFrameMotion(
   const effectivePolicy = resolveEffectiveMotionPolicy(basePolicy, {
     narrativeIntent: input.narrativeIntent,
     musicSectionId: input.skillHints?.musicSectionId,
-    timelapse: input.timelapse,
   });
   const isHookSlot = input.isDefaultHookSlot === true;
   const skillProse = buildMotionSkillContext(input.skillHints, {
@@ -288,6 +287,14 @@ export async function generateSingleFrameMotion(
     tempoBlock = `\n\nVO TEMPO: sparse narration (~${wps.toFixed(1)} words/sec) — push camera and subject motion harder so the frame stays alive.\n`;
   }
 
+  const timelapseBlock = input.timelapse ? `\n\nTIMELAPSE MODE — PROCESS DOCUMENTATION (this overrides parts of the structural rules below):
+This clip documents a real-world process (e.g. construction, cleaning, growth, decay, cooking, healing). The clip's primaryAction is ONE process unfolding over the clip's duration — its "ONE action" is the WHOLE transformation, not a single instant. Treat the process as the singular subject of the action.
+- primaryAction MUST describe a visible state-change arc across the clip — start state → intermediate stages → end state — for ONE subject undergoing ONE process. Examples that are CORRECT here (and would be banned in non-timelapse): "scaffolding rises around the bare frame floor by floor as walls fill in and windows pop into place", "rust flakes loosen and chip away revealing bright metal, then a fresh coat of paint sweeps across the hull", "dough rises in the bowl and a crust browns on top".
+- The "ONE BEAT" rule below is RELAXED ONLY for sequential stages of the SAME process on the SAME subject. You may use temporal connectors ("as", "then", "while", commas linking stages) WITHIN a single subject's transformation. You may NOT introduce a second unrelated subject or an unrelated action.
+- subjectDynamics: detail the secondary process artifacts — dust clouds rise from work, sparks fly from welding, soap suds slide and recede, paint chips scatter, condensation forms.
+- cameraMove: keep camera OBSERVATIONAL — locked, slow drift, slow push-in, slow tilt, slow orbit. The transformation is the spectacle; the camera should not compete with it. NO whips, NO fast tracking, NO snap zooms.
+- endState: name the FINAL state of the process for THIS clip (e.g. "completed top floor with windows installed and scaffolding partially removed"). It is a snapshot of where the transformation has reached, not a new action.\n` : "";
+
   const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and a single compiled text prompt. You output STRUCTURED fields that will be assembled into that prompt.
 
 CORE PRINCIPLE: AI video models execute ONE action well. Multiple unrelated primary actions produce garbled, morphing artifacts.
@@ -296,7 +303,7 @@ TEMPORAL READ: The output must describe motion that READS AS VIDEO across the wh
 
 MOTION POLICY: ${effectivePolicy.toUpperCase()}${basePolicy !== effectivePolicy ? ` (refined from base ${basePolicy} via section/intent rules)` : ""}
 ${motionIntensity[effectivePolicy] ?? motionIntensity.moderate}
-${targetModelBlock}${cameraConstraint}${materialConstraint}${grammarBlock}${tempoBlock}${skillBlock}
+${targetModelBlock}${cameraConstraint}${materialConstraint}${grammarBlock}${tempoBlock}${skillBlock}${timelapseBlock}
 
 SUBJECT MUST MOVE NATURALLY — NOT JUST THE CAMERA: primaryAction describes the SUBJECT'S OWN motion through world space, with believable physics. If the subject holds a pose and only the camera moves around it, the result feels like a 3D pan over a still photo. This is the most common cause of "static" output, even when a frame nominally has a "dynamic" policy.
 - Translation through space: name where the subject travels — "drifts forward and crosses the field of view, background streaming past" not "is in flight, banked". For people: "pushes off and accelerates left-to-right across the lane" not "mid-stride".
