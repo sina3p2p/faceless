@@ -70,7 +70,12 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
-      await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", "generate-pipeline-motion");
+      // Timelapse projects already have motionSpec + visualDescription
+    // populated at plan time, so they skip the motion-director job entirely.
+    const nextJobAfterImages = videoProject.videoType === "timelapse"
+      ? "generate-frame-videos"
+      : "generate-pipeline-motion";
+    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", nextJobAfterImages);
       return;
     }
 
@@ -253,7 +258,12 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-images] All ${targets.length} frames processed`);
 
-    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", "generate-pipeline-motion");
+    // Timelapse projects already have motionSpec + visualDescription
+    // populated at plan time, so they skip the motion-director job entirely.
+    const nextJobAfterImages = videoProject.videoType === "timelapse"
+      ? "generate-frame-videos"
+      : "generate-pipeline-motion";
+    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", nextJobAfterImages);
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, msg);

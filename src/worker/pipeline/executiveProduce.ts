@@ -17,6 +17,15 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "PRODUCING");
 
+    // Timelapse takes a different fork: the slim pipeline replaces the
+    // creative-brief → story → director → … chain with a single
+    // timelapse-plan worker. No brief needed.
+    if (video.videoType === "timelapse") {
+      console.log(`[executive-produce] Forking to timelapse pipeline for ${videoProjectId}`);
+      await renderQueue.add("timelapse-plan", { videoProjectId });
+      return;
+    }
+
     const config = video.config ?? {};
 
     const duration: DurationPreference = config.duration

@@ -16,11 +16,10 @@ const mediaModelOpt = z.string().min(1);
 
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
-  videoType: z.enum(["standalone", "music_video", "dialogue"]).default("standalone"),
+  videoType: z.enum(["standalone", "music_video", "dialogue", "timelapse"]).default("standalone"),
   /** English style string for AI music generation when `videoType` is music_video. */
   musicGenre: z.string().min(1).max(500).optional(),
   style: z.string().default("cinematic"),
-  timelapse: z.boolean().optional().default(false),
   videoSize: z.enum(["9:16", "16:9", "1:1"]).default("9:16"),
   voiceId: z.string().optional(),
   language: z.string().default("en"),
@@ -121,7 +120,6 @@ export async function POST(req: NextRequest) {
       language: data.language,
       videoType: data.videoType,
       style: data.style,
-      timelapse: data.timelapse,
       userId: user.id,
       idea: data.prompt,
       voiceId: data.voiceId,

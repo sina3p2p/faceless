@@ -39,8 +39,7 @@ export async function storyboardJob(job: Job<RenderJobData>) {
       duration,
       config.continuityNotes,
       storyboardModel,
-      config.heroAssetPlan,
-      videoProject.timelapse
+      config.heroAssetPlan
     );
 
     await mergeProjectConfig(videoProjectId, { frameBreakdown: breakdown });

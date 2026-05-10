@@ -37,8 +37,7 @@ export async function generateFrameBreakdown(
   duration: number,
   continuity: ContinuityNotes,
   model?: string,
-  heroAssetPlan?: HeroAssetPlan,
-  timelapse: boolean = false
+  heroAssetPlan?: HeroAssetPlan
 ): Promise<FrameBreakdown> {
   const primaryModel = model || LLM.storyboardModel;
 
@@ -109,17 +108,7 @@ RULES:
     - Any scene with ≥3 frames MUST contain at least one "establishing" or "wide" shot
     - Across the whole video, include at least one "close-up", "extreme-close-up", or "detail" shot every 5 frames (so the audience gets emotional anchors)
     - Avoid more than 2 consecutive "medium" shots — vary the rhythm
-12. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".${timelapse ? `
-
-TIMELAPSE OVERRIDE — STAGE-SNAPSHOT PACING:
-This video is a timelapse. The whole video is shot from one locked vantage; scenes are stage snapshots cut together; transformation lives in the cuts, not within clips. That changes the pacing math considerably:
-- Prefer FEWER, LONGER frames per scene. One frame per scene is often correct — that frame holds the locked vantage, fills the scene's audio duration, and shows ambient stage motion (workers, machinery, dust, water flow). Do NOT split a stage into multiple frames just to honor rule 11; the variety rule below is RELAXED for timelapse — see below.
-- Prefer the LONGEST supported clipDuration that fits each scene (within [${durationsList}]); don't pad with multiple short clips.
-- shotType: "establishing" or "wide" is the default. Close-ups and detail shots break the locked-vantage illusion and are FORBIDDEN in timelapse mode unless the script explicitly calls for an inserted detail beat — even then, use them sparingly.
-- motionPolicy: clamp to "static" or "subtle" — the camera is locked, motion comes from ambient subject activity. Never "dynamic" or "frenetic".
-- transitionIn: prefer "cut" or "dissolve". "Dissolve" is especially good for big time-jumps between stages. Avoid "whip-pan" and "match-cut" — they imply camera motion the locked vantage rejects.
-- narrativeIntent: most stage-snapshot frames will be "introduce" (first stage), "build" (intermediate stages), or "resolve" (final stage). "Climax" is rare in timelapse; "react" usually doesn't apply.
-- The shot-variety rule 11 above (≥1 establishing/wide per scene with 3+ frames; ≥1 close-up every 5 frames; no 3 consecutive mediums) is RELAXED for timelapse: it's expected and correct that all frames share the same establishing/wide vantage. The deterministic shot-budget validator will not penalize timelapse breakdowns for these rules.` : ""}`;
+12. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".`;
 
   const userPrompt = `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}`;
   const { output } = await recordAiCall(
@@ -139,8 +128,6 @@ This video is a timelapse. The whole video is shot from one locked vantage; scen
       }),
   );
   if (!output) throw new Error("Failed to generate frame breakdown");
-
-  if (timelapse) return output;
 
   const violations = validateShotBudget(output);
   if (violations.length === 0) return output;

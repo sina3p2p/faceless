@@ -12,3 +12,4 @@ export { generateFrameImagesJob } from "./generateFrameImages";
 export { generateMotionJob } from "./generateMotion";
 export { generateFrameVideosJob } from "./generateFrameVideos";
 export { composeFinalJob } from "./composeFinal";
+export { timelapsePlanJob } from "./timelapse/plan";

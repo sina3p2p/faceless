@@ -52,7 +52,6 @@ const visualStyleGuideSchema = z.object({
     backgroundPrefix: z.string().describe("Injected BEFORE every background description. Include material language. Example: 'Miniature clay diorama set,'"),
   }),
   perScene: z.array(perSceneSchema),
-  lockedVantage: z.string().nullable().describe("TIMELAPSE ONLY: 1-2 sentence anchor describing the EXACT observational camera position, framing, distance, and unchanging environmental anchors (skyline, terrain, signature trees) that every frame in the video must reproduce so cuts read as time-jumps on a single tripod. Set to null when the video is not a timelapse."),
 });
 
 export async function generateVisualStyleGuide(
@@ -61,8 +60,7 @@ export async function generateVisualStyleGuide(
   style: string,
   videoType: string,
   model?: string,
-  assets: StoryAsset[] = [],
-  timelapse: boolean = false
+  assets: StoryAsset[] = []
 ): Promise<VisualStyleGuide> {
   const primaryModel = model || LLM.cinematographerModel;
 
@@ -73,21 +71,6 @@ export async function generateVisualStyleGuide(
   const styleConstraint =
     STYLE_CONSTRAINTS[style] ??
     `Style "${style}": follow the spirit of the named style; choose camera physics, medium, and material language that fit it.`;
-
-  const timelapseBlock = timelapse ? `
-
-TIMELAPSE MODE — STAGE SNAPSHOTS WITH LOCKED VANTAGE (overlays on top of the medium constraints above; does NOT replace them):
-This video depicts a real-world staged process (e.g. a building being constructed, an excavation being filled, a ship being cleaned, a road being paved, a forest growing). The transformation does NOT play out within a single clip — current i2v models can't do that reliably. Instead, the transformation lives in the CUTS between scenes: each scene is one stable STAGE of the process, and every scene reproduces the EXACT same camera vantage so cuts read as time-jumps on a single tripod. Within each clip, only ambient stage-appropriate motion plays (excavator dust, concrete pouring, workers moving, water flowing, machinery operating).
-
-CRITICAL: populate the new \`lockedVantage\` field. This is a 1–2 sentence description of the camera position that EVERY frame in this video must reproduce — same height, distance, angle, framing, and the unchanging environmental anchors that flank the action (skyline, distant city/mountains, signature trees, terrain horizon, road curves). Example: "Elevated drone vantage approximately 30 meters above the access road, looking down-stream over the worksite. The same city skyline sits on the horizon line, the same line of trees frames the right edge, and the same tilled fields wrap around the left." The lockedVantage is what makes the cuts feel like real timelapse instead of unrelated shots.
-
-- global.cameraPhysics: "Locked observational vantage held identical across ALL scenes — no recomposition, no angle changes, no zoom changes between scenes. Within a scene, only imperceptible drift is allowed."
-- global.materialLanguage: stay faithful to the chosen art style. Describe ambient stage motion appropriate to whatever stage is being shown (dust, exhaust, water, sparks, machinery in operation, workers in motion). DO NOT describe whole-process transformation; one stage at a time.
-- global.defaultLighting: a single time-of-day choice for the whole video (the locked vantage benefits from lighting consistency too). Per-scene overrides may shift it slightly to imply later/earlier in the day.
-- promptRegions.subjectPrefix: front-load stage identity — e.g. "Stage of [process] — ", "[Process] in progress — ".
-- promptRegions.cameraPrefix: must include the locked-vantage reminder, e.g. "Locked aerial vantage, ".
-- promptRegions.backgroundPrefix: must explicitly bake in the unchanging environmental anchors from \`lockedVantage\` so the image model reproduces the same horizon/skyline/framing in every scene.
-- Per-scene overrides may vary lighting and tone but MUST NOT change the camera position or framing.` : "";
 
   const systemPrompt = `You are a Cinematographer designing the visual language for a video production.
 
@@ -118,7 +101,6 @@ PROMPT REGION RULES:
 
 STYLE-SPECIFIC CONSTRAINTS (only the rules for the selected style — apply them):
 ${styleConstraint}
-${timelapseBlock}
 
 PER-SCENE OVERRIDES:
 - Only override when the narrative demands it (night scene, flashback, emotional shift)

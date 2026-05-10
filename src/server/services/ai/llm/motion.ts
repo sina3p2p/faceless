@@ -287,12 +287,6 @@ export async function generateSingleFrameMotion(
     tempoBlock = `\n\nVO TEMPO: sparse narration (~${wps.toFixed(1)} words/sec) — push camera and subject motion harder so the frame stays alive.\n`;
   }
 
-  const timelapseBlock = input.timelapse ? `\n\nTIMELAPSE MODE — STAGE SNAPSHOT WITH AMBIENT MOTION (specializes the rules below; does NOT relax them):
-This clip is ONE stable stage of a longer real-world process. The transformation between stages happens via the CUTS between scenes (storyboard's job), NOT within this clip. Within THIS clip, the camera is locked and only ambient stage-appropriate motion plays. The standard ONE-BEAT rule below fully applies — the "one beat" is the dominant ambient motion of this stage.
-- primaryAction: name the ambient stage motion happening RIGHT NOW (e.g. "excavator buckets swing and bite into the earth in a steady rhythm, dust plumes rising from the trench", "concrete cascades from the pump-arm nozzle into the formwork in a thick continuous pour", "workers in high-vis vests crisscross the rebar grid carrying tools"). Do NOT describe the whole transformation arc; pick the one ambient motion that defines this stage.
-- subjectDynamics: secondary ambient artifacts — dust clouds, exhaust plumes, sparks, water spray, paint mist, condensation, leaves rustling, distant traffic. These are what sell the "alive moment" feel.
-- cameraMove: LOCKED. Static or imperceptible drift only. The locked vantage is the SAME across every clip in this video; do not recompose, zoom, or change angle. NO whips, NO push-ins, NO orbit, NO tilts.
-- endState: a settle of the same ambient motion (e.g. "excavators continue digging at steady pace as dust drifts off-frame"). It is NOT a different stage of the process — that's the next clip's job.\n` : "";
 
   const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and a single compiled text prompt. You output STRUCTURED fields that will be assembled into that prompt.
 
@@ -302,7 +296,7 @@ TEMPORAL READ: The output must describe motion that READS AS VIDEO across the wh
 
 MOTION POLICY: ${effectivePolicy.toUpperCase()}${basePolicy !== effectivePolicy ? ` (refined from base ${basePolicy} via section/intent rules)` : ""}
 ${motionIntensity[effectivePolicy] ?? motionIntensity.moderate}
-${targetModelBlock}${cameraConstraint}${materialConstraint}${grammarBlock}${tempoBlock}${skillBlock}${timelapseBlock}
+${targetModelBlock}${cameraConstraint}${materialConstraint}${grammarBlock}${tempoBlock}${skillBlock}
 
 SUBJECT MUST MOVE NATURALLY — NOT JUST THE CAMERA: primaryAction describes the SUBJECT'S OWN motion through world space, with believable physics. If the subject holds a pose and only the camera moves around it, the result feels like a 3D pan over a still photo. This is the most common cause of "static" output, even when a frame nominally has a "dynamic" policy.
 - Translation through space: name where the subject travels — "drifts forward and crosses the field of view, background streaming past" not "is in flight, banked". For people: "pushes off and accelerates left-to-right across the lane" not "mid-stride".

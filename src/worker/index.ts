@@ -15,6 +15,7 @@ import {
   generateMotionJob as pipelineGenerateMotionJob,
   generateFrameVideosJob,
   composeFinalJob,
+  timelapsePlanJob,
 } from "./pipeline";
 import { RENDER_QUEUE_NAME } from "@/lib/constants";
 import { logger } from "@/lib/logger";
@@ -67,6 +68,8 @@ const worker = new Worker(
           await generateFrameVideosJob(job);
         } else if (job.name === "compose-final") {
           await composeFinalJob(job);
+        } else if (job.name === "timelapse-plan") {
+          await timelapsePlanJob(job);
         } else {
           logger.warn("Skipping unknown/removed job", { jobName: job.name, jobId: job.id });
         }
