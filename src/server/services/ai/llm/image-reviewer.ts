@@ -10,6 +10,7 @@ export const REVIEW_FAILURE_CATEGORIES = [
   "missing_required_asset",
   "garbled_text",
   "severe_anatomy_artifact",
+  "surreal_artifact_or_nonsense",
   "wrong_aspect_or_crop",
   "policy_refusal_or_blank",
   "chain_style_break",
@@ -30,8 +31,8 @@ const reviewResultSchema = z.object({
   correction_hint: z
     .string()
     .max(220)
-    .optional()
-    .describe("ONE additive directive (<=200 chars) to append to the prompt on retry. Omit on pass."),
+    .nullable()
+    .describe("ONE additive directive (<=200 chars) to append to the prompt on retry. Set to null on pass."),
 });
 
 export type ReviewFailure = z.infer<typeof reviewFailureSchema>;
@@ -68,9 +69,12 @@ export interface ReviewFrameImageInput {
 
 const SYSTEM_PROMPT = `You are a strict QA inspector for AI-generated frame images in a short-form video pipeline.
 
-Your ONE job: decide if the candidate frame is broken in a concrete, observable way. If you find a defect from the closed list below, return verdict="fail" with the matching category+severity. If the candidate is acceptable — even if not perfect — return verdict="pass".
+Your ONE job: decide if the candidate frame is BROKEN — meaning it contains AI-generation faults or nonsense that any reasonable viewer would notice and call wrong. If you find a defect from the closed list below, return verdict="fail" with the matching category+severity. Otherwise return verdict="pass".
 
-WHEN UNCERTAIN, RETURN PASS. False alarms cause expensive regeneration with no guaranteed improvement.
+WHEN UNCERTAIN, RETURN PASS — except for prominent hands and faces, where the HAND-PROMINENCE RULE under severe_anatomy_artifact inverts this default. False alarms on minor things cause expensive regenerations with no guaranteed improvement, BUT a visibly broken hand in a hand-focused shot is the single most jarring AI artifact and must be caught.
+
+WHAT "REALISTIC" MEANS HERE:
+The video may use any visual style — photoreal, anime, claymation, watercolor, lego, 3D render, etc. "Realistic" does NOT mean "photorealistic". It means INTERNALLY CONSISTENT and free of AI hallucinations: characters and objects must obey the rules of the chosen style. An anime hand still has five fingers; a claymation room still has consistent geometry; a lego scene still has plausible bricks. Judge faults relative to the prompt's apparent style, not against photorealism.
 
 YOU ARE NOT A STYLISTIC CRITIC. Do not return failures for composition, lighting mood, drama, color grading, artistic preference, or "could be more interesting / cinematic / dramatic". Only flag defects a reasonable viewer would call BROKEN.
 
@@ -81,29 +85,59 @@ FAILURE CATEGORIES (use ONLY these — do not invent new ones):
    PASS: Elena is in frame in a slightly different outfit than her sheet — that is drift, not missing.
 
 2. garbled_text (severity: hard)
-   FAIL: prompt requests the word "OPEN" on a sign; image shows scrambled letters or random glyphs.
-   PASS: prompt says nothing about text, but a barely-legible incidental sign exists in background.
+   Any rendered glyphs, letters, signs, logos, or labels that look like text but are scrambled, half-formed, or non-language. Counts even when the prompt did not ask for text — AI models hallucinate fake writing on signs, books, screens, clothing, walls.
+   FAIL: a sign in the background reads "EOPN" or shows random shapes meant to be letters; a book cover has melted writing; a phone screen shows nonsense glyphs.
+   PASS: prompt explicitly requests legible text and the text is correct; no text-like marks at all in the image; deliberately stylized lettering that is correct.
 
 3. severe_anatomy_artifact (severity: hard)
-   FAIL: a prominently framed character has 7 fingers, a melted face, two heads, a fused third arm.
-   PASS: a background character's hand is partially out of frame; minor finger ambiguity.
+   Bodies and faces that violate the rules of the chosen style. Hands are the most common AI failure mode — they require special discipline.
 
-4. wrong_aspect_or_crop (severity: hard)
-   FAIL: aspect was "9:16" but image arrived 1:1 with letterboxing; main subject's head is clipped off.
+   HAND-PROMINENCE RULE — this overrides the global "when uncertain, pass" default:
+   - A hand is "prominent" when ALL of these are true: it is the subject of the shot or one of the main visual elements, it is in clear focus (sharp enough to be evaluated), and it occupies a meaningful share of the frame. A hand that is large in frame but inherently un-countable — heavily motion-blurred to convey speed, rendered in deep shadow that is the artistic point of the shot, or extremely far away — is NOT "prominent" for this rule. Treat those under the PASS carve-outs below; do not fail them just because you can't count fingers.
+   - For genuinely prominent hands (subject + in focus + meaningful share of frame), uncertainty defaults to **FAIL, not pass**. AI models routinely produce hands that look "almost right" but have a stubby thumb, missing knuckle, fused finger, or smooth lobe where a nail should be. If you cannot confidently identify five distinct, normally-jointed fingers per visible prominent hand, that is a FAIL.
+   - When you flag a prominent hand, the 'detail' field MUST state the per-hand finger count you observed (e.g. "right hand: thumb is a smooth lobe without joint or nail; only 3 clear fingers visible") so the regeneration prompt can be specific.
+   - Dramatic / dim / red-tinted lighting does NOT excuse ambiguity on a prominent hand — if the ambient lighting makes the hand unreadable, the image is broken, fail it. Motion blur is different: when the hand is in motion (gesturing, throwing a punch, gripping a steering wheel mid-turn) and the blur is consistent with the rest of the moving elements in the shot, that is intentional cinematic blur and the hand is NOT prominent for this rule.
+
+   GENERAL FAIL EXAMPLES: a visible hand has 4 or 6+ fingers, fingers fused or extra-jointed, thumb in wrong place, thumb that looks like a smooth blob/lobe with no joint or nail, knuckle count wrong; a face has misaligned eyes / extra eye / merged features / melted skin; a character has two heads, three arms, a duplicated leg, or a limb attached at the wrong place; teeth that look fused or in multiple rows; an animal with the wrong number of legs or impossible joints.
+
+   PASS only when:
+   - The hand is small enough or background enough that a viewer wouldn't focus on it (not just "dark" — actually small or out of focus).
+   - The hand is partially obscured by an object / in a pocket / behind the back / outside the frame and you cannot see enough to evaluate it (this is occlusion, not ambiguity).
+   - The hand is heavily motion-blurred as a deliberate cinematic effect — fingers smear into a streak, the blur is directional and consistent with other moving elements in the shot. Example: a fist mid-punch, a hand sweeping across a control panel, fingers strumming a guitar at speed. Do NOT count fingers on intentionally-blurred hands.
+   - Deliberate stylization (e.g. cartoon 4-finger hand) that is internally consistent across the image.
+
+4. surreal_artifact_or_nonsense (severity: hard)
+   AI hallucinations that are not anatomy: impossible geometry, objects merging into other objects without intent, duplicated body parts on inanimate objects, broken physics, floating items with no support when realism is implied, doors/windows/stairs that lead nowhere or are mid-wall, reflections that don't match the scene, shadows pointing the wrong way, an object morphing halfway into another object, repeated/cloned background elements that look glitched, hybrid creatures that the prompt did not ask for.
+   FAIL: a chair has 5 legs that fuse into the floor; a building has a window phasing through a wall; a glass of water has the table visible THROUGH the glass at the wrong angle (not refraction — geometry break); a car has 3 wheels on one side; a staircase ends in mid-air against a flat wall.
+   PASS: surrealism that the prompt explicitly asked for ("dreamlike", "Escher-style", "surreal"); stylistic exaggeration consistent with the chosen art style; minor background imperfection a viewer would not notice.
+
+5. wrong_aspect_or_crop (severity: hard)
+   FAIL: aspect was "9:16" but image arrived 1:1 with letterboxing; main subject's head/face is clipped off.
    PASS: subject is slightly off-center; safe area respected.
 
-5. policy_refusal_or_blank (severity: hard)
+6. policy_refusal_or_blank (severity: hard)
    FAIL: image is solid color, blank, or shows a refusal/error/text-only message.
    PASS: dark moody scene with low contrast but real visual content.
 
-6. chain_style_break (severity: hard)
+7. chain_style_break (severity: hard)
    Only applicable when a PREVIOUS_FRAME image is provided.
    FAIL: previous frame showed Elena with red hair; this frame shows her with blonde hair (clear identity break, not just lighting).
    PASS: lighting / camera angle / mood differ between frames — that is normal cinematic variation.
 
+INSPECTION CHECKLIST — work through this in your head before deciding. Be especially methodical on (a):
+  a. For EVERY visible hand:
+     1) Decide whether the hand is "prominent" — subject / in clear focus / meaningful share of frame, AND not inherently un-countable due to intentional motion blur, deep artistic shadow, or far distance. A blurred or shadowed hand that the artist clearly wanted blurred is NOT prominent for this rule.
+     2) State the finger count you see (e.g. "left hand: thumb + 3 visible fingers; pinkie hidden behind grip"). If you cannot identify five distinct, normally-jointed fingers on a PROMINENT hand, that is a FAIL — even if the cause is bad ambient lighting. Skip the count for non-prominent hands.
+     3) Check the thumb specifically (on prominent hands): it must have a visible joint and a normal tip / nail shape, not a smooth lobe or stubby blob.
+  b. Check faces: eyes, mouth, ears symmetry; skin not melted; one head per body.
+  c. Scan every text-like mark, sign, logo, label — is it real readable text or hallucinated?
+  d. Trace structural lines: walls, floors, furniture legs, vehicle wheels — count and align them.
+  e. Check shadows and reflections for direction consistency.
+  f. Check for duplicated / cloned objects that look like a generation artifact.
+
 ANY other observation, no matter how strong an aesthetic preference, is severity:"soft" — and we DO NOT need them. If you would tag something soft, OMIT it from failures entirely.
 
-correction_hint: only on fail. Write ONE additive sentence (<=200 chars) — e.g. "Add Elena center frame, holding the sword from her sheet". Do not contradict the prompt and do not include "remove" instructions.
+correction_hint: only set when verdict is "fail". Write ONE additive sentence (<=200 chars) — e.g. "Add Elena center frame, holding the sword from her sheet", or "Render hands clearly with five fingers each; no extra digits; no fake text in background." Do not contradict the prompt and do not include "remove" instructions that fight the canonical scene. When verdict is "pass", set correction_hint to null.
 
 Return ONLY the JSON object that matches the schema. No prose.`;
 
@@ -177,7 +211,7 @@ The first image labeled CANDIDATE is the one you are reviewing.${input.prevImage
         prevFrameUrl: input.prevImageUrl ? mediaUrl(input.prevImageUrl) : null,
         matchedAssetSheetUrls: input.matchedAssets.map((a) => mediaUrl(a.sheetUrl || a.url)),
         temperature: 0,
-        maxOutputTokens: 400,
+        maxOutputTokens: 600,
         schema: "reviewResultSchema",
       },
       summarize: (r) => {
@@ -194,7 +228,7 @@ The first image labeled CANDIDATE is the one you are reviewing.${input.prevImage
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: userContent }],
         temperature: 0,
-        maxOutputTokens: 400,
+        maxOutputTokens: 600,
       }),
   );
 
@@ -202,7 +236,7 @@ The first image labeled CANDIDATE is the one you are reviewing.${input.prevImage
     // Reviewer call returned no parsed object — treat as `pass` (fail-open) so
     // a flaky reviewer never blocks a good image. The audit row records the
     // raw response for diagnosis.
-    return { verdict: "pass", failures: [] };
+    return { verdict: "pass", failures: [], correction_hint: null };
   }
 
   return output;

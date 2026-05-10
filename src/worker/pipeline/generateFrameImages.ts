@@ -45,7 +45,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     const reviewEnabled = cfg.imageReviewEnabled !== false;
     const maxRetries = clampRetries(cfg.imageReviewMaxRetries);
     const severityFloor: "hard" | "soft" = cfg.imageReviewSeverityFloor ?? "hard";
-    const reviewerModel = videoProject.modelSettings.reviewerModel;
+    const reviewerModel = getAgentModels(videoProject.modelSettings, "reviewerModel");
 
     const allAssets = await resolveStoryAssets(videoProjectId);
 
@@ -208,7 +208,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
               `[generate-frame-images] frame ${frame.id} attempt ${attempt} reviewer error — accepting image:`,
               err instanceof Error ? err.message : err
             );
-            verdict = { verdict: "pass", failures: [] };
+            verdict = { verdict: "pass", failures: [], correction_hint: null };
           }
         }
 
