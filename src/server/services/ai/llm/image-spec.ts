@@ -280,6 +280,10 @@ export function serializeFrameImageSpec(params: {
 
   const lines: string[] = [];
 
+  if (styleGuide.lockedVantage && styleGuide.lockedVantage.trim()) {
+    lines.push(`LOCKED VANTAGE (must match across every frame in this video — same camera position, framing, distance, and unchanging environmental anchors): ${styleGuide.lockedVantage.trim()}`);
+  }
+
   lines.push(`${pr.subjectPrefix} ${spec.subject.primary}${secondary}${focusFrag}.${actionFrag}`);
   lines.push(`Camera: ${pr.cameraPrefix} ${cameraLine}.`);
   lines.push(`Lighting: ${pr.lightingPrefix} ${lightingDetail}.`);

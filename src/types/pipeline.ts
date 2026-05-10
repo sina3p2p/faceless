@@ -182,6 +182,13 @@ export interface VisualStyleGuide {
     paletteOverride: string[] | null;
     environmentMood: string;
   }>;
+  /**
+   * Timelapse mode only: a 1-2 sentence description of the locked observational
+   * vantage that EVERY frame in the video must reproduce — same camera position,
+   * framing, distance, skyline anchors. Cuts between scenes then read as
+   * time-jumps on a single tripod. Null / unset for non-timelapse videos.
+   */
+  lockedVantage?: string | null;
 }
 
 // ── Storyboard Agent → FrameBreakdown ──

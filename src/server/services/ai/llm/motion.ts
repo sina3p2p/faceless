@@ -287,13 +287,12 @@ export async function generateSingleFrameMotion(
     tempoBlock = `\n\nVO TEMPO: sparse narration (~${wps.toFixed(1)} words/sec) — push camera and subject motion harder so the frame stays alive.\n`;
   }
 
-  const timelapseBlock = input.timelapse ? `\n\nTIMELAPSE MODE — PROCESS DOCUMENTATION (this overrides parts of the structural rules below):
-This clip documents a real-world process (e.g. construction, cleaning, growth, decay, cooking, healing). The clip's primaryAction is ONE process unfolding over the clip's duration — its "ONE action" is the WHOLE transformation, not a single instant. Treat the process as the singular subject of the action.
-- primaryAction MUST describe a visible state-change arc across the clip — start state → intermediate stages → end state — for ONE subject undergoing ONE process. Examples that are CORRECT here (and would be banned in non-timelapse): "scaffolding rises around the bare frame floor by floor as walls fill in and windows pop into place", "rust flakes loosen and chip away revealing bright metal, then a fresh coat of paint sweeps across the hull", "dough rises in the bowl and a crust browns on top".
-- The "ONE BEAT" rule below is RELAXED ONLY for sequential stages of the SAME process on the SAME subject. You may use temporal connectors ("as", "then", "while", commas linking stages) WITHIN a single subject's transformation. You may NOT introduce a second unrelated subject or an unrelated action.
-- subjectDynamics: detail the secondary process artifacts — dust clouds rise from work, sparks fly from welding, soap suds slide and recede, paint chips scatter, condensation forms.
-- cameraMove: keep camera OBSERVATIONAL — locked, slow drift, slow push-in, slow tilt, slow orbit. The transformation is the spectacle; the camera should not compete with it. NO whips, NO fast tracking, NO snap zooms.
-- endState: name the FINAL state of the process for THIS clip (e.g. "completed top floor with windows installed and scaffolding partially removed"). It is a snapshot of where the transformation has reached, not a new action.\n` : "";
+  const timelapseBlock = input.timelapse ? `\n\nTIMELAPSE MODE — STAGE SNAPSHOT WITH AMBIENT MOTION (specializes the rules below; does NOT relax them):
+This clip is ONE stable stage of a longer real-world process. The transformation between stages happens via the CUTS between scenes (storyboard's job), NOT within this clip. Within THIS clip, the camera is locked and only ambient stage-appropriate motion plays. The standard ONE-BEAT rule below fully applies — the "one beat" is the dominant ambient motion of this stage.
+- primaryAction: name the ambient stage motion happening RIGHT NOW (e.g. "excavator buckets swing and bite into the earth in a steady rhythm, dust plumes rising from the trench", "concrete cascades from the pump-arm nozzle into the formwork in a thick continuous pour", "workers in high-vis vests crisscross the rebar grid carrying tools"). Do NOT describe the whole transformation arc; pick the one ambient motion that defines this stage.
+- subjectDynamics: secondary ambient artifacts — dust clouds, exhaust plumes, sparks, water spray, paint mist, condensation, leaves rustling, distant traffic. These are what sell the "alive moment" feel.
+- cameraMove: LOCKED. Static or imperceptible drift only. The locked vantage is the SAME across every clip in this video; do not recompose, zoom, or change angle. NO whips, NO push-ins, NO orbit, NO tilts.
+- endState: a settle of the same ambient motion (e.g. "excavators continue digging at steady pace as dust drifts off-frame"). It is NOT a different stage of the process — that's the next clip's job.\n` : "";
 
   const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and a single compiled text prompt. You output STRUCTURED fields that will be assembled into that prompt.
 

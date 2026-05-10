@@ -27,11 +27,11 @@ const MUSIC_LADDER: Record<MusicSectionId, MotionPolicy> = {
  * Refines `basePolicy` using music section (highest priority when set) or narrative intent.
  * Falls back to `basePolicy` if refinements are absent.
  *
- * Note: `timelapse` does NOT clamp motion intensity here — in timelapse mode the
- * subject is actively transforming across the clip (construction unfolding,
- * cleaning progressing), which reads as moderate-to-dynamic motion. The
- * timelapse directive is enforced via the cinematographer's prompt regions
- * and the motion director's per-frame instructions, not by capping intensity.
+ * No timelapse-specific clamp here — the storyboard already biases timelapse
+ * frames' base motionPolicy to "static" / "subtle", and the cinematographer +
+ * motion director carry the locked-vantage / ambient-motion-only directive via
+ * prompt regions. So whatever basePolicy the storyboard chose is the right
+ * floor to refine from.
  */
 export function resolveEffectiveMotionPolicy(
   basePolicy: MotionPolicy,
