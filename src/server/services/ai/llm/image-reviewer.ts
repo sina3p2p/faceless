@@ -93,15 +93,17 @@ FAILURE CATEGORIES (use ONLY these — do not invent new ones):
    Bodies and faces that violate the rules of the chosen style. Hands are the most common AI failure mode — they require special discipline.
 
    HAND-PROMINENCE RULE — this overrides the global "when uncertain, pass" default:
-   - If ANY hand is "prominent" (subject of the shot, in clear focus, occupies a meaningful share of the frame, or one of the main visual elements), then **uncertainty about that hand defaults to FAIL, not pass**. AI models routinely produce hands that look "almost right" but have a stubby thumb, missing knuckle, fused finger, or smooth lobe where a nail should be. If you cannot confidently identify five distinct, normally-jointed fingers per visible prominent hand, that is a FAIL.
+   - A hand is "prominent" when ALL of these are true: it is the subject of the shot or one of the main visual elements, it is in clear focus (sharp enough to be evaluated), and it occupies a meaningful share of the frame. A hand that is large in frame but inherently un-countable — heavily motion-blurred to convey speed, rendered in deep shadow that is the artistic point of the shot, or extremely far away — is NOT "prominent" for this rule. Treat those under the PASS carve-outs below; do not fail them just because you can't count fingers.
+   - For genuinely prominent hands (subject + in focus + meaningful share of frame), uncertainty defaults to **FAIL, not pass**. AI models routinely produce hands that look "almost right" but have a stubby thumb, missing knuckle, fused finger, or smooth lobe where a nail should be. If you cannot confidently identify five distinct, normally-jointed fingers per visible prominent hand, that is a FAIL.
    - When you flag a prominent hand, the 'detail' field MUST state the per-hand finger count you observed (e.g. "right hand: thumb is a smooth lobe without joint or nail; only 3 clear fingers visible") so the regeneration prompt can be specific.
-   - Dramatic / dim / red-tinted / motion-blurred lighting does NOT excuse ambiguity on a prominent hand. If the lighting makes the hand unreadable, the image is broken — fail it.
+   - Dramatic / dim / red-tinted lighting does NOT excuse ambiguity on a prominent hand — if the ambient lighting makes the hand unreadable, the image is broken, fail it. Motion blur is different: when the hand is in motion (gesturing, throwing a punch, gripping a steering wheel mid-turn) and the blur is consistent with the rest of the moving elements in the shot, that is intentional cinematic blur and the hand is NOT prominent for this rule.
 
    GENERAL FAIL EXAMPLES: a visible hand has 4 or 6+ fingers, fingers fused or extra-jointed, thumb in wrong place, thumb that looks like a smooth blob/lobe with no joint or nail, knuckle count wrong; a face has misaligned eyes / extra eye / merged features / melted skin; a character has two heads, three arms, a duplicated leg, or a limb attached at the wrong place; teeth that look fused or in multiple rows; an animal with the wrong number of legs or impossible joints.
 
    PASS only when:
    - The hand is small enough or background enough that a viewer wouldn't focus on it (not just "dark" — actually small or out of focus).
    - The hand is partially obscured by an object / in a pocket / behind the back / outside the frame and you cannot see enough to evaluate it (this is occlusion, not ambiguity).
+   - The hand is heavily motion-blurred as a deliberate cinematic effect — fingers smear into a streak, the blur is directional and consistent with other moving elements in the shot. Example: a fist mid-punch, a hand sweeping across a control panel, fingers strumming a guitar at speed. Do NOT count fingers on intentionally-blurred hands.
    - Deliberate stylization (e.g. cartoon 4-finger hand) that is internally consistent across the image.
 
 4. surreal_artifact_or_nonsense (severity: hard)
@@ -124,9 +126,9 @@ FAILURE CATEGORIES (use ONLY these — do not invent new ones):
 
 INSPECTION CHECKLIST — work through this in your head before deciding. Be especially methodical on (a):
   a. For EVERY visible hand:
-     1) Decide whether the hand is "prominent" (subject / focus / large in frame / center of attention).
-     2) State the finger count you see (e.g. "left hand: thumb + 3 visible fingers; pinkie hidden behind grip"). If you cannot identify five distinct, normally-jointed fingers on a PROMINENT hand, that is a FAIL — even if the cause is bad lighting.
-     3) Check the thumb specifically: it must have a visible joint and a normal tip / nail shape, not a smooth lobe or stubby blob.
+     1) Decide whether the hand is "prominent" — subject / in clear focus / meaningful share of frame, AND not inherently un-countable due to intentional motion blur, deep artistic shadow, or far distance. A blurred or shadowed hand that the artist clearly wanted blurred is NOT prominent for this rule.
+     2) State the finger count you see (e.g. "left hand: thumb + 3 visible fingers; pinkie hidden behind grip"). If you cannot identify five distinct, normally-jointed fingers on a PROMINENT hand, that is a FAIL — even if the cause is bad ambient lighting. Skip the count for non-prominent hands.
+     3) Check the thumb specifically (on prominent hands): it must have a visible joint and a normal tip / nail shape, not a smooth lobe or stubby blob.
   b. Check faces: eyes, mouth, ears symmetry; skin not melted; one head per body.
   c. Scan every text-like mark, sign, logo, label — is it real readable text or hallucinated?
   d. Trace structural lines: walls, floors, furniture legs, vehicle wheels — count and align them.
