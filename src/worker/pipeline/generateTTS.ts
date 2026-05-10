@@ -122,7 +122,13 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       console.log(`[generate-tts] All TTS complete`);
     }
 
-    await renderQueue.add("cinematography", { videoProjectId });
+    // Timelapse projects skip the entire narrative middle (cinematography,
+    // hero-asset extraction, storyboard, prompt-architect) — the timelapse
+    // planner already wrote scenes/frames with imagePrompts and motionSpecs.
+    const nextJob = videoProject.videoType === "timelapse"
+      ? "generate-frame-images"
+      : "cinematography";
+    await renderQueue.add(nextJob, { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-tts] Failed for ${videoProjectId}:`, msg);

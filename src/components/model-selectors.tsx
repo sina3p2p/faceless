@@ -105,17 +105,15 @@ export function VideoSizeSelector({ value, onChange }: ModelSelectorProps) {
             key={s.id}
             type="button"
             onClick={() => onChange(s.id)}
-            className={`rounded-xl border p-3 text-center transition-all ${
-              value === s.id
-                ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
-                : "border-white/10 bg-white/5 hover:border-white/20"
-            }`}
+            className={`rounded-xl border p-3 text-center transition-all ${value === s.id
+              ? "border-violet-500 bg-violet-500/10 ring-1 ring-violet-500"
+              : "border-white/10 bg-white/5 hover:border-white/20"
+              }`}
           >
             <div className="flex justify-center mb-2">
               <div
-                className={`border-2 rounded ${
-                  value === s.id ? "border-violet-400" : "border-gray-500"
-                }`}
+                className={`border-2 rounded ${value === s.id ? "border-violet-400" : "border-gray-500"
+                  }`}
                 style={{
                   width: s.id === "9:16" ? 20 : s.id === "16:9" ? 36 : 24,
                   height: s.id === "9:16" ? 36 : s.id === "16:9" ? 20 : 24,
@@ -147,30 +145,31 @@ const AGENT_LLM_GROUPS: {
   title: string;
   steps: { key: keyof AgentModels; label: string; blurb: string }[];
 }[] = [
-  {
-    title: "Planning",
-    steps: [
-      { key: "producerModel", label: "Executive producer", blurb: "Creative brief, tone, and format plan" },
-      { key: "storyModel", label: "Story", blurb: "Full script and title from your idea" },
-    ],
-  },
-  {
-    title: "Script & structure",
-    steps: [
-      { key: "directorModel", label: "Director", blurb: "Split story into timed scenes" },
-      { key: "supervisorModel", label: "Script supervisor", blurb: "Continuity, names, and carry-over" },
-    ],
-  },
-  {
-    title: "Look & motion",
-    steps: [
-      { key: "cinematographerModel", label: "Cinematographer", blurb: "Visual style and lighting" },
-      { key: "storyboardModel", label: "Storyboard", blurb: "Shots, framing, and pacing per scene" },
-      { key: "promptModel", label: "Image prompts", blurb: "Text-to-image prompts for each frame" },
-      { key: "motionModel", label: "Motion", blurb: "How each clip should move" },
-    ],
-  },
-];
+    {
+      title: "Planning",
+      steps: [
+        { key: "producerModel", label: "Executive producer", blurb: "Creative brief, tone, and format plan" },
+        { key: "researchModel", label: "Research", blurb: "Web search queries and claims" },
+        { key: "storyModel", label: "Story", blurb: "Full script and title from your idea" },
+      ],
+    },
+    {
+      title: "Script & structure",
+      steps: [
+        { key: "directorModel", label: "Director", blurb: "Split story into timed scenes" },
+        { key: "supervisorModel", label: "Script supervisor", blurb: "Continuity, names, and carry-over" },
+      ],
+    },
+    {
+      title: "Look & motion",
+      steps: [
+        { key: "cinematographerModel", label: "Cinematographer", blurb: "Visual style and lighting" },
+        { key: "storyboardModel", label: "Storyboard", blurb: "Shots, framing, and pacing per scene" },
+        { key: "promptModel", label: "Image prompts", blurb: "Text-to-image prompts for each frame" },
+        { key: "motionModel", label: "Motion", blurb: "How each clip should move" },
+      ],
+    },
+  ];
 
 export type AgentLlmOverrides = Partial<Record<keyof AgentModels, string>>;
 
@@ -230,22 +229,20 @@ export function AgentLlmModelSection({
         <button
           type="button"
           onClick={() => onPerStepChange(false)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            !perStep
-              ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
-              : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${!perStep
+            ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+            : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+            }`}
         >
           One model for all steps
         </button>
         <button
           type="button"
           onClick={() => onPerStepChange(true)}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-            perStep
-              ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
-              : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
-          }`}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${perStep
+            ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+            : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+            }`}
         >
           Pick per step
         </button>

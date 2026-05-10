@@ -4,7 +4,7 @@ import { videoProjects, videoScenes, sceneFrames } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
 import { mediaUrl } from "@/lib/storage";
-import { generateSingleFrameMotion } from "@/server/services/llm";
+import { generateSingleFrameMotion } from "@/server/services/ai/llm";
 import type { PipelineConfig } from "@/types/pipeline";
 
 export async function POST(

@@ -112,3 +112,4 @@ export * from "./hero-asset-extractor";
 export * from "./storyboard";
 export * from "./prompt-contract";
 export * from "./image-spec";
+export * from "./timelapse/planner";

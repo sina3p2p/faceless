@@ -5,7 +5,7 @@ import { linkStoryAssetsToVideo } from "@/server/db/story-assets";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
-import { DEFAULT_LLM_MODEL, VIDEO_MODEL_IDS } from "@/lib/constants";
+import { DEFAULT_LLM_MODEL, LLM, VIDEO_MODEL_IDS } from "@/lib/constants";
 import type { ModelSettings } from "@/types/llm-common";
 import { z } from "zod/v4";
 import { generateSeed } from "@/lib/seed";
@@ -16,7 +16,7 @@ const mediaModelOpt = z.string().min(1);
 
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
-  videoType: z.enum(["standalone", "music_video", "dialogue"]).default("standalone"),
+  videoType: z.enum(["standalone", "music_video", "dialogue", "timelapse"]).default("standalone"),
   /** English style string for AI music generation when `videoType` is music_video. */
   musicGenre: z.string().min(1).max(500).optional(),
   style: z.string().default("cinematic"),
@@ -33,6 +33,7 @@ const standaloneSchema = z.object({
   promptModel: textModelOpt,
   motionModel: textModelOpt,
   imageModel: mediaModelOpt,
+  researchModel: textModelOpt,
   videoModel: z.enum(VIDEO_MODEL_IDS),
   duration: z.object({
     preferred: z.number().min(10).max(180),
@@ -52,7 +53,7 @@ type ParsedStandalone = z.infer<typeof standaloneSchema>;
 
 function resolveTextModel(
   p: ParsedStandalone,
-  k: "producerModel" | "storyModel" | "directorModel" | "supervisorModel" | "cinematographerModel" | "storyboardModel" | "promptModel" | "motionModel"
+  k: "producerModel" | "storyModel" | "directorModel" | "supervisorModel" | "cinematographerModel" | "researchModel" | "storyboardModel" | "promptModel" | "motionModel"
 ) {
   return p[k] ?? DEFAULT_LLM_MODEL;
 }
@@ -64,11 +65,13 @@ function buildModelSettings(p: ParsedStandalone): ModelSettings {
     directorModel: resolveTextModel(p, "directorModel"),
     supervisorModel: resolveTextModel(p, "supervisorModel"),
     cinematographerModel: resolveTextModel(p, "cinematographerModel"),
+    researchModel: resolveTextModel(p, "researchModel"),
     storyboardModel: resolveTextModel(p, "storyboardModel"),
     promptModel: resolveTextModel(p, "promptModel"),
     motionModel: resolveTextModel(p, "motionModel"),
     imageModel: p.imageModel,
     videoModel: p.videoModel,
+    reviewerModel: LLM.reviewerModel,
   };
 }
 

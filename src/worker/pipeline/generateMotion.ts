@@ -2,7 +2,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { WORKER } from "@/lib/constants";
-import { generateSingleFrameMotion } from "@/server/services/llm";
+import { generateSingleFrameMotion } from "@/server/services/ai/llm";
 import { withAiAuditContext } from "@/server/services/ai-audit";
 import { mediaUrl } from "@/lib/storage";
 import { getAgentModels, autoChainOrReview } from "./shared";
@@ -88,7 +88,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-motion] Generating motion for ${framesToProcess.length} frames across ${existingScenes.length} scenes`);
 
-    const agents = getAgentModels(videoProject);
+    const motionModel = getAgentModels(videoProject.modelSettings, 'motionModel');
     const videoModelId = videoProject.modelSettings.videoModel;
     const BATCH_SIZE = WORKER.parallelImages;
 
@@ -146,7 +146,7 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
                   },
                   currentImageUrl,
                   nextImageUrl,
-                  agents.motionModel,
+                  motionModel,
                   videoModelId,
                 ),
             );

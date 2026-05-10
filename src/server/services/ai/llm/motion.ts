@@ -66,8 +66,29 @@ export const frameMotionSpecSchema = z.object({
 
 export type FrameMotionSpec = z.infer<typeof frameMotionSpecSchema>;
 
-/** Turn structured motion into one dense prompt for text-native video models. */
-export function compileMotionPrompt(spec: FrameMotionSpec): string {
+// ── Per-model prompt compilers ──
+//
+// Each i2v model parses prompts differently; one universal template under-
+// performs every model. Compilers below are tuned to each model's documented
+// strengths and failure modes (see docs/video-model-prompts.md for sources).
+
+/** Strip a leading "Camera"/"Camera:" if the LLM already wrote it. */
+function stripCameraPrefix(s: string): string {
+  return s.replace(/^camera\s*[:\-—]\s*/i, "").trim();
+}
+
+/** Ensure a clause ends with a single period. */
+function asSentence(s: string): string {
+  const t = s.trim().replace(/[.,;:\s]+$/, "");
+  return t ? `${t}.` : "";
+}
+
+/**
+ * Default compiler — legacy generic template. Used by Veo 3.1, Kling 3 Std/Pro,
+ * Runway Gen-4 / Gen-4.5, and Grok. These models tolerate the format
+ * acceptably; per-model tuning can be added later if data warrants.
+ */
+function compileDefault(spec: FrameMotionSpec): string {
   const pa = spec.primaryAction.trim();
   const sd = spec.subjectDynamics.trim();
   const cm = spec.cameraMove.trim();
@@ -84,6 +105,110 @@ export function compileMotionPrompt(spec: FrameMotionSpec): string {
   const body = parts.join(" ").replace(/\s+/g, " ").trim();
   if (!body) return "";
   return `Smooth continuous motion throughout — ${body}`;
+}
+
+/**
+ * Seedance 2.0 compiler.
+ *
+ * Seedance parses period-separated short declarative sentences as a beat
+ * timeline. It also interprets negatives positively unless rephrased — so we
+ * convert negativeMotion into a fixed positive anchor instead of echoing it.
+ * The "Smooth continuous motion throughout —" prefix is dropped: it adds
+ * nothing for Seedance and eats prompt budget.
+ */
+function compileSeedance(spec: FrameMotionSpec): string {
+  const pa = asSentence(spec.primaryAction);
+  const sd = asSentence(spec.subjectDynamics);
+  const cm = stripCameraPrefix(spec.cameraMove);
+  const es = spec.endState.trim();
+  const neg = spec.negativeMotion.trim();
+
+  const parts: string[] = [];
+  if (pa) parts.push(pa);
+  if (sd) parts.push(sd);
+  if (cm) parts.push(asSentence(`Camera ${cm}`));
+  if (es) parts.push(asSentence(`Settles: ${es}`));
+  // Positive-form anchor instead of a negative list (Seedance interprets "no X"
+  // as "X"). The LLM's negativeMotion is intentionally discarded here.
+  if (neg) parts.push("Stable identity, natural proportions, clean edges throughout.");
+
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Kling v2.5 Turbo Pro compiler.
+ *
+ * Kuaishou's official prompt formula uses labelled clauses
+ * (Subject + Movement + Scene + Camera + Lighting + Atmosphere). We don't
+ * carry Lighting/Atmosphere fields, so we structure what we have using
+ * Kling's preferred labelled form. Pacing words ('slowly', 'gradually') are
+ * the documented mitigation for finger/face artifacts; we inject one if the
+ * LLM didn't already emit one. Negatives are kept (Kling's negative_prompt
+ * field handles short lists well) but lightly capped.
+ */
+function compileKling25Turbo(spec: FrameMotionSpec): string {
+  const pacingRe = /\b(slow(ly)?|gradual(ly)?|gentl[ey]|slight(ly)?|softly)\b/i;
+  let pa = spec.primaryAction.trim();
+  if (pa && !pacingRe.test(pa)) {
+    pa = `Slowly ${pa.charAt(0).toLowerCase()}${pa.slice(1)}`;
+  }
+  const sd = spec.subjectDynamics.trim();
+  const cm = stripCameraPrefix(spec.cameraMove);
+  const es = spec.endState.trim();
+  const neg = spec.negativeMotion.trim();
+
+  const parts: string[] = [];
+  const subjectClause = [pa, sd].filter(Boolean).join(", ");
+  if (subjectClause) parts.push(asSentence(subjectClause));
+  if (cm) parts.push(asSentence(`Camera: ${cm}`));
+  if (es) parts.push(asSentence(`Ending: ${es}`));
+  if (neg) parts.push(asSentence(`Avoid: ${neg}`));
+
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Pixverse V6 compiler.
+ *
+ * V6 is sequentially parsed (Subject + Action + Atmospheric motion + Camera
+ * + Style/Mood). Three documented anti-patterns we eliminate:
+ *   1. The "Smooth continuous motion throughout —" prefix — V6's default
+ *      motion_mode already does this; the phrase wastes budget.
+ *   2. "Ending:" — V6 has no end_image and no terminal-frame conditioning;
+ *      explicit endings confuse the parser. Trajectory belongs in the verb.
+ *   3. Inline "Avoid:" — burying negatives in the positive prompt is
+ *      documented to HURT V6 quality. Until we wire negative_prompt through
+ *      the Replicate provider, dropping is better than burying.
+ */
+function compilePixverseV6(spec: FrameMotionSpec): string {
+  const pa = asSentence(spec.primaryAction);
+  const sd = asSentence(spec.subjectDynamics);
+  const cm = stripCameraPrefix(spec.cameraMove);
+
+  const parts: string[] = [];
+  if (pa) parts.push(pa);
+  if (sd) parts.push(sd);
+  if (cm) parts.push(asSentence(`Camera: ${cm}`));
+
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/** Turn structured motion into one dense prompt, tuned to the target model. */
+export function compileMotionPrompt(
+  spec: FrameMotionSpec,
+  modelId?: TVideoModelId | null,
+): string {
+  switch (modelId) {
+    case "seedance-2-pro":
+    case "seedance-2-fast":
+      return compileSeedance(spec);
+    case "kling-v2.5-turbo-pro":
+      return compileKling25Turbo(spec);
+    case "pixverse-v6":
+      return compilePixverseV6(spec);
+    default:
+      return compileDefault(spec);
+  }
 }
 
 export type SingleFrameMotionResult = {
@@ -161,6 +286,7 @@ export async function generateSingleFrameMotion(
   } else if (wps > 0 && wps <= 1.5) {
     tempoBlock = `\n\nVO TEMPO: sparse narration (~${wps.toFixed(1)} words/sec) — push camera and subject motion harder so the frame stays alive.\n`;
   }
+
 
   const systemPrompt = `You are a motion director for an AI video generation model. The model receives ONE starting image and a single compiled text prompt. You output STRUCTURED fields that will be assembled into that prompt.
 
@@ -257,7 +383,7 @@ TARGET: Compiled prompt ~55–130 words total across fields; include enough temp
   );
   if (!output) throw new Error("Failed to generate frame motion");
 
-  const visualDescription = compileMotionPrompt(output);
+  const visualDescription = compileMotionPrompt(output, videoModelId);
   if (!visualDescription) throw new Error("Compiled motion prompt is empty");
 
   return { motionSpec: output, visualDescription };

@@ -5,6 +5,18 @@ import axios, { AxiosInstance } from "axios";
 
 const REPLICATE_API = "https://api.replicate.com/v1";
 
+// Per-model `negative_prompt` baselines. Both Kling v2.5 Turbo Pro and
+// Pixverse V6 expose a dedicated `negative_prompt` Replicate input — using it
+// outperforms burying negatives in the positive prompt (documented to HURT
+// Pixverse V6 quality, and Kling responds best to 5–8 focused terms rather
+// than long inline lists). See docs/video-model-prompts.md for sources.
+const NEGATIVE_PROMPTS: Partial<Record<TVideoModelId, string>> = {
+  "kling-v2.5-turbo-pro":
+    "blur, distortion, warping, extra fingers, jittery motion, low quality, watermark",
+  "pixverse-v6":
+    "extra fingers, distorted hands, morphing, warping, deformed face, text, watermark, shaky camera, sudden cuts, fast zoom, jitter, flicker, low quality",
+};
+
 function extractOutputUrl(out: unknown): string {
   if (typeof out === "string" && (out.startsWith("http://") || out.startsWith("https://"))) {
     return out;
@@ -35,6 +47,7 @@ export class ReplicateVideoProvider implements IVideoProvider {
       case "seedance-2-fast":
         return {
           image: req.startImageUrl,
+          last_frame_image: req.endImageUrl,
           prompt: req.prompt,
           duration: req.duration,
           aspect_ratio: req.aspectRatio,
@@ -46,8 +59,19 @@ export class ReplicateVideoProvider implements IVideoProvider {
           start_image: req.startImageUrl,
           end_image: req.endImageUrl,
           prompt: req.prompt,
+          negative_prompt: NEGATIVE_PROMPTS[model],
           duration: req.duration,
           aspect_ratio: req.aspectRatio,
+        };
+      case "pixverse-v6":
+        return {
+          image: req.startImageUrl,
+          last_frame_image: req.endImageUrl,
+          prompt: req.prompt,
+          negative_prompt: NEGATIVE_PROMPTS[model],
+          duration: req.duration,
+          aspect_ratio: req.aspectRatio,
+          quality: VIDEO_MODELS[model].supportedResolution[0],
         };
       default:
         throw new Error(`Replicate: video model ${model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);

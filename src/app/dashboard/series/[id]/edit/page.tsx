@@ -189,6 +189,7 @@ export default function EditSeriesPage() {
             <Select label="Niche" value={form.niche} onChange={(e) => setForm({ ...form, niche: e.target.value })} options={NICHES.map((n) => ({ value: n.id, label: `${n.label} — ${n.description}` }))} />
             <Select label="Script Language" value={form.language} onChange={(e) => setForm({ ...form, language: e.target.value })} options={LANGUAGES.map((l) => ({ value: l.id, label: l.label }))} />
             <Select label="Art Style" value={form.style} onChange={(e) => setForm({ ...form, style: e.target.value })} options={ART_STYLES.map((s) => ({ value: s.id, label: s.label }))} />
+
             <Select label="Caption Style" value={form.captionStyle} onChange={(e) => setForm({ ...form, captionStyle: e.target.value })} options={CAPTION_STYLES.map((c) => ({ value: c.id, label: `${c.label} — ${c.description}` }))} />
 
             <div>

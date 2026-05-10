@@ -8,7 +8,7 @@ import { generateImage, type CharacterRef } from "@/server/services/media";
 import {
   buildHeroAssetSheetPrompt,
   aspectRatioForHeroAsset,
-} from "@/server/services/llm";
+} from "@/server/services/ai/llm";
 import { assertUserOwnsVideo } from "@/server/db/story-assets";
 
 /**

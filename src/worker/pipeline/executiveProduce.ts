@@ -3,7 +3,7 @@ import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { resolveDuration, type DurationPreference } from "@/types/pipeline";
-import { generateCreativeBrief } from "@/server/services/llm";
+import { generateCreativeBrief } from "@/server/services/ai/llm";
 import { getAgentModels, mergeProjectConfig } from "./shared";
 
 export async function executiveProduceJob(job: Job<RenderJobData>) {
@@ -17,6 +17,15 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "PRODUCING");
 
+    // Timelapse takes a different fork: the slim pipeline replaces the
+    // creative-brief → story → director → … chain with a single
+    // timelapse-plan worker. No brief needed.
+    if (video.videoType === "timelapse") {
+      console.log(`[executive-produce] Forking to timelapse pipeline for ${videoProjectId}`);
+      await renderQueue.add("timelapse-plan", { videoProjectId });
+      return;
+    }
+
     const config = video.config ?? {};
 
     const duration: DurationPreference = config.duration
@@ -29,7 +38,7 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     const assets = await resolveStoryAssets(videoProjectId);
 
-    const agents = getAgentModels(video);
+    const producerModel = getAgentModels(video.modelSettings, 'producerModel');
 
     console.log(`[executive-produce] Generating creative brief for video=${videoProjectId}`);
 
@@ -40,7 +49,7 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
       duration,
       topicIdea,
       assets,
-      agents.producerModel
+      producerModel
     );
 
     await mergeProjectConfig(videoProjectId, { duration, creativeBrief: brief });

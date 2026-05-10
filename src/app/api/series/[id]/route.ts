@@ -12,7 +12,7 @@ const updateSeriesSchema = z.object({
   style: z.string().optional(),
   captionStyle: z.string().optional(),
   language: z.string().optional(),
-  videoType: z.enum(["standalone", "music_video", "dialogue"]).optional(),
+  videoType: z.enum(["standalone", "music_video", "dialogue", "timelapse"]).optional(),
   llmModel: z.string().optional(),
   imageModel: z.string().optional(),
   videoModel: z.string().optional(),

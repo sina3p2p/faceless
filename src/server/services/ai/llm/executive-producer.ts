@@ -78,7 +78,14 @@ FORMAT CONSTRAINTS — you must decide:
 5. dialogueDensity: "none", "sparse" (occasional quotes), "moderate" (regular dialogue), "heavy" (mostly conversation)
 6. maxSentencesPerScene: how many narration sentences fit one scene (typically 1–4 for short-form)
 
-Choose these based on the video type, and duration. A 15s video needs different constraints than a 120s video.${topicIdea ? `\n\nTOPIC DIRECTION: ${topicIdea}` : ""}`;
+Choose these based on the video type and duration. Use this concrete guidance for the chosen target duration (${duration.preferred}s) — these are starting points, override only with reason:
+${
+  duration.preferred <= 30
+    ? `- SHORT FORM (≤30s): maxSentencesPerScene=1, openingHook='claim' or 'mystery' (no time for slow burns), revealTiming='early' or 'final' (gradual won't fit), resolutionType='closed' or 'cliffhanger', dialogueDensity='none' or 'sparse'. Pacing: rapid-fire, every second earns its keep.`
+    : duration.preferred <= 90
+      ? `- MID FORM (30–90s): maxSentencesPerScene=2–3, any openingHook works, revealTiming='gradual' fits well, dialogueDensity up to 'moderate'. Pacing: room for one quiet beat before the climax.`
+      : `- LONG FORM (>90s): maxSentencesPerScene=3–4, revealTiming='gradual' or 'early' (audience needs payoff signposts), dialogueDensity up to 'heavy'. Pacing: steady escalation with multiple breath beats.`
+}${topicIdea ? `\n\nTOPIC DIRECTION: ${topicIdea}` : ""}`;
 
   const visionParts = await buildStoryAssetVisionContentParts(assets);
   const { output } = await recordAiCall(

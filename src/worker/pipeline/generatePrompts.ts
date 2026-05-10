@@ -2,11 +2,11 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
-import { generateFramePrompts } from "@/server/services/llm/prompts";
+import { generateFramePrompts } from "@/server/services/ai/llm/prompts";
 import {
   formatPromptContractLogLine,
   resolveFrameImagePromptWithFallback,
-} from "@/server/services/llm/prompt-contract";
+} from "@/server/services/ai/llm/prompt-contract";
 import { getAgentModels } from "./shared";
 
 export async function generatePromptsJob(job: Job<RenderJobData>) {
@@ -34,8 +34,6 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
 
     const assets = await resolveStoryAssets(videoProjectId);
 
-    const agents = getAgentModels(videoProject);
-
     console.log(`[generate-prompts] Generating frame prompts for ${existingScenes.length} scenes`);
 
     const result = await generateFramePrompts(
@@ -44,7 +42,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
       config.visualStyleGuide,
       config.frameBreakdown,
       config.continuityNotes,
-      agents.promptModel
+      getAgentModels(videoProject.modelSettings, "promptModel")
     );
 
     await db.delete(schema.sceneFrames).where(eq(schema.sceneFrames.videoProjectId, videoProjectId));
@@ -63,7 +61,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
           primaryImagePrompt: sceneFrames[j].imagePrompt,
           subjectFocus,
           characterRegistry: config.continuityNotes.characterRegistry,
-          providerProfile: agents.promptModel ?? "prompt-model",
+          providerProfile: getAgentModels(videoProject.modelSettings, "promptModel"),
           styleGuide: config.visualStyleGuide,
           sceneIndex: i,
           frameSpec,

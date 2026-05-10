@@ -11,6 +11,7 @@ const LLM_DEFAULT_BY_AGENT: Record<keyof AgentModels, string> = {
   directorModel: LLM.directorModel,
   supervisorModel: LLM.supervisorModel,
   cinematographerModel: LLM.cinematographerModel,
+  researchModel: LLM.researchModel,
   storyboardModel: LLM.storyboardModel,
   promptModel: LLM.promptModel,
   motionModel: LLM.motionModel,
@@ -23,6 +24,7 @@ const AGENT_MODEL_KEYS: (keyof AgentModels)[] = [
   "directorModel",
   "supervisorModel",
   "cinematographerModel",
+  "researchModel",
   "storyboardModel",
   "promptModel",
   "motionModel",
@@ -41,27 +43,11 @@ export function getModelDurationsArray(videoModel: TVideoModelId): number[] {
 }
 
 export function getAgentModels(
-  project: {
-    llmModel?: string | null;
-    modelSettings?: ModelSettings | null;
-    config?: unknown;
-  } | null | undefined
-): AgentModels {
-  const s = project?.modelSettings;
-  const fromProject = project?.llmModel || undefined;
-  const cfg = getProjectConfig(project?.config);
-  const fromConfig = cfg.agentModels;
-  const out: AgentModels = {};
-  for (const k of AGENT_MODEL_KEYS) {
-    if (k === "producerModel") {
-      out.producerModel =
-        fromConfig?.producerModel || fromProject || LLM_DEFAULT_BY_AGENT.producerModel;
-      continue;
-    }
-    const fromMs = s?.[k as keyof ModelSettings] as string | undefined;
-    out[k] = fromMs || fromConfig?.[k] || fromProject || LLM_DEFAULT_BY_AGENT[k];
-  }
-  return out;
+  modelSettings: ModelSettings,
+  key: keyof AgentModels
+): string {
+  const fromMs = modelSettings[key as keyof ModelSettings] as string | undefined;
+  return fromMs || LLM_DEFAULT_BY_AGENT[key];
 }
 
 export function getProjectConfig(config: unknown): PipelineConfig {

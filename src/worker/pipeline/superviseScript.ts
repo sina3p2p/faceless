@@ -1,7 +1,7 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
-import { superviseScript } from "@/server/services/llm";
+import { superviseScript } from "@/server/services/ai/llm";
 import { getAgentModels, mergeProjectConfig, autoChainOrReview } from "./shared";
 
 export async function superviseScriptJob(job: Job<RenderJobData>) {
@@ -26,7 +26,7 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
 
     const assets = await resolveStoryAssets(videoProjectId);
 
-    const agents = getAgentModels(videoProject);
+    const supervisorModel = getAgentModels(videoProject.modelSettings, 'supervisorModel');
 
     console.log(`[supervise-script] Supervising ${existingScenes.length} scenes for ${videoProjectId}`);
 
@@ -34,7 +34,7 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
       existingScenes,
       config.creativeBrief,
       assets,
-      agents.supervisorModel
+      supervisorModel
     );
 
     await db.delete(schema.videoScenes).where(eq(schema.videoScenes.videoProjectId, videoProjectId));

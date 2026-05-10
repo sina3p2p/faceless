@@ -3,14 +3,14 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, resolveStoryAssets, filterAssetsByRefs, failJob } from "../shared";
 import { getVideoSize } from "@/lib/constants";
 import type { RenderJobData } from "@/lib/queue";
-import { serializeCanonicalForImageProvider } from "@/server/services/llm/prompt-contract";
+import { serializeCanonicalForImageProvider } from "@/server/services/ai/llm/prompt-contract";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { generateImage, type AspectRatio } from "@/server/services/media";
 import {
   reviewFrameImage,
   type FrameMediaMetadata,
   type ReviewResult,
-} from "@/server/services/llm/image-reviewer";
+} from "@/server/services/ai/llm/image-reviewer";
 import { autoChainOrReview, getAgentModels, loadProjectConfig } from "./shared";
 
 const SEVERITY_RANK: Record<"hard" | "soft", number> = { hard: 1, soft: 0 };
@@ -45,7 +45,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     const reviewEnabled = cfg.imageReviewEnabled !== false;
     const maxRetries = clampRetries(cfg.imageReviewMaxRetries);
     const severityFloor: "hard" | "soft" = cfg.imageReviewSeverityFloor ?? "hard";
-    const reviewerModel = getAgentModels(videoProject).reviewerModel!;
+    const reviewerModel = getAgentModels(videoProject.modelSettings, "reviewerModel");
 
     const allAssets = await resolveStoryAssets(videoProjectId);
 
@@ -70,7 +70,12 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
-      await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", "generate-pipeline-motion");
+      // Timelapse projects already have motionSpec + visualDescription
+    // populated at plan time, so they skip the motion-director job entirely.
+    const nextJobAfterImages = videoProject.videoType === "timelapse"
+      ? "generate-frame-videos"
+      : "generate-pipeline-motion";
+    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", nextJobAfterImages);
       return;
     }
 
@@ -109,7 +114,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         const correctionSuffix = priorHints.length > 0
           ? "\n\nCorrection from prior attempts (must satisfy):\n" +
-            priorHints.map((h, idx) => `  ${idx + 1}. ${h}`).join("\n")
+          priorHints.map((h, idx) => `  ${idx + 1}. ${h}`).join("\n")
           : "";
         const effectivePrompt = prompt + correctionSuffix;
 
@@ -253,7 +258,12 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-frame-images] All ${targets.length} frames processed`);
 
-    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", "generate-pipeline-motion");
+    // Timelapse projects already have motionSpec + visualDescription
+    // populated at plan time, so they skip the motion-director job entirely.
+    const nextJobAfterImages = videoProject.videoType === "timelapse"
+      ? "generate-frame-videos"
+      : "generate-pipeline-motion";
+    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", nextJobAfterImages);
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, msg);

@@ -12,10 +12,10 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import type { ImageSpec } from "@/server/services/llm/image-spec";
-import type { FrameMotionSpec } from "@/server/services/llm/motion";
+import type { ImageSpec } from "@/server/services/ai/llm/image-spec";
+import type { FrameMotionSpec } from "@/server/services/ai/llm/motion";
 import type { MotionSkillHints } from "@/types/motion-skill-hints";
-import type { ResultMeta } from "@/server/services/llm/prompt-contract";
+import type { ResultMeta } from "@/server/services/ai/llm/prompt-contract";
 import type { ModelSettings } from "@/types/llm-common";
 import { PipelineConfig } from "@/types/pipeline";
 

@@ -1,5 +1,5 @@
 import { generateText, ImagePart, TextPart, UserContent } from "ai";
-import { openrouter } from "@/server/services/llm";
+import { openrouter } from "@/server/services/ai/llm";
 import { generateViaOpenRouter, type CharacterRef } from "@/server/services/media";
 import type { StoryAsset } from "@/types/llm-common";
 import { uploadFile, mediaUrl } from "@/lib/storage";

@@ -2,7 +2,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
-import { generateStory, generateMusicLyrics, generateBeatSheet } from "@/server/services/llm";
+import { generateStory, generateMusicLyrics, generateBeatSheet } from "@/server/services/ai/llm";
 import { getResearchPackForVideo } from "@/server/db/research";
 import { getAgentModels, mergeProjectConfig } from "./shared";
 import { deriveSubseed } from "@/lib/seed";
@@ -28,7 +28,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
 
     console.log(`[generate-story] Starting story generation for video=${videoProjectId}`);
 
-    const agents = getAgentModels(video);
+    const storyModel = getAgentModels(video.modelSettings, 'storyModel');
 
     const researchPack =
       config.webResearch === true ? await getResearchPackForVideo(videoProjectId) : null;
@@ -48,7 +48,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
         style: video.style,
         topicIdea,
         language: video.language ?? undefined,
-        model: agents.storyModel,
+        model: storyModel,
         musicGenreStyle: config.musicGenre,
         researchPack,
         targetDurationSec: preferred,
@@ -66,7 +66,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
           config.creativeBrief,
           video.language || "en",
           researchPack,
-          agents.storyModel,
+          storyModel,
         );
         await mergeProjectConfig(videoProjectId, { beatSheet });
         console.log(`[generate-story] Beat sheet: ${beatSheet.beats.length} beats, voice="${beatSheet.voice}"`);
@@ -76,7 +76,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
         video.style,
         topicIdea,
         video.language,
-        agents.storyModel,
+        storyModel,
         config.creativeBrief,
         researchPack,
         storySeed,

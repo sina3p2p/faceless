@@ -43,10 +43,11 @@ export const LLM = {
   directorModel: "anthropic/claude-opus-4.6",
   supervisorModel: "anthropic/claude-opus-4.6",
   cinematographerModel: "openai/gpt-5.4",
+  researchModel: "openai/gpt-4.1-mini",
   storyboardModel: "openai/gpt-4.1-mini",
   promptModel: "openai/gpt-5.4",
   motionModel: "openai/gpt-5.4",
-  reviewerModel: "openai/gpt-4.1",
+  reviewerModel: "anthropic/claude-opus-4.7",
 } as const;
 
 export const LLM_MODELS = [
@@ -208,6 +209,16 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
     supportedResolution: [],
     description: "Kling master-quality i2v (via Fal — v2.1 master)",
     durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    endFrameSupported: false,
+  },
+  "pixverse-v6": {
+    id: "pixverse-v6",
+    label: "Pixverse V6",
+    endpoint: "pixverse/pixverse-v6",
+    provider: "replicate",
+    supportedResolution: ["360p"],
+    description: "Pixverse V6 i2v (via Replicate), 1–15s",
+    durations: [5, 8, 10, 15],
     endFrameSupported: false,
   },
 };
@@ -376,6 +387,7 @@ export const VIDEO_TYPES = [
   { id: "standalone", label: "Standalone", description: "Story-driven video with AI-generated visuals and voiceover" },
   { id: "music_video", label: "Music Video", description: "AI-generated song with vocals + cinematic visuals (~$3-4/video)" },
   { id: "dialogue", label: "Dialogue", description: "Conversational story between characters with different voices" },
+  { id: "timelapse", label: "Timelapse", description: "Locked-vantage stage snapshots of a real-world process (construction, cleaning, growth) — one image per stage, animated with ambient motion." },
 ] as const;
 
 /** Preset music genres for music videos — `style` is English text for the AI music generator (e.g. Suno). */

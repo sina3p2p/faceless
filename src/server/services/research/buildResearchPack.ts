@@ -2,7 +2,7 @@ import { generateText as aiGenerateText, Output } from "ai";
 import { recordAiCall } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { RESEARCH, getLanguageName } from "@/lib/constants";
-import { openrouter } from "@/server/services/llm/openrouter-client";
+import { openrouter } from "@/server/services/ai/llm/openrouter-client";
 import type { CreativeBrief } from "@/types/pipeline";
 import type { ResearchClaimConfidence, ResearchSourceType } from "@/types/pipeline";
 import { inferSourceType } from "./inferSourceType";

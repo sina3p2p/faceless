@@ -4,7 +4,7 @@ import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import {
   splitStoryIntoScenes,
-} from "@/server/services/llm";
+} from "@/server/services/ai/llm";
 import { getAgentModels } from "./shared";
 
 export async function splitScenesJob(job: Job<RenderJobData>) {
@@ -22,7 +22,7 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     console.log(`[split-scenes] Splitting story into scenes for ${videoProjectId}`);
 
-    const agents = getAgentModels(videoProject);
+    const directorModel = getAgentModels(videoProject.modelSettings, 'directorModel');
 
     const assets = await resolveStoryAssets(videoProjectId);
 
@@ -35,7 +35,7 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
       storyInput,
       videoProject.style,
       videoProject.language || "en",
-      agents.directorModel,
+      directorModel,
       videoProject.videoType || undefined,
       config.creativeBrief,
       assets
