@@ -8,8 +8,10 @@ import type { ResearchClaimConfidence, ResearchSourceType } from "@/types/pipeli
 import { inferSourceType } from "./inferSourceType";
 import { hostnameFromUrl, normalizeUrl, tavilySearch, type TavilySearchResult } from "./tavily";
 
+// Azure structured outputs only support minItems/maxItems of 0 or 1, so array
+// length bounds (3–6 queries, 1–35 claims) are enforced at runtime below.
 const researchQueriesSchema = z.object({
-  queries: z.array(z.string().min(2)).min(3).max(6),
+  queries: z.array(z.string().min(2)),
 });
 
 const extractedClaimSchema = z.object({
@@ -20,7 +22,7 @@ const extractedClaimSchema = z.object({
 });
 
 const researchExtractionSchema = z.object({
-  claims: z.array(extractedClaimSchema).min(1).max(35),
+  claims: z.array(extractedClaimSchema),
 });
 
 export interface BuiltResearchClaim {
@@ -99,9 +101,10 @@ Language for the final video: ${langName} (queries may still be in English for b
       }),
   );
   if (!queryOut?.queries?.length) throw new Error("Research query planning produced no queries");
+  const queries = queryOut.queries.slice(0, 6);
 
   const perQuery: TavilySearchResult[][] = [];
-  for (const q of queryOut.queries) {
+  for (const q of queries) {
     perQuery.push(await tavilySearch(q));
   }
   const corpus = mergeDedupedResults(perQuery);
@@ -139,7 +142,7 @@ Rules:
 
   const claims: BuiltResearchClaim[] = [];
   let order = 0;
-  for (const c of extractOut.claims) {
+  for (const c of extractOut.claims.slice(0, 35)) {
     const norm = normalizeUrl(c.sourceUrl);
     if (!allowed.has(norm)) continue;
     const row = findSourceRow(corpus, c.sourceUrl);
@@ -167,7 +170,7 @@ Rules:
   }
 
   return {
-    queries: queryOut.queries,
+    queries,
     searchProvider: "tavily",
     claims,
   };
