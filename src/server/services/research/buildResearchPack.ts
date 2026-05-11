@@ -9,7 +9,7 @@ import { inferSourceType } from "./inferSourceType";
 import { hostnameFromUrl, normalizeUrl, tavilySearch, type TavilySearchResult } from "./tavily";
 
 const researchQueriesSchema = z.object({
-  queries: z.array(z.string().min(2)).min(3).max(6),
+  queries: z.array(z.string().min(2)),
 });
 
 const extractedClaimSchema = z.object({
@@ -20,7 +20,7 @@ const extractedClaimSchema = z.object({
 });
 
 const researchExtractionSchema = z.object({
-  claims: z.array(extractedClaimSchema).min(1).max(35),
+  claims: z.array(extractedClaimSchema),
 });
 
 export interface BuiltResearchClaim {
