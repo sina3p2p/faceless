@@ -2,6 +2,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { superviseScript } from "@/server/services/ai/llm";
+import { countNarrationWords, estimateDurationSec } from "@/server/services/ai/llm/pacing";
 import { getAgentModels, mergeProjectConfig, autoChainOrReview } from "./shared";
 
 export async function superviseScriptJob(job: Job<RenderJobData>) {
@@ -42,12 +43,18 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
     await db.insert(schema.videoScenes).values(result.scenes.map((s, i) => {
       const baseNote = s.directorNote.replace(/^\[Scene function:[^\]]*\]\s*/i, "");
       const surpriseLine = s.surpriseInjection ? `\n[Surprise injection: ${s.surpriseInjection}]` : "";
+      const imageabilityScore = Math.min(5, Math.max(1, Math.round(s.imageabilityScore)));
       return {
         videoProjectId,
         sceneOrder: i,
         sceneTitle: s.sceneTitle,
         directorNote: `[Scene function: ${s.sceneFunction}]\n${baseNote}${surpriseLine}`,
         text: s.text,
+        estimatedDurationSec: estimateDurationSec(
+          countNarrationWords(s.text),
+          s.voicePace ?? "standard"
+        ),
+        imageabilityScore,
       };
     }));
 

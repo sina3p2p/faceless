@@ -72,6 +72,42 @@ export async function generateVisualStyleGuide(
     STYLE_CONSTRAINTS[style] ??
     `Style "${style}": follow the spirit of the named style; choose camera physics, medium, and material language that fit it.`;
 
+  const cinematicSpecBlock = brief.cinematicSpec
+    ? `
+
+CINEMATIC SPEC FROM PRODUCER (LOCKED — your style guide must be consistent with these technical anchors; do not contradict them):
+- Lighting style: ${brief.cinematicSpec.lightingStyle}
+- Color temperature: ${brief.cinematicSpec.colorTemperatureK}K (${
+        brief.cinematicSpec.colorTemperatureK <= 3500
+          ? "warm — golden hour / tungsten / candlelight"
+          : brief.cinematicSpec.colorTemperatureK <= 5000
+            ? "neutral-warm — overcast / mixed practical"
+            : brief.cinematicSpec.colorTemperatureK <= 6500
+              ? "daylight neutral"
+              : "cool — moonlit / cold shadow"
+      })
+- Lens focal length: ${brief.cinematicSpec.lensFocalMm}mm (${
+        brief.cinematicSpec.lensFocalMm <= 28
+          ? "wide / environmental"
+          : brief.cinematicSpec.lensFocalMm <= 40
+            ? "natural-wide"
+            : brief.cinematicSpec.lensFocalMm <= 60
+              ? "natural"
+              : brief.cinematicSpec.lensFocalMm <= 100
+                ? "portrait / intimate"
+                : "compressed / voyeuristic"
+      })
+- Depth of field: ${brief.cinematicSpec.depthOfField}
+- Camera movement vocabulary: ${brief.cinematicSpec.cameraMovement}
+- Aspect mood: ${brief.cinematicSpec.aspectMood}
+
+Bake these into:
+- global.defaultLighting (must echo the lightingStyle and the Kelvin anchor)
+- global.cameraPhysics (must reflect the camera movement vocabulary)
+- promptRegions.lightingPrefix (open with the locked lighting setup)
+- promptRegions.cameraPrefix (open with the lens focal length and DoF, then the movement vocabulary)`
+    : "";
+
   const systemPrompt = `You are a Cinematographer designing the visual language for a video production.
 
 Your output is a VISUAL STYLE GUIDE that the Prompt Architect and Motion Director will follow exactly. Every image prompt will be assembled using your promptRegions — so they must be precise and concatenation-ready.
@@ -79,7 +115,7 @@ Your output is a VISUAL STYLE GUIDE that the Prompt Architect and Motion Directo
 VISUAL STYLE: ${style}
 VIDEO TYPE: ${videoType}
 VISUAL MOOD FROM BRIEF: ${brief.visualMood}
-PACING: ${brief.pacingStrategy}
+PACING: ${brief.pacingStrategy}${cinematicSpecBlock}
 
 YOUR RESPONSIBILITIES:
 1. Define the MEDIUM — what physical material/technique the visuals simulate

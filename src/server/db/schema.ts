@@ -296,6 +296,16 @@ export const videoScenes = pgTable("video_scenes", {
   speaker: text("speaker"),
   assetRefs: json("asset_refs").$type<string[]>(),
   duration: real("duration").notNull().default(0),
+  // Director's WPM-based estimate of narration length before TTS runs. Lets
+  // the cinematographer request matching-length clips and lets the supervisor
+  // catch over/under-budget scenes earlier.
+  estimatedDurationSec: real("estimated_duration_sec"),
+  // 1-5 score from the imageability pass. <=2 means the supervisor rewrote
+  // the directorNote into a concrete metaphor.
+  imageabilityScore: integer("imageability_score"),
+  // Forward-compatible seam for BGM beat-sync. Cut offset (ms) relative to
+  // scene start where a downstream beat-sync agent prefers to land the cut.
+  beatAlignmentHintMs: integer("beat_alignment_hint_ms"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

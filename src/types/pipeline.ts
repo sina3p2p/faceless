@@ -45,13 +45,40 @@ export interface FormatConstraints {
   maxSentencesPerScene: number;
 }
 
+export type NarrativeFramework = "AIDA" | "PAS" | "heros-journey" | "freeform";
+
+export type DepthOfField = "deep" | "shallow" | "anamorphic-bokeh";
+
+export interface AudienceSegment {
+  segment: string;
+  primaryGoal: string;
+  primaryFear: string;
+  emotionalTriggers: string[];
+  trustSignals: string[];
+  toneToAvoid: string;
+}
+
+export interface CinematicSpec {
+  lightingStyle: string;
+  colorTemperatureK: number;
+  lensFocalMm: number;
+  depthOfField: DepthOfField;
+  cameraMovement: string;
+  aspectMood: string;
+}
+
 export interface CreativeBrief {
   concept: string;
   tone: string;
   targetAudience: string;
+  // Optional in the TS interface because briefs persisted before the
+  // upgrade lack these fields. New briefs always have them (Zod-enforced).
+  audience?: AudienceSegment;
   pacingStrategy: string;
   visualMood: string;
   narrativeArc: string;
+  narrativeFramework?: NarrativeFramework;
+  cinematicSpec?: CinematicSpec;
   durationGuidance: {
     wordBudgetMin: number;
     wordBudgetTarget: number;

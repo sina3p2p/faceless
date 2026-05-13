@@ -6,6 +6,7 @@ import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset
 import { openrouter, type StoryAsset } from "./index";
 import type { CreativeBrief } from "@/types/pipeline";
 import { TVideoScene } from "@/types/video";
+import { countNarrationWords, WORDS_PER_SECOND } from "./pacing";
 
 const characterEntrySchema = z.object({
   canonicalName: z.string().describe("The ONE correct name for this character, used everywhere downstream. Must match storyAssets name if an asset exists."),
@@ -46,11 +47,15 @@ const sceneFunctionEnum = z.enum([
   "resolve",
 ]);
 
+const voicePaceEnum = z.enum(["slow", "standard", "fast"]);
+
 const correctedSceneSchema = z.object({
   sceneTitle: z.string(),
-  text: z.string().describe("The corrected narration text — names fixed, pacing adjusted"),
+  text: z.string().describe("The corrected narration text — names fixed, pacing adjusted. Preserve any [pause:N] markers from the director's input unless you split/merge the scene, in which case keep at most ONE pause marker per resulting scene."),
   sceneFunction: sceneFunctionEnum.describe("Dramatic function of this scene. Preserve the director's tag if it exists ([Scene function: X] in the input directorNote). If a scene reveals nothing new and is not a quiet-beat, either flag it via surpriseInjection or re-tag it after restructuring."),
+  voicePace: voicePaceEnum.describe("Delivery pace: 'slow' (~100 wpm), 'standard' (~150 wpm), 'fast' (~180 wpm). Preserve the director's pick unless the rewrite materially changed the scene's energy."),
   directorNote: z.string().describe("The corrected director note — names fixed, appearance locked to registry. DO NOT include the [Scene function: ...] tag here; the sceneFunction field carries that. Lighting and color palette MAY shift between scenes to reflect emotional state, even when wardrobe/hair/features are locked."),
+  imageabilityScore: z.number().describe("Score from 1 (abstract / unrenderable — e.g. 'inflation reaching 25.5%') to 5 (concrete and physical — e.g. 'a grocery cart emptying while a register climbs'). Score the COMBINATION of narration text and the directorNote. If you score ≤2, you MUST rewrite the directorNote into a concrete metaphor before returning."),
   surpriseInjection: z.string().nullable().describe("If this scene reveals nothing new (no fresh fact, image, turn, or tonal shift) AND is not intentionally tagged 'quiet-beat', describe in one sentence what concrete element to inject — a small revelation, a contradicting detail, a sensory turn. Otherwise null."),
 });
 
@@ -87,8 +92,8 @@ export async function superviseScript(
     ? `\nSTORY ASSETS (these names are the CANONICAL source of truth):\n${storyAssets.map((a) => `  - ${a.name} (${a.type}): ${a.description}`).join("\n")}`
     : "\nNo story assets provided.";
 
-  const wordCount = scenes.reduce((sum, s) => sum + s.text.split(/\s+/).length, 0);
-  const estimatedDuration = Math.round(wordCount / 2.5);
+  const wordCount = scenes.reduce((sum, s) => sum + countNarrationWords(s.text), 0);
+  const estimatedDuration = Math.round(wordCount / WORDS_PER_SECOND);
 
   const systemPrompt = `You are a Script Supervisor with FULL REWRITE AUTHORITY. You are not a passive reviewer — you are an enforcer.
 
@@ -118,6 +123,13 @@ APPEARANCE LOCK (what to lock vs. what to let breathe):
 - LOCKED across all scenes: clothing, hair, distinguishing features. If scene 3 says "now wearing a blue jacket" but scene 0 said "red coat", fix scene 3 — UNLESS the story explicitly describes a costume change.
 - INTENTIONALLY NOT LOCKED: lighting, color palette, weather, time-of-day mood. These SHOULD shift between scenes to reflect emotional state — that's how cinema conveys change without redressing the character. Do not "correct" lighting or palette differences; treat them as deliberate.
 - The cinematographer downstream will use those mood shifts. Your job is to preserve them, not flatten them.
+
+IMAGEABILITY (PER-SCENE — gates the visual pipeline):
+- Score every scene 1–5 on how easily its narration + directorNote can be turned into a coherent, physically renderable shot.
+  - 1 = abstract numbers, percentages, statistical claims, or purely conceptual statements with no visible referent.
+  - 5 = a concrete, photographable moment with named subjects, a setting, and a single physical action.
+- If a scene scores ≤2, REWRITE its directorNote on the spot into a concrete metaphor that visually carries the same meaning. Example: "inflation reaching 25.5%" → "a time-lapse of a grocery cart emptying while the register display climbs past 25.5". Never lower the score to dodge the rewrite.
+- Do NOT rewrite the narration text to chase a higher score — the rewrite happens in the directorNote (the renderer's prompt), not in what the viewer hears.
 
 SURPRISE / DYNAMICS CHECK (this is what stops the video from feeling static):
 - For every scene, ask: "What does the viewer learn, feel, or see for the first time here?"
