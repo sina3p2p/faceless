@@ -1,5 +1,6 @@
 import { TTS } from "@/lib/constants";
 import type { TTSResult, WordTimestamp } from "@/types/tts";
+import { translatePauseMarkersToSsml } from "./ai/llm/pacing";
 
 export type { TTSResult, WordTimestamp };
 
@@ -21,6 +22,10 @@ export async function generateSpeech(
     style = TTS.defaultStyle,
   } = options;
 
+  // [pause:N] markers persist in scene text so we can swap TTS providers
+  // without rewriting stored data. Convert to ElevenLabs SSML at send time.
+  const requestText = translatePauseMarkersToSsml(text);
+
   const response = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
     {
@@ -30,7 +35,7 @@ export async function generateSpeech(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        text,
+        text: requestText,
         model_id: TTS.model,
         voice_settings: {
           stability,

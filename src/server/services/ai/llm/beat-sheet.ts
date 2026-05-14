@@ -4,11 +4,53 @@ import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter } from "./index";
 import { recordAiCall } from "@/server/services/ai-audit";
 import type {
+  AudienceSegment,
   BeatSheet,
   CreativeBrief,
+  NarrativeFramework,
   ResearchPackWithClaims,
 } from "@/types/pipeline";
 import { formatResearchEvidence } from "./research-evidence";
+
+function formatFrameworkSkeleton(framework: NarrativeFramework | undefined): string {
+  switch (framework) {
+    case "AIDA":
+      return `\nFRAMEWORK: AIDA — your beats MUST map onto Attention → Interest → Desire → Action.
+- Beat 1 (Attention): the 0–2 second visual hook. Define what stops the scroll.
+- Beat 2–3 (Interest): contextual build-up that sustains attention.
+- Beat 4 (Desire): the emotional peak that makes the viewer want the outcome.
+- Final beat (Action): the explicit transition that prompts the viewer to act / share / believe.
+Use 4–5 beats total.`;
+    case "PAS":
+      return `\nFRAMEWORK: PAS — your beats MUST map onto Problem → Agitation → Solution.
+- Beat 1 (Problem): open with a visceral pain point the audience recognizes.
+- Beat 2–3 (Agitation): intensify the pain visually and emotionally — create urgency.
+- Final beat (Solution): the resolution; mark it with isReversal=true if the relief overturns the dread.
+Use 3–5 beats total.`;
+    case "heros-journey":
+      return `\nFRAMEWORK: Hero's Journey (compressed) — beats MUST map onto Challenge → Mentor/Tool → Victory.
+- Beats 1–2 (Challenge): establish the protagonist and the impossible obstacle.
+- Beat 3–4 (Mentor/Tool): introduce the catalyst (a mentor, a discovery, a tool) that changes the trajectory.
+- Beats 5–7 (Victory): the transformation. At least one beat must be a reversal of an earlier expectation.
+Use 5–7 beats total.`;
+    case "freeform":
+    case undefined:
+    default:
+      return `\nFRAMEWORK: freeform — the brief did not specify a structural framework. You may design any 5–7 beat structure that still satisfies the HARD REQUIREMENTS above.`;
+  }
+}
+
+function formatAudienceForBeats(audience: AudienceSegment | undefined): string {
+  if (!audience) return "";
+  return `
+
+AUDIENCE LENS (every beat should land for this viewer):
+- Segment: ${audience.segment}
+- Primary goal: ${audience.primaryGoal}
+- Primary fear: ${audience.primaryFear}
+- Emotional triggers: ${audience.emotionalTriggers.join("; ")}
+- Tone to avoid: ${audience.toneToAvoid}`;
+}
 
 const beatSchema = z.object({
   name: z.string().describe("Short label for this beat (2-4 words). E.g. 'Inciting Incident', 'False Victory', 'Reversal'."),
@@ -71,6 +113,7 @@ CREATIVE BRIEF (the beat sheet must serve this):
 - Resolution type: ${brief.formatConstraints.resolutionType}
 - Opening hook: ${brief.formatConstraints.openingHook}
 - Scene budget downstream: ${brief.durationGuidance.sceneBudget.min}–${brief.durationGuidance.sceneBudget.max} scenes (your beats need not map 1:1 to scenes)
+${formatFrameworkSkeleton(brief.narrativeFramework)}${formatAudienceForBeats(brief.audience)}
 
 VOICE:
 Pick a SPECIFIC narrator stance with attitude. "Neutral observer" is forbidden. The voice should have a stake, a bias, a tone. The writer will channel it.

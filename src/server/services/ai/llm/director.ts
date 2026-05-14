@@ -18,10 +18,13 @@ const sceneFunctionEnum = z.enum([
   "resolve",
 ]);
 
+const voicePaceEnum = z.enum(["slow", "standard", "fast"]);
+
 const directorSceneSchema = z.object({
   sceneTitle: z.string().describe("Short descriptive title for this scene (2-5 words), like a chapter heading"),
-  text: z.string().describe("The narration text chunk for this scene — extracted from the story prose. This is what the viewer HEARS."),
+  text: z.string().describe("The narration text chunk for this scene — extracted from the story prose. This is what the viewer HEARS. You MAY insert `[pause:N]` markers (N in seconds, 0.3–1.5) at beat transitions inside this scene — the TTS layer translates them to natural silences. Use one when a reversal lands, when stakes shift, or before/after the climactic line. Do not stack pauses or use them as line-breaks."),
   sceneFunction: sceneFunctionEnum.describe("The DRAMATIC function this scene serves: 'setup' (establish), 'escalate' (raise stakes), 'reveal' (deliver new info), 'reversal' (overturn expectation), 'quiet-beat' (slow down before a punch), 'climax' (peak), 'resolve' (land the ending)."),
+  voicePace: voicePaceEnum.describe("Delivery pace for THIS scene: 'slow' (~100 wpm — technical, somber, weighty); 'standard' (~150 wpm — default conversational); 'fast' (~180 wpm — urgent, escalating, high-energy promo). Pick based on tonal shift and stake level — high-stakes climaxes typically 'standard' or 'fast'; reveals and quiet-beats 'slow' or 'standard'."),
   directorNote: z.string().describe("Concrete creative brief for the visual team. Be specific — every detail must be physically renderable. Describe: SETTING (exact location, time period, weather, architecture, materials), SUBJECTS (appearance by consistent name, clothing, posture, expression, age), ACTION (visual progression — 2-3 sequential beats), MOOD (physical elements only — lighting, weather, posture), CAMERA (angle, framing, constrained to the visual style's medium). VISUAL CONTINUITY: maintain consistent subject names and appearance across scenes. Write as if briefing a cinematographer on a film set."),
 });
 
@@ -59,7 +62,12 @@ export async function splitStoryIntoScenes(
   - Scene count: ${brief.durationGuidance.sceneBudget.min}–${brief.durationGuidance.sceneBudget.max} scenes
   - Reveal timing: ${brief.formatConstraints.revealTiming === "early" ? "reveal the key information early, then explore consequences" : brief.formatConstraints.revealTiming === "gradual" ? "reveal pieces throughout the narrative" : "build toward a final reveal at the end"}
   - Pacing: ${brief.pacingStrategy}
-  - Visual mood: ${brief.visualMood}` : "";
+  - Visual mood: ${brief.visualMood}${brief.cinematicSpec ? `
+  - Cinematic spec (LOCKED across all scenes — your directorNotes must be consistent with these):
+    - Lighting: ${brief.cinematicSpec.lightingStyle} (~${brief.cinematicSpec.colorTemperatureK}K)
+    - Lens / DoF: ${brief.cinematicSpec.lensFocalMm}mm, ${brief.cinematicSpec.depthOfField}
+    - Camera movement vocabulary: ${brief.cinematicSpec.cameraMovement}
+    - Aspect mood: ${brief.cinematicSpec.aspectMood}` : ""}` : "";
 
   const musicInstruction = `You are an elite music video director. Given song lyrics organized by sections, create a scene for each section with a detailed visual director's note.
 
@@ -115,6 +123,10 @@ SCENE FUNCTION (CRITICAL — this is what stops the video from feeling static):
 - Required across the whole sequence: at least one 'quiet-beat' (a slower, lower-stakes moment placed before a high-stakes scene so the next punch lands), and at least one of 'reversal' or 'reveal'.
 - 'setup' and 'escalate' are common — but if you tag every scene 'escalate', the result is a flat, droning video. Use them sparingly.
 - The scene function should drive visual choices: 'quiet-beat' = stiller framing, softer light, more negative space; 'reversal' = a visual contradiction (the same place, different); 'climax' = peak motion and tightest framing.
+
+PACE & PAUSE MARKERS (drive TTS timing):
+- Pick a voicePace per scene from {slow, standard, fast}. Default is 'standard'. Use 'slow' (~100 wpm) for reveals, quiet-beats, and technical/somber moments. Use 'fast' (~180 wpm) only for urgent escalation or high-energy promo beats. Vary across scenes — never make every scene 'fast'.
+- Inside text, insert at most ONE [pause:N] marker per scene at a beat transition. N is seconds (0.3–1.5). Use a pause BEFORE the climactic word in a 'climax', AT the turn in a 'reversal', and AFTER the punch in a 'resolve'. Skip pauses entirely in low-stakes 'setup' scenes. Do not use [pause] in place of punctuation.
 
 DIRECTOR NOTE RULES (CRITICAL — this is what makes the video look amazing):
 - Be maximally specific and concrete. Every detail you write must be physically visible on screen — if a camera cannot photograph it, do not include it.

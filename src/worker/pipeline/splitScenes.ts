@@ -5,6 +5,7 @@ import type { RenderJobData } from "@/lib/queue";
 import {
   splitStoryIntoScenes,
 } from "@/server/services/ai/llm";
+import { countNarrationWords, estimateDurationSec } from "@/server/services/ai/llm/pacing";
 import { getAgentModels } from "./shared";
 
 export async function splitScenesJob(job: Job<RenderJobData>) {
@@ -50,6 +51,13 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
         sceneTitle: s.sceneTitle,
         directorNote: `[Scene function: ${s.sceneFunction}]\n${s.directorNote}`,
         text: s.text,
+        // Server-computed duration — never trust LLM arithmetic. Pause markers
+        // are stripped from the word count; the SSML <break> contributes its
+        // own time downstream when TTS runs.
+        estimatedDurationSec: estimateDurationSec(
+          countNarrationWords(s.text),
+          s.voicePace ?? "standard"
+        ),
       }))
     );
 

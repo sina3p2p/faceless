@@ -85,7 +85,12 @@ CREATIVE BRIEF (follow these constraints):
 - Concept: ${brief.concept}
 - Tone: ${brief.tone}
 - Narrative arc: ${brief.narrativeArc}
-- Target audience: ${brief.targetAudience}
+- Target audience: ${brief.targetAudience}${brief.audience ? `
+- Audience goal: ${brief.audience.primaryGoal}
+- Audience fear: ${brief.audience.primaryFear}
+- Emotional triggers to hit: ${brief.audience.emotionalTriggers.join("; ")}
+- Tone to AVOID at all costs: ${brief.audience.toneToAvoid}` : ""}${brief.narrativeFramework && brief.narrativeFramework !== "freeform" ? `
+- Narrative framework: ${brief.narrativeFramework} — honor the beat-sheet structure that was generated against this framework.` : ""}
 - Word budget: aim for approximately ${brief.durationGuidance.wordBudgetTarget} words (range: ${brief.durationGuidance.wordBudgetMin}–${brief.durationGuidance.wordBudgetMax})
 - Narration style: ${brief.formatConstraints.narrationStyle === "voiceover" ? "Write as voiceover narration — a narrator tells the story" : brief.formatConstraints.narrationStyle === "dialogue" ? "Write dialogue between characters — no narrator" : "Mix narration with occasional dialogue"}
 - Opening hook: ${brief.formatConstraints.openingHook === "question" ? "Open with a provocative question" : brief.formatConstraints.openingHook === "claim" ? "Open with a bold, surprising claim" : brief.formatConstraints.openingHook === "mystery" ? "Open by withholding key information — create mystery" : "Open mid-action — drop the reader into the middle of something happening"}
