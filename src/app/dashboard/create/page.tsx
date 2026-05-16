@@ -13,6 +13,7 @@ import {
   DEFAULT_IMAGE_MODEL,
   DEFAULT_VIDEO_MODEL,
   DEFAULT_VIDEO_SIZE,
+  getDefaultVideoResolution,
   LANGUAGES,
   DEFAULT_LANGUAGE,
   MUSIC_VIDEO_GENRES,
@@ -27,6 +28,7 @@ import {
   type AgentLlmOverrides,
   ImageModelSelector,
   VideoModelSelector,
+  VideoQualitySelector,
   VideoSizeSelector,
 } from "@/components/model-selectors";
 import { GenerateCharacterModal } from "@/components/generate-character-modal";
@@ -72,6 +74,7 @@ export default function CreateVideoPage() {
     agentModelOverrides: {} as AgentLlmOverrides,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
+    videoResolution: getDefaultVideoResolution(DEFAULT_VIDEO_MODEL) ?? "",
     videoSize: DEFAULT_VIDEO_SIZE as string,
     language: DEFAULT_LANGUAGE as string,
     webResearch: false,
@@ -161,6 +164,7 @@ export default function CreateVideoPage() {
           })(),
           imageModel: form.imageModel,
           videoModel: form.videoModel,
+          ...(form.videoResolution ? { videoResolution: form.videoResolution } : {}),
           duration: {
             preferred: form.durationPreferred,
             priority: form.durationPriority,
@@ -293,7 +297,22 @@ export default function CreateVideoPage() {
               onOverridesChange={(overrides) => setForm({ ...form, agentModelOverrides: overrides })}
             />
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
-            <VideoModelSelector value={form.videoModel} onChange={(v) => setForm({ ...form, videoModel: v })} />
+            <VideoModelSelector
+              value={form.videoModel}
+              onChange={(v) => {
+                const nextResolution = getDefaultVideoResolution(v as typeof DEFAULT_VIDEO_MODEL);
+                setForm({
+                  ...form,
+                  videoModel: v,
+                  videoResolution: nextResolution ?? "",
+                });
+              }}
+            />
+            <VideoQualitySelector
+              videoModelId={form.videoModel}
+              value={form.videoResolution}
+              onChange={(v) => setForm({ ...form, videoResolution: v })}
+            />
 
             <div
               onClick={() => setForm({ ...form, webResearch: !form.webResearch })}

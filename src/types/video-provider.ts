@@ -24,13 +24,7 @@ export interface VideoResult {
   durationSeconds: number;
 }
 
-export interface I2vRequest {
-  startImageUrl: string;
-  endImageUrl?: string;
-  prompt: string;
-  duration: number;
-  aspectRatio: TAspectRatio;
-}
+export type TVideoResolution = "360p" | "480p" | "540p" | "720p" | "1080p" | "4k";
 
 export type TVideoModel = {
   id: TVideoModelId;
@@ -39,9 +33,18 @@ export type TVideoModel = {
   provider: TVideoProviderId;
   endpoint?: TVideoModelEndpoint;
   durations: number[];
-  supportedResolution: ("360p" | "480p" | "540p" | "720p" | "1080p" | "4k")[];
+  supportedResolution: TVideoResolution[];
   endFrameSupported: boolean;
 };
+
+export interface I2vRequest {
+  startImageUrl: string;
+  endImageUrl?: string;
+  prompt: string;
+  duration: number;
+  aspectRatio: TAspectRatio;
+  resolution: TVideoResolution;
+}
 
 export interface IVideoProvider {
   readonly client: AxiosInstance;

@@ -9,6 +9,9 @@ import {
   DEFAULT_VIDEO_MODEL,
   VIDEO_I2V_PROVIDER,
   videoModelsForProvider,
+  videoResolutionsForModel,
+  getDefaultVideoResolution,
+  coerceVideoResolution,
   VIDEO_TYPES,
   VIDEO_SIZES,
   DEFAULT_VIDEO_SIZE,
@@ -63,6 +66,58 @@ export function ImageModelSelector({ value, onChange }: ModelSelectorProps) {
         description: m.description,
       }))}
     />
+  );
+}
+
+type VideoQualitySelectorProps = {
+  videoModelId: string;
+  value: string;
+  onChange: (value: string) => void;
+};
+
+export function VideoQualitySelector({ videoModelId, value, onChange }: VideoQualitySelectorProps) {
+  const modelId = videoModelId as TVideoModelId;
+  const resolutions = videoResolutionsForModel(modelId);
+
+  useEffect(() => {
+    const coerced = coerceVideoResolution(modelId, value);
+    if (coerced && coerced !== value) {
+      onChange(coerced);
+    }
+  }, [modelId, value, onChange]);
+
+  if (resolutions.length <= 1) return null;
+
+  const defaultResolution = getDefaultVideoResolution(modelId);
+  const selected = coerceVideoResolution(modelId, value) ?? defaultResolution ?? resolutions[0];
+
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-300 mb-2">
+        Video Quality
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {resolutions.map((r) => (
+          <button
+            key={r}
+            type="button"
+            onClick={() => onChange(r)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${selected === r
+              ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
+              : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
+              }`}
+          >
+            {r.toUpperCase()}
+            {r === defaultResolution && (
+              <span className="ml-1.5 text-[9px] font-medium text-violet-400/80">DEFAULT</span>
+            )}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-gray-500 mt-1.5">
+        Output resolution for clip generation.
+      </p>
+    </div>
   );
 }
 

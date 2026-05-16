@@ -35,6 +35,7 @@ const standaloneSchema = z.object({
   imageModel: mediaModelOpt,
   researchModel: textModelOpt,
   videoModel: z.enum(VIDEO_MODEL_IDS),
+  videoResolution: z.enum(["360p", "480p", "540p", "720p", "1080p", "4k"]),
   duration: z.object({
     preferred: z.number().min(10).max(180),
     min: z.number().min(5).max(180).optional(),
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
     .values({
       status: "PENDING",
       modelSettings,
+      videoResolution: data.videoResolution,
       videoSize: data.videoSize,
       language: data.language,
       videoType: data.videoType,

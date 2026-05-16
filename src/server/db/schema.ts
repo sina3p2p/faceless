@@ -18,6 +18,7 @@ import type { MotionSkillHints } from "@/types/motion-skill-hints";
 import type { ResultMeta } from "@/server/services/ai/llm/prompt-contract";
 import type { ModelSettings } from "@/types/llm-common";
 import { PipelineConfig } from "@/types/pipeline";
+import { TVideoResolution } from "@/types/video-provider";
 
 // ── Enums ──
 
@@ -181,6 +182,7 @@ export const videoProjects = pgTable("video_projects", {
   thumbnailUrl: text("thumbnail_url"),
   modelSettings: json("model_settings").$type<ModelSettings>().notNull(),
   videoSize: text("video_size").$type<TAspectRatio>().notNull(),
+  videoResolution: text("video_resolution").$type<TVideoResolution>().notNull(),
   voiceId: text("voice_id"),
   idea: text("prompt"),
   style: text("style").default("cinematic").notNull(),

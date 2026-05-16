@@ -51,7 +51,7 @@ export class ReplicateVideoProvider implements IVideoProvider {
           prompt: req.prompt,
           duration: req.duration,
           aspect_ratio: req.aspectRatio,
-          resolution: VIDEO_MODELS[model].supportedResolution[0],
+          resolution: req.resolution,
           generate_audio: false,
         };
       case "kling-v2.5-turbo-pro":
@@ -71,7 +71,7 @@ export class ReplicateVideoProvider implements IVideoProvider {
           negative_prompt: NEGATIVE_PROMPTS[model],
           duration: req.duration,
           aspect_ratio: req.aspectRatio,
-          quality: VIDEO_MODELS[model].supportedResolution[0],
+          quality: req.resolution,
         };
       default:
         throw new Error(`Replicate: video model ${model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);

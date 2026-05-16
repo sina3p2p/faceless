@@ -2,7 +2,7 @@
 // Central configuration — all settings and env vars in one place
 // ─────────────────────────────────────────────────────────
 
-import type { TVideoModel, TVideoProviderId } from "@/types/video-provider";
+import type { TVideoModel, TVideoProviderId, TVideoResolution } from "@/types/video-provider";
 
 export const env = (key: string, fallback = "") => process.env[key] || fallback;
 
@@ -231,6 +231,28 @@ export function videoModelsForProvider(p: TVideoProviderId) {
   const models = Object.values(VIDEO_MODELS);
   if (p === "replicate") return models.filter((m) => m.provider === "replicate");
   return models;
+}
+
+export function videoResolutionsForModel(modelId: TVideoModelId): TVideoResolution[] {
+  return VIDEO_MODELS[modelId]?.supportedResolution ?? [];
+}
+
+/** Highest tier listed last in each model's `supportedResolution`. */
+export function getDefaultVideoResolution(modelId: TVideoModelId): TVideoResolution | undefined {
+  const resolutions = videoResolutionsForModel(modelId);
+  return resolutions.length ? resolutions[resolutions.length - 1] : undefined;
+}
+
+export function coerceVideoResolution(
+  modelId: TVideoModelId,
+  resolution: string | undefined | null
+): TVideoResolution | undefined {
+  const supported = videoResolutionsForModel(modelId);
+  if (!supported.length) return undefined;
+  if (resolution && supported.includes(resolution as TVideoResolution)) {
+    return resolution as TVideoResolution;
+  }
+  return getDefaultVideoResolution(modelId);
 }
 
 export const IMAGE_MODELS = [

@@ -58,7 +58,15 @@ export async function POST(
   const prompt = motionPrompt;
 
   try {
-    const result = await generateVideoFromImage(mediaUrl(frame.imageMedia.url), prompt, duration, videoModel);
+    const result = await generateVideoFromImage(
+      mediaUrl(frame.imageMedia.url),
+      prompt,
+      duration,
+      videoModel,
+      undefined,
+      video.videoSize,
+      video.videoResolution
+    );
 
     const videoResponse = await fetch(result.videoUrl);
     if (!videoResponse.ok) throw new Error("Failed to download generated video");

@@ -34,6 +34,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     const videoModelId = videoProject.modelSettings.videoModel;
     const aspectRatio = videoProject.videoSize;
+    const videoResolution = videoProject.videoResolution;
 
     const indexById = new Map(timeline.map((f, i) => [f.id, i] as const));
 
@@ -87,7 +88,8 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
               desiredDuration,
               videoModelId,
               endImageUrl,
-              aspectRatio
+              aspectRatio,
+              videoResolution
             );
 
             const videoResp = await fetch(videoResult.videoUrl);
