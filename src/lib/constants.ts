@@ -216,7 +216,7 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
     label: "Pixverse V6",
     endpoint: "pixverse/pixverse-v6",
     provider: "replicate",
-    supportedResolution: ["360p"],
+    supportedResolution: ["360p", "540p", "720p", "1080p"],
     description: "Pixverse V6 i2v (via Replicate), 1–15s",
     durations: [5, 8, 10, 15],
     endFrameSupported: false,
