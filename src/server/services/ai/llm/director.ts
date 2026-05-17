@@ -22,6 +22,7 @@ const voicePaceEnum = z.enum(["slow", "standard", "fast"]);
 
 const directorSceneSchema = z.object({
   sceneTitle: z.string().describe("Short descriptive title for this scene (2-5 words), like a chapter heading"),
+  speaker: z.string().nullable().describe("MOVIE TYPE ONLY: the character who delivers this scene's spoken line, written with the SAME consistent name used in directorNote, or 'Narrator' for narrated/voiceover scenes. Set to null for all non-movie video types."),
   text: z.string().describe("The narration text chunk for this scene — extracted from the story prose. This is what the viewer HEARS. You MAY insert `[pause:N]` markers (N in seconds, 0.3–1.5) at beat transitions inside this scene — the TTS layer translates them to natural silences. Use one when a reversal lands, when stakes shift, or before/after the climactic line. Do not stack pauses or use them as line-breaks."),
   sceneFunction: sceneFunctionEnum.describe("The DRAMATIC function this scene serves: 'setup' (establish), 'escalate' (raise stakes), 'reveal' (deliver new info), 'reversal' (overturn expectation), 'quiet-beat' (slow down before a punch), 'climax' (peak), 'resolve' (land the ending)."),
   voicePace: voicePaceEnum.describe("Delivery pace for THIS scene: 'slow' (~100 wpm — technical, somber, weighty); 'standard' (~150 wpm — default conversational); 'fast' (~180 wpm — urgent, escalating, high-energy promo). Pick based on tonal shift and stake level — high-stakes climaxes typically 'standard' or 'fast'; reveals and quiet-beats 'slow' or 'standard'."),
@@ -50,6 +51,19 @@ export async function splitStoryIntoScenes(
   const primaryModel = model || LLM.directorModel;
   const langName = getLanguageName(language);
   const isMusic = videoType === "music_video";
+  const isMovie = videoType === "movie";
+
+  const movieSpeakerRule = isMovie
+    ? `
+
+MOVIE — SPEAKER ATTRIBUTION (CRITICAL for this video type):
+- This is a cinematic film. Some scenes are spoken by a character; others are narrated. Decide per scene from the story — do NOT force dialogue everywhere.
+- For every scene set "speaker": the character delivering the line (use their EXACT consistent name), or "Narrator" when the text is voiceover/narration with no character speaking.
+- When a character speaks, the text field is their spoken line; when "Narrator", it is narration.
+- Keep speaker names identical to the names you use in directorNote (same naming-consistency rule).`
+    : `
+
+SPEAKER FIELD: This is not a movie-type video — set "speaker" to null for every scene.`;
 
   const assetSys =
     assets && assets.length > 0
@@ -162,7 +176,7 @@ LANGUAGE RULE:
   const userStoryPrompt = `Split this story into scenes and write director's notes:\n\n${storyMarkdown}`;
   const visionParts = assets && assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
-  const systemPromptResolved = (isMusic ? musicInstruction : storyInstruction) + assetSys;
+  const systemPromptResolved = (isMusic ? musicInstruction : storyInstruction) + assetSys + movieSpeakerRule;
   const { output } = await recordAiCall(
     {
       provider: "openrouter",

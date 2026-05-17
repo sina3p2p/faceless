@@ -17,7 +17,7 @@ const createSeriesSchema = z.object({
   videoSize: z.string().default("9:16"),
   captionStyle: z.string().default("none"),
   language: z.string().default("en"),
-  videoType: z.enum(["standalone", "music_video", "dialogue", "timelapse"]).default("standalone"),
+  videoType: z.enum(["standalone", "music_video", "movie", "timelapse"]).default("standalone"),
   topicIdeas: z.array(z.string()).default([]),
   storyAssets: z
     .array(

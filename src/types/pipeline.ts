@@ -139,6 +139,10 @@ export interface CharacterEntry {
     hair: string;
     distinguishingFeatures: string;
   };
+  /** Voice-casting hint from the supervisor; null for non-movie or ambiguous. */
+  voiceProfile?: "male" | "female" | "neutral" | null;
+  /** TTS voice id assigned in code (movie type) so each character sounds distinct. */
+  voiceId?: string | null;
   firstScene: number;
   presentInScenes: number[];
 }

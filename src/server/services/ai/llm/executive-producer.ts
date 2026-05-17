@@ -99,7 +99,9 @@ FORMAT CONSTRAINTS — you must decide:
 4. resolutionType: "closed" (complete ending), "open" (ambiguous), "cliffhanger" (unresolved tension)
 5. dialogueDensity: "none", "sparse" (occasional quotes), "moderate" (regular dialogue), "heavy" (mostly conversation)
 6. maxSentencesPerScene: how many narration sentences fit one scene (typically 1–4 for short-form)
-
+${videoType === "movie" ? `
+MOVIE TYPE: This is a cinematic short film. Dialogue is OPTIONAL — decide narrationStyle and dialogueDensity purely from what THIS story needs. A movie can be pure voiceover, mixed, or dialogue-driven; do not force heavy dialogue, and do not avoid it when the story genuinely calls for characters to speak.
+` : ""}
 Choose these based on the video type and duration. Use this concrete guidance for the chosen target duration (${duration.preferred}s) — these are starting points, override only with reason:
 ${
   duration.preferred <= 30

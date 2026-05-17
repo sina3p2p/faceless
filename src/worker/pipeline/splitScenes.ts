@@ -49,6 +49,7 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
         videoProjectId,
         sceneOrder: i,
         sceneTitle: s.sceneTitle,
+        speaker: s.speaker ?? null,
         directorNote: `[Scene function: ${s.sceneFunction}]\n${s.directorNote}`,
         text: s.text,
         // Server-computed duration — never trust LLM arithmetic. Pause markers
