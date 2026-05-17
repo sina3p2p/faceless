@@ -21,6 +21,32 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
 
     const config = videoProject.config ?? {};
 
+    // Movie type: the screenwriter already authored structured scenes with
+    // reliable speaker attribution — map them directly and skip the director's
+    // text re-segmentation. (Falls through to the director split if a movie has
+    // no screenplay, e.g. after a plain-text script refine.)
+    if (videoProject.videoType === "movie" && config.screenplay?.scenes?.length) {
+      const screenplayScenes = config.screenplay.scenes;
+      await db.delete(schema.videoScenes).where(eq(schema.videoScenes.videoProjectId, videoProjectId));
+      await db.insert(schema.videoScenes).values(
+        screenplayScenes.map((s, i) => ({
+          videoProjectId,
+          sceneOrder: i,
+          sceneTitle: s.sceneTitle,
+          speaker: s.speaker ?? null,
+          directorNote: `[Scene function: ${s.sceneFunction}]\n${s.directorNote}${s.action?.trim() ? `\n[Action: ${s.action.trim()}]` : ""}`,
+          text: s.line,
+          estimatedDurationSec: estimateDurationSec(
+            countNarrationWords(s.line),
+            s.voicePace ?? "standard"
+          ),
+        }))
+      );
+      console.log(`[split-scenes] Movie: mapped ${screenplayScenes.length} screenplay scenes (director split skipped)`);
+      await renderQueue.add("supervise-script", { videoProjectId });
+      return;
+    }
+
     console.log(`[split-scenes] Splitting story into scenes for ${videoProjectId}`);
 
     const directorModel = getAgentModels(videoProject.modelSettings, 'directorModel');

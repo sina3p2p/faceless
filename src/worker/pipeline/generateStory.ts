@@ -1,8 +1,14 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
+import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
 import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
-import { generateStory, generateMusicLyrics, generateBeatSheet } from "@/server/services/ai/llm";
+import {
+  generateStory,
+  generateMusicLyrics,
+  generateBeatSheet,
+  generateScreenplay,
+  renderScreenplayMarkdown,
+} from "@/server/services/ai/llm";
 import { getResearchPackForVideo } from "@/server/db/research";
 import { getAgentModels, mergeProjectConfig } from "./shared";
 import { deriveSubseed } from "@/lib/seed";
@@ -72,20 +78,39 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
         console.log(`[generate-story] Beat sheet: ${beatSheet.beats.length} beats, voice="${beatSheet.voice}"`);
       }
 
-      const storyMarkdown = await generateStory(
-        video.style,
-        topicIdea,
-        video.language,
-        storyModel,
-        config.creativeBrief,
-        researchPack,
-        storySeed,
-        beatSheet,
-      );
-      const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
-      title = titleMatch ? titleMatch[1].trim() : "Untitled";
-      scriptPayload = storyMarkdown;
-      console.log(`[generate-story] Story ready: "${title}" (${storyMarkdown.length} chars)`);
+      if (video.videoType === "movie") {
+        const assets = await resolveStoryAssets(videoProjectId);
+        const screenplay = await generateScreenplay({
+          style: video.style,
+          topicIdea,
+          language: video.language ?? undefined,
+          model: storyModel,
+          brief: config.creativeBrief,
+          researchPack,
+          beatSheet,
+          assets,
+          seed: storySeed,
+        });
+        title = screenplay.title;
+        scriptPayload = renderScreenplayMarkdown(screenplay);
+        await mergeProjectConfig(videoProjectId, { screenplay });
+        console.log(`[generate-story] Screenplay ready: "${title}" (${screenplay.scenes.length} scenes)`);
+      } else {
+        const storyMarkdown = await generateStory(
+          video.style,
+          topicIdea,
+          video.language,
+          storyModel,
+          config.creativeBrief,
+          researchPack,
+          storySeed,
+          beatSheet,
+        );
+        const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
+        title = titleMatch ? titleMatch[1].trim() : "Untitled";
+        scriptPayload = storyMarkdown;
+        console.log(`[generate-story] Story ready: "${title}" (${storyMarkdown.length} chars)`);
+      }
     }
 
     await db

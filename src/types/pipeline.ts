@@ -128,6 +128,31 @@ export type SceneFunction =
   | "climax"
   | "resolve";
 
+export type VoicePace = "slow" | "standard" | "fast";
+
+// ── Screenwriter → Screenplay (movie video type) ──
+
+/** One spoken moment of the film: either a character line or a narration beat. */
+export interface ScreenplayScene {
+  sceneTitle: string;
+  sceneFunction: SceneFunction;
+  voicePace: VoicePace;
+  /** Consistent character name for a spoken line, or "Narrator" for narration. */
+  speaker: string;
+  /** Exactly what the viewer hears in this scene (dialogue line or narration). */
+  line: string;
+  /** Concrete on-screen staging the viewer SEES while the line plays. */
+  action: string;
+  /** Rich visual brief for the cinematography pipeline (English). */
+  directorNote: string;
+}
+
+export interface Screenplay {
+  title: string;
+  logline: string;
+  scenes: ScreenplayScene[];
+}
+
 // ── Script Supervisor → ContinuityNotes ──
 
 export interface CharacterEntry {
@@ -414,6 +439,8 @@ export interface PipelineConfig {
   duration?: DurationPreference;
   creativeBrief?: CreativeBrief;
   beatSheet?: BeatSheet;
+  /** Structured screenplay authored by the screenwriter agent (movie type). */
+  screenplay?: Screenplay;
   continuityNotes?: ContinuityNotes;
   visualStyleGuide?: VisualStyleGuide;
   /** Hero asset plan + refs produced by the extract-hero-assets agent. */
