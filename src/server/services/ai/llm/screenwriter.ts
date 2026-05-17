@@ -107,7 +107,7 @@ CREATIVE BRIEF (follow these constraints):
 - Word budget for ALL spoken lines combined: ~${brief.durationGuidance.wordBudgetTarget} words (range ${brief.durationGuidance.wordBudgetMin}–${brief.durationGuidance.wordBudgetMax})
 - Scene count: ${brief.durationGuidance.sceneBudget.min}–${brief.durationGuidance.sceneBudget.max} scenes
 - Max sentences per scene line: ${brief.formatConstraints.maxSentencesPerScene}
-- Narration-style leaning (guidance, not a mandate — the story decides): ${brief.formatConstraints.narrationStyle}; dialogue density leaning: ${brief.formatConstraints.dialogueDensity}
+- Narration-style leaning: ${brief.formatConstraints.narrationStyle}; dialogue density leaning: ${brief.formatConstraints.dialogueDensity}. Treat these as a WEAK prior only — if named characters drive this story, a 'voiceover' leaning does NOT mean a silent cast; prefer mixed and let the characters speak the pivotal beats.
 - Opening hook: ${brief.formatConstraints.openingHook}
 - Resolution: ${brief.formatConstraints.resolutionType}${brief.narrativeFramework && brief.narrativeFramework !== "freeform" ? `
 - Narrative framework: ${brief.narrativeFramework} — honor the beat-sheet structure built against it.` : ""}`
@@ -123,7 +123,8 @@ CREATIVE BRIEF (follow these constraints):
 OUTPUT MODEL (critical):
 - The film is an ordered list of SCENES. Each scene is ONE moment the audience experiences.
 - Every scene has audio: either a CHARACTER speaks one line (speaker = that character's consistent name) OR it is a NARRATION beat (speaker = "Narrator").
-- DIALOGUE IS OPTIONAL AND STORY-DRIVEN. A real movie is not wall-to-wall talking. Use silence, action, and narration where the story breathes; use dialogue only where a character speaking is the strongest choice. Some films are mostly visual with sparse lines; others are dialogue-driven. Let THIS story decide — do not force either extreme.
+- DIALOGUE IS THE DEFAULT FOR CHARACTER-DRIVEN STORIES, NOT AN AFTERTHOUGHT. If the film has named human characters and the concept is not inherently wordless (a pure montage, an abstract/explainer piece, a process timelapse), then the PIVOTAL beats — confrontations, the turning point, the climax, the resolution — MUST be delivered as spoken character lines (speaker = the character's name). Narration is the connective tissue between those moments, never a substitute for them. As a guide, several of the key scenes in a character-driven short should be character speech — not zero, and not every scene.
+- An all-narration film with silent named characters is a FAILURE for this format unless the concept is genuinely wordless. That said, quiet visual beats, silence, and narration are powerful storytelling — use them deliberately between the spoken moments.
 - One action per scene. If a moment contains a glance, a turn, and a reply, that is three scenes.
 
 WRITING CRAFT (non-negotiable):
@@ -144,47 +145,75 @@ LANGUAGE RULES:
 ${beatSheetBlock ? `
 EXECUTE THE BEAT SHEET. Each beat is a movement — give big beats more scenes, small beats fewer. Do not skip or invent beats.${beatSheetBlock}` : ""}${researchBlock}`;
 
-  const userPrompt = `Write the screenplay for this film idea: ${topicIdea}\n\nThe intended visual style/medium is: ${style}. Make it cinematic and impossible to predict. Decide for yourself, scene by scene, when a character should speak and when the film should breathe in narration or silence.`;
+  const userPrompt = `Write the screenplay for this film idea: ${topicIdea}\n\nThe intended visual style/medium is: ${style}. Make it cinematic and impossible to predict. Let the characters carry the pivotal moments in their own voices; use narration to bridge between them, not to replace them.`;
 
   const visionParts =
     assets && assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.generateScreenplay",
-      request: {
-        system: systemPrompt,
-        userPrompt,
-        visionParts,
-        temperature: 0.85,
-        seed,
-        schema: "screenplaySchema",
+  const run = async (systemSuffix: string): Promise<Screenplay | undefined> => {
+    const system = systemPrompt + systemSuffix;
+    const { output } = await recordAiCall(
+      {
+        provider: "openrouter",
+        model: primaryModel,
+        operation: "llm.generateScreenplay",
+        request: {
+          system,
+          userPrompt,
+          visionParts,
+          temperature: 0.85,
+          seed,
+          schema: "screenplaySchema",
+        },
+        summarize: (r) => ({
+          sceneCount:
+            (r as { output?: { scenes?: unknown[] } }).output?.scenes?.length ?? 0,
+        }),
       },
-      summarize: (r) => ({
-        sceneCount:
-          (r as { output?: { scenes?: unknown[] } }).output?.scenes?.length ?? 0,
-      }),
-    },
-    () =>
-      aiGenerateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: screenplaySchema }),
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: [...visionParts, { type: "text", text: userPrompt }],
-          },
-        ],
-        temperature: 0.85,
-        ...(seed !== undefined && { seed }),
-      }),
-  );
+      () =>
+        aiGenerateText({
+          model: openrouter.chat(primaryModel),
+          output: Output.object({ schema: screenplaySchema }),
+          system,
+          messages: [
+            {
+              role: "user",
+              content: [...visionParts, { type: "text", text: userPrompt }],
+            },
+          ],
+          temperature: 0.85,
+          ...(seed !== undefined && { seed }),
+        }),
+    );
+    return output;
+  };
 
-  if (!output) throw new Error("Failed to generate screenplay");
-  return output;
+  let screenplay = await run("");
+  if (!screenplay) throw new Error("Failed to generate screenplay");
+
+  // Safety net: if every scene is narration and no character ever speaks, the
+  // headline movie feature (cast voices) is dead. Regenerate once with a hard
+  // dialogue mandate — unless the concept is genuinely a wordless montage, in
+  // which case a single retry still produces the best available result.
+  if (isAllNarration(screenplay)) {
+    console.warn(
+      "[screenwriter] All scenes are narration with no character speech — regenerating once with a dialogue mandate."
+    );
+    const retried = await run(`
+
+REVISION MANDATE (your previous draft failed): every scene was narration and not one character ever spoke. This is a film with characters. Rewrite so the pivotal emotional beats — the confrontation, the turning point, the climax, and the resolution — are SPOKEN CHARACTER LINES (speaker = the character's name), with narration only bridging between them. Only keep an all-narration structure if this concept is truly a wordless montage; otherwise the key turning points MUST be dialogue.`);
+    if (retried && !isAllNarration(retried)) screenplay = retried;
+  }
+
+  return screenplay;
+}
+
+/** True when a multi-scene screenplay has no character speech at all. */
+function isAllNarration(s: Screenplay): boolean {
+  if (s.scenes.length < 2) return false;
+  return s.scenes.every(
+    (sc) => (sc.speaker?.trim().toLowerCase() || "narrator") === "narrator"
+  );
 }
 
 /**
