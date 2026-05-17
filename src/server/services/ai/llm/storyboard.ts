@@ -7,6 +7,7 @@ import type {
   CreativeBrief,
   ContinuityNotes,
   FrameBreakdown,
+  FrameSpec,
   HeroAssetPlan,
 } from "@/types/pipeline";
 import type { TVideoScene } from "@/types/video";
@@ -129,8 +130,15 @@ RULES:
   );
   if (!output) throw new Error("Failed to generate frame breakdown");
 
+  // Guarantee exactly one breakdown entry per input scene. The LLM is told to
+  // do this (rule 9) but can still drop/merge scenes, especially with many
+  // short scenes (e.g. a dialogue-driven movie). Without this, a missing entry
+  // makes the downstream prompt stage throw "Missing frame breakdown".
+  const finalize = (b: FrameBreakdown): FrameBreakdown =>
+    normalizeBreakdownToScenes(b, scenes, sortedDurations, continuity);
+
   const violations = validateShotBudget(output);
-  if (violations.length === 0) return output;
+  if (violations.length === 0) return finalize(output);
 
   console.warn(
     `[storyboard] Shot-budget violations on first pass: ${violations.join("; ")}. Re-prompting once.`
@@ -163,12 +171,67 @@ RULES:
           `[storyboard] Shot-budget violations remain after retry: ${retryViolations.join("; ")}. Accepting anyway.`
         );
       }
-      return retry;
+      return finalize(retry);
     }
   } catch (err) {
     console.warn(`[storyboard] Shot-budget retry failed (${err instanceof Error ? err.message : err}); accepting first pass.`);
   }
-  return output;
+  return finalize(output);
+}
+
+/**
+ * Force the breakdown to have exactly one entry per input scene. Missing or
+ * empty scenes get a synthesized single default frame; extra entries beyond
+ * the scene count are dropped. This keeps the storyboard→prompts contract
+ * intact no matter how the LLM under/over-produces.
+ */
+export function normalizeBreakdownToScenes(
+  breakdown: FrameBreakdown,
+  scenes: TVideoScene[],
+  sortedDurations: number[],
+  continuity: ContinuityNotes
+): FrameBreakdown {
+  const minDur = sortedDurations[0] ?? 2;
+  const maxDur = sortedDurations[sortedDurations.length - 1] ?? minDur;
+
+  const out = scenes.map((scene, i) => {
+    const existing = breakdown.scenes[i];
+    if (existing && existing.frames.length > 0) return existing;
+
+    console.warn(
+      `[storyboard] No frames returned for scene ${i} — synthesizing a default frame to preserve scene parity.`
+    );
+
+    const audioSec = Math.ceil(scene.duration || 0);
+    const clipDuration =
+      audioSec > 0
+        ? sortedDurations.find((d) => d >= audioSec) ?? maxDur
+        : minDur;
+
+    const speaker = scene.speaker?.trim();
+    const subjectFocus =
+      speaker && speaker.toLowerCase() !== "narrator"
+        ? speaker
+        : continuity.characterRegistry.find((c) => c.presentInScenes.includes(i))
+            ?.canonicalName ??
+          continuity.characterRegistry[0]?.canonicalName ??
+          "";
+
+    const frame: FrameSpec = {
+      clipDuration,
+      shotType: "medium",
+      narrativeIntent:
+        i === 0 ? "introduce" : i === scenes.length - 1 ? "resolve" : "build",
+      motionPolicy: "moderate",
+      transitionIn: "cut",
+      subjectFocus,
+      pacingNote: "Auto-generated: storyboard returned no frames for this scene.",
+      sfxHint: "none",
+    };
+    return { frames: [frame] };
+  });
+
+  return { scenes: out };
 }
 
 /**
