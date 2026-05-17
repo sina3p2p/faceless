@@ -99,6 +99,7 @@ export function buildMusicDurationInstruction(targetDuration: number, durations?
 }
 
 export * from "./story";
+export * from "./screenwriter";
 export * from "./director";
 export * from "./prompts";
 export * from "./motion";
