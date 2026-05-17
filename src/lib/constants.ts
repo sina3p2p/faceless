@@ -408,7 +408,7 @@ export function getLanguageName(code: string): string {
 export const VIDEO_TYPES = [
   { id: "standalone", label: "Standalone", description: "Story-driven video with AI-generated visuals and voiceover" },
   { id: "music_video", label: "Music Video", description: "AI-generated song with vocals + cinematic visuals (~$3-4/video)" },
-  { id: "dialogue", label: "Dialogue", description: "Conversational story between characters with different voices" },
+  { id: "movie", label: "Movie", description: "Cinematic story from a prompt — narration, dialogue, or both as the story demands. Characters are generated automatically." },
   { id: "timelapse", label: "Timelapse", description: "Locked-vantage stage snapshots of a real-world process (construction, cleaning, growth) — one image per stage, animated with ambient motion." },
 ] as const;
 

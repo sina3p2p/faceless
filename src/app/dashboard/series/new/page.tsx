@@ -239,15 +239,6 @@ export default function NewSeriesPage() {
           </CardContent>
         </Card>
 
-        {form.videoType === "dialogue" && (() => {
-          const charsWithVoices = pendingAssets.filter((a) => a.type === "character" && a.voiceId);
-          return charsWithVoices.length < 2 ? (
-            <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
-              Assign voices to at least 2 character assets to use Dialogue mode.
-            </div>
-          ) : null;
-        })()}
-
         <div className="flex justify-end gap-3 mt-6">
           <Button type="button" variant="ghost" onClick={() => router.back()}>Cancel</Button>
           <Button type="submit" loading={loading}>Create Series</Button>

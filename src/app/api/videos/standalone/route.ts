@@ -16,7 +16,7 @@ const mediaModelOpt = z.string().min(1);
 
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),
-  videoType: z.enum(["standalone", "music_video", "dialogue", "timelapse"]).default("standalone"),
+  videoType: z.enum(["standalone", "music_video", "movie", "timelapse"]).default("standalone"),
   /** English style string for AI music generation when `videoType` is music_video. */
   musicGenre: z.string().min(1).max(500).optional(),
   style: z.string().default("cinematic"),

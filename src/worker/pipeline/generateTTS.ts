@@ -88,10 +88,28 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       const sceneTexts = scenes.map((scene) => scene.text);
       console.log(`[generate-tts] Generating TTS for ${sceneTexts.length} scenes`);
 
+      let perSceneVoiceIds: (string | undefined)[] | undefined;
+      if (videoProject.videoType === "movie") {
+        const registry = videoProject.config?.continuityNotes?.characterRegistry ?? [];
+        const voiceByName = new Map<string, string>();
+        for (const c of registry) {
+          if (c.voiceId) voiceByName.set(c.canonicalName.toLowerCase(), c.voiceId);
+        }
+        perSceneVoiceIds = scenes.map((scene) => {
+          const speaker = scene.speaker?.trim();
+          if (!speaker || speaker.toLowerCase() === "narrator") return undefined;
+          return voiceByName.get(speaker.toLowerCase());
+        });
+        const distinct = new Set(perSceneVoiceIds.filter(Boolean)).size;
+        console.log(`[generate-tts] Movie mode: ${distinct} character voice(s) across ${scenes.length} scenes (narrator/default for the rest)`);
+      }
+
       const { audioPaths, ttsResults } = await generateTTSParallel(
         sceneTexts,
         videoProject.voiceId,
-        workDir
+        workDir,
+        undefined,
+        perSceneVoiceIds
       );
 
       for (const [index, scene] of scenes.entries()) {

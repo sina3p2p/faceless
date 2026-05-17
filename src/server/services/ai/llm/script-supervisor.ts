@@ -17,6 +17,7 @@ const characterEntrySchema = z.object({
     hair: z.string().describe("Hair style and color — locked"),
     distinguishingFeatures: z.string().describe("Scars, glasses, build, age markers — locked"),
   }),
+  voiceProfile: z.enum(["male", "female", "neutral"]).nullable().describe("Voice casting hint for this character based on their depiction in the script/assets: 'male', 'female', or 'neutral' if ambiguous/non-human. Used downstream to cast a fitting TTS voice."),
   firstScene: z.number().describe("Scene index (0-based) where this character first appears"),
   presentInScenes: z.array(z.number()).describe("All scene indices (0-based) where this character is present"),
 });
@@ -51,6 +52,7 @@ const voicePaceEnum = z.enum(["slow", "standard", "fast"]);
 
 const correctedSceneSchema = z.object({
   sceneTitle: z.string(),
+  speaker: z.string().nullable().describe("Carry over and NORMALIZE the director's speaker: rewrite it to the character's canonicalName from characterRegistry, or 'Narrator' for narrated scenes. Keep null if the input scene's speaker was null (non-movie video)."),
   text: z.string().describe("The corrected narration text — names fixed, pacing adjusted. Preserve any [pause:N] markers from the director's input unless you split/merge the scene, in which case keep at most ONE pause marker per resulting scene."),
   sceneFunction: sceneFunctionEnum.describe("Dramatic function of this scene. Preserve the director's tag if it exists ([Scene function: X] in the input directorNote). If a scene reveals nothing new and is not a quiet-beat, either flag it via surpriseInjection or re-tag it after restructuring."),
   voicePace: voicePaceEnum.describe("Delivery pace: 'slow' (~100 wpm), 'standard' (~150 wpm), 'fast' (~180 wpm). Preserve the director's pick unless the rewrite materially changed the scene's energy."),
@@ -85,7 +87,7 @@ export async function superviseScript(
   const primaryModel = model || LLM.supervisorModel;
 
   const scenesContext = scenes.map((s, i) =>
-    `Scene ${i} — "${s.sceneTitle}":\n  Narration: "${s.text}"\n  Director's Note: ${s.directorNote}`
+    `Scene ${i} — "${s.sceneTitle}":\n  Speaker: ${s.speaker ?? "null"}\n  Narration: "${s.text}"\n  Director's Note: ${s.directorNote}`
   ).join("\n\n");
 
   const assetList = storyAssets.length > 0
@@ -104,6 +106,7 @@ Your job:
 4. ENFORCE duration — current word count is ${wordCount} words (~${estimatedDuration}s). Target range: ${brief.durationGuidance.wordBudgetMin}–${brief.durationGuidance.wordBudgetMax} words (target: ${brief.durationGuidance.wordBudgetTarget})
 5. RESTRUCTURE weak scenes — merge scenes that are too thin, split scenes that are overloaded
 6. COMPUTE carry-over — for each scene transition, list what persists and what changes
+7. NORMALIZE speakers & CAST voices — see SPEAKER & VOICE CASTING below
 
 REWRITE RULES:
 - If a character is called "the old man" in scene 0 but "Thomas" in scene 2, and there's an asset named "Thomas", then:
@@ -136,6 +139,11 @@ SURPRISE / DYNAMICS CHECK (this is what stops the video from feeling static):
 - A scene that reveals NOTHING new (no fresh fact, no new image, no tonal shift, no turn) is dead weight UNLESS it is intentionally a 'quiet-beat' before a high-stakes scene.
 - For each dead-weight scene, populate surpriseInjection with a concrete one-sentence note for the visual team — a small revelation, a contradicting detail, a sensory turn — that the downstream prompt architect can render. Do NOT invent new plot; pull from what is implied or under-shown.
 - The sequence of sceneFunctions across scenes must VARY. Forbidden: two scenes in a row sharing the same sceneFunction. If you find a violation, either restructure (merge / split / re-tag) or note it via surpriseInjection.
+SPEAKER & VOICE CASTING:
+- Each input scene has a "Speaker" field. If it is "null", this is NOT a movie-type video — set every output scene's speaker to null and skip voice casting (leave voiceProfile null).
+- Otherwise (movie): set each output scene's speaker to the character's canonicalName from characterRegistry, or "Narrator" for narrated/voiceover scenes. Resolve aliases — never emit an alias as a speaker.
+- For every character in characterRegistry, set voiceProfile to "male", "female", or "neutral" based on how they are depicted in the script and any reference images. Use "neutral" only when truly ambiguous or non-human.
+
 ${assetList}
 
 FORMAT CONSTRAINTS FROM BRIEF:

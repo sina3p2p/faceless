@@ -653,7 +653,7 @@ function SceneList({ scenes, sensors, selectedSceneId, setSelectedSceneId, setEd
               onUpdateAssetRefs={(refs) => onUpdateAssetRefs(scene.id, refs)}
               generatingImage={generatingSceneIds.has(scene.id) || (scene.frames ?? []).some((f) => generatingFrameIds.has(f.id))}
               isMusicVideo={isMusicVideo}
-              isDialogue={video?.videoType === "dialogue"}
+              isMovie={video?.videoType === "movie"}
               // TODO: Implement
               storyAssets={[]}
               showMotionEdit={phase.showMotionEdit}

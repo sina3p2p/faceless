@@ -19,7 +19,7 @@ export function SortableSceneCard({
   onUpdateAssetRefs,
   generatingImage,
   isMusicVideo,
-  isDialogue,
+  isMovie,
   storyAssets,
   showMotionEdit,
   showDirectorNote,
@@ -51,7 +51,7 @@ export function SortableSceneCard({
   onUpdateAssetRefs: (refs: string[]) => void;
   generatingImage: boolean;
   isMusicVideo?: boolean;
-  isDialogue?: boolean;
+  isMovie?: boolean;
   storyAssets: StoryAssetItem[];
   showMotionEdit?: boolean;
   showDirectorNote?: boolean;
@@ -153,7 +153,7 @@ export function SortableSceneCard({
             </div>
           )}
 
-          {isDialogue && scene.speaker && (
+          {isMovie && scene.speaker && (
             <div className="mb-1.5">
               <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${scene.speaker.toLowerCase() === "narrator"
                 ? "bg-gray-500/20 text-gray-400"
@@ -166,7 +166,7 @@ export function SortableSceneCard({
 
           <div className="mb-2">
             <span className="text-[10px] uppercase tracking-wider text-gray-600 font-medium">
-              {isMusicVideo ? scene.searchQuery || "Lyrics" : isDialogue ? "Dialogue" : "Narration"}
+              {isMusicVideo ? scene.searchQuery || "Lyrics" : isMovie ? scene.speaker || "Narration" : "Narration"}
             </span>
             {editing ? (
               <textarea

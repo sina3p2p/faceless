@@ -649,30 +649,21 @@ export default function CreateVideoPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
-                  {form.videoType === "dialogue" ? "Narrator / Default Voice" : "Voice"}
+                  {form.videoType === "movie" ? "Narrator / Default Voice" : "Voice"}
                 </label>
                 <VoiceSelector
                   value={form.voiceId}
                   onChange={(voiceId) => setForm({ ...form, voiceId })}
                 />
                 <p className="text-xs text-gray-500 mt-1.5">
-                  {form.videoType === "dialogue"
-                    ? "Used for Narrator lines and characters without an assigned voice."
+                  {form.videoType === "movie"
+                    ? "Used for narration and any character without a dedicated voice."
                     : "Leave unselected to use the default voice."}
                 </p>
               </div>
             </CardContent>
           )}
         </Card>
-
-        {form.videoType === "dialogue" && (() => {
-          const charsWithVoices = pendingAssets.filter((a) => a.type === "character" && a.voiceId);
-          return charsWithVoices.length < 2 ? (
-            <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm">
-              Assign voices to at least 2 character assets to use Dialogue mode.
-            </div>
-          ) : null;
-        })()}
 
         {error && (
           <div className="mt-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
@@ -691,10 +682,7 @@ export default function CreateVideoPage() {
           <Button
             type="submit"
             loading={loading}
-            disabled={
-              !form.prompt.trim() ||
-              (form.videoType === "dialogue" && pendingAssets.filter((a) => a.type === "character" && a.voiceId).length < 2)
-            }
+            disabled={!form.prompt.trim()}
           >
             Generate Video
           </Button>

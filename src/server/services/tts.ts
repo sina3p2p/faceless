@@ -106,6 +106,35 @@ export async function generateSpeech(
   };
 }
 
+export interface AvailableVoice {
+  id: string;
+  name: string;
+  gender: "male" | "female" | null;
+}
+
+/** Fetch the ElevenLabs voice library (server-side; used for auto voice casting). */
+export async function listVoices(): Promise<AvailableVoice[]> {
+  if (!TTS.apiKey) return [];
+  const res = await fetch("https://api.elevenlabs.io/v1/voices", {
+    headers: { "xi-api-key": TTS.apiKey },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    console.warn(`[tts] listVoices failed: ${res.status}`);
+    return [];
+  }
+  const data = await res.json();
+  return (data.voices as Array<{ voice_id: string; name: string; labels?: Record<string, string> }>)
+    .map((v) => {
+      const g = v.labels?.gender?.toLowerCase();
+      return {
+        id: v.voice_id,
+        name: v.name,
+        gender: g === "male" || g === "female" ? (g as "male" | "female") : null,
+      };
+    });
+}
+
 export async function generateSpeechForScenes(
   scenes: Array<{ text: string }>,
   voiceId?: string
