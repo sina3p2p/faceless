@@ -107,7 +107,7 @@ CREATIVE BRIEF (follow these constraints):
 - Word budget for ALL spoken lines combined: ~${brief.durationGuidance.wordBudgetTarget} words (range ${brief.durationGuidance.wordBudgetMin}–${brief.durationGuidance.wordBudgetMax})
 - Scene count: ${brief.durationGuidance.sceneBudget.min}–${brief.durationGuidance.sceneBudget.max} scenes
 - Max sentences per scene line: ${brief.formatConstraints.maxSentencesPerScene}
-- Narration-style leaning: ${brief.formatConstraints.narrationStyle}; dialogue density leaning: ${brief.formatConstraints.dialogueDensity}. Treat these as a WEAK prior only — if named characters drive this story, a 'voiceover' leaning does NOT mean a silent cast; prefer mixed and let the characters speak the pivotal beats.
+- Narration-style / dialogue-density leanings from the brief (${brief.formatConstraints.narrationStyle} / ${brief.formatConstraints.dialogueDensity}): IGNORE these for pacing the talk balance. This is a movie — it is dialogue-driven regardless of what the brief leans. Use the brief only for tone/arc/audience, not to justify narration.
 - Opening hook: ${brief.formatConstraints.openingHook}
 - Resolution: ${brief.formatConstraints.resolutionType}${brief.narrativeFramework && brief.narrativeFramework !== "freeform" ? `
 - Narrative framework: ${brief.narrativeFramework} — honor the beat-sheet structure built against it.` : ""}`
@@ -118,20 +118,22 @@ CREATIVE BRIEF (follow these constraints):
       ? `\n\nCAST & WORLD: Reference images and descriptions are attached. Write these named characters/locations into the screenplay using their EXACT names; match their depicted look. You may also introduce new characters the story needs.`
       : "";
 
-  const systemPrompt = `You are an award-winning SCREENWRITER and director writing a short cinematic film — not a narrated essay, not a trailer voiceover. Think in scenes and moments, the way real cinema does.
+  const systemPrompt = `You are an award-winning SCREENWRITER writing a DIALOGUE-DRIVEN cinematic short film — a movie where characters talk to each other and the drama plays out between them. This is NOT a narrated essay, NOT a trailer voiceover, NOT voiceover storytelling with occasional quotes. Think real cinema: scenes, characters, conversations.
 
 OUTPUT MODEL (critical):
 - The film is an ordered list of SCENES. Each scene is ONE moment the audience experiences.
-- Every scene has audio: either a CHARACTER speaks one line (speaker = that character's consistent name) OR it is a NARRATION beat (speaker = "Narrator").
-- DIALOGUE IS THE DEFAULT FOR CHARACTER-DRIVEN STORIES, NOT AN AFTERTHOUGHT. If the film has named human characters and the concept is not inherently wordless (a pure montage, an abstract/explainer piece, a process timelapse), then the PIVOTAL beats — confrontations, the turning point, the climax, the resolution — MUST be delivered as spoken character lines (speaker = the character's name). Narration is the connective tissue between those moments, never a substitute for them. As a guide, several of the key scenes in a character-driven short should be character speech — not zero, and not every scene.
-- An all-narration film with silent named characters is a FAILURE for this format unless the concept is genuinely wordless. That said, quiet visual beats, silence, and narration are powerful storytelling — use them deliberately between the spoken moments.
+- Every scene has audio: either a CHARACTER speaks one line (speaker = that character's consistent name) OR — rarely — it is a NARRATION beat (speaker = "Narrator").
+- DIALOGUE IS THE DEFAULT AND DOMINANT MODE. The film should be carried by characters speaking — to each other, in real exchanges (one scene = one line, so a back-and-forth is several consecutive scenes with alternating speakers). Conversations, confrontations, and quiet two-handers ARE the movie.
+- NARRATION IS A RARE EXCEPTION. Use a "Narrator" scene ONLY when something essential genuinely cannot be dramatized through dialogue or action — a hard time jump, an opening/closing card, context impossible to show or speak. Aim for zero narration; never let it exceed ~1 in 5 scenes, and never use it to explain what dialogue or the image already conveys. If you're tempted to narrate, first try: can a character SAY this, or can we SEE it instead? Almost always, yes.
+- A silent cast is a failure. If named characters exist and the concept can possibly be dramatized (it almost always can), they must talk. An all-narration or narration-heavy result is wrong for this format.
 - One action per scene. If a moment contains a glance, a turn, and a reply, that is three scenes.
 
 WRITING CRAFT (non-negotiable):
-- Subtext over exposition. Characters rarely say exactly what they mean. Narration never explains what an image already shows.
+- Subtext over exposition. Characters talk AROUND the feeling, not about it. BANNED: thesis-statement / greeting-card lines that name the theme out loud (e.g. "Our rivalry was really a partnership", "Respect made us believers"). Say it sideways — through a small concrete request, a deflection, an unfinished sentence.
+- Real speech: contractions, interruptions, subtext, characters who don't fully answer each other. No speeches, no narrator-style lines coming out of a character's mouth.
 - At least one REVERSAL: set an expectation early, break it mid-to-late. If the beat sheet marks a REVERSAL beat, land it there.
 - Vary the dramatic function across scenes — forbidden: two consecutive scenes with the same sceneFunction. Include at least one 'quiet-beat' before a high-stakes scene and at least one 'reversal' or 'reveal'.
-- Distinct character voices: each character has their own diction, rhythm, and stance. The narrator (if used) has a point of view, not a neutral drone.
+- Distinct character voices: each character has their own diction, rhythm, and stance — distinguishable without the speaker label.
 - Escalating specificity: each scene reveals a concrete new thing (a name, an object, a turn) — never just "things intensify".
 - 'action' must be physically photographable — bodies, objects, weather, light. No abstractions, no camera/lens terminology (that lives in directorNote).
 
@@ -145,7 +147,7 @@ LANGUAGE RULES:
 ${beatSheetBlock ? `
 EXECUTE THE BEAT SHEET. Each beat is a movement — give big beats more scenes, small beats fewer. Do not skip or invent beats.${beatSheetBlock}` : ""}${researchBlock}`;
 
-  const userPrompt = `Write the screenplay for this film idea: ${topicIdea}\n\nThe intended visual style/medium is: ${style}. Make it cinematic and impossible to predict. Let the characters carry the pivotal moments in their own voices; use narration to bridge between them, not to replace them.`;
+  const userPrompt = `Write the screenplay for this film idea: ${topicIdea}\n\nThe intended visual style/medium is: ${style}. This is a movie: the characters carry it by talking to each other. Write real scenes and exchanges, with subtext — not a voiceover with quotes. Use narration only if something truly cannot be dramatized.`;
 
   const visionParts =
     assets && assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
@@ -191,29 +193,29 @@ EXECUTE THE BEAT SHEET. Each beat is a movement — give big beats more scenes, 
   let screenplay = await run("");
   if (!screenplay) throw new Error("Failed to generate screenplay");
 
-  // Safety net: if every scene is narration and no character ever speaks, the
-  // headline movie feature (cast voices) is dead. Regenerate once with a hard
-  // dialogue mandate — unless the concept is genuinely a wordless montage, in
-  // which case a single retry still produces the best available result.
-  if (isAllNarration(screenplay)) {
+  // Safety net: a movie must be dialogue-driven. If the draft is narration-
+  // heavy (less than half the scenes are character speech), regenerate once
+  // with a hard mandate to make it a real talking film.
+  if (isNarrationHeavy(screenplay)) {
     console.warn(
-      "[screenwriter] All scenes are narration with no character speech — regenerating once with a dialogue mandate."
+      "[screenwriter] Draft is narration-heavy (movies must be dialogue-driven) — regenerating once with a dialogue mandate."
     );
     const retried = await run(`
 
-REVISION MANDATE (your previous draft failed): every scene was narration and not one character ever spoke. This is a film with characters. Rewrite so the pivotal emotional beats — the confrontation, the turning point, the climax, and the resolution — are SPOKEN CHARACTER LINES (speaker = the character's name), with narration only bridging between them. Only keep an all-narration structure if this concept is truly a wordless montage; otherwise the key turning points MUST be dialogue.`);
-    if (retried && !isAllNarration(retried)) screenplay = retried;
+REVISION MANDATE (your previous draft failed): it leaned on narration instead of letting the characters talk. A movie is dialogue-driven. Rewrite so the film is carried by characters speaking to each other in real exchanges (alternating speaker scenes), with subtext and no thesis-statement lines. Use a "Narrator" scene ONLY where something truly cannot be dramatized — aim for zero, never more than ~1 in 5 scenes. The confrontation, turning point, climax, and resolution MUST be spoken character dialogue.`);
+    if (retried && !isNarrationHeavy(retried)) screenplay = retried;
   }
 
   return screenplay;
 }
 
-/** True when a multi-scene screenplay has no character speech at all. */
-function isAllNarration(s: Screenplay): boolean {
+/** True when a multi-scene movie isn't dialogue-driven (>=half is narration). */
+function isNarrationHeavy(s: Screenplay): boolean {
   if (s.scenes.length < 2) return false;
-  return s.scenes.every(
-    (sc) => (sc.speaker?.trim().toLowerCase() || "narrator") === "narrator"
-  );
+  const characterScenes = s.scenes.filter(
+    (sc) => (sc.speaker?.trim().toLowerCase() || "narrator") !== "narrator"
+  ).length;
+  return characterScenes / s.scenes.length < 0.5;
 }
 
 /**
