@@ -222,15 +222,12 @@ interface WhisperWord {
   end: number;
 }
 
-export async function transcribeSong(audioUrl: string): Promise<WhisperWord[]> {
-  console.log("[whisper] Transcribing song for lyrics alignment...");
-
-  const audioRes = await axios.get<ArrayBuffer>(audioUrl, {
-    responseType: "arraybuffer",
-    timeout: 300_000,
-  });
-  const buffer = Buffer.from(audioRes.data);
-  const file = await toFile(buffer, "song.mp3", { type: "audio/mpeg" });
+/** Whisper word-level transcription of an in-memory audio buffer. */
+export async function transcribeAudioBuffer(
+  buffer: Buffer,
+  label = "audio"
+): Promise<WhisperWord[]> {
+  const file = await toFile(buffer, "audio.mp3", { type: "audio/mpeg" });
 
   const tr = await recordAiCall(
     {
@@ -239,7 +236,7 @@ export async function transcribeSong(audioUrl: string): Promise<WhisperWord[]> {
       operation: "audio.transcribe",
       request: {
         model: "whisper-1",
-        audioUrl,
+        label,
         bytes: buffer.length,
         response_format: "verbose_json",
         timestamp_granularities: ["word"],
@@ -264,8 +261,18 @@ export async function transcribeSong(audioUrl: string): Promise<WhisperWord[]> {
       end: w.end as number,
     }));
 
-  console.log(`[whisper] Transcribed ${words.length} words from song`);
+  console.log(`[whisper] Transcribed ${words.length} words from ${label}`);
   return words;
+}
+
+export async function transcribeSong(audioUrl: string): Promise<WhisperWord[]> {
+  console.log("[whisper] Transcribing song for lyrics alignment...");
+
+  const audioRes = await axios.get<ArrayBuffer>(audioUrl, {
+    responseType: "arraybuffer",
+    timeout: 300_000,
+  });
+  return transcribeAudioBuffer(Buffer.from(audioRes.data), "song");
 }
 
 function normalizeText(text: string): string {
