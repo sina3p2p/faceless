@@ -9,12 +9,43 @@ interface TTSOptions {
   stability?: number;
   similarityBoost?: number;
   style?: number;
+  /** Used only when the v3 expressive model is enabled — selects an audio tag. */
+  emotion?: string | null;
+  emotionIntensity?: string | null;
 }
 
 export type EmotionVoiceSettings = Pick<
   TTSOptions,
   "stability" | "similarityBoost" | "style"
 >;
+
+/** Per-scene TTS overrides: voice settings plus emotion (for v3 audio tags). */
+export type PerSceneTTSOptions = EmotionVoiceSettings &
+  Pick<TTSOptions, "emotion" | "emotionIntensity">;
+
+// ElevenLabs v3 inline audio tags per emotion. Empty = no tag (neutral).
+const EMOTION_V3_TAG: Record<string, string> = {
+  neutral: "",
+  joyful: "[happy]",
+  sad: "[sad]",
+  angry: "[angry]",
+  fearful: "[nervous]",
+  tender: "[gentle]",
+  tense: "[urgent]",
+  triumphant: "[triumphant]",
+  playful: "[playful]",
+  cold: "[cold]",
+};
+
+/** Inline v3 audio tag for an emotion; strong anger escalates to a shout. */
+export function emotionToV3Tag(
+  emotion?: string | null,
+  intensity?: string | null
+): string {
+  const key = emotion?.toLowerCase() ?? "";
+  if (key === "angry" && intensity === "strong") return "[shouting]";
+  return EMOTION_V3_TAG[key] ?? "";
+}
 
 // Base ElevenLabs v2 voice_settings per emotion. Lower `stability` = more
 // expressive variance; higher `style` = more performed/exaggerated delivery.
@@ -67,11 +98,20 @@ export async function generateSpeech(
     stability = TTS.defaultStability,
     similarityBoost = TTS.defaultSimilarityBoost,
     style = TTS.defaultStyle,
+    emotion,
+    emotionIntensity,
   } = options;
 
   // [pause:N] markers persist in scene text so we can swap TTS providers
   // without rewriting stored data. Convert to ElevenLabs SSML at send time.
-  const requestText = translatePauseMarkersToSsml(text);
+  let requestText = translatePauseMarkersToSsml(text);
+
+  // v3 trial: prepend an inline emotion audio tag so the line is performed.
+  // v2 does NOT understand tags (it would speak them), so this is gated.
+  if (TTS.useExpressiveV3) {
+    const tag = emotionToV3Tag(emotion, emotionIntensity);
+    if (tag) requestText = `${tag} ${requestText}`;
+  }
 
   const response = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
@@ -83,7 +123,7 @@ export async function generateSpeech(
       },
       body: JSON.stringify({
         text: requestText,
-        model_id: TTS.model,
+        model_id: TTS.activeModel,
         voice_settings: {
           stability,
           similarity_boost: similarityBoost,
@@ -107,6 +147,12 @@ export async function generateSpeech(
   const audioBuffer = Buffer.from(audioBase64, "base64");
 
   const wordTimestamps: WordTimestamp[] = [];
+
+  if (!data.alignment && TTS.useExpressiveV3) {
+    console.warn(
+      "[tts] v3 expressive model returned no alignment — word-timestamp captions will be degraded for this scene."
+    );
+  }
 
   if (data.alignment) {
     const { characters, character_start_times_seconds, character_end_times_seconds } = data.alignment;
