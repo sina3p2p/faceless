@@ -95,6 +95,25 @@ export const AI_VIDEO = {
 } as const;
 
 /**
+ * SPIKE: audio-driven lip sync for movie scenes. Runs an extra Replicate
+ * pass on the first clip of each scene whose speaker is an on-camera
+ * character, syncing the mouth to that scene's TTS audio.
+ *
+ * OFF by default and best-effort: any failure leaves the original clip
+ * untouched, so a render never breaks. Requires a configured Replicate
+ * lip-sync model VERSION id (`REPLICATE_LIPSYNC_VERSION`). The model must
+ * accept `{ video, audio }` inputs (e.g. latentsync / video-retalking
+ * family). `enabled` implies a version is set.
+ */
+export const LIPSYNC = {
+  get version() { return env("REPLICATE_LIPSYNC_VERSION", ""); },
+  get modelLabel() { return env("REPLICATE_LIPSYNC_MODEL", "replicate-lipsync"); },
+  get enabled() {
+    return env("LIPSYNC_ENABLED", "false") === "true" && this.version.length > 0;
+  },
+} as const;
+
+/**
  * Image-to-video backend: `"fal"` (Fal.ai) or `"replicate"` (Replicate for models with `replicateModel` in `VIDEO_MODELS`).
  * Change this value only — not exposed in the app UI. Rebuild after changing (client model list reads this at build time).
  */
