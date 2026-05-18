@@ -108,9 +108,11 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       // Per-scene emotional delivery: map each scene's emotion → ElevenLabs
       // voice_settings so lines are acted, not read flat. Applies to every
       // non-music type; scenes with no emotion fall back to a neutral baseline.
-      const perSceneVoiceSettings = scenes.map((scene) =>
-        emotionToVoiceSettings(scene.emotion, scene.emotionIntensity)
-      );
+      const perSceneVoiceSettings = scenes.map((scene) => ({
+        ...emotionToVoiceSettings(scene.emotion, scene.emotionIntensity),
+        emotion: scene.emotion,
+        emotionIntensity: scene.emotionIntensity,
+      }));
       const emotionMix = scenes.reduce<Record<string, number>>((acc, s) => {
         const key = s.emotion ?? "unset";
         acc[key] = (acc[key] ?? 0) + 1;

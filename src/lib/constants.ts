@@ -68,6 +68,15 @@ export const TTS = {
   get apiKey() { return env("ELEVENLABS_API_KEY"); },
   get defaultVoiceId() { return env("ELEVENLABS_DEFAULT_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"); },
   model: "eleven_multilingual_v2",
+  /** Expressive model used when ELEVENLABS_USE_V3=true. Supports inline emotion audio tags. */
+  expressiveModel: "eleven_v3",
+  /**
+   * Opt-in trial: route TTS through the expressive v3 model with inline
+   * emotion audio tags. OFF by default — v3 may not return word-level
+   * timestamps, so captions degrade gracefully (no crash) when enabled.
+   */
+  get useExpressiveV3() { return env("ELEVENLABS_USE_V3", "false") === "true"; },
+  get activeModel() { return this.useExpressiveV3 ? this.expressiveModel : this.model; },
   defaultStability: 0.4,
   defaultSimilarityBoost: 0.8,
   defaultStyle: 0.3,
