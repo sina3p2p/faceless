@@ -7,7 +7,7 @@ import postgres from "postgres";
 import { eq, and, ne, desc, asc } from "drizzle-orm";
 import * as schema from "@/server/db/schema";
 import { DATABASE, WORKER } from "@/lib/constants";
-import { generateSpeech, type TTSResult } from "@/server/services/tts";
+import { generateSpeech, type TTSResult, type EmotionVoiceSettings } from "@/server/services/tts";
 import { mediaUrl } from "@/lib/storage";
 import { env } from "@/lib/constants";
 import type { StoryAssetInput } from "@/types/worker";
@@ -62,7 +62,8 @@ export async function generateTTSParallel(
   voiceId: string | null | undefined,
   workDir: string,
   concurrency = WORKER.parallelTTS,
-  perSceneVoiceIds?: (string | undefined)[]
+  perSceneVoiceIds?: (string | undefined)[],
+  perSceneVoiceSettings?: (EmotionVoiceSettings | undefined)[]
 ): Promise<{ audioPaths: string[]; ttsResults: TTSResult[] }> {
   const audioPaths: string[] = new Array(sceneTexts.length);
   const ttsResults: TTSResult[] = new Array(sceneTexts.length);
@@ -78,7 +79,10 @@ export async function generateTTSParallel(
     await Promise.all(
       chunk.map(async (i) => {
         const sceneVoice = perSceneVoiceIds?.[i] ?? voiceId ?? env("ELEVENLABS_DEFAULT_VOICE_ID");
-        const result = await generateSpeech(sceneTexts[i], { voiceId: sceneVoice });
+        const result = await generateSpeech(sceneTexts[i], {
+          voiceId: sceneVoice,
+          ...(perSceneVoiceSettings?.[i] ?? {}),
+        });
         const audioPath = path.join(workDir, `audio_${i}.mp3`);
         await fs.writeFile(audioPath, result.audioBuffer);
         audioPaths[i] = audioPath;

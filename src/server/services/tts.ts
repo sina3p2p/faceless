@@ -11,6 +11,53 @@ interface TTSOptions {
   style?: number;
 }
 
+export type EmotionVoiceSettings = Pick<
+  TTSOptions,
+  "stability" | "similarityBoost" | "style"
+>;
+
+// Base ElevenLabs v2 voice_settings per emotion. Lower `stability` = more
+// expressive variance; higher `style` = more performed/exaggerated delivery.
+const EMOTION_SETTINGS: Record<string, { stability: number; style: number }> = {
+  neutral: { stability: 0.5, style: 0.2 },
+  joyful: { stability: 0.3, style: 0.55 },
+  sad: { stability: 0.32, style: 0.35 },
+  angry: { stability: 0.22, style: 0.6 },
+  fearful: { stability: 0.25, style: 0.5 },
+  tender: { stability: 0.4, style: 0.35 },
+  tense: { stability: 0.28, style: 0.5 },
+  triumphant: { stability: 0.28, style: 0.6 },
+  playful: { stability: 0.3, style: 0.55 },
+  cold: { stability: 0.5, style: 0.4 },
+};
+
+const clamp = (v: number, lo: number, hi: number) =>
+  Math.min(hi, Math.max(lo, v));
+
+/**
+ * Map a scene's emotion + intensity to ElevenLabs v2 voice_settings so the
+ * delivery is acted, not flat. Unknown/empty emotion → neutral baseline.
+ */
+export function emotionToVoiceSettings(
+  emotion?: string | null,
+  intensity?: string | null
+): EmotionVoiceSettings {
+  const base = EMOTION_SETTINGS[emotion?.toLowerCase() ?? ""] ?? EMOTION_SETTINGS.neutral;
+  let { stability, style } = base;
+  if (intensity === "subtle") {
+    stability += 0.12;
+    style -= 0.12;
+  } else if (intensity === "strong") {
+    stability -= 0.1;
+    style += 0.12;
+  }
+  return {
+    stability: clamp(stability, 0.15, 0.7),
+    style: clamp(style, 0, 0.85),
+    similarityBoost: 0.8,
+  };
+}
+
 export async function generateSpeech(
   text: string,
   options: TTSOptions = {}

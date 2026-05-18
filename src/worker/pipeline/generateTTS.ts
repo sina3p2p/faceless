@@ -8,6 +8,7 @@ import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { uploadFile } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
+import { emotionToVoiceSettings } from "@/server/services/tts";
 import {
   generateSong,
   transcribeSong,
@@ -104,12 +105,26 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
         console.log(`[generate-tts] Movie mode: ${distinct} character voice(s) across ${scenes.length} scenes (narrator/default for the rest)`);
       }
 
+      // Per-scene emotional delivery: map each scene's emotion → ElevenLabs
+      // voice_settings so lines are acted, not read flat. Applies to every
+      // non-music type; scenes with no emotion fall back to a neutral baseline.
+      const perSceneVoiceSettings = scenes.map((scene) =>
+        emotionToVoiceSettings(scene.emotion, scene.emotionIntensity)
+      );
+      const emotionMix = scenes.reduce<Record<string, number>>((acc, s) => {
+        const key = s.emotion ?? "unset";
+        acc[key] = (acc[key] ?? 0) + 1;
+        return acc;
+      }, {});
+      console.log(`[generate-tts] Emotional delivery mix: ${JSON.stringify(emotionMix)}`);
+
       const { audioPaths, ttsResults } = await generateTTSParallel(
         sceneTexts,
         videoProject.voiceId,
         workDir,
         undefined,
-        perSceneVoiceIds
+        perSceneVoiceIds,
+        perSceneVoiceSettings
       );
 
       for (const [index, scene] of scenes.entries()) {

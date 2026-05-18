@@ -65,6 +65,8 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
         sceneOrder: i,
         sceneTitle: s.sceneTitle,
         speaker: s.speaker ?? null,
+        emotion: s.emotion ?? null,
+        emotionIntensity: s.emotionIntensity ?? null,
         directorNote: `[Scene function: ${s.sceneFunction}]\n${baseNote}${surpriseLine}`,
         text: s.text,
         estimatedDurationSec: estimateDurationSec(

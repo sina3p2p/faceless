@@ -130,6 +130,20 @@ export type SceneFunction =
 
 export type VoicePace = "slow" | "standard" | "fast";
 
+export type Emotion =
+  | "neutral"
+  | "joyful"
+  | "sad"
+  | "angry"
+  | "fearful"
+  | "tender"
+  | "tense"
+  | "triumphant"
+  | "playful"
+  | "cold";
+
+export type EmotionIntensity = "subtle" | "moderate" | "strong";
+
 // ── Screenwriter → Screenplay (movie video type) ──
 
 /** One spoken moment of the film: either a character line or a narration beat. */
@@ -141,6 +155,9 @@ export interface ScreenplayScene {
   speaker: string;
   /** Exactly what the viewer hears in this scene (dialogue line or narration). */
   line: string;
+  /** Emotional performance the line is delivered with (drives TTS). */
+  emotion: Emotion;
+  emotionIntensity: EmotionIntensity;
   /** Concrete on-screen staging the viewer SEES while the line plays. */
   action: string;
   /** Rich visual brief for the cinematography pipeline (English). */
