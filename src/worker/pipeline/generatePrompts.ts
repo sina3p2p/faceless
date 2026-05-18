@@ -92,6 +92,7 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
           assetRefs: sceneFrames[j].assetRefs,
           transitionIn: frameSpec?.transitionIn ?? null,
           sfxHint: frameSpec?.sfxHint ?? null,
+          isSpeakingCloseup: frameSpec?.isSpeakingCloseup ?? false,
         });
         totalFrames++;
       }

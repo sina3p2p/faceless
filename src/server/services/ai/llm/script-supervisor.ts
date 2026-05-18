@@ -4,7 +4,7 @@ import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
 import { openrouter, type StoryAsset } from "./index";
-import type { CreativeBrief } from "@/types/pipeline";
+import { EMOTIONS, type CreativeBrief } from "@/types/pipeline";
 import { TVideoScene } from "@/types/video";
 import { countNarrationWords, WORDS_PER_SECOND } from "./pacing";
 
@@ -50,18 +50,7 @@ const sceneFunctionEnum = z.enum([
 
 const voicePaceEnum = z.enum(["slow", "standard", "fast"]);
 
-const emotionEnum = z.enum([
-  "neutral",
-  "joyful",
-  "sad",
-  "angry",
-  "fearful",
-  "tender",
-  "tense",
-  "triumphant",
-  "playful",
-  "cold",
-]);
+const emotionEnum = z.enum(EMOTIONS);
 
 const emotionIntensityEnum = z.enum(["subtle", "moderate", "strong"]);
 

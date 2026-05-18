@@ -8,7 +8,9 @@ import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { uploadFile } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
-import { emotionToVoiceSettings } from "@/server/services/tts";
+import { emotionToVoiceSettings, type TTSResult } from "@/server/services/tts";
+import { TTS } from "@/lib/constants";
+import { generateMovieDialogueAudio } from "./movieDialogue";
 import {
   generateSong,
   transcribeSong,
@@ -89,6 +91,40 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       const sceneTexts = scenes.map((scene) => scene.text);
       console.log(`[generate-tts] Generating TTS for ${sceneTexts.length} scenes`);
 
+      const useDialog =
+        videoProject.videoType === "movie" &&
+        (videoProject.config?.movieDialogMode ?? true) &&
+        TTS.dialogEnabled;
+
+      let audioPaths: string[];
+      let ttsResults: TTSResult[];
+
+      if (useDialog) {
+        const registry =
+          videoProject.config?.continuityNotes?.characterRegistry ?? [];
+        console.log(
+          `[generate-tts] Movie dialog mode: v3 Text-to-Dialogue for ${scenes.length} scenes`
+        );
+        ({ audioPaths, ttsResults } = await generateMovieDialogueAudio(
+          scenes.map((s) => ({
+            text: s.text,
+            speaker: s.speaker,
+            emotion: s.emotion,
+            emotionIntensity: s.emotionIntensity,
+          })),
+          registry,
+          videoProject.voiceId,
+          workDir
+        ));
+        const emotionMix = scenes.reduce<Record<string, number>>((acc, s) => {
+          const key = s.emotion ?? "unset";
+          acc[key] = (acc[key] ?? 0) + 1;
+          return acc;
+        }, {});
+        console.log(
+          `[generate-tts] Emotional delivery mix: ${JSON.stringify(emotionMix)}`
+        );
+      } else {
       let perSceneVoiceIds: (string | undefined)[] | undefined;
       if (videoProject.videoType === "movie") {
         const registry = videoProject.config?.continuityNotes?.characterRegistry ?? [];
@@ -120,14 +156,15 @@ export async function generateTTSJob(job: Job<RenderJobData>) {
       }, {});
       console.log(`[generate-tts] Emotional delivery mix: ${JSON.stringify(emotionMix)}`);
 
-      const { audioPaths, ttsResults } = await generateTTSParallel(
+      ({ audioPaths, ttsResults } = await generateTTSParallel(
         sceneTexts,
         videoProject.voiceId,
         workDir,
         undefined,
         perSceneVoiceIds,
         perSceneVoiceSettings
-      );
+      ));
+      }
 
       for (const [index, scene] of scenes.entries()) {
         const audioBuffer = await fs.readFile(audioPaths[index]);
