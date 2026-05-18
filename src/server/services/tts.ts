@@ -228,6 +228,41 @@ export async function listVoices(): Promise<AvailableVoice[]> {
     });
 }
 
+export interface DialogueTurn {
+  /** Spoken text for this turn, optionally prefixed with a v3 audio tag. */
+  text: string;
+  voiceId: string;
+}
+
+/**
+ * ElevenLabs v3 Text-to-Dialogue: synthesize a multi-turn exchange in ONE
+ * pass so the model hears the whole conversation (reactions, interruptions,
+ * emotional carry-over) instead of reading each line cold. Returns a single
+ * combined audio stream — callers force-align it back to per-scene clips.
+ */
+export async function generateDialogue(inputs: DialogueTurn[]): Promise<Buffer> {
+  const response = await fetch("https://api.elevenlabs.io/v1/text-to-dialogue", {
+    method: "POST",
+    headers: {
+      "xi-api-key": TTS.apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model_id: TTS.expressiveModel,
+      inputs: inputs.map((t) => ({ text: t.text, voice_id: t.voiceId })),
+    }),
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => "");
+    throw new Error(
+      `ElevenLabs Text-to-Dialogue failed: ${response.status} ${response.statusText} - ${errBody}`
+    );
+  }
+
+  return Buffer.from(await response.arrayBuffer());
+}
+
 export async function generateSpeechForScenes(
   scenes: Array<{ text: string }>,
   voiceId?: string

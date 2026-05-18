@@ -77,6 +77,16 @@ export const TTS = {
    */
   get useExpressiveV3() { return env("ELEVENLABS_USE_V3", "false") === "true"; },
   get activeModel() { return this.useExpressiveV3 ? this.expressiveModel : this.model; },
+  /**
+   * Opt-in trial: synthesize movie scenes via the v3 Text-to-Dialogue API.
+   * The whole exchange is generated in one pass so the model hears the
+   * conversation (reactions, emotional carry-over) instead of reading each
+   * line in isolation. OFF by default; movie-type only; per-scene path is
+   * the fallback if dialogue synthesis/alignment fails.
+   */
+  get useDialogueMode() { return env("ELEVENLABS_USE_DIALOGUE", "false") === "true"; },
+  /** Char budget per Text-to-Dialogue request; scenes are batched under it. */
+  dialogueMaxCharsPerRequest: 2800,
   defaultStability: 0.4,
   defaultSimilarityBoost: 0.8,
   defaultStyle: 0.3,
