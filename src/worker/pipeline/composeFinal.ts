@@ -9,6 +9,7 @@ import { getVideoSize } from "@/lib/constants";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { downloadFile, composeVideo, type ComposerScene } from "@/server/services/composer";
 import { buildXfadeFilterChain, sceneNeedsXfade } from "@/server/services/composer/xfade";
+import { applyLipSyncIfEnabled } from "./lipSync";
 import type { TransitionType } from "@/types/pipeline";
 
 export async function composeFinalJob(job: Job<RenderJobData>) {
@@ -23,6 +24,11 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
     if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
 
     await updateVideoStatus(videoProjectId, "RENDERING");
+
+    // SPIKE (flag-gated, no-op by default): re-sync speaking-scene clips to
+    // their audio before composition. Never throws — failures keep the
+    // original clip so composition always proceeds.
+    await applyLipSyncIfEnabled(videoProjectId);
 
     const sizeConfig = getVideoSize(videoProject.videoSize);
 
