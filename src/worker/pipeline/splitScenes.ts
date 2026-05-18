@@ -34,6 +34,8 @@ export async function splitScenesJob(job: Job<RenderJobData>) {
           sceneOrder: i,
           sceneTitle: s.sceneTitle,
           speaker: s.speaker ?? null,
+          emotion: s.emotion ?? null,
+          emotionIntensity: s.emotionIntensity ?? null,
           directorNote: `[Scene function: ${s.sceneFunction}]\n${s.directorNote}${s.action?.trim() ? `\n[Action: ${s.action.trim()}]` : ""}`,
           text: s.line,
           estimatedDurationSec: estimateDurationSec(

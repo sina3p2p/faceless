@@ -27,6 +27,21 @@ const sceneFunctionEnum = z.enum([
 
 const voicePaceEnum = z.enum(["slow", "standard", "fast"]);
 
+const emotionEnum = z.enum([
+  "neutral",
+  "joyful",
+  "sad",
+  "angry",
+  "fearful",
+  "tender",
+  "tense",
+  "triumphant",
+  "playful",
+  "cold",
+]);
+
+const emotionIntensityEnum = z.enum(["subtle", "moderate", "strong"]);
+
 const screenplaySceneSchema = z.object({
   sceneTitle: z.string().describe("Short slug for this beat (2-5 words), like a scene heading."),
   speaker: z
@@ -49,6 +64,12 @@ const screenplaySceneSchema = z.object({
   ),
   voicePace: voicePaceEnum.describe(
     "Delivery pace for this line: 'slow' (~100 wpm — weighty/somber), 'standard' (~150 wpm), 'fast' (~180 wpm — urgent). Vary it."
+  ),
+  emotion: emotionEnum.describe(
+    "The emotion the speaker FEELS as they deliver this exact line — match it to the sense of the words and the character's state in this moment. Vary it across the film; do not default to 'neutral' for lines that carry feeling."
+  ),
+  emotionIntensity: emotionIntensityEnum.describe(
+    "How hard the emotion is played: 'subtle' (held back, under the surface), 'moderate', or 'strong' (full force — a shout, a sob, a roar of triumph)."
   ),
   directorNote: z
     .string()
@@ -134,6 +155,7 @@ WRITING CRAFT (non-negotiable):
 - At least one REVERSAL: set an expectation early, break it mid-to-late. If the beat sheet marks a REVERSAL beat, land it there.
 - Vary the dramatic function across scenes — forbidden: two consecutive scenes with the same sceneFunction. Include at least one 'quiet-beat' before a high-stakes scene and at least one 'reversal' or 'reveal'.
 - Distinct character voices: each character has their own diction, rhythm, and stance — distinguishable without the speaker label.
+- EMOTIONAL PERFORMANCE: every line is ACTED, not read. Set emotion + emotionIntensity to the true feeling under the words (a threat is 'cold' or 'angry', a goodbye is 'sad' or 'tender', a winning roar is 'triumphant' 'strong'). The emotion should shift scene to scene with the drama — a film delivered in one flat tone is a failure.
 - Escalating specificity: each scene reveals a concrete new thing (a name, an object, a turn) — never just "things intensify".
 - 'action' must be physically photographable — bodies, objects, weather, light. No abstractions, no camera/lens terminology (that lives in directorNote).
 

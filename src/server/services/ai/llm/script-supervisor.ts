@@ -50,9 +50,26 @@ const sceneFunctionEnum = z.enum([
 
 const voicePaceEnum = z.enum(["slow", "standard", "fast"]);
 
+const emotionEnum = z.enum([
+  "neutral",
+  "joyful",
+  "sad",
+  "angry",
+  "fearful",
+  "tender",
+  "tense",
+  "triumphant",
+  "playful",
+  "cold",
+]);
+
+const emotionIntensityEnum = z.enum(["subtle", "moderate", "strong"]);
+
 const correctedSceneSchema = z.object({
   sceneTitle: z.string(),
   speaker: z.string().nullable().describe("Carry over and NORMALIZE the director's speaker: rewrite it to the character's canonicalName from characterRegistry, or 'Narrator' for narrated scenes. Keep null if the input scene's speaker was null (non-movie video)."),
+  emotion: emotionEnum.describe("The emotion the line is delivered with, matched to the sense of the words and the speaker's state. Preserve the input scene's Emotion when present and still apt; otherwise infer it. Vary it across scenes — never leave a feeling-laden line as 'neutral'."),
+  emotionIntensity: emotionIntensityEnum.describe("How hard the emotion is performed: 'subtle', 'moderate', or 'strong'. Preserve the input scene's value when present and apt; otherwise infer from the stakes of the moment."),
   text: z.string().describe("The corrected narration text — names fixed, pacing adjusted. Preserve any [pause:N] markers from the director's input unless you split/merge the scene, in which case keep at most ONE pause marker per resulting scene."),
   sceneFunction: sceneFunctionEnum.describe("Dramatic function of this scene. Preserve the director's tag if it exists ([Scene function: X] in the input directorNote). If a scene reveals nothing new and is not a quiet-beat, either flag it via surpriseInjection or re-tag it after restructuring."),
   voicePace: voicePaceEnum.describe("Delivery pace: 'slow' (~100 wpm), 'standard' (~150 wpm), 'fast' (~180 wpm). Preserve the director's pick unless the rewrite materially changed the scene's energy."),
@@ -87,7 +104,7 @@ export async function superviseScript(
   const primaryModel = model || LLM.supervisorModel;
 
   const scenesContext = scenes.map((s, i) =>
-    `Scene ${i} — "${s.sceneTitle}":\n  Speaker: ${s.speaker ?? "null"}\n  Narration: "${s.text}"\n  Director's Note: ${s.directorNote}`
+    `Scene ${i} — "${s.sceneTitle}":\n  Speaker: ${s.speaker ?? "null"}\n  Emotion: ${s.emotion ?? "unset"} (${s.emotionIntensity ?? "unset"})\n  Narration: "${s.text}"\n  Director's Note: ${s.directorNote}`
   ).join("\n\n");
 
   const assetList = storyAssets.length > 0
@@ -143,6 +160,10 @@ SPEAKER & VOICE CASTING:
 - Each input scene has a "Speaker" field. If it is "null", this is NOT a movie-type video — set every output scene's speaker to null and skip voice casting (leave voiceProfile null).
 - Otherwise (movie): set each output scene's speaker to the character's canonicalName from characterRegistry, or "Narrator" for narrated/voiceover scenes. Resolve aliases — never emit an alias as a speaker.
 - For every character in characterRegistry, set voiceProfile to "male", "female", or "neutral" based on how they are depicted in the script and any reference images. Use "neutral" only when truly ambiguous or non-human.
+
+EMOTIONAL PERFORMANCE:
+- Every scene drives a TTS performance. Set emotion + emotionIntensity to the true feeling of the spoken line in that moment, matched to its sense and the speaker. Preserve the input "Emotion" when present and still apt; refine it if the rewrite changed the line's energy.
+- The emotional track MUST move with the drama — a film read in one flat tone is the failure we are preventing. Do not leave feeling-laden lines as 'neutral'.
 
 ${assetList}
 

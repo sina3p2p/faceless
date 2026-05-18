@@ -296,6 +296,11 @@ export const videoScenes = pgTable("video_scenes", {
   imageUrl: text("image_url"),
   videoUrl: text("video_url"),
   speaker: text("speaker"),
+  // Emotional performance for TTS delivery (movie/dialogue). `emotion` is one
+  // of the screenwriter/supervisor enum values; `emotionIntensity` is
+  // subtle|moderate|strong. Null = neutral default.
+  emotion: text("emotion"),
+  emotionIntensity: text("emotion_intensity"),
   assetRefs: json("asset_refs").$type<string[]>(),
   duration: real("duration").notNull().default(0),
   // Director's WPM-based estimate of narration length before TTS runs. Lets
