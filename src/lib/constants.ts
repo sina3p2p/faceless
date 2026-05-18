@@ -77,6 +77,17 @@ export const TTS = {
    */
   get useExpressiveV3() { return env("ELEVENLABS_USE_V3", "false") === "true"; },
   get activeModel() { return this.useExpressiveV3 ? this.expressiveModel : this.model; },
+  /**
+   * Kill-switch for the movie-type v3 Text-to-Dialogue path. ON by default;
+   * set ELEVENLABS_DIALOG_ENABLED=false to force the legacy per-scene path.
+   */
+  get dialogEnabled() { return env("ELEVENLABS_DIALOG_ENABLED", "true") === "true"; },
+  /** Model used for the v3 Text-to-Dialogue endpoint. */
+  dialogModel: "eleven_v3",
+  /** Max chars per dialogue request before a new group is started. */
+  dialogMaxChars: 2800,
+  /** Max turns per dialogue request before a new group is started. */
+  dialogMaxTurns: 10,
   defaultStability: 0.4,
   defaultSimilarityBoost: 0.8,
   defaultStyle: 0.3,
@@ -101,6 +112,19 @@ export const RESEARCH = {
 export const AI_VIDEO = {
   get falKey() { return env("FAL_KEY"); },
   get replicateToken() { return env("REPLICATE_API_TOKEN"); },
+} as const;
+
+// ── Lip-sync (Replicate; movie type only) ──
+
+export const LIPSYNC = {
+  get replicateToken() { return env("REPLICATE_API_TOKEN"); },
+  /**
+   * Replicate model `version` for the lip-sync prediction. `sync/lipsync-2`
+   * takes `{ video, audio }` URLs and returns one video URL. Override the
+   * pinned version hash via env if the model is updated.
+   */
+  get model() { return env("LIPSYNC_REPLICATE_MODEL", "sync/lipsync-2"); },
+  get version() { return env("LIPSYNC_REPLICATE_VERSION", "sync/lipsync-2"); },
 } as const;
 
 /**

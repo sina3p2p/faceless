@@ -1,4 +1,4 @@
-import { AI_VIDEO, VIDEO_MODELS } from "@/lib/constants";
+import { AI_VIDEO, VIDEO_MODELS, LIPSYNC } from "@/lib/constants";
 import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
 import { sleep } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
@@ -91,5 +91,27 @@ export class ReplicateVideoProvider implements IVideoProvider {
       }
     }
     throw new Error(`Replicate: prediction ${status}`);
+  }
+
+  /**
+   * Lip-sync a clip to an audio track via a dedicated Replicate model (e.g.
+   * `sync/lipsync-2`). Separate from the i2v path so the i2v input switch is
+   * untouched. Inputs are URLs (Replicate pulls them), mirroring how i2v
+   * passes the image URL.
+   */
+  async lipSync(videoUrl: string, audioUrl: string): Promise<VideoResult> {
+    const input = { video: videoUrl, audio: audioUrl };
+    const prediction = await this.client.post('predictions', { input, version: LIPSYNC.version });
+    const predictionId = prediction.data.id;
+    let status = 'pending';
+    while (status !== 'succeeded' && status !== 'failed' && status !== 'canceled') {
+      await sleep(2000);
+      const response = await this.client.get(`predictions/${predictionId}`);
+      status = response.data.status;
+      if (status === 'succeeded') {
+        return { videoUrl: extractOutputUrl(response.data.output), durationSeconds: 0 };
+      }
+    }
+    throw new Error(`Replicate: lip-sync prediction ${status}`);
   }
 }

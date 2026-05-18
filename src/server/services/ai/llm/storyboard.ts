@@ -21,6 +21,7 @@ const frameSpecSchema = z.object({
   subjectFocus: z.string().describe("Who/what dominates this frame — use a canonical character name from continuity, or describe the object"),
   pacingNote: z.string().describe("Brief note on timing feel: 'hold for impact', 'quick cut to maintain energy'"),
   sfxHint: z.enum(["whoosh", "impact", "hit", "riser", "none"]).optional().describe("Optional sound-effect cue at the START of this frame. Use sparingly — only on climax beats, big transitions, or true emphasis moments."),
+  isSpeakingCloseup: z.boolean().optional().describe("True ONLY when this frame is a close-up or medium-close on the character who is SPEAKING this scene's line, with their face clearly visible and lip-syncable. False for cutaways, wide/establishing shots, listeners/reaction shots, objects, hands, or any narrator-over-visuals frame. Be conservative — when in doubt, false."),
 });
 
 const frameBreakdownSchema = z.object({
@@ -109,7 +110,8 @@ RULES:
     - Any scene with ≥3 frames MUST contain at least one "establishing" or "wide" shot
     - Across the whole video, include at least one "close-up", "extreme-close-up", or "detail" shot every 5 frames (so the audience gets emotional anchors)
     - Avoid more than 2 consecutive "medium" shots — vary the rhythm
-12. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".`;
+12. SFX HINT (optional, sparingly): emit "sfxHint" only on climax beats, hard transitions, or single high-emphasis moments. Most frames should leave it blank/"none". Allowed values: "whoosh" | "impact" | "hit" | "riser" | "none".
+13. SPEAKING CLOSE-UP (for lip-sync): set "isSpeakingCloseup": true ONLY for a close-up / extreme-close-up / medium shot that is ON the character delivering this scene's spoken line, face clearly visible (not turned away, not silhouetted). Set false for every wide/establishing shot, cutaway, reaction/listener shot, object/hand insert, and any narration-over-visuals frame. A scene with dialogue typically has at most one or two such frames. Be conservative — false unless the speaking face genuinely fills the frame.`;
 
   const userPrompt = `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}`;
   const { output } = await recordAiCall(
@@ -194,9 +196,28 @@ export function normalizeBreakdownToScenes(
   const minDur = sortedDurations[0] ?? 2;
   const maxDur = sortedDurations[sortedDurations.length - 1] ?? minDur;
 
+  // Deterministic guard for the lip-sync flag: only honor it for a
+  // non-narrator speaking scene on a tight enough shot. Applied to both LLM
+  // output and synthesized defaults so the lip-sync stage can trust the flag.
+  const lipSyncShots = new Set(["close-up", "extreme-close-up", "medium"]);
+  const clampSpeakingCloseup = (
+    frames: FrameSpec[],
+    scene: TVideoScene
+  ): FrameSpec[] => {
+    const speaker = scene.speaker?.trim().toLowerCase();
+    const speaks = !!speaker && speaker !== "narrator";
+    return frames.map((f) => ({
+      ...f,
+      isSpeakingCloseup:
+        speaks && f.isSpeakingCloseup === true && lipSyncShots.has(f.shotType),
+    }));
+  };
+
   const out = scenes.map((scene, i) => {
     const existing = breakdown.scenes[i];
-    if (existing && existing.frames.length > 0) return existing;
+    if (existing && existing.frames.length > 0) {
+      return { frames: clampSpeakingCloseup(existing.frames, scene) };
+    }
 
     console.warn(
       `[storyboard] No frames returned for scene ${i} — synthesizing a default frame to preserve scene parity.`
@@ -227,6 +248,7 @@ export function normalizeBreakdownToScenes(
       subjectFocus,
       pacingNote: "Auto-generated: storyboard returned no frames for this scene.",
       sfxHint: "none",
+      isSpeakingCloseup: false,
     };
     return { frames: [frame] };
   });

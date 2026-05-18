@@ -35,15 +35,39 @@ const EMOTION_V3_TAG: Record<string, string> = {
   triumphant: "[triumphant]",
   playful: "[playful]",
   cold: "[cold]",
+  anxious: "[nervous]",
+  hopeful: "[hopeful]",
+  desperate: "[desperate]",
+  sarcastic: "[sarcastic]",
+  awe: "[whispering]",
+  grief: "[crying]",
+  rage: "[shouting]",
+  warm: "[warm]",
+  resigned: "[sighs]",
+  manic: "[frantic]",
 };
 
-/** Inline v3 audio tag for an emotion; strong anger escalates to a shout. */
+// `emotion:intensity` → escalated tag. Strong feelings push past the base tag
+// into a performed extreme so the climax of a movie actually lands.
+const EMOTION_INTENSITY_TAG: Record<string, string> = {
+  "angry:strong": "[shouting]",
+  "rage:strong": "[screaming]",
+  "grief:strong": "[sobbing]",
+  "sad:strong": "[crying]",
+  "joyful:strong": "[laughing]",
+  "fearful:strong": "[terrified]",
+  "desperate:strong": "[pleading]",
+  "manic:strong": "[laughing]",
+};
+
+/** Inline v3 audio tag for an emotion; strong feelings escalate the tag. */
 export function emotionToV3Tag(
   emotion?: string | null,
   intensity?: string | null
 ): string {
   const key = emotion?.toLowerCase() ?? "";
-  if (key === "angry" && intensity === "strong") return "[shouting]";
+  const escalated = EMOTION_INTENSITY_TAG[`${key}:${intensity ?? ""}`];
+  if (escalated) return escalated;
   return EMOTION_V3_TAG[key] ?? "";
 }
 
@@ -60,6 +84,16 @@ const EMOTION_SETTINGS: Record<string, { stability: number; style: number }> = {
   triumphant: { stability: 0.28, style: 0.6 },
   playful: { stability: 0.3, style: 0.55 },
   cold: { stability: 0.5, style: 0.4 },
+  anxious: { stability: 0.26, style: 0.5 },
+  hopeful: { stability: 0.36, style: 0.45 },
+  desperate: { stability: 0.2, style: 0.62 },
+  sarcastic: { stability: 0.42, style: 0.55 },
+  awe: { stability: 0.4, style: 0.4 },
+  grief: { stability: 0.22, style: 0.45 },
+  rage: { stability: 0.18, style: 0.7 },
+  warm: { stability: 0.42, style: 0.35 },
+  resigned: { stability: 0.5, style: 0.3 },
+  manic: { stability: 0.2, style: 0.7 },
 };
 
 const clamp = (v: number, lo: number, hi: number) =>
@@ -87,6 +121,59 @@ export function emotionToVoiceSettings(
     style: clamp(style, 0, 0.85),
     similarityBoost: 0.8,
   };
+}
+
+/** ElevenLabs character-level alignment payload (`with-timestamps` responses). */
+export interface ElevenLabsAlignment {
+  characters: string[];
+  character_start_times_seconds: number[];
+  character_end_times_seconds: number[];
+}
+
+/**
+ * Fold ElevenLabs char-level alignment into word timestamps. Returns [] when
+ * alignment is absent (v3 may omit it) so callers degrade gracefully instead
+ * of crashing. Shared by single-voice TTS and the v3 dialogue path.
+ */
+export function charsToWords(
+  alignment: ElevenLabsAlignment | null | undefined
+): WordTimestamp[] {
+  const wordTimestamps: WordTimestamp[] = [];
+  if (!alignment) return wordTimestamps;
+
+  const {
+    characters,
+    character_start_times_seconds,
+    character_end_times_seconds,
+  } = alignment;
+
+  let currentWord = "";
+  let wordStart = -1;
+  let wordEnd = 0;
+
+  for (let i = 0; i < characters.length; i++) {
+    const char = characters[i];
+    const startTime = character_start_times_seconds[i];
+    const endTime = character_end_times_seconds[i];
+
+    if (char === " " || char === "\n") {
+      if (currentWord.trim()) {
+        wordTimestamps.push({ word: currentWord.trim(), start: wordStart, end: wordEnd });
+      }
+      currentWord = "";
+      wordStart = -1;
+    } else {
+      if (wordStart === -1) wordStart = startTime;
+      wordEnd = endTime;
+      currentWord += char;
+    }
+  }
+
+  if (currentWord.trim()) {
+    wordTimestamps.push({ word: currentWord.trim(), start: wordStart, end: wordEnd });
+  }
+
+  return wordTimestamps;
 }
 
 export async function generateSpeech(
@@ -146,51 +233,13 @@ export async function generateSpeech(
   const audioBase64: string = data.audio_base64;
   const audioBuffer = Buffer.from(audioBase64, "base64");
 
-  const wordTimestamps: WordTimestamp[] = [];
-
   if (!data.alignment && TTS.useExpressiveV3) {
     console.warn(
       "[tts] v3 expressive model returned no alignment — word-timestamp captions will be degraded for this scene."
     );
   }
 
-  if (data.alignment) {
-    const { characters, character_start_times_seconds, character_end_times_seconds } = data.alignment;
-
-    let currentWord = "";
-    let wordStart = -1;
-    let wordEnd = 0;
-
-    for (let i = 0; i < characters.length; i++) {
-      const char = characters[i];
-      const startTime = character_start_times_seconds[i];
-      const endTime = character_end_times_seconds[i];
-
-      if (char === " " || char === "\n") {
-        if (currentWord.trim()) {
-          wordTimestamps.push({
-            word: currentWord.trim(),
-            start: wordStart,
-            end: wordEnd,
-          });
-        }
-        currentWord = "";
-        wordStart = -1;
-      } else {
-        if (wordStart === -1) wordStart = startTime;
-        wordEnd = endTime;
-        currentWord += char;
-      }
-    }
-
-    if (currentWord.trim()) {
-      wordTimestamps.push({
-        word: currentWord.trim(),
-        start: wordStart,
-        end: wordEnd,
-      });
-    }
-  }
+  const wordTimestamps = charsToWords(data.alignment);
 
   return {
     audioBuffer,

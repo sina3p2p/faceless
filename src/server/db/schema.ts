@@ -335,6 +335,12 @@ export const sceneFrames = pgTable("scene_frames", {
   transitionIn: text("transition_in"),
   /** Storyboard-suggested SFX cue at the start of this frame. Null = no cue. */
   sfxHint: text("sfx_hint"),
+  /**
+   * Movie type: true when this frame is a close-up on the character speaking
+   * the scene's line (face visible, lip-syncable). The compose stage lip-syncs
+   * only these frames to the scene audio.
+   */
+  isSpeakingCloseup: boolean("is_speaking_closeup").notNull().default(false),
   visualDescription: text("visual_description"),
   imageMediaId: text("image_media_id"),
   videoMediaId: text("video_media_id"),

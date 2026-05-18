@@ -130,17 +130,35 @@ export type SceneFunction =
 
 export type VoicePace = "slow" | "standard" | "fast";
 
-export type Emotion =
-  | "neutral"
-  | "joyful"
-  | "sad"
-  | "angry"
-  | "fearful"
-  | "tender"
-  | "tense"
-  | "triumphant"
-  | "playful"
-  | "cold";
+// Single source of truth for the performance-emotion vocabulary. The
+// screenwriter and script-supervisor zod enums derive from this, and the TTS
+// layer maps each value to an ElevenLabs v3 audio tag + v2 voice_settings.
+// Every consumer falls back to "neutral" for unmapped values, so the list is
+// safe to extend.
+export const EMOTIONS = [
+  "neutral",
+  "joyful",
+  "sad",
+  "angry",
+  "fearful",
+  "tender",
+  "tense",
+  "triumphant",
+  "playful",
+  "cold",
+  "anxious",
+  "hopeful",
+  "desperate",
+  "sarcastic",
+  "awe",
+  "grief",
+  "rage",
+  "warm",
+  "resigned",
+  "manic",
+] as const;
+
+export type Emotion = (typeof EMOTIONS)[number];
 
 export type EmotionIntensity = "subtle" | "moderate" | "strong";
 
@@ -345,6 +363,12 @@ export interface FrameSpec {
   subjectFocus: string;
   pacingNote: string;
   sfxHint?: SfxHint;
+  /**
+   * Movie type: true ONLY when this frame is a close-up/medium-close on the
+   * character speaking the scene's line, face clearly visible. Drives the
+   * lip-sync stage. False for cutaways, wides, listeners, objects, narration.
+   */
+  isSpeakingCloseup?: boolean;
 }
 
 export interface FrameBreakdown {
@@ -437,6 +461,17 @@ export interface PipelineConfig {
    * is safe to flip on before the asset library lands.
    */
   enableSfx?: boolean;
+  /**
+   * Movie type only. When true (default for movie), dialogue is synthesized
+   * with the ElevenLabs v3 Text-to-Dialogue API so a scene group is performed
+   * as one emotionally connected exchange, then sliced back per scene.
+   */
+  movieDialogMode?: boolean;
+  /**
+   * Movie type only. When true (default for movie), the compose stage
+   * lip-syncs the speaking-close-up frames to the scene audio.
+   */
+  lipSyncEnabled?: boolean;
   pipelineMode?: "manual" | "auto";
   /**
    * When true (default), each generated frame image is checked by a vision LLM
