@@ -44,6 +44,7 @@ export async function POST(
   const jobName = inferResumeJobFromVideoStatus(video.status, {
     hasSceneFrames,
     renderJobStep: rj?.step,
+    videoType: video.videoType,
   });
 
   if (!jobName || !isResumablePipelineJob(jobName)) {

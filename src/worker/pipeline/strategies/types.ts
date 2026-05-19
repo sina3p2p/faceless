@@ -76,9 +76,6 @@ export interface ComposeAudioInput {
 export interface ContentStrategy {
   readonly videoType: VideoType;
 
-  /** executive-produce: timelapse skips creative-brief generation entirely. */
-  skipsCreativeBrief(): boolean;
-
   /** generate-story: produce the title + script body for this type. */
   generateStory(input: StoryStageInput): Promise<StoryStageResult>;
 

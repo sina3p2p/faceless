@@ -40,9 +40,10 @@ export const moviePipeline: readonly PipelineStep[] = standalonePipeline;
 
 // Timelapse replaces the brief → story → director → storyboard → motion chain
 // with a single slim planner, then rejoins the shared audio/image/video/
-// compose tail. It never runs motion (the planner already emits motionSpecs).
+// compose tail. It never runs executive-produce (no creative brief) or motion
+// (the planner already emits motionSpecs) — the divergence is expressed here
+// in the pipeline, not via a behavioral flag.
 export const timelapsePipeline: readonly PipelineStep[] = [
-  { name: "executive-produce" },
   { name: "timelapse-plan" },
   { name: "generate-tts" },
   { name: "generate-frame-images", gate: "REVIEW_IMAGES" },
