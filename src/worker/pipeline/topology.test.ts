@@ -61,9 +61,8 @@ describe("topology — standalone/movie/music share one graph", () => {
 });
 
 describe("topology — timelapse slim pipeline", () => {
-  it("replaces the brief→story→motion chain with timelapse-plan and skips motion", () => {
+  it("starts at timelapse-plan and skips brief/story/motion entirely", () => {
     expect(resolveSteps(ctx({ videoType: "timelapse" })).map((s) => s.name)).toEqual([
-      "executive-produce",
       "timelapse-plan",
       "generate-tts",
       "generate-frame-images",
@@ -72,10 +71,16 @@ describe("topology — timelapse slim pipeline", () => {
     ]);
   });
 
-  it("routes executive-produce → timelapse-plan", () => {
-    expect(nextStep(ctx({ videoType: "timelapse" }), "executive-produce")).toEqual({
+  it("does not include executive-produce", () => {
+    expect(
+      resolveSteps(ctx({ videoType: "timelapse" })).some((s) => s.name === "executive-produce")
+    ).toBe(false);
+  });
+
+  it("routes timelapse-plan → generate-tts", () => {
+    expect(nextStep(ctx({ videoType: "timelapse" }), "timelapse-plan")).toEqual({
       kind: "enqueue",
-      job: "timelapse-plan",
+      job: "generate-tts",
     });
   });
 });
@@ -134,9 +139,10 @@ describe("stepAfterGate — review resume", () => {
 });
 
 describe("firstJob / isPipelineJob", () => {
-  it("first job is executive-produce for every type", () => {
+  it("first job reflects the per-type pipeline (timelapse starts at the planner)", () => {
     expect(firstJob(ctx())).toBe("executive-produce");
-    expect(firstJob(ctx({ videoType: "timelapse" }))).toBe("executive-produce");
+    expect(firstJob(ctx({ videoType: "movie" }))).toBe("executive-produce");
+    expect(firstJob(ctx({ videoType: "timelapse" }))).toBe("timelapse-plan");
   });
 
   it("recognizes pipeline jobs and rejects others", () => {

@@ -28,10 +28,6 @@ import type { ContinuityNotes } from "@/types/pipeline";
 export class StandaloneStrategy implements ContentStrategy {
   readonly videoType: VideoType = "standalone";
 
-  skipsCreativeBrief(): boolean {
-    return false;
-  }
-
   /** Beat sheet generation is shared between standalone and movie. */
   protected async ensureBeatSheet(input: StoryStageInput) {
     const { project, topicIdea, config, storyModel, researchPack, videoProjectId } = input;

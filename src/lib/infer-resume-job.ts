@@ -22,6 +22,12 @@ const UNAMBIGUOUS_STATUS_TO_JOB: Record<string, string> = {
 };
 
 export function inferResumeJobFromVideoStatus(status: string, ctx: ResumeJobContext): string | null {
+  // Timelapse has its own entry job (timelapse-plan) and never runs
+  // executive-produce. Both early statuses funnel back to the planner.
+  if (ctx.videoType === "timelapse" && (status === "PENDING" || status === "PRODUCING")) {
+    return "timelapse-plan";
+  }
+
   const direct = UNAMBIGUOUS_STATUS_TO_JOB[status];
   if (direct) return direct;
 

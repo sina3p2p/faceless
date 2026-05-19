@@ -5,8 +5,10 @@ import { linkStoryAssetsToVideo } from "@/server/db/story-assets";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
+import { firstJob, resolveVideoType } from "@/worker/pipeline/topology";
 import { DEFAULT_LLM_MODEL, LLM, VIDEO_MODEL_IDS } from "@/lib/constants";
 import type { ModelSettings } from "@/types/llm-common";
+import type { PipelineConfig } from "@/types/pipeline";
 import { z } from "zod/v4";
 import { generateSeed } from "@/lib/seed";
 
@@ -136,7 +138,12 @@ export async function POST(req: NextRequest) {
 
   await db.insert(renderJobs).values({ videoProjectId: videoProject.id });
 
-  await renderQueue.add("executive-produce", {
+  const startJob = firstJob({
+    videoType: resolveVideoType(data.videoType),
+    config: (hasConfig ? config : {}) as PipelineConfig,
+  });
+
+  await renderQueue.add(startJob, {
     videoProjectId: videoProject.id,
     userId: user.id,
     seriesId: "",

@@ -4,7 +4,6 @@ import type { RenderJobData } from "@/lib/queue";
 import { resolveDuration, type DurationPreference } from "@/types/pipeline";
 import { generateCreativeBrief } from "@/server/services/ai/llm";
 import { getAgentModels, mergeProjectConfig } from "./shared";
-import { getStrategy } from "./strategies";
 
 export async function executiveProduceJob(job: Job<RenderJobData>) {
   const { videoProjectId } = job.data;
@@ -17,14 +16,8 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "PRODUCING");
 
-    // Timelapse skips the creative brief entirely — the slim planner replaces
-    // the brief → story → director chain. The runner routes to timelapse-plan
-    // next per the timelapse topology.
-    if (getStrategy(video.videoType).skipsCreativeBrief()) {
-      console.log(`[executive-produce] No creative brief for ${video.videoType}; deferring to slim pipeline`);
-      return;
-    }
-
+    // executive-produce is no longer part of the timelapse pipeline (that
+    // type starts at timelapse-plan), so this stage always produces a brief.
     const config = video.config ?? {};
 
     const duration: DurationPreference = config.duration
