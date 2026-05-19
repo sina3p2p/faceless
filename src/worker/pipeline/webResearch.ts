@@ -1,6 +1,5 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
-import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { replaceResearchPackWithClaims } from "@/server/db/research";
 import { buildResearchPack } from "@/server/services/research/buildResearchPack";
@@ -41,8 +40,6 @@ export async function webResearchJob(job: Job<RenderJobData>) {
     console.log(
       `[web-research] Stored ${built.claims.length} claims (${built.queries.length} queries) for video=${videoProjectId}`
     );
-
-    await renderQueue.add("generate-story", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[web-research] Failed for ${videoProjectId}:`, msg);

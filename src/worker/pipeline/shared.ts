@@ -1,5 +1,4 @@
-import { db, schema, eq, updateVideoStatus } from "../shared";
-import { renderQueue } from "@/lib/queue";
+import { db, schema, eq } from "../shared";
 import { VIDEO_MODELS, LLM } from "@/lib/constants";
 import { type PipelineConfig } from "@/types/pipeline";
 import type { ModelSettings } from "@/types/llm-common";
@@ -30,13 +29,6 @@ const AGENT_MODEL_KEYS: (keyof AgentModels)[] = [
   "motionModel",
   "reviewerModel",
 ];
-
-function getPipelineMode(config: unknown): "manual" | "auto" {
-  if (config && typeof config === "object" && "pipelineMode" in config) {
-    return (config as Record<string, unknown>).pipelineMode === "auto" ? "auto" : "manual";
-  }
-  return "manual";
-}
 
 export function getModelDurationsArray(videoModel: TVideoModelId): number[] {
   return VIDEO_MODELS[videoModel].durations;
@@ -69,22 +61,4 @@ export async function mergeProjectConfig(videoProjectId: string, patch: Partial<
     .update(schema.videoProjects)
     .set({ config: { ...existing, ...patch } })
     .where(eq(schema.videoProjects.id, videoProjectId));
-}
-
-export async function autoChainOrReview(
-  videoProjectId: string,
-  reviewStatus: (typeof schema.videoStatusEnum.enumValues)[number],
-  nextJobName: string
-) {
-  const project = await db.query.videoProjects.findFirst({
-    where: eq(schema.videoProjects.id, videoProjectId),
-    columns: { config: true },
-  });
-  const mode = getPipelineMode(project?.config);
-
-  if (mode === "auto") {
-    await renderQueue.add(nextJobName, { videoProjectId });
-  } else {
-    await updateVideoStatus(videoProjectId, reviewStatus);
-  }
 }
