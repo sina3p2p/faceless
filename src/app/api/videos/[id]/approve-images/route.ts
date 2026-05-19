@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { renderQueue } from "@/lib/queue";
+import { enqueueAfterReviewGate } from "@/lib/pipeline-advance";
 
 export async function POST(
   _req: NextRequest,
@@ -21,10 +21,7 @@ export async function POST(
 
   if (!video) return notFound("Video not found");
 
-  await renderQueue.add("generate-pipeline-motion", {
-    videoProjectId: id,
-    userId: user.id,
-  });
+  await enqueueAfterReviewGate(id, "REVIEW_IMAGES", { userId: user.id });
 
   return NextResponse.json({ success: true });
 }

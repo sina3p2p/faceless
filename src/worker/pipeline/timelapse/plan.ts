@@ -1,6 +1,5 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../../shared";
-import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import {
   generateTimelapsePlan,
@@ -134,10 +133,6 @@ export async function timelapsePlanJob(job: Job<RenderJobData>) {
     }
 
     console.log(`[timelapse-plan] Wrote ${plan.stages.length} scenes/frames for ${videoProjectId}`);
-
-    // Generate per-stage narration (skipped automatically by generateTTS if
-    // text is empty / whitespace, but our scenes always have text).
-    await renderQueue.add("generate-tts", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[timelapse-plan] Failed for ${videoProjectId}:`, msg);

@@ -1,6 +1,5 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
-import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { generateFramePrompts } from "@/server/services/ai/llm/prompts";
 import {
@@ -99,8 +98,6 @@ export async function generatePromptsJob(job: Job<RenderJobData>) {
     }
 
     console.log(`[generate-prompts] Created ${totalFrames} frames across ${existingScenes.length} scenes`);
-
-    await renderQueue.add("generate-frame-images", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-prompts] Failed for ${videoProjectId}:`, msg);

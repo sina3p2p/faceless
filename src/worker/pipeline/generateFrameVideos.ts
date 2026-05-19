@@ -4,7 +4,6 @@ import type { RenderJobData } from "@/lib/queue";
 import { WORKER } from "@/lib/constants";
 import { generateVideoFromImage } from "@/server/services/ai/video";
 import { uploadFile, mediaUrl } from "@/lib/storage";
-import { autoChainOrReview } from "./shared";
 import { and, isNotNull } from "drizzle-orm";
 
 export async function generateFrameVideosJob(job: Job<RenderJobData>) {
@@ -132,8 +131,6 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
     const succeeded = updatedFrames.length;
 
     console.log(`[generate-frame-videos] ${succeeded}/${timeline.length} clips generated`);
-
-    await autoChainOrReview(videoProjectId, "REVIEW_PRODUCTION", "compose-final");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-videos] Failed for ${videoProjectId}:`, msg);

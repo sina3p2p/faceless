@@ -36,9 +36,8 @@ export async function extractHeroAssetsJob(job: Job<RenderJobData>) {
     const existingByJob = existing.filter((r) => r.generatedByJobId);
     if (existingByJob.length > 0) {
       console.log(
-        `[extract-hero-assets] ${existingByJob.length} agent-generated assets already exist for ${videoProjectId} — skipping generation, only ensuring review status`
+        `[extract-hero-assets] ${existingByJob.length} agent-generated assets already exist for ${videoProjectId} — skipping generation`
       );
-      await updateVideoStatus(videoProjectId, "REVIEW_HERO_ASSETS");
       return;
     }
 
@@ -74,7 +73,6 @@ export async function extractHeroAssetsJob(job: Job<RenderJobData>) {
         `[extract-hero-assets] Plan empty — no hero assets needed; skipping straight to storyboard.`
       );
       await mergeProjectConfig(videoProjectId, { heroAssetPlan: plan, heroAssetRefs: {} });
-      await updateVideoStatus(videoProjectId, "REVIEW_HERO_ASSETS");
       return;
     }
 
@@ -162,8 +160,6 @@ export async function extractHeroAssetsJob(job: Job<RenderJobData>) {
       heroAssetRefs,
       continuityNotes: continuity,
     });
-
-    await updateVideoStatus(videoProjectId, "REVIEW_HERO_ASSETS");
 
     console.log(
       `[extract-hero-assets] Done. ${plan.entries.filter((e) => e.assetRef).length}/${plan.entries.length} sheets generated; awaiting user approval.`

@@ -1,17 +1,9 @@
 import { Job } from "bullmq";
-import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
-import { renderQueue } from "@/lib/queue";
+import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
-import {
-  generateStory,
-  generateMusicLyrics,
-  generateBeatSheet,
-  generateScreenplay,
-  renderScreenplayMarkdown,
-} from "@/server/services/ai/llm";
 import { getResearchPackForVideo } from "@/server/db/research";
-import { getAgentModels, mergeProjectConfig } from "./shared";
-import { deriveSubseed } from "@/lib/seed";
+import { getAgentModels } from "./shared";
+import { getStrategy } from "./strategies";
 
 export async function generateStoryJob(job: Job<RenderJobData>) {
   const { videoProjectId } = job.data;
@@ -25,10 +17,7 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
     await updateVideoStatus(videoProjectId, "STORY");
 
     const topicIdea = video.idea;
-
-    if (!topicIdea) {
-      throw new Error("No idea found");
-    }
+    if (!topicIdea) throw new Error("No idea found");
 
     const config = video.config ?? {};
 
@@ -42,83 +31,19 @@ export async function generateStoryJob(job: Job<RenderJobData>) {
       throw new Error("Web research is enabled but no research pack was found. Re-run the research step.");
     }
 
-    const isMusic = video.videoType === "music_video";
-    const storySeed = video.seed != null ? deriveSubseed(video.seed, "story") : undefined;
-
-    let title: string;
-    let scriptPayload: string;
-
-    if (isMusic) {
-      const preferred = config.duration?.preferred ?? 60;
-      const song = await generateMusicLyrics({
-        style: video.style,
-        topicIdea,
-        language: video.language ?? undefined,
-        model: storyModel,
-        musicGenreStyle: config.musicGenre,
-        researchPack,
-        targetDurationSec: preferred,
-      });
-      title = song.title;
-      scriptPayload = song.lyrics;
-      console.log(`[generate-story] Music lyrics ready: "${title}" (${scriptPayload.length} chars body)`);
-    } else {
-      let beatSheet = config.beatSheet;
-      if (!beatSheet && config.creativeBrief) {
-        console.log(`[generate-story] Designing beat sheet for video=${videoProjectId}`);
-        beatSheet = await generateBeatSheet(
-          topicIdea,
-          video.style,
-          config.creativeBrief,
-          video.language || "en",
-          researchPack,
-          storyModel,
-        );
-        await mergeProjectConfig(videoProjectId, { beatSheet });
-        console.log(`[generate-story] Beat sheet: ${beatSheet.beats.length} beats, voice="${beatSheet.voice}"`);
-      }
-
-      if (video.videoType === "movie") {
-        const assets = await resolveStoryAssets(videoProjectId);
-        const screenplay = await generateScreenplay({
-          style: video.style,
-          topicIdea,
-          language: video.language ?? undefined,
-          model: storyModel,
-          brief: config.creativeBrief,
-          researchPack,
-          beatSheet,
-          assets,
-          seed: storySeed,
-        });
-        title = screenplay.title;
-        scriptPayload = renderScreenplayMarkdown(screenplay);
-        await mergeProjectConfig(videoProjectId, { screenplay });
-        console.log(`[generate-story] Screenplay ready: "${title}" (${screenplay.scenes.length} scenes)`);
-      } else {
-        const storyMarkdown = await generateStory(
-          video.style,
-          topicIdea,
-          video.language,
-          storyModel,
-          config.creativeBrief,
-          researchPack,
-          storySeed,
-          beatSheet,
-        );
-        const titleMatch = storyMarkdown.match(/^#\s+(.+)$/m);
-        title = titleMatch ? titleMatch[1].trim() : "Untitled";
-        scriptPayload = storyMarkdown;
-        console.log(`[generate-story] Story ready: "${title}" (${storyMarkdown.length} chars)`);
-      }
-    }
+    const { title, script } = await getStrategy(video.videoType).generateStory({
+      videoProjectId,
+      project: video,
+      topicIdea,
+      config,
+      storyModel,
+      researchPack,
+    });
 
     await db
       .update(schema.videoProjects)
-      .set({ title, script: scriptPayload })
+      .set({ title, script })
       .where(eq(schema.videoProjects.id, videoProjectId));
-
-    await renderQueue.add("split-scenes", { videoProjectId });
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-story] Failed for ${videoProjectId}:`, msg);

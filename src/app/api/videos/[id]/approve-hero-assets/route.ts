@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { videoProjects, videoStoryAssets } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { and, eq, ne } from "drizzle-orm";
-import { renderQueue } from "@/lib/queue";
+import { enqueueAfterReviewGate } from "@/lib/pipeline-advance";
 
 export async function POST(
   _req: NextRequest,
@@ -42,7 +42,7 @@ export async function POST(
     .set({ status: "STORYBOARD" })
     .where(eq(videoProjects.id, id));
 
-  await renderQueue.add("storyboard", { videoProjectId: id, userId: user.id });
+  await enqueueAfterReviewGate(id, "REVIEW_HERO_ASSETS", { userId: user.id });
 
   return NextResponse.json({ success: true });
 }

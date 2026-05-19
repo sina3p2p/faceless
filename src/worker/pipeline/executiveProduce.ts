@@ -1,10 +1,10 @@
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob, resolveStoryAssets } from "../shared";
-import { renderQueue } from "@/lib/queue";
 import type { RenderJobData } from "@/lib/queue";
 import { resolveDuration, type DurationPreference } from "@/types/pipeline";
 import { generateCreativeBrief } from "@/server/services/ai/llm";
 import { getAgentModels, mergeProjectConfig } from "./shared";
+import { getStrategy } from "./strategies";
 
 export async function executiveProduceJob(job: Job<RenderJobData>) {
   const { videoProjectId } = job.data;
@@ -17,12 +17,11 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "PRODUCING");
 
-    // Timelapse takes a different fork: the slim pipeline replaces the
-    // creative-brief → story → director → … chain with a single
-    // timelapse-plan worker. No brief needed.
-    if (video.videoType === "timelapse") {
-      console.log(`[executive-produce] Forking to timelapse pipeline for ${videoProjectId}`);
-      await renderQueue.add("timelapse-plan", { videoProjectId });
+    // Timelapse skips the creative brief entirely — the slim planner replaces
+    // the brief → story → director chain. The runner routes to timelapse-plan
+    // next per the timelapse topology.
+    if (getStrategy(video.videoType).skipsCreativeBrief()) {
+      console.log(`[executive-produce] No creative brief for ${video.videoType}; deferring to slim pipeline`);
       return;
     }
 
@@ -33,7 +32,6 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
       : resolveDuration({ preferred: 30 });
 
     const topicIdea = video.idea;
-
     if (!topicIdea) throw new Error("No idea found");
 
     const assets = await resolveStoryAssets(videoProjectId);
@@ -55,12 +53,6 @@ export async function executiveProduceJob(job: Job<RenderJobData>) {
     await mergeProjectConfig(videoProjectId, { duration, creativeBrief: brief });
 
     console.log(`[executive-produce] Brief ready: "${brief.concept}" (${brief.durationGuidance.wordBudgetTarget} target words)`);
-
-    if (config.webResearch) {
-      await renderQueue.add("web-research", { videoProjectId });
-    } else {
-      await renderQueue.add("generate-story", { videoProjectId });
-    }
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[executive-produce] Failed for ${videoProjectId}:`, msg);

@@ -5,7 +5,7 @@ import { WORKER } from "@/lib/constants";
 import { generateSingleFrameMotion } from "@/server/services/ai/llm";
 import { withAiAuditContext } from "@/server/services/ai-audit";
 import { mediaUrl } from "@/lib/storage";
-import { getAgentModels, autoChainOrReview } from "./shared";
+import { getAgentModels } from "./shared";
 import { computeFrameWps } from "@/server/services/frame-tempo";
 import type { WordTimestamp } from "@/types/tts";
 
@@ -171,8 +171,6 @@ export async function generateMotionJob(job: Job<RenderJobData>) {
     }
 
     console.log(`[generate-motion] Motion descriptions ready`);
-
-    await autoChainOrReview(videoProjectId, "REVIEW_MOTION", "generate-frame-videos");
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-motion] Failed for ${videoProjectId}:`, msg);

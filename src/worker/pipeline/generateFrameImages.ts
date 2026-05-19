@@ -11,7 +11,7 @@ import {
   type FrameMediaMetadata,
   type ReviewResult,
 } from "@/server/services/ai/llm/image-reviewer";
-import { autoChainOrReview, getAgentModels, loadProjectConfig } from "./shared";
+import { getAgentModels, loadProjectConfig } from "./shared";
 
 const SEVERITY_RANK: Record<"hard" | "soft", number> = { hard: 1, soft: 0 };
 
@@ -70,12 +70,6 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
-      // Timelapse projects already have motionSpec + visualDescription
-    // populated at plan time, so they skip the motion-director job entirely.
-    const nextJobAfterImages = videoProject.videoType === "timelapse"
-      ? "generate-frame-videos"
-      : "generate-pipeline-motion";
-    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", nextJobAfterImages);
       return;
     }
 
@@ -257,13 +251,6 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     }
 
     console.log(`[generate-frame-images] All ${targets.length} frames processed`);
-
-    // Timelapse projects already have motionSpec + visualDescription
-    // populated at plan time, so they skip the motion-director job entirely.
-    const nextJobAfterImages = videoProject.videoType === "timelapse"
-      ? "generate-frame-videos"
-      : "generate-pipeline-motion";
-    await autoChainOrReview(videoProjectId, "REVIEW_IMAGES", nextJobAfterImages);
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[generate-frame-images] Failed for ${videoProjectId}:`, msg);
