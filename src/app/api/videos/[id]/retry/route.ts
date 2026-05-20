@@ -5,6 +5,7 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { renderQueue } from "@/lib/queue";
 import { desc, eq } from "drizzle-orm";
 import { canRetryOrResumeFromFailure } from "@/lib/pipeline-resume";
+import { firstJob, resolveVideoType } from "@/worker/pipeline/topology";
 
 export async function POST(
   _req: NextRequest,
@@ -46,7 +47,12 @@ export async function POST(
 
   await db.insert(renderJobs).values({ videoProjectId: id });
 
-  await renderQueue.add("executive-produce", {
+  const startJob = firstJob({
+    videoType: resolveVideoType(video.videoType),
+    config: video.config ?? {},
+  });
+
+  await renderQueue.add(startJob, {
     videoProjectId: id,
     userId: user.id,
     seriesId: video.seriesId ?? "",
