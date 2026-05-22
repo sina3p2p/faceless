@@ -28,7 +28,7 @@ const planSchema = z.object({
   ),
   processName: z.string().describe("Short label of the process: '30-story tower construction', 'cargo ship hull cleaning', 'wheat field through four seasons'."),
   setting: z.string().describe("1-2 sentences describing the location and unchanging surroundings."),
-  stages: z.array(stageSchema).min(3).max(20).describe(
+  stages: z.array(stageSchema).describe(
     "Ordered list of stages, 3 to 20 entries. Stage 0 should be the initial/empty state at the locked vantage. Subsequent stages each add one major visible change. The final stage shows the completed/resolved state. Stages should feel like real time-skips (days/weeks/seasons apart), not narrative beats."
   ),
 });
