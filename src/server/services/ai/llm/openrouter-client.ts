@@ -9,9 +9,9 @@ export const openrouter = createOpenRouter({
   // routing `require_parameters` makes OpenRouter only pick upstreams that
   // support every parameter in the request, so structured calls fall back to
   // a compatible provider while plain-text calls are unaffected.
-  extraBody: {
-    provider: {
-      require_parameters: true,
-    },
-  },
+  // extraBody: {
+  //   provider: {
+  //     require_parameters: true,
+  //   },
+  // },
 });
