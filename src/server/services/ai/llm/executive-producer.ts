@@ -1,5 +1,5 @@
-import { generateText, Output } from "ai";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { Output } from "ai";
+import { generateText } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
@@ -103,13 +103,12 @@ ${videoType === "movie" ? `
 MOVIE TYPE: This is a dialogue-driven cinematic film — characters talk to each other and the drama plays out between them, not a voiceover narration piece. Set narrationStyle to "dialogue" (or "mixed" only if the story truly needs occasional connective narration) and dialogueDensity to "heavy" (or "moderate" at minimum). Voiceover-led movies are wrong for this type.
 ` : ""}
 Choose these based on the video type and duration. Use this concrete guidance for the chosen target duration (${duration.preferred}s) — these are starting points, override only with reason:
-${
-  duration.preferred <= 30
-    ? `- SHORT FORM (≤30s): maxSentencesPerScene=1, openingHook='claim' or 'mystery' (no time for slow burns), revealTiming='early' or 'final' (gradual won't fit), resolutionType='closed' or 'cliffhanger', dialogueDensity='none' or 'sparse'. Pacing: rapid-fire, every second earns its keep.`
-    : duration.preferred <= 90
-      ? `- MID FORM (30–90s): maxSentencesPerScene=2–3, any openingHook works, revealTiming='gradual' fits well, dialogueDensity up to 'moderate'. Pacing: room for one quiet beat before the climax.`
-      : `- LONG FORM (>90s): maxSentencesPerScene=3–4, revealTiming='gradual' or 'early' (audience needs payoff signposts), dialogueDensity up to 'heavy'. Pacing: steady escalation with multiple breath beats.`
-}
+${duration.preferred <= 30
+      ? `- SHORT FORM (≤30s): maxSentencesPerScene=1, openingHook='claim' or 'mystery' (no time for slow burns), revealTiming='early' or 'final' (gradual won't fit), resolutionType='closed' or 'cliffhanger', dialogueDensity='none' or 'sparse'. Pacing: rapid-fire, every second earns its keep.`
+      : duration.preferred <= 90
+        ? `- MID FORM (30–90s): maxSentencesPerScene=2–3, any openingHook works, revealTiming='gradual' fits well, dialogueDensity up to 'moderate'. Pacing: room for one quiet beat before the climax.`
+        : `- LONG FORM (>90s): maxSentencesPerScene=3–4, revealTiming='gradual' or 'early' (audience needs payoff signposts), dialogueDensity up to 'heavy'. Pacing: steady escalation with multiple breath beats.`
+    }
 
 AUDIENCE (structured micro-segment — not a demographic bucket):
 - Move from "young adults interested in tech" → "indie devs, 25–34, evening hobbyists, anxious about shipping".
@@ -125,13 +124,12 @@ NARRATIVE FRAMEWORK (closed enum — pick one):
 - "heros-journey" (Challenge → Mentor/Tool → Victory): long-form (>90s) narratives only.
 - "freeform": only allowed when none of the above fits. If you pick freeform, the narrativeArc field MUST contain a one-line justification.
 
-For the chosen target duration (${duration.preferred}s), default preference: ${
-  duration.preferred <= 30
-    ? `PAS (or AIDA for brand spots).`
-    : duration.preferred <= 90
-      ? `AIDA or PAS depending on intent (story vs direct-response).`
-      : `heros-journey allowed; AIDA also acceptable.`
-}
+For the chosen target duration (${duration.preferred}s), default preference: ${duration.preferred <= 30
+      ? `PAS (or AIDA for brand spots).`
+      : duration.preferred <= 90
+        ? `AIDA or PAS depending on intent (story vs direct-response).`
+        : `heros-journey allowed; AIDA also acceptable.`
+    }
 
 CINEMATIC SPEC (AI Director of Photography — deterministic, no subjective adjectives):
 - lightingStyle: pick from cinematography vocabulary. Examples: "Rembrandt key + negative fill" (intimate/dramatic), "butterfly key with rim" (beauty/portrait), "high-key soft" (commercial/clean), "low-key directional" (noir/tension), "practical sources only" (vérité/grounded). Do not write "moody" or "dramatic" here — write the setup that PRODUCES that mood.
@@ -142,31 +140,22 @@ CINEMATIC SPEC (AI Director of Photography — deterministic, no subjective adje
 - aspectMood: one or two words for the technical look — "gritty", "polished", "high-contrast", "pastel-flat", "filmic-grainy".
 - visualMood (the existing field) remains the narrative-emotional descriptor; cinematicSpec is the deterministic technical layer that the cinematographer will lock across every scene.${topicIdea ? `\n\nTOPIC DIRECTION: ${topicIdea}` : ""}`;
 
-  const visionParts = await buildStoryAssetVisionContentParts(assets);
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.generateCreativeBrief",
-      request: { system: systemPrompt, visionParts, temperature: 0.8, schema: "creativeBriefSchema" },
-    },
-    () =>
-      generateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: creativeBriefSchema }),
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: [
-              ...visionParts,
-              { type: "text", text: "Create the creative brief for this production." },
-            ],
-          },
+  const visionParts = buildStoryAssetVisionContentParts(assets);
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: creativeBriefSchema }),
+    system: systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: [
+          ...visionParts,
+          { type: "text", text: "Create the creative brief for this production." },
         ],
-        temperature: 0.8,
-      }),
-  );
+      },
+    ],
+    temperature: 0.8,
+  });
   if (!output) throw new Error("Failed to generate creative brief");
 
   return output;

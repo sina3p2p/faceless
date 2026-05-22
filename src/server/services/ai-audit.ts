@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { db } from "@/server/db";
 import { aiAuditLogs } from "@/server/db/schema";
 import { logger } from "@/lib/logger";
+import { generateText as _generateText } from "ai";
 
 export interface AiAuditContext {
   userId?: string;
@@ -42,6 +43,37 @@ export interface RecordAiCallMeta {
   extractUsage?: (response: unknown) => unknown;
 }
 
+type TGenerateTextParams = Parameters<typeof _generateText>[0];
+
+export async function generateText(params: TGenerateTextParams) {
+  const startedAt = new Date();
+  const startMs = Date.now();
+  const sanitizedRequest = sanitize(params);
+
+  let response;
+  let errorMessage: string | undefined;
+  try {
+    response = await _generateText(params);
+    return response;
+  } catch (err) {
+    errorMessage = err instanceof Error ? err.message : String(err);
+    throw err;
+  } finally {
+    const durationMs = Date.now() - startMs;
+    const status = errorMessage ? "error" : "success";
+    await db.insert(aiAuditLogs).values({
+      createdAt: startedAt,
+      provider: params.model.toString(),
+      model: params.model.toString(),
+      status,
+      durationMs,
+      errorMessage,
+      request: sanitizedRequest as object,
+      response: errorMessage ? null : (sanitize(response) as object),
+    });
+  }
+}
+
 /**
  * Wrap an AI call with full request/response audit logging. Persists one row
  * to `ai_audit_logs` after the call resolves (success or error). The audit
@@ -68,34 +100,16 @@ export async function recordAiCall<T>(
   } finally {
     const durationMs = Date.now() - startMs;
     const status = errorMessage ? "error" : "success";
-    let summary: unknown;
-    let usage: unknown;
-    try {
-      if (response !== undefined && meta.summarize) summary = meta.summarize(response);
-      if (response !== undefined && meta.extractUsage) usage = meta.extractUsage(response);
-    } catch {
-      // summarizer errors must never break the call
-    }
-
     try {
       await db.insert(aiAuditLogs).values({
         createdAt: startedAt,
         provider: meta.provider,
         model: meta.model,
-        operation: meta.operation,
         status,
         durationMs,
         errorMessage,
-        userId: ctx.userId,
-        videoProjectId: ctx.videoProjectId,
-        sceneId: ctx.sceneId,
-        frameId: ctx.frameId,
-        renderJobId: ctx.renderJobId,
-        bullmqJobId: ctx.bullmqJobId,
         request: sanitizedRequest as object,
         response: errorMessage ? null : (sanitize(response) as object),
-        responseSummary: (summary ?? null) as object | null,
-        usage: (usage ?? null) as object | null,
       });
     } catch (writeErr) {
       logger.warn("ai-audit-log write failed", {
