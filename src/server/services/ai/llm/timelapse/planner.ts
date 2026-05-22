@@ -71,7 +71,12 @@ Be CONCRETE about places, materials, and equipment specific to the user's proces
     model: openrouter.chat(primaryModel),
     output: Output.object({ schema: planSchema }),
     system: systemPrompt,
-    prompt: userPrompt,
+    messages: [
+      {
+        role: 'user',
+        content: userPrompt
+      }
+    ],
     temperature: 0.6,
   });
   if (!output) throw new Error("Failed to generate timelapse plan");
