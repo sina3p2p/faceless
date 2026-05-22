@@ -61,10 +61,11 @@ export async function generateText(params: TGenerateTextParams) {
   } finally {
     const durationMs = Date.now() - startMs;
     const status = errorMessage ? "error" : "success";
+    const { provider, model } = typeof params.model === 'object' ? { model: params.model.modelId, provider: params.model.provider } : { model: params.model, provider: params.model }
     await db.insert(aiAuditLogs).values({
       createdAt: startedAt,
-      provider: params.model.toString(),
-      model: params.model.toString(),
+      provider,
+      model,
       status,
       durationMs,
       errorMessage,
