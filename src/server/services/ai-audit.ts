@@ -53,8 +53,6 @@ export async function generateText(params: TGenerateTextParams) {
   let response;
   let errorMessage: string | undefined;
   try {
-    console.log('params', params);
-
     response = await _generateText(params);
     return response;
   } catch (err) {

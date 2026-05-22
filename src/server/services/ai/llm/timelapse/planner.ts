@@ -1,9 +1,9 @@
-import { generateText, Output } from "ai";
+import { Output } from "ai";
 import { z } from "zod";
-import { recordAiCall } from "@/server/services/ai-audit";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "../index";
 import type { TimelapsePlan } from "@/types/pipeline";
+import { generateText } from "@/server/services/ai-audit";
 
 const stageSchema = z.object({
   stageIndex: z.number().int().min(0).describe("0-based stage order. Stage 0 is the empty/initial state."),
@@ -67,27 +67,13 @@ Be CONCRETE about places, materials, and equipment specific to the user's proces
 
   const userPrompt = `User request: ${prompt}\n\nProduce the timelapse plan as structured output.`;
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.generateTimelapsePlan",
-      request: {
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: 0.6,
-        schema: "timelapsePlanSchema",
-      },
-    },
-    () =>
-      generateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: planSchema }),
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: 0.6,
-      }),
-  );
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: planSchema }),
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.6,
+  });
   if (!output) throw new Error("Failed to generate timelapse plan");
 
   return {

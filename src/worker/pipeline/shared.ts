@@ -4,7 +4,7 @@ import { type PipelineConfig } from "@/types/pipeline";
 import type { ModelSettings } from "@/types/llm-common";
 import type { AgentModels } from "@/types/worker-pipeline";
 
-const LLM_DEFAULT_BY_AGENT: Record<keyof AgentModels, string> = {
+export const LLM_DEFAULT_BY_AGENT: Record<keyof AgentModels, string> = {
   producerModel: LLM.producerModel,
   storyModel: LLM.storyModel,
   directorModel: LLM.directorModel,
@@ -16,19 +16,6 @@ const LLM_DEFAULT_BY_AGENT: Record<keyof AgentModels, string> = {
   motionModel: LLM.motionModel,
   reviewerModel: LLM.reviewerModel,
 };
-
-const AGENT_MODEL_KEYS: (keyof AgentModels)[] = [
-  "producerModel",
-  "storyModel",
-  "directorModel",
-  "supervisorModel",
-  "cinematographerModel",
-  "researchModel",
-  "storyboardModel",
-  "promptModel",
-  "motionModel",
-  "reviewerModel",
-];
 
 export function getModelDurationsArray(videoModel: TVideoModelId): number[] {
   return VIDEO_MODELS[videoModel].durations;

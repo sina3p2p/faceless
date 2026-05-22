@@ -11,6 +11,7 @@ import type { ModelSettings } from "@/types/llm-common";
 import type { PipelineConfig } from "@/types/pipeline";
 import { z } from "zod/v4";
 import { generateSeed } from "@/lib/seed";
+import { LLM_DEFAULT_BY_AGENT } from "@/worker/pipeline/shared";
 
 const modelId = z.string().min(1);
 const textModelOpt = z.string().min(1).optional();
@@ -63,6 +64,7 @@ function resolveTextModel(
 
 function buildModelSettings(p: ParsedStandalone): ModelSettings {
   return {
+    ...LLM_DEFAULT_BY_AGENT,
     producerModel: resolveTextModel(p, "producerModel"),
     storyModel: resolveTextModel(p, "storyModel"),
     directorModel: resolveTextModel(p, "directorModel"),
