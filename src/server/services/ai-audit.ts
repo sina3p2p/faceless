@@ -43,9 +43,7 @@ export interface RecordAiCallMeta {
   extractUsage?: (response: unknown) => unknown;
 }
 
-type TGenerateTextParams = Parameters<typeof _generateText>[0];
-
-export async function generateText(params: TGenerateTextParams) {
+async function _auditedGenerateText(params: Parameters<typeof _generateText>[0]) {
   const startedAt = new Date();
   const startMs = Date.now();
   const sanitizedRequest = sanitize(params);
@@ -74,6 +72,10 @@ export async function generateText(params: TGenerateTextParams) {
     });
   }
 }
+
+// Cast to typeof _generateText so callers get exact generic inference (TOOLS, OUTPUT)
+// without needing to use Output as a type constraint in this file.
+export const generateText = _auditedGenerateText as unknown as typeof _generateText;
 
 /**
  * Wrap an AI call with full request/response audit logging. Persists one row
