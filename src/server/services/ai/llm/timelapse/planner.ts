@@ -6,7 +6,7 @@ import type { TimelapsePlan } from "@/types/pipeline";
 import { generateText } from "@/server/services/ai-audit";
 
 const stageSchema = z.object({
-  stageIndex: z.number().int().describe("0-based stage order. Stage 0 is the empty/initial state."),
+  stageIndex: z.number().describe("0-based integer stage order. Stage 0 is the empty/initial state."),
   stageDescription: z.string().describe("One-sentence label of what this stage shows. Used for review UI only — not fed to image/video models."),
   imagePrompt: z.string().describe(
     "Image-generation prompt describing the visible state of the worksite at this stage. MUST weave in the locked vantage and the unchanging environmental anchors so the image model reproduces the same camera position and skyline as every other stage. Focus on what is built / cleaned / changed at this stage; the camera position itself never changes."
@@ -17,7 +17,7 @@ const stageSchema = z.object({
   voiceoverLine: z.string().describe(
     "Optional 1-2 sentence narration line for this stage. Empty string if no narration. Keep it short and observational ('Excavators carve the foundation pit through autumn'); avoid dramatic narrative language."
   ),
-  durationSeconds: z.number().int().describe(
+  durationSeconds: z.number().describe(
     "Target seconds for this stage's clip. Default 5; use 7-10 for stages with rich visible activity, 3-4 for quick beats. Will be clamped to model-supported durations."
   ),
 });
