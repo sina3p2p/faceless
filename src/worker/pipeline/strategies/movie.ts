@@ -285,10 +285,8 @@ async function applyLipSync(
 
       if (!isFlagged) continue;
 
-      const alreadySynced =
-        (frame.videoMedia?.metadata as { lipSync?: boolean } | null)?.lipSync ===
-        true;
-      if (alreadySynced) continue;
+      const meta = frame.videoMedia?.metadata as { lipSync?: boolean; nativeLipSync?: boolean } | null;
+      if (meta?.lipSync === true || meta?.nativeLipSync === true) continue;
       if (end - start < 0.3) continue;
 
       const audioSegPath = path.join(workDir, `lipsync_seg_${frame.id}.mp3`);

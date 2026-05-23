@@ -35,6 +35,8 @@ export type TVideoModel = {
   durations: number[];
   supportedResolution: TVideoResolution[];
   endFrameSupported: boolean;
+  /** Model can generate in-clip audio when generate_audio is passed. */
+  supportsAudio?: boolean;
 };
 
 export interface I2vRequest {
@@ -44,6 +46,8 @@ export interface I2vRequest {
   duration: number;
   aspectRatio: TAspectRatio;
   resolution: TVideoResolution;
+  /** Generate audio in the video clip (ambient or speech, model-dependent). */
+  generateAudio?: boolean;
 }
 
 export interface IVideoProvider {

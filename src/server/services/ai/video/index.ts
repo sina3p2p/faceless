@@ -14,7 +14,8 @@ export async function generateVideoFromImage(
   videoModelId: TVideoModelId,
   endImageUrl?: string,
   aspectRatio: TAspectRatio = "9:16",
-  resolution: TVideoResolution = "480p"
+  resolution: TVideoResolution = "480p",
+  generateAudio?: boolean,
 ): Promise<VideoResult> {
   const replicate = new ReplicateVideoProvider();
 
@@ -27,6 +28,7 @@ export async function generateVideoFromImage(
     duration,
     aspectRatio,
     resolution,
+    generateAudio,
   };
 
   return replicate.generateFromImage(req, videoModelId);

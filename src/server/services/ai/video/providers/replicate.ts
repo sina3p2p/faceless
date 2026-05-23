@@ -52,7 +52,7 @@ export class ReplicateVideoProvider implements IVideoProvider {
           duration: req.duration,
           aspect_ratio: req.aspectRatio,
           resolution: req.resolution,
-          generate_audio: false,
+          generate_audio: req.generateAudio ?? false,
         };
       case "kling-v2.5-turbo-pro":
         return {

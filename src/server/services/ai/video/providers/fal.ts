@@ -154,6 +154,9 @@ import axios, { AxiosInstance } from "axios";
 //   }
 // }
 
+/**
+ * @deprecated
+ */
 export class FalVideoProvider implements IVideoProvider {
   readonly client: AxiosInstance;
   constructor() {

@@ -153,6 +153,7 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
     description: "ByteDance Seedance 2.0 i2v on Fal (4–15s, optional last frame, up to 1080p)",
     durations: SEEDANCE2_DURATIONS,
     endFrameSupported: true,
+    supportsAudio: true,
   },
   "seedance-2-fast": {
     id: "seedance-2-fast",
@@ -163,6 +164,7 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
     description: "Seedance 2.0 Fast on Fal — lower latency; 480p/720p only on API",
     durations: SEEDANCE2_DURATIONS,
     endFrameSupported: true,
+    supportsAudio: true,
   },
   "kling-v2.5-turbo-pro": {
     id: "kling-v2.5-turbo-pro",
