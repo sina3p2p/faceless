@@ -1,5 +1,5 @@
-import { generateText as aiGenerateText, Output } from "ai";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { Output } from "ai";
+import { generateText } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { openrouter, buildMusicDurationInstruction, type ChatMessage } from "./index";
@@ -70,22 +70,13 @@ ${musicGenreStyle ? `GENRE CONSTRAINT:
     ? `Write a catchy song about: ${topicIdea}. The music video visual style is ${style}. Target sound: ${musicGenreStyle}.`
     : `Write a catchy song about: ${topicIdea}. The music video visual style is ${style}.`;
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.generateMusicLyrics",
-      request: { system: systemPrompt, prompt: userPrompt, temperature: 0.85, schema: "musicLyricsScriptSchema" },
-    },
-    () =>
-      aiGenerateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: musicLyricsScriptSchema }),
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: 0.85,
-      }),
-  );
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: musicLyricsScriptSchema }),
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.85,
+  });
 
   if (!output) throw new Error("Failed to generate music lyrics");
   return output;
@@ -152,22 +143,13 @@ RULES:
   }
   messages.push({ role: "user", content: userMessage });
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.refineMusicLyrics",
-      request: { system: systemPrompt, messages, temperature: 0.7, schema: "musicLyricsScriptSchema" },
-    },
-    () =>
-      aiGenerateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: musicLyricsScriptSchema }),
-        system: systemPrompt,
-        messages,
-        temperature: 0.7,
-      }),
-  );
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: musicLyricsScriptSchema }),
+    system: systemPrompt,
+    messages,
+    temperature: 0.7,
+  });
 
   if (!output) throw new Error("Failed to refine music lyrics");
   return output;

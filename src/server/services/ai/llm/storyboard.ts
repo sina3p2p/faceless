@@ -1,5 +1,5 @@
-import { generateText, Output } from "ai";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { Output } from "ai";
+import { generateText } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "./index";
@@ -51,8 +51,8 @@ export async function generateFrameBreakdown(
   const lockedHeroEntities = (heroAssetPlan?.entries ?? []).filter((e) => e.assetRef);
   const lockedHeroSection = lockedHeroEntities.length > 0
     ? `\nLOCKED HERO ENTITIES (these have approved reference images — use the EXACT name in subjectFocus when the entity is on screen, do NOT redescribe their appearance):\n${lockedHeroEntities
-        .map((e) => `  - ${e.name} (${e.type}): ${e.description}`)
-        .join("\n")}`
+      .map((e) => `  - ${e.name} (${e.type}): ${e.description}`)
+      .join("\n")}`
     : "";
 
   const sceneSummary = scenes.map((s, i) => {
@@ -114,22 +114,13 @@ RULES:
 13. SPEAKING CLOSE-UP (for lip-sync): set "isSpeakingCloseup": true ONLY for a close-up / extreme-close-up / medium shot that is ON the character delivering this scene's spoken line, face clearly visible (not turned away, not silhouetted). Set false for every wide/establishing shot, cutaway, reaction/listener shot, object/hand insert, and any narration-over-visuals frame. A scene with dialogue typically has at most one or two such frames. Be conservative — false unless the speaking face genuinely fills the frame.`;
 
   const userPrompt = `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}`;
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.generateFrameBreakdown",
-      request: { system: systemPrompt, prompt: userPrompt, temperature: 0.5, schema: "frameBreakdownSchema" },
-    },
-    () =>
-      generateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: frameBreakdownSchema }),
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: 0.5,
-      }),
-  );
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: frameBreakdownSchema }),
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.5,
+  });
   if (!output) throw new Error("Failed to generate frame breakdown");
 
   // Guarantee exactly one breakdown entry per input scene. The LLM is told to
@@ -150,22 +141,13 @@ RULES:
 
   try {
     const retryPrompt = `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}\n\n${fixupNote}`;
-    const { output: retry } = await recordAiCall(
-      {
-        provider: "openrouter",
-        model: primaryModel,
-        operation: "llm.generateFrameBreakdown.retry",
-        request: { system: systemPrompt, prompt: retryPrompt, temperature: 0.5, schema: "frameBreakdownSchema" },
-      },
-      () =>
-        generateText({
-          model: openrouter.chat(primaryModel),
-          output: Output.object({ schema: frameBreakdownSchema }),
-          system: systemPrompt,
-          prompt: retryPrompt,
-          temperature: 0.5,
-        }),
-    );
+    const { output: retry } = await generateText({
+      model: openrouter.chat(primaryModel),
+      output: Output.object({ schema: frameBreakdownSchema }),
+      system: systemPrompt,
+      prompt: retryPrompt,
+      temperature: 0.5,
+    });
     if (retry) {
       const retryViolations = validateShotBudget(retry);
       if (retryViolations.length > 0) {
@@ -234,9 +216,9 @@ export function normalizeBreakdownToScenes(
       speaker && speaker.toLowerCase() !== "narrator"
         ? speaker
         : continuity.characterRegistry.find((c) => c.presentInScenes.includes(i))
-            ?.canonicalName ??
-          continuity.characterRegistry[0]?.canonicalName ??
-          "";
+          ?.canonicalName ??
+        continuity.characterRegistry[0]?.canonicalName ??
+        "";
 
     const frame: FrameSpec = {
       clipDuration,

@@ -1,5 +1,5 @@
-import { generateText, Output } from "ai";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { Output } from "ai";
+import { generateText } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
@@ -77,26 +77,24 @@ export async function generateVisualStyleGuide(
 
 CINEMATIC SPEC FROM PRODUCER (LOCKED — your style guide must be consistent with these technical anchors; do not contradict them):
 - Lighting style: ${brief.cinematicSpec.lightingStyle}
-- Color temperature: ${brief.cinematicSpec.colorTemperatureK}K (${
-        brief.cinematicSpec.colorTemperatureK <= 3500
-          ? "warm — golden hour / tungsten / candlelight"
-          : brief.cinematicSpec.colorTemperatureK <= 5000
-            ? "neutral-warm — overcast / mixed practical"
-            : brief.cinematicSpec.colorTemperatureK <= 6500
-              ? "daylight neutral"
-              : "cool — moonlit / cold shadow"
-      })
-- Lens focal length: ${brief.cinematicSpec.lensFocalMm}mm (${
-        brief.cinematicSpec.lensFocalMm <= 28
-          ? "wide / environmental"
-          : brief.cinematicSpec.lensFocalMm <= 40
-            ? "natural-wide"
-            : brief.cinematicSpec.lensFocalMm <= 60
-              ? "natural"
-              : brief.cinematicSpec.lensFocalMm <= 100
-                ? "portrait / intimate"
-                : "compressed / voyeuristic"
-      })
+- Color temperature: ${brief.cinematicSpec.colorTemperatureK}K (${brief.cinematicSpec.colorTemperatureK <= 3500
+      ? "warm — golden hour / tungsten / candlelight"
+      : brief.cinematicSpec.colorTemperatureK <= 5000
+        ? "neutral-warm — overcast / mixed practical"
+        : brief.cinematicSpec.colorTemperatureK <= 6500
+          ? "daylight neutral"
+          : "cool — moonlit / cold shadow"
+    })
+- Lens focal length: ${brief.cinematicSpec.lensFocalMm}mm (${brief.cinematicSpec.lensFocalMm <= 28
+      ? "wide / environmental"
+      : brief.cinematicSpec.lensFocalMm <= 40
+        ? "natural-wide"
+        : brief.cinematicSpec.lensFocalMm <= 60
+          ? "natural"
+          : brief.cinematicSpec.lensFocalMm <= 100
+            ? "portrait / intimate"
+            : "compressed / voyeuristic"
+    })
 - Depth of field: ${brief.cinematicSpec.depthOfField}
 - Camera movement vocabulary: ${brief.cinematicSpec.cameraMovement}
 - Aspect mood: ${brief.cinematicSpec.aspectMood}
@@ -147,33 +145,18 @@ ${assets.length > 0 ? `\nSTORY ASSET REFERENCES: When images are attached in the
   const stylePrompt = `Design the visual style guide for these ${scenes.length} scenes:\n\n${sceneSummary}`;
   const visionParts = assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.generateVisualStyleGuide",
-      request: {
-        system: systemPrompt,
-        stylePrompt,
-        visionParts,
-        temperature: 0.7,
-        schema: "visualStyleGuideSchema",
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: visualStyleGuideSchema }),
+    system: systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: [...visionParts, { type: "text", text: stylePrompt }],
       },
-    },
-    () =>
-      generateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: visualStyleGuideSchema }),
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: [...visionParts, { type: "text", text: stylePrompt }],
-          },
-        ],
-        temperature: 0.7,
-      }),
-  );
+    ],
+    temperature: 0.7,
+  });
   if (!output) throw new Error("Failed to generate visual style guide");
 
   return output;

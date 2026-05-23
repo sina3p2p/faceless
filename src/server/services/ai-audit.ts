@@ -134,7 +134,7 @@ export async function recordAiCall<T>(
  */
 function sanitize(value: unknown, depth = 0): unknown {
   if (value == null) return value;
-  if (depth > 8) return "[max-depth]";
+  if (depth > 10) return "[max-depth]";
 
   if (typeof value === "string") {
     // Strip data URLs

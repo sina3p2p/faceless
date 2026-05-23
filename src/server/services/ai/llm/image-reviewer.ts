@@ -1,10 +1,10 @@
-import { generateText, Output, type ImagePart, type TextPart } from "ai";
+import { Output, type ImagePart, type TextPart } from "ai";
 import { z } from "zod";
 import { openrouter } from "./index";
-import { recordAiCall } from "@/server/services/ai-audit";
 import { mediaUrl } from "@/lib/storage";
 import type { AspectRatio } from "@/server/services/media";
 import type { StoryAssetInput } from "@/types/worker";
+import { generateText } from "../../ai-audit";
 
 export const REVIEW_FAILURE_CATEGORIES = [
   "missing_required_asset",
@@ -195,42 +195,14 @@ The first image labeled CANDIDATE is the one you are reviewing.${input.prevImage
 
   userContent.push({ type: "text", text: userText });
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: input.model,
-      operation: "llm.reviewFrameImage",
-      request: {
-        system: SYSTEM_PROMPT,
-        userText,
-        attempt: input.attempt,
-        aspectRatio: input.aspectRatio,
-        assetRefs: declared,
-        priorHints: input.priorHints,
-        candidateUrl: mediaUrl(input.imageUrl),
-        prevFrameUrl: input.prevImageUrl ? mediaUrl(input.prevImageUrl) : null,
-        matchedAssetSheetUrls: input.matchedAssets.map((a) => mediaUrl(a.sheetUrl || a.url)),
-        temperature: 0,
-        maxOutputTokens: 600,
-        schema: "reviewResultSchema",
-      },
-      summarize: (r) => {
-        const obj = (r as { output?: ReviewResult }).output;
-        return obj
-          ? { verdict: obj.verdict, failureCount: obj.failures.length, hasHint: !!obj.correction_hint }
-          : { verdict: "unknown" };
-      },
-    },
-    () =>
-      generateText({
-        model: openrouter.chat(input.model),
-        output: Output.object({ schema: reviewResultSchema }),
-        system: SYSTEM_PROMPT,
-        messages: [{ role: "user", content: userContent }],
-        temperature: 0,
-        maxOutputTokens: 600,
-      }),
-  );
+  const { output } = await generateText({
+    model: openrouter.chat(input.model),
+    output: Output.object({ schema: reviewResultSchema }),
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userContent }],
+    temperature: 0,
+    maxOutputTokens: 600,
+  });
 
   if (!output) {
     // Reviewer call returned no parsed object — treat as `pass` (fail-open) so

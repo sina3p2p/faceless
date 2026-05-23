@@ -1,5 +1,5 @@
-import { generateText, Output } from "ai";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { Output } from "ai";
+import { generateText } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "./index";
@@ -131,22 +131,13 @@ CREATIVE BRIEF:
 
 Produce the hero asset plan now. Output the array with at most ${maxAssets} entries, ordered by importance (most identity-critical first).`;
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.extractHeroAssetPlan",
-      request: { system: systemPrompt, prompt: userPrompt, temperature: 0.3, schema: "heroAssetPlanSchema" },
-    },
-    () =>
-      generateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: heroAssetPlanSchema }),
-        system: systemPrompt,
-        prompt: userPrompt,
-        temperature: 0.3,
-      }),
-  );
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: heroAssetPlanSchema }),
+    system: systemPrompt,
+    prompt: userPrompt,
+    temperature: 0.3,
+  });
 
   if (!output) throw new Error("Failed to extract hero asset plan");
 

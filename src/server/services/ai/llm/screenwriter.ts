@@ -1,4 +1,4 @@
-import { generateText as aiGenerateText, Output } from "ai";
+import { Output } from "ai";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
@@ -12,7 +12,7 @@ import {
 } from "@/types/pipeline";
 import { formatResearchEvidence } from "./research-evidence";
 import { formatBeatSheetForPrompt } from "./beat-sheet";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { generateText } from "@/server/services/ai-audit";
 
 // ── Screenwriter Agent (movie video type) ──
 
@@ -166,39 +166,20 @@ EXECUTE THE BEAT SHEET. Each beat is a movement — give big beats more scenes, 
 
   const run = async (systemSuffix: string): Promise<Screenplay | undefined> => {
     const system = systemPrompt + systemSuffix;
-    const { output } = await recordAiCall(
+    const { output } = await generateText(
       {
-        provider: "openrouter",
-        model: primaryModel,
-        operation: "llm.generateScreenplay",
-        request: {
-          system,
-          userPrompt,
-          visionParts,
-          temperature: 0.85,
-          seed,
-          schema: "screenplaySchema",
-        },
-        summarize: (r) => ({
-          sceneCount:
-            (r as { output?: { scenes?: unknown[] } }).output?.scenes?.length ?? 0,
-        }),
-      },
-      () =>
-        aiGenerateText({
-          model: openrouter.chat(primaryModel),
-          output: Output.object({ schema: screenplaySchema }),
-          system,
-          messages: [
-            {
-              role: "user",
-              content: [...visionParts, { type: "text", text: userPrompt }],
-            },
-          ],
-          temperature: 0.85,
-          ...(seed !== undefined && { seed }),
-        }),
-    );
+        model: openrouter.chat(primaryModel),
+        output: Output.object({ schema: screenplaySchema }),
+        system,
+        messages: [
+          {
+            role: "user",
+            content: [...visionParts, { type: "text", text: userPrompt }],
+          },
+        ],
+        temperature: 0.85,
+        ...(seed !== undefined && { seed }),
+      });
     return output;
   };
 

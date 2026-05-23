@@ -1,10 +1,10 @@
-import { generateText as aiGenerateText, Output } from "ai";
+import { Output } from "ai";
 import { z } from "zod";
 import { LLM, getLanguageName } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
 import { openrouter, type StoryAsset } from "./index";
 import type { CreativeBrief, SceneFunction } from "@/types/pipeline";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { generateText } from "@/server/services/ai-audit";
 
 // ── Director Agent Schemas ──
 
@@ -177,36 +177,18 @@ LANGUAGE RULE:
   const visionParts = assets && assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
   const systemPromptResolved = (isMusic ? musicInstruction : storyInstruction) + assetSys + movieSpeakerRule;
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.splitStoryIntoScenes",
-      request: {
-        system: systemPromptResolved,
-        userStoryPrompt,
-        visionParts,
-        temperature: 0.7,
-        schema: "directorOutputSchema",
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: directorOutputSchema }),
+    system: systemPromptResolved,
+    messages: [
+      {
+        role: "user",
+        content: [...visionParts, { type: "text", text: userStoryPrompt }],
       },
-      summarize: (r) => ({
-        sceneCount: (r as { output?: { scenes?: unknown[] } }).output?.scenes?.length ?? 0,
-      }),
-    },
-    () =>
-      aiGenerateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: directorOutputSchema }),
-        system: systemPromptResolved,
-        messages: [
-          {
-            role: "user",
-            content: [...visionParts, { type: "text", text: userStoryPrompt }],
-          },
-        ],
-        temperature: 0.7,
-      }),
-  );
+    ],
+    temperature: 0.7,
+  });
   if (!output) throw new Error("Failed to split story into scenes");
 
   return output;

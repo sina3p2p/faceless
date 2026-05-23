@@ -1,5 +1,5 @@
-import { generateText as aiGenerateText, Output } from "ai";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { Output } from "ai";
+import { generateText } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { buildStoryAssetVisionContentParts } from "@/server/services/story-asset-tools";
@@ -164,27 +164,18 @@ ${storyAssets.length > 0 ? `\nREFERENCE IMAGES: When the user message includes s
   const reviewPrompt = `Review and correct these ${scenes.length} scenes:\n\n${scenesContext}`;
   const visionParts = await buildStoryAssetVisionContentParts(storyAssets);
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.superviseScript",
-      request: { system: systemPrompt, reviewPrompt, visionParts, temperature: 0.4, schema: "supervisorOutputSchema" },
-    },
-    () =>
-      aiGenerateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: supervisorOutputSchema }),
-        system: systemPrompt,
-        messages: [
-          {
-            role: "user",
-            content: [...visionParts, { type: "text", text: reviewPrompt }],
-          },
-        ],
-        temperature: 0.4,
-      }),
-  );
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: supervisorOutputSchema }),
+    system: systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: [...visionParts, { type: "text", text: reviewPrompt }],
+      },
+    ],
+    temperature: 0.4,
+  });
   if (!output) throw new Error("Failed to supervise script");
 
   return output;

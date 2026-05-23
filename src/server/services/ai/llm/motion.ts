@@ -1,5 +1,5 @@
-import { generateText as aiGenerateText, Output } from "ai";
-import { recordAiCall } from "@/server/services/ai-audit";
+import { Output } from "ai";
+import { generateText } from "@/server/services/ai-audit";
 import { z } from "zod";
 import { LLM } from "@/lib/constants";
 import { openrouter } from "./index";
@@ -359,28 +359,13 @@ TARGET: Compiled prompt ~55–130 words total across fields; include enough temp
   context += `\n\nFill all five structured fields.`;
   contentParts.push({ type: "text", text: context });
 
-  const { output } = await recordAiCall(
-    {
-      provider: "openrouter",
-      model: primaryModel,
-      operation: "llm.generateSingleFrameMotion",
-      request: {
-        system: systemPrompt,
-        contentParts,
-        temperature: 0.7,
-        schema: "frameMotionSpecSchema",
-        clipDuration: input.clipDuration,
-      },
-    },
-    () =>
-      aiGenerateText({
-        model: openrouter.chat(primaryModel),
-        output: Output.object({ schema: frameMotionSpecSchema }),
-        system: systemPrompt,
-        messages: [{ role: "user", content: contentParts }],
-        temperature: 0.7,
-      }),
-  );
+  const { output } = await generateText({
+    model: openrouter.chat(primaryModel),
+    output: Output.object({ schema: frameMotionSpecSchema }),
+    system: systemPrompt,
+    messages: [{ role: "user", content: contentParts }],
+    temperature: 0.7,
+  });
   if (!output) throw new Error("Failed to generate frame motion");
 
   const visualDescription = compileMotionPrompt(output, videoModelId);
