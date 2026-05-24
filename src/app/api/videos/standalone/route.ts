@@ -12,7 +12,7 @@ import { z } from "zod/v4";
 import { generateSeed } from "@/lib/seed";
 
 const modelId = z.string().min(1);
-const textModelOpt = z.enum(LLM_MODEL_IDS).optional();
+const textModelOpt = z.enum(LLM_MODEL_IDS);
 
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),

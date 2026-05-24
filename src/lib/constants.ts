@@ -59,16 +59,16 @@ export const MODEL_SETTINGS: ModelSettings = {
   imageModel: "gpt-image-2",
 }
 
-export const LLM_MODELS: LLMModel[] = [
-  { id: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", description: "Newest Opus; best for complex scripts (~$0.04+/script)" },
-  { id: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", description: "Best quality, higher cost (~$0.04/script)" },
-  { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Great quality, moderate cost (~$0.02/script)" },
-  { id: "openai/gpt-5.5", label: "GPT-5.5", description: "Latest GPT flagships; strong reasoning and long context" },
-  { id: "openai/gpt-4.1", label: "GPT-4.1", description: "Good quality, lower cost (~$0.01/script)" },
-  { id: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", description: "Decent quality, cheapest (~$0.003/script)" },
-  { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Great quality, competitive cost (~$0.02/script)" },
-  { id: "google/gemini-3.1-pro-preview", label: "Gemini 3 Pro", description: "Great quality, competitive cost (~$0.02/script)" },
-];
+export const LLM_MODELS: Record<LLMModelId, LLMModel> = {
+  "anthropic/claude-opus-4.7": { id: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", description: "Newest Opus; best for complex scripts (~$0.04+/script)" },
+  "anthropic/claude-opus-4.6": { id: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", description: "Best quality, higher cost (~$0.04/script)" },
+  "anthropic/claude-sonnet-4": { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Great quality, moderate cost (~$0.02/script)" },
+  "openai/gpt-5.5": { id: "openai/gpt-5.5", label: "GPT-5.5", description: "Latest GPT flagships; strong reasoning and long context" },
+  "openai/gpt-4.1": { id: "openai/gpt-4.1", label: "GPT-4.1", description: "Good quality, lower cost (~$0.01/script)" },
+  "openai/gpt-4.1-mini": { id: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", description: "Decent quality, cheapest (~$0.003/script)" },
+  "google/gemini-2.5-pro": { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Great quality, competitive cost (~$0.02/script)" },
+  "google/gemini-3.1-pro-preview": { id: "google/gemini-3.1-pro-preview", label: "Gemini 3 Pro", description: "Great quality, competitive cost (~$0.02/script)" },
+};
 
 export const IMAGE_MODELS: Record<TImageModelId, TImageModel> = {
   "gpt-image-1.5": { id: "gpt-image-1.5", label: "GPT Image 1.5", description: "Best OpenAI image model, instruction-following (OpenAI)" },

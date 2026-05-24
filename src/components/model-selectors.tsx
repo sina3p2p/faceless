@@ -164,7 +164,7 @@ export function VideoSizeSelector({ value, onChange }: ModelSelectorProps) {
   );
 }
 
-const llmOptions = LLM_MODELS.map((m) => ({
+const llmOptions = Object.values(LLM_MODELS).map((m) => ({
   value: m.id,
   label: m.label,
   description: m.description,
