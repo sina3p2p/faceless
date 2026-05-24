@@ -58,7 +58,6 @@ export const frameMotionSpecSchema = z.object({
    */
   endFramePolicyReason: z
     .string()
-    .optional()
     .describe(
       "Brief reason for the endFramePolicy choice (e.g. 'same subject, near-identical framing, hand-raise bridges cleanly' or 'different framing, would morph the face'). Metadata only — does not affect the video prompt."
     ),
