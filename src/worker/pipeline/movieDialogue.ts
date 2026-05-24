@@ -177,12 +177,19 @@ export async function generateMovieDialogueAudio(
 
   for (let g = 0; g < groups.length; g++) {
     const idxs = groups[g];
-    const turns: DialogueTurn[] = idxs.map((i) => ({
-      text: scenes[i].text,
-      voiceId: resolveSceneVoiceId(scenes[i], voiceByName, fallbackVoice),
-      emotion: scenes[i].emotion,
-      emotionIntensity: scenes[i].emotionIntensity,
-    }));
+    const turns: DialogueTurn[] = idxs.map((i) => {
+      const raw = scenes[i].text;
+      const text = raw?.trim() ? raw : "...";
+      if (!raw?.trim()) {
+        console.warn(`[movie-dialogue] Scene ${i} has empty text — substituting pause placeholder.`);
+      }
+      return {
+        text,
+        voiceId: resolveSceneVoiceId(scenes[i], voiceByName, fallbackVoice),
+        emotion: scenes[i].emotion,
+        emotionIntensity: scenes[i].emotionIntensity,
+      };
+    });
     const outPaths = idxs.map((i) => path.join(workDir, `audio_${i}.mp3`));
 
     try {

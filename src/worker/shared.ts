@@ -79,7 +79,15 @@ export async function generateTTSParallel(
     await Promise.all(
       chunk.map(async (i) => {
         const sceneVoice = perSceneVoiceIds?.[i] ?? voiceId ?? env("ELEVENLABS_DEFAULT_VOICE_ID");
-        const result = await generateSpeech(sceneTexts[i], {
+        // ElevenLabs rejects empty text (after it strips speaker tags / emojis).
+        // Replace blank scenes with a short pause marker so the pipeline keeps
+        // scene-index parity without crashing.
+        const rawText = sceneTexts[i];
+        const effectiveText = rawText?.trim() ? rawText : "...";
+        if (!rawText?.trim()) {
+          console.warn(`[tts] Scene ${i} has empty text — substituting pause placeholder.`);
+        }
+        const result = await generateSpeech(effectiveText, {
           voiceId: sceneVoice,
           ...(perSceneVoiceSettings?.[i] ?? {}),
         });
