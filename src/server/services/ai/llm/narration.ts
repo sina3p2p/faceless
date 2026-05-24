@@ -9,10 +9,10 @@ export async function refineNarrationScript(
   currentScript: NarrationScript,
   userMessage: string,
   chatHistory: ChatMessage[] = [],
-  model?: string,
+  model: string,
   language = "en"
 ): Promise<NarrationScript> {
-  const primaryModel = model || LLM.defaultModel;
+  const primaryModel = model;
   const langName = getLanguageName(language);
 
   const systemPrompt = `You are a collaborative video script editor. The user has a narration script with director's notes and wants to improve it through conversation.

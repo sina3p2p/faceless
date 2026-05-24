@@ -83,10 +83,10 @@ export async function generateBeatSheet(
   style: string,
   brief: CreativeBrief,
   language: string,
+  model: string,
   researchPack?: ResearchPackWithClaims | null,
-  model?: string,
 ): Promise<BeatSheet> {
-  const primaryModel = model || LLM.storyModel;
+  const primaryModel = model;
   const langName = getLanguageName(language);
   const researchBlock = researchPack?.claims?.length
     ? `\n\n${formatResearchEvidence(researchPack)}`

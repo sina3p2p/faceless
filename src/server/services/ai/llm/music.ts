@@ -19,7 +19,7 @@ export interface GenerateMusicLyricsParams {
   style: string;
   topicIdea: string;
   language?: string;
-  model?: string;
+  model: string;
   musicGenreStyle?: string;
   researchPack?: ResearchPackWithClaims | null;
   targetDurationSec?: number;
@@ -41,8 +41,6 @@ export async function generateMusicLyrics(params: GenerateMusicLyricsParams): Pr
     targetDurationSec = 60,
     durations,
   } = params;
-
-  const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
   const researchBlock = researchPack?.claims?.length ? `\n\n${formatResearchEvidence(researchPack)}` : "";
 
@@ -71,7 +69,7 @@ ${musicGenreStyle ? `GENRE CONSTRAINT:
     : `Write a catchy song about: ${topicIdea}. The music video visual style is ${style}.`;
 
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: musicLyricsScriptSchema }),
     system: systemPrompt,
     prompt: userPrompt,
@@ -119,10 +117,9 @@ export async function refineMusicLyrics(
   current: MusicLyricsScript,
   userMessage: string,
   chatHistory: ChatMessage[] = [],
-  model?: string,
+  model: string,
   language = "en"
 ): Promise<MusicLyricsScript> {
-  const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
 
   const systemPrompt = `You are a collaborative songwriter. The user wants to improve song lyrics through conversation.
@@ -144,7 +141,7 @@ RULES:
   messages.push({ role: "user", content: userMessage });
 
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: musicLyricsScriptSchema }),
     system: systemPrompt,
     messages,

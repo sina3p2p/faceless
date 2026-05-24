@@ -154,6 +154,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
               finalPrompt,
               desiredDuration,
               videoModelId,
+              videoProject.modelSettings.motionModel,
               endImageUrl,
               aspectRatio,
               videoResolution,
@@ -236,7 +237,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
 
     // Clean up temp dir.
     if (workDir) {
-      await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+      await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
     }
 
     const updatedFrames = await db.query.sceneFrames.findMany({

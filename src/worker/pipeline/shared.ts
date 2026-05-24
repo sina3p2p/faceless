@@ -1,21 +1,8 @@
 import { db, schema, eq } from "../shared";
-import { VIDEO_MODELS, LLM } from "@/lib/constants";
+import { VIDEO_MODELS, LLM, MODEL_SETTINGS } from "@/lib/constants";
 import { type PipelineConfig } from "@/types/pipeline";
 import type { ModelSettings } from "@/types/llm-common";
 import type { AgentModels } from "@/types/worker-pipeline";
-
-export const LLM_DEFAULT_BY_AGENT: Record<keyof AgentModels, string> = {
-  producerModel: LLM.producerModel,
-  storyModel: LLM.storyModel,
-  directorModel: LLM.directorModel,
-  supervisorModel: LLM.supervisorModel,
-  cinematographerModel: LLM.cinematographerModel,
-  researchModel: LLM.researchModel,
-  storyboardModel: LLM.storyboardModel,
-  promptModel: LLM.promptModel,
-  motionModel: LLM.motionModel,
-  reviewerModel: LLM.reviewerModel,
-};
 
 export function getModelDurationsArray(videoModel: TVideoModelId): number[] {
   return VIDEO_MODELS[videoModel].durations;
@@ -23,10 +10,10 @@ export function getModelDurationsArray(videoModel: TVideoModelId): number[] {
 
 export function getAgentModels(
   modelSettings: ModelSettings,
-  key: keyof AgentModels
+  key: keyof ModelSettings
 ): string {
-  const fromMs = modelSettings[key as keyof ModelSettings] as string | undefined;
-  return fromMs || LLM_DEFAULT_BY_AGENT[key];
+  const fromMs = modelSettings[key] as string | undefined;
+  return fromMs || MODEL_SETTINGS[key];
 }
 
 export function getProjectConfig(config: unknown): PipelineConfig {

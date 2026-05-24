@@ -222,11 +222,9 @@ export async function generateSingleFrameMotion(
   input: MotionDirectorInput,
   currentImageUrl: string,
   nextImageUrl: string | null,
-  model?: string,
+  model: string,
   videoModelId?: TVideoModelId | null
 ): Promise<SingleFrameMotionResult> {
-  const primaryModel = model || LLM.motionModel;
-
   const targetModelProfile = getMotionModelProfile(videoModelId);
   const targetModelBlock = buildTargetModelBlock(videoModelId);
   // Some i2v models cannot accept an end-image (Veo, Luma, Grok, Kling 3 Pro).
@@ -360,7 +358,7 @@ TARGET: Compiled prompt ~55–130 words total across fields; include enough temp
   contentParts.push({ type: "text", text: context });
 
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: frameMotionSpecSchema }),
     system: systemPrompt,
     messages: [{ role: "user", content: contentParts }],

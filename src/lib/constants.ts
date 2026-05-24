@@ -2,7 +2,7 @@
 // Central configuration — all settings and env vars in one place
 // ─────────────────────────────────────────────────────────
 
-import type { TVideoModel, TVideoProviderId, TVideoResolution } from "@/types/video-provider";
+import { ModelSettings } from "@/types/llm-common";
 
 export const env = (key: string, fallback = "") => process.env[key] || fallback;
 
@@ -36,101 +36,42 @@ export const AUTH = {
 export const LLM = {
   get apiKey() { return env("OPENROUTER_API_KEY"); },
   defaultModel: "anthropic/claude-opus-4.7",
-  fallbackModel: "openai/gpt-4.1",
+} as const;
+
+export const MODEL_SETTINGS = {
   visionModel: "google/gemini-2.5-pro",
-  producerModel: "anthropic/claude-opus-4.6",
-  storyModel: "anthropic/claude-opus-4.6",
-  directorModel: "anthropic/claude-opus-4.6",
-  supervisorModel: "anthropic/claude-opus-4.6",
+  producerModel: "anthropic/claude-opus-4.7",
+  storyModel: "anthropic/claude-opus-4.7",
+  directorModel: "anthropic/claude-opus-4.7",
+  supervisorModel: "anthropic/claude-opus-4.7",
   cinematographerModel: "openai/gpt-5.4",
   researchModel: "openai/gpt-4.1-mini",
   storyboardModel: "openai/gpt-4.1-mini",
   promptModel: "openai/gpt-5.4",
   motionModel: "openai/gpt-5.4",
   reviewerModel: "anthropic/claude-opus-4.7",
-} as const;
+  videoModel: "kling-3-standard",
+  imageModel: "gpt-image-2"
+} as ModelSettings
 
 export const LLM_MODELS = [
-  { id: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", description: "Best quality, higher cost (~$0.04/script)" },
   { id: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", description: "Newest Opus; best for complex scripts (~$0.04+/script)" },
+  { id: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", description: "Best quality, higher cost (~$0.04/script)" },
   { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Great quality, moderate cost (~$0.02/script)" },
+  { id: "openai/gpt-5.5-pro", label: "GPT-5.5", description: "Latest GPT flagships; strong reasoning and long context" },
   { id: "openai/gpt-4.1", label: "GPT-4.1", description: "Good quality, lower cost (~$0.01/script)" },
-  { id: "openai/gpt-5.4", label: "GPT-5.5", description: "Latest GPT flagships; strong reasoning and long context" },
   { id: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", description: "Decent quality, cheapest (~$0.003/script)" },
   { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Great quality, competitive cost (~$0.02/script)" },
 ] as const;
 
-export const DEFAULT_LLM_MODEL = LLM.defaultModel;
-
-// ── TTS (ElevenLabs) ──
-
-export const TTS = {
-  get apiKey() { return env("ELEVENLABS_API_KEY"); },
-  get defaultVoiceId() { return env("ELEVENLABS_DEFAULT_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"); },
-  model: "eleven_multilingual_v2",
-  /** Expressive model used when ELEVENLABS_USE_V3=true. Supports inline emotion audio tags. */
-  expressiveModel: "eleven_v3",
-  /**
-   * Opt-in trial: route TTS through the expressive v3 model with inline
-   * emotion audio tags. OFF by default — v3 may not return word-level
-   * timestamps, so captions degrade gracefully (no crash) when enabled.
-   */
-  get useExpressiveV3() { return env("ELEVENLABS_USE_V3", "false") === "true"; },
-  get activeModel() { return this.useExpressiveV3 ? this.expressiveModel : this.model; },
-  /**
-   * Kill-switch for the movie-type v3 Text-to-Dialogue path. ON by default;
-   * set ELEVENLABS_DIALOG_ENABLED=false to force the legacy per-scene path.
-   */
-  get dialogEnabled() { return env("ELEVENLABS_DIALOG_ENABLED", "true") === "true"; },
-  /** Model used for the v3 Text-to-Dialogue endpoint. */
-  dialogModel: "eleven_v3",
-  /** Max chars per dialogue request before a new group is started. */
-  dialogMaxChars: 2800,
-  /** Max turns per dialogue request before a new group is started. */
-  dialogMaxTurns: 10,
-  defaultStability: 0.4,
-  defaultSimilarityBoost: 0.8,
-  defaultStyle: 0.3,
-} as const;
-
-// ── Media (OpenAI + Kling image API) ──
-
-export const MEDIA = {
-  get openaiApiKey() { return env("OPENAI_API_KEY"); },
-} as const;
-
-// ── Web research (Tavily) ──
-
-export const RESEARCH = {
-  get tavilyApiKey() { return env("TAVILY_API_KEY"); },
-  /** OpenRouter model for query planning + claim extraction (cheap / fast). */
-  researchModel: "openai/gpt-4.1-mini",
-} as const;
-
-// ── AI Video (image-to-video) ──
-
-export const AI_VIDEO = {
-  get falKey() { return env("FAL_KEY"); },
-  get replicateToken() { return env("REPLICATE_API_TOKEN"); },
-} as const;
-
-
-/**
- * Image-to-video backend: `"fal"` (Fal.ai) or `"replicate"` (Replicate for models with `replicateModel` in `VIDEO_MODELS`).
- * Change this value only — not exposed in the app UI. Rebuild after changing (client model list reads this at build time).
- */
-export const VIDEO_I2V_PROVIDER: TVideoProviderId = "replicate";
-
-// ── Music (Suno) ──
-
-export const MUSIC = {
-  get sunoApiKey() { return env("SUNO_API_KEY"); },
-  sunoBaseUrl: "https://api.sunoapi.org",
-  sunoModel: "V5" as const,
-} as const;
+export const IMAGE_MODELS: Record<TImageModelId, TImageModel> = {
+  "gpt-image-1.5": { id: "gpt-image-1.5", label: "GPT Image 1.5", description: "Best OpenAI image model, instruction-following (OpenAI)" },
+  "gpt-image-2": { id: "gpt-image-2", label: "GPT Image 2", description: "State-of-the-art OpenAI image generation, text and editing (OpenAI)" },
+  "nano-banana-2": { id: "nano-banana-2", label: "Nano Banana 2", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
+  "nano-banana-pro": { id: "nano-banana-pro", label: "Nano Banana Pro", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
+};
 
 const SEEDANCE2_DURATIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-
 export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   "seedance-2-pro": {
     id: "seedance-2-pro",
@@ -246,6 +187,75 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   },
 };
 
+export const DEFAULT_LLM_MODEL = LLM.defaultModel;
+
+// ── TTS (ElevenLabs) ──
+
+export const TTS = {
+  get apiKey() { return env("ELEVENLABS_API_KEY"); },
+  get defaultVoiceId() { return env("ELEVENLABS_DEFAULT_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"); },
+  model: "eleven_multilingual_v2",
+  /** Expressive model used when ELEVENLABS_USE_V3=true. Supports inline emotion audio tags. */
+  expressiveModel: "eleven_v3",
+  /**
+   * Opt-in trial: route TTS through the expressive v3 model with inline
+   * emotion audio tags. OFF by default — v3 may not return word-level
+   * timestamps, so captions degrade gracefully (no crash) when enabled.
+   */
+  get useExpressiveV3() { return env("ELEVENLABS_USE_V3", "false") === "true"; },
+  get activeModel() { return this.useExpressiveV3 ? this.expressiveModel : this.model; },
+  /**
+   * Kill-switch for the movie-type v3 Text-to-Dialogue path. ON by default;
+   * set ELEVENLABS_DIALOG_ENABLED=false to force the legacy per-scene path.
+   */
+  get dialogEnabled() { return env("ELEVENLABS_DIALOG_ENABLED", "true") === "true"; },
+  /** Model used for the v3 Text-to-Dialogue endpoint. */
+  dialogModel: "eleven_v3",
+  /** Max chars per dialogue request before a new group is started. */
+  dialogMaxChars: 2800,
+  /** Max turns per dialogue request before a new group is started. */
+  dialogMaxTurns: 10,
+  defaultStability: 0.4,
+  defaultSimilarityBoost: 0.8,
+  defaultStyle: 0.3,
+} as const;
+
+// ── Media (OpenAI + Kling image API) ──
+
+export const MEDIA = {
+  get openaiApiKey() { return env("OPENAI_API_KEY"); },
+} as const;
+
+// ── Web research (Tavily) ──
+
+export const RESEARCH = {
+  get tavilyApiKey() { return env("TAVILY_API_KEY"); },
+  /** OpenRouter model for query planning + claim extraction (cheap / fast). */
+} as const;
+
+// ── AI Video (image-to-video) ──
+
+export const AI_VIDEO = {
+  get falKey() { return env("FAL_KEY"); },
+  get replicateToken() { return env("REPLICATE_API_TOKEN"); },
+} as const;
+
+
+/**
+ * Image-to-video backend: `"fal"` (Fal.ai) or `"replicate"` (Replicate for models with `replicateModel` in `VIDEO_MODELS`).
+ * Change this value only — not exposed in the app UI. Rebuild after changing (client model list reads this at build time).
+ */
+export const VIDEO_I2V_PROVIDER: TVideoProviderId = "replicate";
+
+// ── Music (Suno) ──
+
+export const MUSIC = {
+  get sunoApiKey() { return env("SUNO_API_KEY"); },
+  sunoBaseUrl: "https://api.sunoapi.org",
+  sunoModel: "V5" as const,
+} as const;
+
+export const IMAGE_MODEL_IDS = Object.keys(IMAGE_MODELS) as TImageModelId[]
 export const VIDEO_MODEL_IDS = Object.keys(VIDEO_MODELS) as TVideoModelId[];
 
 export const DEFAULT_VIDEO_MODEL = "kling-3-standard";
@@ -277,13 +287,6 @@ export function coerceVideoResolution(
   }
   return getDefaultVideoResolution(modelId);
 }
-
-export const IMAGE_MODELS = [
-  { id: "gpt-image-1.5", label: "GPT Image 1.5", description: "Best OpenAI image model, instruction-following (OpenAI)" },
-  { id: "gpt-image-2", label: "GPT Image 2", description: "State-of-the-art OpenAI image generation, text and editing (OpenAI)" },
-  { id: "nano-banana-2", label: "Nano Banana 2", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
-  { id: "nano-banana-pro", label: "Nano Banana Pro", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
-] as const;
 
 export const DEFAULT_IMAGE_MODEL = "gpt-image-1.5";
 

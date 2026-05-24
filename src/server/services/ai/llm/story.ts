@@ -11,13 +11,12 @@ export async function generateStory(
   style: string,
   topicIdea: string,
   language = "en",
-  model?: string,
+  model: string,
   brief?: CreativeBrief,
   researchPack?: ResearchPackWithClaims | null,
   seed?: number,
   beatSheet?: BeatSheet,
 ): Promise<string> {
-  const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
   const researchBlock = researchPack?.claims?.length ? `\n\n${formatResearchEvidence(researchPack)}` : "";
   const beatSheetBlock = beatSheet ? `\n\n${formatBeatSheetForPrompt(beatSheet)}` : "";
@@ -68,7 +67,7 @@ CREATIVE BRIEF (follow these constraints):
   const userPrompt = `Write the story for this idea: ${topicIdea}. The intended visual style is ${style}. Execute the beat sheet if provided. Make it impossible to stop reading — and impossible to predict.`;
 
   const { text } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     system: systemPrompt,
     prompt: userPrompt,
     temperature: 0.85,
@@ -85,9 +84,8 @@ export async function refineStory(
   userMessage: string,
   chatHistory: ChatMessage[] = [],
   language = "en",
-  model?: string
+  model: string
 ): Promise<string> {
-  const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
 
   const systemPrompt = `You are a collaborative story editor. The user has a story and wants to improve it through conversation.
@@ -112,7 +110,7 @@ LANGUAGE RULE:
   messages.push({ role: "user", content: userMessage });
 
   const { text } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     system: systemPrompt,
     messages,
     temperature: 0.7,

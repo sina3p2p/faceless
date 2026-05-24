@@ -60,9 +60,8 @@ export interface HeroAssetExtractorInput {
  */
 export async function extractHeroAssetPlan(
   input: HeroAssetExtractorInput,
-  model?: string
+  model: string
 ): Promise<HeroAssetPlan> {
-  const primaryModel = model || LLM.supervisorModel;
   const maxAssets = input.maxAssets ?? 6;
 
   const sceneSummary = input.scenes
@@ -132,7 +131,7 @@ CREATIVE BRIEF:
 Produce the hero asset plan now. Output the array with at most ${maxAssets} entries, ordered by importance (most identity-critical first).`;
 
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: heroAssetPlanSchema }),
     system: systemPrompt,
     prompt: userPrompt,

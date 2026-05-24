@@ -22,7 +22,7 @@ export interface ModelSettings {
   storyboardModel: string;
   promptModel: string;
   motionModel: string;
-  imageModel: string;
+  imageModel: TImageModelId;
   videoModel: TVideoModelId;
   reviewerModel: string;
 }

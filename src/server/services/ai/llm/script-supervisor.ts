@@ -88,10 +88,8 @@ export async function superviseScript(
   scenes: TVideoScene[],
   brief: CreativeBrief,
   storyAssets: StoryAsset[],
-  model?: string
+  model: string
 ): Promise<SupervisorOutput> {
-  const primaryModel = model || LLM.supervisorModel;
-
   const scenesContext = scenes.map((s, i) =>
     `Scene ${i} — "${s.sceneTitle}":\n  Speaker: ${s.speaker ?? "null"}\n  Emotion: ${s.emotion ?? "unset"} (${s.emotionIntensity ?? "unset"})\n  Narration: "${s.text}"\n  Director's Note: ${s.directorNote}`
   ).join("\n\n");
@@ -165,7 +163,7 @@ ${storyAssets.length > 0 ? `\nREFERENCE IMAGES: When the user message includes s
   const visionParts = await buildStoryAssetVisionContentParts(storyAssets);
 
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: supervisorOutputSchema }),
     system: systemPrompt,
     messages: [

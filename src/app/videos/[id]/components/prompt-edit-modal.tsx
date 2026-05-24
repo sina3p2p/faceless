@@ -20,7 +20,7 @@ export function PromptEditModal({
 }: {
   scene: Scene;
   scenes: Scene[];
-  imageModel: string;
+  imageModel: TImageModelId;
   videoId: string;
   onClose: () => void;
   onSubmit: (prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[], modelOverride?: string) => void;
@@ -145,7 +145,7 @@ export function PromptEditModal({
           <div className="mb-4">
             <label className="block text-xs font-medium text-gray-400 mb-1.5">Image Model</label>
             <div className="flex gap-1.5 flex-wrap">
-              {IMAGE_MODELS.map((m) => (
+              {Object.values(IMAGE_MODELS).map((m) => (
                 <button
                   key={m.id}
                   type="button"
@@ -164,7 +164,7 @@ export function PromptEditModal({
             </div>
             {selectedModel !== imageModel && (
               <p className="text-[10px] text-amber-400/80 mt-1">
-                Overriding series default ({IMAGE_MODELS.find((m) => m.id === imageModel)?.label || imageModel})
+                Overriding series default ({IMAGE_MODELS[imageModel].label || imageModel})
               </p>
             )}
           </div>

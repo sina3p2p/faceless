@@ -117,7 +117,7 @@ export class ReplicateVideoProvider implements IVideoProvider {
    * content rejections (E005) the agent rewrites the prompt using a growing
    * chat history so each attempt is informed by every prior failure.
    */
-  async generateFromImageSafe(req: I2vRequest, model: TVideoModelId): Promise<VideoResult> {
+  async generateFromImageSafe(req: I2vRequest, model: TVideoModelId, correctionAgentModelId: string): Promise<VideoResult> {
     let currentPrompt = req.prompt;
     let lastCorrection: string | null = null;
     const history: ModelMessage[] = [
@@ -146,7 +146,7 @@ export class ReplicateVideoProvider implements IVideoProvider {
             });
           }
           const { text } = await generateText({
-            model: openrouter.chat(LLM.fallbackModel),
+            model: openrouter.chat(correctionAgentModelId),
             messages: history,
           });
           lastCorrection = text.trim();

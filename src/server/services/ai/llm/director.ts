@@ -43,12 +43,11 @@ export async function splitStoryIntoScenes(
   storyMarkdown: string,
   style: string,
   language = "en",
-  model?: string,
+  model: string,
   videoType?: string,
   brief?: CreativeBrief,
   assets?: StoryAsset[]
 ): Promise<DirectorOutput> {
-  const primaryModel = model || LLM.directorModel;
   const langName = getLanguageName(language);
   const isMusic = videoType === "music_video";
   const isMovie = videoType === "movie";
@@ -178,7 +177,7 @@ LANGUAGE RULE:
 
   const systemPromptResolved = (isMusic ? musicInstruction : storyInstruction) + assetSys + movieSpeakerRule;
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: directorOutputSchema }),
     system: systemPromptResolved,
     messages: [

@@ -70,10 +70,10 @@ export async function buildResearchPack(input: {
   language: string;
   videoType: string;
   brief: CreativeBrief;
-  model?: string;
+  model: string;
 }): Promise<BuiltResearchPack> {
   const { topicIdea, language, videoType, brief } = input;
-  const primaryModel = input.model || RESEARCH.researchModel;
+  const primaryModel = input.model;
   const langName = getLanguageName(language);
 
   const querySystem = `You plan web search queries for factual research before writing a script or song.

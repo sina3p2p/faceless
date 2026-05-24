@@ -56,10 +56,8 @@ export async function generateFramePrompts(
   styleGuide: VisualStyleGuide,
   frameBreakdown: FrameBreakdown,
   continuity: ContinuityNotes,
-  model?: string
+  model: string
 ): Promise<FramePromptsOutput> {
-  const primaryModel = model || LLM.promptModel;
-
   const scenesContext = scenes.map((s, i) => {
     const sceneFrames = frameBreakdown.scenes[i]?.frames ?? [];
     const frameSpecs = sceneFrames.map((f, fi) =>
@@ -113,14 +111,14 @@ ${buildAssetBlock(assets)}
 ${assets.length > 0 ? "\nWhen reference images are attached in the user message, use them to decide which assets belong in assetRefs per frame; still obey ASSET RULES — no appearance pile-up in imageSpec for ref-backed characters." : ""}
 Return exactly ${scenes.length} scenes.`;
 
-  const strictStructuredOutputs = usesStrictStructuredImageSpecModel(primaryModel);
+  const strictStructuredOutputs = usesStrictStructuredImageSpecModel(model);
   const framePromptsLlmOutputSchema = buildFramePromptsLlmOutputSchema(strictStructuredOutputs);
 
   const frameTaskPrompt = `Create imageSpec for each frame:\n\n${scenesContext}`;
   const visionParts = buildStoryAssetVisionContentParts(assets);
 
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: framePromptsLlmOutputSchema }),
     system: systemPrompt,
     messages: [

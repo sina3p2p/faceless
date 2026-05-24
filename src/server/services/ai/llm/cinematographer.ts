@@ -59,11 +59,9 @@ export async function generateVisualStyleGuide(
   brief: CreativeBrief,
   style: string,
   videoType: string,
-  model?: string,
+  model: string,
   assets: StoryAsset[] = []
 ): Promise<VisualStyleGuide> {
-  const primaryModel = model || LLM.cinematographerModel;
-
   const sceneSummary = scenes.map((s, i) =>
     `Scene ${i} — "${s.sceneTitle}": ${s.directorNote}`
   ).join("\n");
@@ -146,7 +144,7 @@ ${assets.length > 0 ? `\nSTORY ASSET REFERENCES: When images are attached in the
   const visionParts = assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: visualStyleGuideSchema }),
     system: systemPrompt,
     messages: [

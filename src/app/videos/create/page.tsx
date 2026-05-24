@@ -19,19 +19,19 @@ import {
   MUSIC_VIDEO_GENRES,
   DEFAULT_MUSIC_VIDEO_GENRE_ID,
   getMusicVideoGenreStyle,
+  MODEL_SETTINGS,
 } from "@/lib/constants";
 import { VoiceSelector } from "@/components/voice-selector";
 import {
   VideoTypeSelector,
   AgentLlmModelSection,
-  buildAgentModelsBody,
-  type AgentLlmOverrides,
   ImageModelSelector,
   VideoModelSelector,
   VideoQualitySelector,
   VideoSizeSelector,
 } from "@/components/model-selectors";
 import { GenerateCharacterModal } from "@/components/generate-character-modal";
+import { ModelSettings } from "@/types/llm-common";
 
 type AssetType = "character" | "location" | "prop";
 
@@ -70,8 +70,7 @@ export default function CreateVideoPage() {
     style: ART_STYLES[0].id as string,
     captionStyle: CAPTION_STYLES[0].id as string,
     llmModel: DEFAULT_LLM_MODEL as string,
-    usePerStepLlm: false,
-    agentModelOverrides: {} as AgentLlmOverrides,
+    modelSettings: MODEL_SETTINGS,
     imageModel: DEFAULT_IMAGE_MODEL as string,
     videoModel: DEFAULT_VIDEO_MODEL as string,
     videoResolution: getDefaultVideoResolution(DEFAULT_VIDEO_MODEL) ?? "",
@@ -80,7 +79,6 @@ export default function CreateVideoPage() {
     webResearch: false,
     voiceId: "",
     durationPreferred: 30,
-    durationPriority: "quality" as "quality" | "duration",
     musicVideoGenreId: DEFAULT_MUSIC_VIDEO_GENRE_ID as string,
   });
 
@@ -148,27 +146,13 @@ export default function CreateVideoPage() {
           videoSize: form.videoSize,
           language: form.language,
           voiceId: form.voiceId || undefined,
-          ...(() => {
-            const m = buildAgentModelsBody(form.llmModel, form.agentModelOverrides);
-            return {
-              storyModel: m.storyModel,
-              directorModel: m.directorModel,
-              supervisorModel: m.supervisorModel,
-              cinematographerModel: m.cinematographerModel,
-              researchModel: m.researchModel,
-              storyboardModel: m.storyboardModel,
-              promptModel: m.promptModel,
-              motionModel: m.motionModel,
-              producerModel: m.producerModel,
-            };
-          })(),
-          imageModel: form.imageModel,
-          videoModel: form.videoModel,
-          ...(form.videoResolution ? { videoResolution: form.videoResolution } : {}),
-          duration: {
-            preferred: form.durationPreferred,
-            priority: form.durationPriority,
+          modelSettings: {
+            ...form.modelSettings,
+            imageModel: form.imageModel,
+            videoModel: form.videoModel,
           },
+          ...(form.videoResolution ? { videoResolution: form.videoResolution } : {}),
+          duration: form.durationPreferred,
           webResearch: form.webResearch,
           storyAssetIds: storyAssetIds.length > 0 ? storyAssetIds : undefined,
         }),
@@ -264,37 +248,11 @@ export default function CreateVideoPage() {
               <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
                 <span>Acceptable range: ~{Math.round(form.durationPreferred * 0.7)}s – ~{Math.round(form.durationPreferred * 1.33)}s</span>
               </div>
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, durationPriority: "quality" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.durationPriority === "quality"
-                    ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
-                    : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
-                    }`}
-                >
-                  Prioritize Quality
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setForm({ ...form, durationPriority: "duration" })}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${form.durationPriority === "duration"
-                    ? "bg-violet-500/20 border border-violet-500/50 text-violet-300"
-                    : "bg-white/5 border border-white/10 text-gray-400 hover:border-white/20"
-                    }`}
-                >
-                  Prioritize Exact Duration
-                </button>
-              </div>
             </div>
 
             <AgentLlmModelSection
-              defaultModel={form.llmModel}
-              onDefaultModelChange={(v) => setForm({ ...form, llmModel: v })}
-              perStep={form.usePerStepLlm}
-              onPerStepChange={(v) => setForm({ ...form, usePerStepLlm: v })}
-              overrides={form.agentModelOverrides}
-              onOverridesChange={(overrides) => setForm({ ...form, agentModelOverrides: overrides })}
+              overrides={form.modelSettings}
+              onOverridesChange={(overrides) => setForm({ ...form, modelSettings: overrides })}
             />
             <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
             <VideoModelSelector

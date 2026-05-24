@@ -109,8 +109,8 @@ export async function POST(
       },
       currentImageUrl,
       nextImageUrl,
-      undefined,
-      video.modelSettings?.videoModel,
+      video.modelSettings.motionModel,
+      video.modelSettings.videoModel,
     );
 
     await db

@@ -1,7 +1,7 @@
 import * as fs from "fs/promises";
 import axios from "axios";
 import { pickBestDuration } from "./pick-duration";
-import type { TVideoResolution, VideoResult } from "@/types/video-provider";
+import type { VideoResult } from "@/types/video-provider";
 import { VIDEO_MODELS } from "@/lib/constants";
 import { ReplicateVideoProvider } from "./providers/replicate";
 
@@ -12,10 +12,11 @@ export async function generateVideoFromImage(
   prompt: string,
   desiredDuration: number = 5,
   videoModelId: TVideoModelId,
+  correctionAgentModelId: string,
   endImageUrl?: string,
   aspectRatio: TAspectRatio = "9:16",
   resolution: TVideoResolution = "480p",
-  generateAudio?: boolean,
+  generateAudio?: boolean
 ): Promise<VideoResult> {
   const replicate = new ReplicateVideoProvider();
 
@@ -31,7 +32,7 @@ export async function generateVideoFromImage(
     generateAudio,
   };
 
-  return replicate.generateFromImageSafe(req, videoModelId);
+  return replicate.generateFromImageSafe(req, videoModelId, correctionAgentModelId);
 }
 
 export async function downloadAIVideo(videoUrl: string, destPath: string): Promise<void> {

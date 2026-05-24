@@ -7,11 +7,11 @@ import { listStoryAssetsForSeries, listStoryAssetsForVideo } from "@/server/db/s
 import { generateImage, generateViaOpenRouter } from "@/server/services/media";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { z } from "zod/v4";
-import { IMAGE_MODELS } from "@/lib/constants";
+import { IMAGE_MODEL_IDS } from "@/lib/constants";
 
 const bodySchema = z.object({
   prompt: z.string().optional(),
-  imageModel: z.enum(IMAGE_MODELS.map((m) => m.id) as [string, ...string[]]).default("gpt-image-1.5"),
+  imageModel: z.enum(IMAGE_MODEL_IDS).default("gpt-image-1.5"),
 });
 
 export async function POST(

@@ -6,12 +6,10 @@ import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
 import { firstJob, resolveVideoType } from "@/worker/pipeline/topology";
-import { DEFAULT_LLM_MODEL, LLM, VIDEO_MODEL_IDS } from "@/lib/constants";
-import type { ModelSettings } from "@/types/llm-common";
+import { IMAGE_MODEL_IDS, MODEL_SETTINGS, VIDEO_MODEL_IDS } from "@/lib/constants";
 import type { PipelineConfig } from "@/types/pipeline";
 import { z } from "zod/v4";
 import { generateSeed } from "@/lib/seed";
-import { LLM_DEFAULT_BY_AGENT } from "@/worker/pipeline/shared";
 
 const modelId = z.string().min(1);
 const textModelOpt = z.string().min(1).optional();
@@ -27,23 +25,24 @@ const standaloneSchema = z.object({
   voiceId: z.string().optional(),
   language: z.string().default("en"),
   captionStyle: z.string().default("none"),
-  storyModel: textModelOpt,
-  directorModel: textModelOpt,
-  supervisorModel: textModelOpt,
-  cinematographerModel: textModelOpt,
-  storyboardModel: textModelOpt,
-  producerModel: textModelOpt,
-  promptModel: textModelOpt,
-  motionModel: textModelOpt,
-  imageModel: mediaModelOpt,
-  researchModel: textModelOpt,
-  videoModel: z.enum(VIDEO_MODEL_IDS),
+  modelSettings: z.object({
+    storyModel: textModelOpt,
+    directorModel: textModelOpt,
+    supervisorModel: textModelOpt,
+    cinematographerModel: textModelOpt,
+    storyboardModel: textModelOpt,
+    producerModel: textModelOpt,
+    promptModel: textModelOpt,
+    motionModel: textModelOpt,
+    researchModel: textModelOpt,
+    imageModel: z.enum(IMAGE_MODEL_IDS),
+    videoModel: z.enum(VIDEO_MODEL_IDS),
+  }),
   videoResolution: z.enum(["360p", "480p", "540p", "720p", "1080p", "4k"]),
   duration: z.object({
     preferred: z.number().min(10).max(180),
     min: z.number().min(5).max(180).optional(),
     max: z.number().min(10).max(300).optional(),
-    priority: z.enum(["quality", "duration"]).default("quality"),
   }).optional(),
   /** Existing canonical story_assets ids (your library); linked to this video in order. */
   storyAssetIds: z.array(z.string()).optional().default([]),
@@ -52,33 +51,6 @@ const standaloneSchema = z.object({
   /** Falls back for any omitted text model when the top-level *Model field is not sent. */
   llmModel: modelId.optional(),
 });
-
-type ParsedStandalone = z.infer<typeof standaloneSchema>;
-
-function resolveTextModel(
-  p: ParsedStandalone,
-  k: "producerModel" | "storyModel" | "directorModel" | "supervisorModel" | "cinematographerModel" | "researchModel" | "storyboardModel" | "promptModel" | "motionModel"
-) {
-  return p[k] ?? DEFAULT_LLM_MODEL;
-}
-
-function buildModelSettings(p: ParsedStandalone): ModelSettings {
-  return {
-    ...LLM_DEFAULT_BY_AGENT,
-    producerModel: resolveTextModel(p, "producerModel"),
-    storyModel: resolveTextModel(p, "storyModel"),
-    directorModel: resolveTextModel(p, "directorModel"),
-    supervisorModel: resolveTextModel(p, "supervisorModel"),
-    cinematographerModel: resolveTextModel(p, "cinematographerModel"),
-    researchModel: resolveTextModel(p, "researchModel"),
-    storyboardModel: resolveTextModel(p, "storyboardModel"),
-    promptModel: resolveTextModel(p, "promptModel"),
-    motionModel: resolveTextModel(p, "motionModel"),
-    imageModel: p.imageModel,
-    videoModel: p.videoModel,
-    reviewerModel: LLM.reviewerModel,
-  };
-}
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser();
@@ -97,7 +69,6 @@ export async function POST(req: NextRequest) {
   }
 
   const data = parsed.data;
-  const modelSettings = buildModelSettings(data);
 
   const config: Record<string, unknown> = {};
   if (data.duration) {
@@ -105,7 +76,6 @@ export async function POST(req: NextRequest) {
       min: data.duration.min ?? Math.round(data.duration.preferred * 0.7),
       preferred: data.duration.preferred,
       max: data.duration.max ?? Math.round(data.duration.preferred * 1.33),
-      priority: data.duration.priority,
     };
   }
   if (data.videoType === "music_video" && data.musicGenre?.trim()) {
@@ -120,7 +90,10 @@ export async function POST(req: NextRequest) {
     .insert(videoProjects)
     .values({
       status: "PENDING",
-      modelSettings,
+      modelSettings: {
+        ...MODEL_SETTINGS,
+        ...data.modelSettings
+      },
       videoResolution: data.videoResolution,
       videoSize: data.videoSize,
       language: data.language,

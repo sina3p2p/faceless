@@ -6,13 +6,13 @@ import { eq } from "drizzle-orm";
 import { generateImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
 import { serializeCanonicalForImageProvider } from "@/server/services/ai/llm/prompt-contract";
 import { uploadFile, mediaUrl } from "@/lib/storage";
-import { getVideoSize, IMAGE_MODELS } from "@/lib/constants";
+import { getVideoSize, IMAGE_MODEL_IDS } from "@/lib/constants";
 import { z } from "zod";
 import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
 
 const bodySchema = z.object({
   imagePrompt: z.string().min(1).optional(),
-  imageModel: z.enum(IMAGE_MODELS.map(m => m.id)).optional(),
+  imageModel: z.enum(IMAGE_MODEL_IDS).optional(),
 });
 
 export async function POST(

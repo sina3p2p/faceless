@@ -137,7 +137,7 @@ function SceneEditor({
 }: {
   scene: Scene;
   scenes: Scene[];
-  imageModel: string;
+  imageModel: TImageModelId;
   onSubmit: (prompt: string, mode: "regenerate" | "edit", referenceSceneIds: string[], modelOverride?: string) => void;
   onUndo: (() => void) | null;
   onUploadImage: (file: File) => void;
@@ -252,7 +252,7 @@ function SceneEditor({
       <div>
         <span className="text-[10px] uppercase tracking-widest text-gray-600 font-semibold mb-1.5 block">Model</span>
         <div className="flex gap-1 flex-wrap">
-          {IMAGE_MODELS.map((m) => (
+          {Object.values(IMAGE_MODELS).map((m) => (
             <button
               key={m.id}
               type="button"
@@ -271,7 +271,7 @@ function SceneEditor({
         </div>
         {selectedModel !== imageModel && (
           <p className="text-[9px] text-amber-400/80 mt-1">
-            Overriding default ({IMAGE_MODELS.find((m) => m.id === imageModel)?.label || imageModel})
+            Overriding default ({IMAGE_MODELS[imageModel].label || imageModel})
           </p>
         )}
       </div>

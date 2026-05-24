@@ -11,20 +11,17 @@ export interface DurationPreference {
   min: number;
   preferred: number;
   max: number;
-  priority: "quality" | "duration";
 }
 
 export function resolveDuration(input: {
   preferred: number;
   min?: number;
   max?: number;
-  priority?: "quality" | "duration";
 }): DurationPreference {
   return {
     min: input.min ?? Math.round(input.preferred * 0.7),
     preferred: input.preferred,
     max: input.max ?? Math.round(input.preferred * 1.33),
-    priority: input.priority ?? "quality",
   };
 }
 

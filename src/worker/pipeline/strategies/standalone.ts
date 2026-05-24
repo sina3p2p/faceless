@@ -39,8 +39,8 @@ export class StandaloneStrategy implements ContentStrategy {
         project.style,
         config.creativeBrief,
         project.language || "en",
+        storyModel,
         researchPack,
-        storyModel
       );
       await mergeProjectConfig(videoProjectId, { beatSheet });
       console.log(

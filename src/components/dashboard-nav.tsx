@@ -15,7 +15,7 @@ const navItems = [
     ),
   },
   {
-    href: "/dashboard/create",
+    href: "/videos/create",
     label: "Create Video",
     icon: (
       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -74,11 +74,10 @@ export function DashboardNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                isActive
-                  ? "bg-violet-600/20 text-violet-400"
-                  : "text-gray-400 hover:text-white hover:bg-white/5"
-              }`}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive
+                ? "bg-violet-600/20 text-violet-400"
+                : "text-gray-400 hover:text-white hover:bg-white/5"
+                }`}
             >
               {item.icon}
               {item.label}

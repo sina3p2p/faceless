@@ -11,7 +11,7 @@ const createSeriesSchema = z.object({
   niche: z.string().min(1),
   style: z.string().default("cinematic"),
   defaultVoiceId: z.string().optional(),
-  llmModel: z.string().default("anthropic/claude-opus-4.6"),
+  llmModel: z.string().default("anthropic/claude-opus-4.7"),
   imageModel: z.string().default("gpt-image-1.5"),
   videoModel: z.string().default("kling-3-standard"),
   videoSize: z.string().default("9:16"),

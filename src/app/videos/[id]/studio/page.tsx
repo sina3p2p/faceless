@@ -276,7 +276,7 @@ export default function StudioPage() {
             {/* Model Command Palette */}
             {variantFrameId && (
               <ModelCommand
-                models={IMAGE_MODELS}
+                models={Object.values(IMAGE_MODELS)}
                 title="Generate variant with..."
                 onSelect={(modelId) => {
                   handleGenerateFrameImage(variantFrameId, undefined, modelId);

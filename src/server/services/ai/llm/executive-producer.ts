@@ -65,9 +65,8 @@ export async function generateCreativeBrief(
   duration: DurationPreference,
   topicIdea: string | undefined,
   assets: StoryAsset[],
-  model?: string
+  model: string
 ): Promise<CreativeBrief> {
-  const primaryModel = model || LLM.producerModel;
   const langName = getLanguageName(language);
 
   const wordBudgetMin = Math.round(duration.min * WORDS_PER_SECOND);
@@ -86,7 +85,7 @@ PRODUCTION PARAMETERS:
 - Video type: ${videoType}
 - Language: ${langName}
 - Duration target: ${duration.preferred}s (acceptable range: ${duration.min}s–${duration.max}s)
-- Duration priority: ${duration.priority === "quality" ? "Quality over exact timing — let the story breathe" : "Hit the target duration — trim to fit"}
+- Duration priority: Quality over exact timing — let the story breathe
 
 DURATION MATH (pre-calculated — use these values):
 - Word budget: ${wordBudgetMin}–${wordBudgetMax} words (target: ${wordBudgetTarget})
@@ -142,7 +141,7 @@ CINEMATIC SPEC (AI Director of Photography — deterministic, no subjective adje
 
   const visionParts = buildStoryAssetVisionContentParts(assets);
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: creativeBriefSchema }),
     system: systemPrompt,
     messages: [

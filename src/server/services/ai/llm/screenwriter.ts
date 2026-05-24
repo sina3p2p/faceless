@@ -78,7 +78,7 @@ export interface GenerateScreenplayInput {
   style: string;
   topicIdea: string;
   language?: string;
-  model?: string;
+  model: string;
   brief?: CreativeBrief;
   researchPack?: ResearchPackWithClaims | null;
   beatSheet?: BeatSheet;
@@ -100,8 +100,6 @@ export async function generateScreenplay(
     assets,
     seed,
   } = input;
-
-  const primaryModel = model || LLM.storyModel;
   const langName = getLanguageName(language);
   const researchBlock = researchPack?.claims?.length
     ? `\n\n${formatResearchEvidence(researchPack)}`
@@ -168,7 +166,7 @@ EXECUTE THE BEAT SHEET. Each beat is a movement — give big beats more scenes, 
     const system = systemPrompt + systemSuffix;
     const { output } = await generateText(
       {
-        model: openrouter.chat(primaryModel),
+        model: openrouter.chat(model),
         output: Output.object({ schema: screenplaySchema }),
         system,
         messages: [

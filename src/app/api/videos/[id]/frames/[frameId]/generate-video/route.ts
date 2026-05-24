@@ -63,6 +63,7 @@ export async function POST(
       prompt,
       duration,
       videoModel,
+      video.modelSettings.motionModel,
       undefined,
       video.videoSize,
       video.videoResolution

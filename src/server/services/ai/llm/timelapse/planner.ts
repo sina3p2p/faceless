@@ -40,10 +40,9 @@ export async function generateTimelapsePlan(params: {
   style: string;
   language: string;
   totalDurationSeconds: number;
-  model?: string;
+  model: string;
 }): Promise<TimelapsePlan> {
   const { prompt, style, language, totalDurationSeconds, model } = params;
-  const primaryModel = model || LLM.cinematographerModel;
 
   const systemPrompt = `You are a Timelapse Planner. The user wants a stage-by-stage timelapse video documenting a real-world process — construction, cleaning, growth, decay, restoration, weather/seasonal change, etc.
 
@@ -68,7 +67,7 @@ Be CONCRETE about places, materials, and equipment specific to the user's proces
   const userPrompt = `User request: ${prompt}\n\nProduce the timelapse plan as structured output.`;
 
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: planSchema }),
     system: systemPrompt,
     messages: [

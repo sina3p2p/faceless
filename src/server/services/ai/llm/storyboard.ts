@@ -38,11 +38,9 @@ export async function generateFrameBreakdown(
   brief: CreativeBrief,
   duration: number,
   continuity: ContinuityNotes,
-  model?: string,
+  model: string,
   heroAssetPlan?: HeroAssetPlan
 ): Promise<FrameBreakdown> {
-  const primaryModel = model || LLM.storyboardModel;
-
   const sortedDurations = [...supportedClipDurations].sort((a, b) => a - b);
   const durationsList = sortedDurations.join(", ");
 
@@ -115,7 +113,7 @@ RULES:
 
   const userPrompt = `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}`;
   const { output } = await generateText({
-    model: openrouter.chat(primaryModel),
+    model: openrouter.chat(model),
     output: Output.object({ schema: frameBreakdownSchema }),
     system: systemPrompt,
     prompt: userPrompt,
@@ -142,7 +140,7 @@ RULES:
   try {
     const retryPrompt = `Create the frame breakdown for these ${scenes.length} scenes:\n\n${sceneSummary}\n\n${fixupNote}`;
     const { output: retry } = await generateText({
-      model: openrouter.chat(primaryModel),
+      model: openrouter.chat(model),
       output: Output.object({ schema: frameBreakdownSchema }),
       system: systemPrompt,
       prompt: retryPrompt,

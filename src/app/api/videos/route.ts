@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { series, videoProjects, renderJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
-import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
 import { eq, desc, and } from "drizzle-orm";
 import { z } from "zod/v4";
@@ -11,7 +10,6 @@ const durationSchema = z.object({
   preferred: z.number().min(10).max(180),
   min: z.number().min(5).max(180).optional(),
   max: z.number().min(10).max(300).optional(),
-  priority: z.enum(["quality", "duration"]).default("quality"),
 });
 
 const createVideoSchema = z.object({
@@ -77,7 +75,6 @@ export async function POST(req: NextRequest) {
       min: d.min ?? Math.round(d.preferred * 0.7),
       preferred: d.preferred,
       max: d.max ?? Math.round(d.preferred * 1.33),
-      priority: d.priority,
     };
   }
   if (parsed.data.pipelineMode) config.pipelineMode = parsed.data.pipelineMode;
