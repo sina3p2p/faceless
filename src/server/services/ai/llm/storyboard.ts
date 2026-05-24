@@ -20,8 +20,8 @@ const frameSpecSchema = z.object({
   transitionIn: z.enum(["cut", "dissolve", "fade", "match-cut", "whip-pan"]),
   subjectFocus: z.string().describe("Who/what dominates this frame — use a canonical character name from continuity, or describe the object"),
   pacingNote: z.string().describe("Brief note on timing feel: 'hold for impact', 'quick cut to maintain energy'"),
-  sfxHint: z.enum(["whoosh", "impact", "hit", "riser", "none"]).optional().describe("Optional sound-effect cue at the START of this frame. Use sparingly — only on climax beats, big transitions, or true emphasis moments."),
-  isSpeakingCloseup: z.boolean().optional().describe("True ONLY when this frame is a close-up or medium-close on the character who is SPEAKING this scene's line, with their face clearly visible and lip-syncable. False for cutaways, wide/establishing shots, listeners/reaction shots, objects, hands, or any narrator-over-visuals frame. Be conservative — when in doubt, false."),
+  sfxHint: z.enum(["whoosh", "impact", "hit", "riser", "none"]).describe("Sound-effect cue at the START of this frame. Use 'none' for most frames — only emit a real cue on climax beats, big transitions, or true emphasis moments."),
+  isSpeakingCloseup: z.boolean().describe("True ONLY when this frame is a close-up or medium-close on the character who is SPEAKING this scene's line, with their face clearly visible and lip-syncable. False for cutaways, wide/establishing shots, listeners/reaction shots, objects, hands, or any narrator-over-visuals frame. Be conservative — when in doubt, false."),
 });
 
 const frameBreakdownSchema = z.object({
