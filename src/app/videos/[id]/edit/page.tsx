@@ -91,8 +91,8 @@ function SortableSceneCard({
       style={style}
       onClick={onSelect}
       className={`rounded-xl border transition-all ${isSelected
-          ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/20"
-          : "border-white/5 bg-white/[0.02] hover:border-white/10"
+        ? "border-violet-500 bg-violet-500/5 ring-1 ring-violet-500/20"
+        : "border-white/5 bg-white/[0.02] hover:border-white/10"
         }`}
     >
       <div className="flex gap-3 p-3">
@@ -313,7 +313,7 @@ export default function VideoEditorPage() {
     try {
       const res = await fetch(`/api/videos/${id}/rerender`, { method: "POST" });
       if (res.ok) {
-        router.push(`/dashboard/videos/${id}`);
+        router.push(`/videos/${id}`);
       }
     } catch { }
     setRerendering(false);
@@ -337,7 +337,7 @@ export default function VideoEditorPage() {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push(`/dashboard/videos/${id}`)}
+            onClick={() => router.push(`/videos/${id}`)}
           >
             &larr; Back
           </Button>

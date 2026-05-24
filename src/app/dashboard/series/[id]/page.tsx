@@ -107,7 +107,7 @@ export default function SeriesDetailPage() {
 
     if (res.ok) {
       const video = await res.json();
-      router.push(`/dashboard/videos/${video.id}`);
+      router.push(`/videos/${video.id}`);
     } else {
       setGenerating(false);
     }
@@ -117,7 +117,7 @@ export default function SeriesDetailPage() {
     setRetryingId(videoId);
     const res = await fetch(`/api/videos/${videoId}/retry`, { method: "POST" });
     if (res.ok) {
-      router.push(`/dashboard/videos/${videoId}`);
+      router.push(`/videos/${videoId}`);
     } else {
       setRetryingId(null);
     }
@@ -127,7 +127,7 @@ export default function SeriesDetailPage() {
     setResumingId(videoId);
     const res = await fetch(`/api/videos/${videoId}/resume-pipeline`, { method: "POST" });
     if (res.ok) {
-      router.push(`/dashboard/videos/${videoId}`);
+      router.push(`/videos/${videoId}`);
     } else {
       setResumingId(null);
     }
@@ -287,7 +287,7 @@ export default function SeriesDetailPage() {
       ) : (
         <div className="space-y-3">
           {series.videoProjects.map((video) => (
-            <Link key={video.id} href={`/dashboard/videos/${video.id}`}>
+            <Link key={video.id} href={`/videos/${video.id}`}>
               <Card className="hover:bg-white/[0.04] transition-colors cursor-pointer">
                 <CardContent className="flex items-center justify-between py-4">
                   <div>
@@ -333,7 +333,7 @@ export default function SeriesDetailPage() {
                         variant="primary"
                         onClick={(e) => {
                           e.preventDefault();
-                          router.push(`/dashboard/videos/${video.id}`);
+                          router.push(`/videos/${video.id}`);
                         }}
                       >
                         {video.status === "REVIEW_SCRIPT" ? "Review Script" : video.status === "IMAGE_GENERATION" ? "View Progress" : "Review Images"}
