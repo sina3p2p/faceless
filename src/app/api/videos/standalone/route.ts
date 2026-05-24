@@ -39,11 +39,7 @@ const standaloneSchema = z.object({
     videoModel: z.enum(VIDEO_MODEL_IDS),
   }),
   videoResolution: z.enum(["360p", "480p", "540p", "720p", "1080p", "4k"]),
-  duration: z.object({
-    preferred: z.number().min(10).max(180),
-    min: z.number().min(5).max(180).optional(),
-    max: z.number().min(10).max(300).optional(),
-  }).optional(),
+  duration: z.number().min(10).max(180),
   /** Existing canonical story_assets ids (your library); linked to this video in order. */
   storyAssetIds: z.array(z.string()).optional().default([]),
   /** When true, run Tavily-backed web research after the creative brief and before story. */
@@ -73,9 +69,9 @@ export async function POST(req: NextRequest) {
   const config: Record<string, unknown> = {};
   if (data.duration) {
     config.duration = {
-      min: data.duration.min ?? Math.round(data.duration.preferred * 0.7),
-      preferred: data.duration.preferred,
-      max: data.duration.max ?? Math.round(data.duration.preferred * 1.33),
+      min: Math.round(data.duration * 0.7),
+      preferred: data.duration,
+      max: Math.round(data.duration * 1.33),
     };
   }
   if (data.videoType === "music_video" && data.musicGenre?.trim()) {
