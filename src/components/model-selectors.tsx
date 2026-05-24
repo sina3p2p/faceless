@@ -6,7 +6,6 @@ import {
   LLM_MODELS,
   DEFAULT_LLM_MODEL,
   IMAGE_MODELS,
-  DEFAULT_VIDEO_MODEL,
   VIDEO_I2V_PROVIDER,
   videoModelsForProvider,
   videoResolutionsForModel,
@@ -15,13 +14,14 @@ import {
   VIDEO_TYPES,
   VIDEO_SIZES,
   DEFAULT_VIDEO_SIZE,
+  MODEL_SETTINGS,
 } from "@/lib/constants";
 import type { AgentModels } from "@/types/worker-pipeline";
 import { ModelSettings } from "@/types/llm-common";
 
-interface ModelSelectorProps {
-  value: string;
-  onChange: (value: string) => void;
+interface ModelSelectorProps<T = string> {
+  value: T;
+  onChange: (value: T) => void;
 }
 
 export function VideoTypeSelector({ value, onChange }: ModelSelectorProps) {
@@ -39,25 +39,9 @@ export function VideoTypeSelector({ value, onChange }: ModelSelectorProps) {
   );
 }
 
-export function LLMModelSelector({ value, onChange }: ModelSelectorProps) {
+export function ImageModelSelector({ value, onChange }: ModelSelectorProps<TImageModelId>) {
   return (
-    <OptionSelect
-      label="AI Script Model"
-      value={value}
-      onChange={onChange}
-      options={LLM_MODELS.map((m) => ({
-        value: m.id,
-        label: m.label,
-        description: m.description,
-        ...(m.id === DEFAULT_LLM_MODEL ? { badge: "RECOMMENDED" } : {}),
-      }))}
-    />
-  );
-}
-
-export function ImageModelSelector({ value, onChange }: ModelSelectorProps) {
-  return (
-    <OptionSelect
+    <OptionSelect<TImageModelId>
       label="Image Generation Model"
       value={value}
       onChange={onChange}
@@ -122,28 +106,18 @@ export function VideoQualitySelector({ videoModelId, value, onChange }: VideoQua
   );
 }
 
-export function VideoModelSelector({ value, onChange }: ModelSelectorProps) {
+export function VideoModelSelector({ value, onChange }: ModelSelectorProps<TVideoModelId>) {
   const models = videoModelsForProvider(VIDEO_I2V_PROVIDER);
-  const defaultId = models.find((m) => m.id === DEFAULT_VIDEO_MODEL)?.id ?? models[0]?.id ?? DEFAULT_VIDEO_MODEL;
-  const coerced = models.some((m) => m.id === value) ? value : (models[0]?.id ?? value);
-
-  useEffect(() => {
-    const list = videoModelsForProvider(VIDEO_I2V_PROVIDER);
-    if (list.length && !list.some((m) => m.id === value) && list[0]) {
-      onChange(list[0].id);
-    }
-  }, [value, onChange]);
-
   return (
     <OptionSelect
       label="Video Generation Model"
-      value={coerced}
+      value={value}
       onChange={onChange}
       options={models.map((m) => ({
         value: m.id,
         label: m.label,
         description: m.description,
-        ...(m.id === defaultId ? { badge: "RECOMMENDED" } : {}),
+        ...(m.id === MODEL_SETTINGS.videoModel ? { badge: "RECOMMENDED" } : {}),
       }))}
     />
   );

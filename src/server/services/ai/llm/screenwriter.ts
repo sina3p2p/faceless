@@ -47,7 +47,7 @@ const screenplaySceneSchema = z.object({
   action: z
     .string()
     .describe(
-      "The concrete on-screen staging the viewer SEES while the line plays — blocking, gesture, physical event. Photographable only; no camera/lens jargon. If the line is dialogue, this is what the character/scene is physically doing as they speak."
+      "The concrete on-screen staging the viewer SEES while the line plays — blocking, gesture, physical event. English only. Photographable only; no camera/lens jargon."
     ),
   sceneFunction: sceneFunctionEnum.describe(
     "Dramatic function: 'setup', 'escalate', 'reveal', 'reversal', 'quiet-beat', 'climax', 'resolve'. The sequence MUST vary — never two identical functions in a row."
@@ -56,10 +56,10 @@ const screenplaySceneSchema = z.object({
     "Delivery pace for this line: 'slow' (~100 wpm — weighty/somber), 'standard' (~150 wpm), 'fast' (~180 wpm — urgent). Vary it."
   ),
   emotion: emotionEnum.describe(
-    "The emotion the speaker FEELS as they deliver this exact line — match it to the sense of the words and the character's state in this moment. Vary it across the film; do not default to 'neutral' for lines that carry feeling."
+    "The emotion the speaker FEELS as they deliver this exact line. Vary it across the film; do not default to 'neutral' for lines that carry feeling."
   ),
   emotionIntensity: emotionIntensityEnum.describe(
-    "How hard the emotion is played: 'subtle' (held back, under the surface), 'moderate', or 'strong' (full force — a shout, a sob, a roar of triumph)."
+    "How hard the emotion is played: 'subtle' (held back), 'moderate', or 'strong' (full force)."
   ),
   directorNote: z
     .string()
@@ -86,9 +86,15 @@ export interface GenerateScreenplayInput {
   seed?: number;
 }
 
-export async function generateScreenplay(
-  input: GenerateScreenplayInput
-): Promise<Screenplay> {
+// ── Pass 1: Prose screenwriter ──
+// Writes the film as a flowing prose screenplay — no schema pressure.
+// The model focuses entirely on storytelling: dialogue subtext, character
+// voice, pacing, and dramatic arc.
+
+async function writeScreenplayProse(
+  input: GenerateScreenplayInput,
+  retryMandate?: string
+): Promise<string> {
   const {
     style,
     topicIdea,
@@ -108,95 +114,165 @@ export async function generateScreenplay(
 
   const briefBlock = brief
     ? `
-CREATIVE BRIEF (follow these constraints):
+CREATIVE BRIEF:
 - Concept: ${brief.concept}
 - Tone: ${brief.tone}
 - Narrative arc: ${brief.narrativeArc}
 - Target audience: ${brief.targetAudience}
 - Word budget for ALL spoken lines combined: ~${brief.durationGuidance.wordBudgetTarget} words (range ${brief.durationGuidance.wordBudgetMin}–${brief.durationGuidance.wordBudgetMax})
 - Scene count: ${brief.durationGuidance.sceneBudget.min}–${brief.durationGuidance.sceneBudget.max} scenes
-- Max sentences per scene line: ${brief.formatConstraints.maxSentencesPerScene}
-- Narration-style / dialogue-density leanings from the brief (${brief.formatConstraints.narrationStyle} / ${brief.formatConstraints.dialogueDensity}): IGNORE these for pacing the talk balance. This is a movie — it is dialogue-driven regardless of what the brief leans. Use the brief only for tone/arc/audience, not to justify narration.
+- Max sentences per line: ${brief.formatConstraints.maxSentencesPerScene}
 - Opening hook: ${brief.formatConstraints.openingHook}
 - Resolution: ${brief.formatConstraints.resolutionType}${brief.narrativeFramework && brief.narrativeFramework !== "freeform" ? `
-- Narrative framework: ${brief.narrativeFramework} — honor the beat-sheet structure built against it.` : ""}`
+- Narrative framework: ${brief.narrativeFramework}` : ""}`
     : "";
 
-  const assetSys =
+  const assetNote =
     assets && assets.length > 0
-      ? `\n\nCAST & WORLD: Reference images and descriptions are attached. Write these named characters/locations into the screenplay using their EXACT names; match their depicted look. You may also introduce new characters the story needs.`
+      ? `\n\nCAST & WORLD: Reference images and descriptions are attached. Write these named characters/locations into the screenplay using their EXACT names; match their depicted look.`
       : "";
 
-  const systemPrompt = `You are an award-winning SCREENWRITER writing a DIALOGUE-DRIVEN cinematic short film — a movie where characters talk to each other and the drama plays out between them. This is NOT a narrated essay, NOT a trailer voiceover, NOT voiceover storytelling with occasional quotes. Think real cinema: scenes, characters, conversations.
+  const systemPrompt = `You are an award-winning screenwriter writing a DIALOGUE-DRIVEN short cinematic film. Your only job right now is to write the best possible screenplay — no formatting constraints, no structured fields, just great writing.
 
-OUTPUT MODEL (critical):
-- The film is an ordered list of SCENES. Each scene is ONE moment the audience experiences.
-- Every scene has audio: either a CHARACTER speaks one line (speaker = that character's consistent name) OR — rarely — it is a NARRATION beat (speaker = "Narrator").
-- DIALOGUE IS THE DEFAULT AND DOMINANT MODE. The film should be carried by characters speaking — to each other, in real exchanges (one scene = one line, so a back-and-forth is several consecutive scenes with alternating speakers). Conversations, confrontations, and quiet two-handers ARE the movie.
-- NARRATION IS A RARE EXCEPTION. Use a "Narrator" scene ONLY when something essential genuinely cannot be dramatized through dialogue or action — a hard time jump, an opening/closing card, context impossible to show or speak. Aim for zero narration; never let it exceed ~1 in 5 scenes, and never use it to explain what dialogue or the image already conveys. If you're tempted to narrate, first try: can a character SAY this, or can we SEE it instead? Almost always, yes.
-- A silent cast is a failure. If named characters exist and the concept can possibly be dramatized (it almost always can), they must talk. An all-narration or narration-heavy result is wrong for this format.
-- One action per scene. If a moment contains a glance, a turn, and a reply, that is three scenes.
+FORMAT: Write in standard screenplay format.
+- Scene headings: INT./EXT. LOCATION - TIME OF DAY
+- Action lines: short, physical, what a camera sees — no internal thoughts, no abstractions
+- Character names in ALL CAPS above their dialogue
+- Parentheticals for delivery only: (quietly), (through tears), (cold), never over-explain
+- Leave a blank line between every element
 
-WRITING CRAFT (non-negotiable):
-- Subtext over exposition. Characters talk AROUND the feeling, not about it. BANNED: thesis-statement / greeting-card lines that name the theme out loud (e.g. "Our rivalry was really a partnership", "Respect made us believers"). Say it sideways — through a small concrete request, a deflection, an unfinished sentence.
-- Real speech: contractions, interruptions, subtext, characters who don't fully answer each other. No speeches, no narrator-style lines coming out of a character's mouth.
-- At least one REVERSAL: set an expectation early, break it mid-to-late. If the beat sheet marks a REVERSAL beat, land it there.
-- Vary the dramatic function across scenes — forbidden: two consecutive scenes with the same sceneFunction. Include at least one 'quiet-beat' before a high-stakes scene and at least one 'reversal' or 'reveal'.
-- Distinct character voices: each character has their own diction, rhythm, and stance — distinguishable without the speaker label.
-- EMOTIONAL PERFORMANCE: every line is ACTED, not read. Set emotion + emotionIntensity to the true feeling under the words (a threat is 'cold' or 'angry', a goodbye is 'sad' or 'tender', a winning roar is 'triumphant' 'strong'). The emotion should shift scene to scene with the drama — a film delivered in one flat tone is a failure.
-- Escalating specificity: each scene reveals a concrete new thing (a name, an object, a turn) — never just "things intensify".
-- 'action' must be physically photographable — bodies, objects, weather, light. No abstractions, no camera/lens terminology (that lives in directorNote).
+CRAFT (non-negotiable):
+- DIALOGUE IS THE DRAMA. Characters carry the film by talking to each other. Every confrontation, turning point, and climax must be spoken. A silent or narrated film is a failure.
+- Subtext over exposition. Characters talk AROUND the feeling. BANNED: thesis-statement lines that name the theme ("Our rivalry was really friendship all along."). Say it sideways — through a small request, a deflection, an object handed over.
+- Real speech: contractions, half-finished sentences, characters who don't fully answer. No speeches.
+- Distinct voices: each character has their own diction, rhythm, and stance — recognizable without the name above.
+- AT LEAST ONE REVERSAL: overturn an expectation set up earlier. Place it mid-to-late.
+- Vary dramatic weight — include one slow, quiet beat before the high-stakes climax.
+- Every action line must be physically photographable. No camera directions, no lens jargon.
 
-CONSISTENCY:
-- Establish a SHORT name for every character and key location the first time they appear; reuse it EXACTLY everywhere (speaker, line, action, directorNote). Never rename or use synonyms.
-- A character's appearance is fixed once established; only the story (a transformation, time jump, disguise) may change it.
-${briefBlock}${assetSys}
-LANGUAGE RULES:
-- sceneTitle and line MUST be written in ${langName}.
-- speaker, action, and directorNote MUST be in English (for downstream AI model compatibility). Keep the speaker name identical across the whole screenplay.
-${beatSheetBlock ? `
-EXECUTE THE BEAT SHEET. Each beat is a movement — give big beats more scenes, small beats fewer. Do not skip or invent beats.${beatSheetBlock}` : ""}${researchBlock}`;
+NARRATION (V.O.):
+- Use "NARRATOR (V.O.)" only when something genuinely cannot be dramatized through dialogue or action.
+- A hard time jump or a closing card is acceptable. Explaining emotion is not.
+- Target: zero narration. Never more than roughly 1 in 5 scenes.
 
-  const userPrompt = `Write the screenplay for this film idea: ${topicIdea}\n\nThe intended visual style/medium is: ${style}. This is a movie: the characters carry it by talking to each other. Write real scenes and exchanges, with subtext — not a voiceover with quotes. Use narration only if something truly cannot be dramatized.`;
+LANGUAGE:
+- Dialogue and scene titles: write in ${langName}.
+- Action lines and scene headings: write in English.
+${briefBlock}${assetNote}${beatSheetBlock ? `
+
+EXECUTE THE BEAT SHEET — every beat must land in the screenplay. Big beats get more scenes; small beats fewer. Do not skip or invent beats.${beatSheetBlock}` : ""}${researchBlock}${retryMandate ? `\n\n${retryMandate}` : ""}`;
 
   const visionParts =
     assets && assets.length > 0 ? await buildStoryAssetVisionContentParts(assets) : [];
 
-  const run = async (systemSuffix: string): Promise<Screenplay | undefined> => {
-    const system = systemPrompt + systemSuffix;
-    const { output } = await generateText(
+  const { text } = await generateText({
+    model: openrouter.chat(model),
+    system: systemPrompt,
+    messages: [
       {
-        model: openrouter.chat(model),
-        output: Output.object({ schema: screenplaySchema }),
-        system,
-        messages: [
+        role: "user",
+        content: [
+          ...visionParts,
           {
-            role: "user",
-            content: [...visionParts, { type: "text", text: userPrompt }],
+            type: "text",
+            text: `Write the screenplay for this film: ${topicIdea}\n\nVisual style/medium: ${style}\n\nWrite the complete screenplay now. Characters must talk to each other — real exchanges with subtext.`,
           },
         ],
-        temperature: 0.85,
-        ...(seed !== undefined && { seed }),
-      });
-    return output;
-  };
+      },
+    ],
+    temperature: 0.9,
+    ...(seed !== undefined && { seed }),
+  });
 
-  let screenplay = await run("");
-  if (!screenplay) throw new Error("Failed to generate screenplay");
+  return text;
+}
 
-  // Safety net: a movie must be dialogue-driven. If the draft is narration-
-  // heavy (less than half the scenes are character speech), regenerate once
-  // with a hard mandate to make it a real talking film.
+// ── Pass 2: Structured extractor ──
+// Reads the prose screenplay and extracts it into the typed Screenplay schema.
+// No creative decisions — purely analytical: segment, label, expand directorNote.
+
+async function structureScreenplayFromProse(
+  prose: string,
+  model: string,
+  language = "en"
+): Promise<Screenplay | undefined> {
+  const langName = getLanguageName(language);
+
+  const systemPrompt = `You are a script editor. Given a prose screenplay, extract it into a structured scene list. Your job is purely analytical — do not rewrite or improve the dialogue, just segment and tag it accurately.
+
+SEGMENTATION RULE:
+- Each spoken moment = ONE scene. One character speech in the prose = one scene, even if it's short.
+- A back-and-forth exchange (A speaks, B speaks, A speaks) = three consecutive scenes with alternating speakers.
+- If a character speaks multiple sentences in one unbroken speech, that is still ONE scene.
+- NARRATOR (V.O.) lines = scenes with speaker "Narrator".
+
+PER-SCENE FIELDS:
+- speaker: the character's name exactly as written in the prose (consistent, English). "Narrator" for V.O.
+- line: the exact spoken dialogue, preserved verbatim (keep the original ${langName} language).
+- action: the physical staging around this line — drawn from nearby action lines in the prose. English only. What the camera sees; no abstractions.
+- emotion: true feeling under the delivery — choose from: ${EMOTIONS.join(", ")}. Match the sense of the words and the character's state. Never default to "neutral" for a line that carries feeling.
+- emotionIntensity: "subtle" | "moderate" | "strong"
+- sceneFunction: dramatic role — "setup" | "escalate" | "reveal" | "reversal" | "quiet-beat" | "climax" | "resolve". Infer from position in the arc and the stakes of the moment. Never assign the same function to two consecutive scenes.
+- voicePace: "slow" | "standard" | "fast" — match the delivery weight of the line.
+- sceneTitle: 2-5 word slug for this moment (in ${langName}).
+- directorNote: RICH visual brief for the cinematography pipeline — ALWAYS in English. Expand from the action lines and scene heading in the prose. Include: SETTING (exact location, time of day, weather, materials, era), SUBJECTS (consistent names, wardrobe, posture, expression), the single physical ACTION, MOOD via physical elements only (light, weather, posture — not abstract feelings), and one concrete visual symbol if present. Write as if briefing a $100M-film cinematographer. This field may be longer than the prose action line — add visual specificity that serves the scene.
+
+CONSISTENCY:
+- Use one short canonical name for each character, consistent across all scenes.
+- A character's appearance (clothing, hair, physical features) is fixed once established — carry it through every directorNote they appear in.`;
+
+  const { output } = await generateText({
+    model: openrouter.chat(model),
+    output: Output.object({ schema: screenplaySchema }),
+    system: systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Extract this screenplay into structured scenes:\n\n${prose}`,
+          },
+        ],
+      },
+    ],
+    temperature: 0.3,
+  });
+
+  return output;
+}
+
+export async function generateScreenplay(
+  input: GenerateScreenplayInput
+): Promise<Screenplay> {
+  // Pass 1: write as free-flowing prose screenplay
+  const prose = await writeScreenplayProse(input);
+  console.log(
+    `[screenwriter] Prose pass complete (~${prose.split(/\s+/).length} words, ~${prose.split("\n").length} lines)`
+  );
+
+  // Pass 2: extract structured scenes from the prose
+  let screenplay = await structureScreenplayFromProse(prose, input.model, input.language);
+  if (!screenplay) throw new Error("Failed to structure screenplay from prose");
+
+  // Safety net: a movie must be dialogue-driven. If the prose writer drifted
+  // toward narration, regenerate the prose with a hard dialogue mandate and
+  // re-extract. The fix targets the prose (root cause), not the structured output.
   if (isNarrationHeavy(screenplay)) {
     console.warn(
-      "[screenwriter] Draft is narration-heavy (movies must be dialogue-driven) — regenerating once with a dialogue mandate."
+      "[screenwriter] Draft is narration-heavy — regenerating prose with dialogue mandate."
     );
-    const retried = await run(`
-
-REVISION MANDATE (your previous draft failed): it leaned on narration instead of letting the characters talk. A movie is dialogue-driven. Rewrite so the film is carried by characters speaking to each other in real exchanges (alternating speaker scenes), with subtext and no thesis-statement lines. Use a "Narrator" scene ONLY where something truly cannot be dramatized — aim for zero, never more than ~1 in 5 scenes. The confrontation, turning point, climax, and resolution MUST be spoken character dialogue.`);
+    const prose2 = await writeScreenplayProse(
+      input,
+      `REVISION MANDATE (your previous draft failed): it leaned on narration (NARRATOR V.O.) instead of letting the characters talk. Rewrite so the film is carried by characters speaking to each other in real exchanges. Use NARRATOR (V.O.) ONLY where something truly cannot be dramatized — aim for zero, never more than 1 in 5 scenes. The confrontation, turning point, climax, and resolution MUST be spoken character dialogue with subtext.`
+    );
+    const retried = await structureScreenplayFromProse(prose2, input.model, input.language);
     if (retried && !isNarrationHeavy(retried)) screenplay = retried;
   }
 
+  console.log(
+    `[screenwriter] Screenplay ready: "${screenplay.title}" (${screenplay.scenes.length} scenes)`
+  );
   return screenplay;
 }
 

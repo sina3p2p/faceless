@@ -38,23 +38,28 @@ export const LLM = {
   defaultModel: "anthropic/claude-opus-4.7",
 } as const;
 
-export const MODEL_SETTINGS = {
-  visionModel: "google/gemini-2.5-pro",
+export const MODEL_SETTINGS: ModelSettings = {
+  // Multimodal — needs to see images
+  reviewerModel: "google/gemini-3.1-pro-preview",
+  // Creative / narrative — needs deep reasoning and voice
   producerModel: "anthropic/claude-opus-4.7",
   storyModel: "anthropic/claude-opus-4.7",
   directorModel: "anthropic/claude-opus-4.7",
-  supervisorModel: "anthropic/claude-opus-4.7",
-  cinematographerModel: "openai/gpt-5.4",
+  // Analytical — continuity tracking, entity extraction
+  supervisorModel: "anthropic/claude-sonnet-4",
+  // Technical / precise structured output
+  cinematographerModel: "openai/gpt-5.5",
+  storyboardModel: "openai/gpt-5.5",
+  promptModel: "openai/gpt-5.5",
+  motionModel: "openai/gpt-5.5",
+  // Fast extraction — cheap is fine
   researchModel: "openai/gpt-4.1-mini",
-  storyboardModel: "openai/gpt-4.1-mini",
-  promptModel: "openai/gpt-5.4",
-  motionModel: "openai/gpt-5.4",
-  reviewerModel: "anthropic/claude-opus-4.7",
-  videoModel: "kling-3-standard",
-  imageModel: "gpt-image-2"
-} as ModelSettings
+  // Media models
+  videoModel: "seedance-2-pro",
+  imageModel: "gpt-image-2",
+}
 
-export const LLM_MODELS = [
+export const LLM_MODELS: LLMModel[] = [
   { id: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", description: "Newest Opus; best for complex scripts (~$0.04+/script)" },
   { id: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", description: "Best quality, higher cost (~$0.04/script)" },
   { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Great quality, moderate cost (~$0.02/script)" },
@@ -62,7 +67,8 @@ export const LLM_MODELS = [
   { id: "openai/gpt-4.1", label: "GPT-4.1", description: "Good quality, lower cost (~$0.01/script)" },
   { id: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", description: "Decent quality, cheapest (~$0.003/script)" },
   { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "Great quality, competitive cost (~$0.02/script)" },
-] as const;
+  { id: "google/gemini-3.1-pro-preview", label: "Gemini 3 Pro", description: "Great quality, competitive cost (~$0.02/script)" },
+];
 
 export const IMAGE_MODELS: Record<TImageModelId, TImageModel> = {
   "gpt-image-1.5": { id: "gpt-image-1.5", label: "GPT Image 1.5", description: "Best OpenAI image model, instruction-following (OpenAI)" },
@@ -258,8 +264,6 @@ export const MUSIC = {
 export const IMAGE_MODEL_IDS = Object.keys(IMAGE_MODELS) as TImageModelId[]
 export const VIDEO_MODEL_IDS = Object.keys(VIDEO_MODELS) as TVideoModelId[];
 
-export const DEFAULT_VIDEO_MODEL = "kling-3-standard";
-
 export function videoModelsForProvider(p: TVideoProviderId) {
   const models = Object.values(VIDEO_MODELS);
   if (p === "replicate") return models.filter((m) => m.provider === "replicate");
@@ -287,9 +291,6 @@ export function coerceVideoResolution(
   }
   return getDefaultVideoResolution(modelId);
 }
-
-export const DEFAULT_IMAGE_MODEL = "gpt-image-1.5";
-
 // ── Storage (S3 / R2) ──
 
 export const STORAGE = {

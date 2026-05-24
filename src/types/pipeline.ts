@@ -102,7 +102,18 @@ export type BeatTonalShift =
 export interface StoryBeat {
   name: string;
   purpose: string;
-  contentSummary: string;
+  /** What the character must feel or face in this beat. */
+  emotionalFunction: string;
+  /** What forces the choice — the external or relational pressure applied. */
+  characterPressure: string;
+  /** How the character's internal or external state must be different by the end. */
+  requiredChange: string;
+  /**
+   * A concrete physical element (object, place, action) that is present in
+   * this beat — left open so the screenwriter invents the specific form.
+   * Gives the writer a dramatic engine without pre-writing the scene.
+   */
+  physicalExecution: string;
   tonalShift: BeatTonalShift;
   stakeLevel: number;
   isReversal: boolean;

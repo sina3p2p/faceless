@@ -13,16 +13,16 @@ export interface StoryAsset {
 }
 
 export interface ModelSettings {
-  producerModel: string;
-  storyModel: string;
-  directorModel: string;
-  supervisorModel: string;
-  cinematographerModel: string;
-  researchModel: string;
-  storyboardModel: string;
-  promptModel: string;
-  motionModel: string;
+  producerModel: LLMModelId;
+  storyModel: LLMModelId;
+  directorModel: LLMModelId;
+  supervisorModel: LLMModelId;
+  cinematographerModel: LLMModelId;
+  researchModel: LLMModelId;
+  storyboardModel: LLMModelId;
+  promptModel: LLMModelId;
+  motionModel: LLMModelId;
   imageModel: TImageModelId;
   videoModel: TVideoModelId;
-  reviewerModel: string;
+  reviewerModel: LLMModelId;
 }

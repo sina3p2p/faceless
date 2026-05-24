@@ -1,6 +1,6 @@
 import { Output } from "ai";
 import { z } from "zod";
-import { LLM, getLanguageName } from "@/lib/constants";
+import { getLanguageName } from "@/lib/constants";
 import { openrouter } from "./index";
 import { generateText } from "@/server/services/ai-audit";
 import type {
@@ -55,7 +55,10 @@ AUDIENCE LENS (every beat should land for this viewer):
 const beatSchema = z.object({
   name: z.string().describe("Short label for this beat (2-4 words). E.g. 'Inciting Incident', 'False Victory', 'Reversal'."),
   purpose: z.string().describe("What this beat accomplishes for the audience in one sentence."),
-  contentSummary: z.string().describe("Concrete summary of what HAPPENS in this beat — actions, revelations, who does what. 1-2 sentences."),
+  emotionalFunction: z.string().describe("What the character must feel or face in this beat — the internal experience that is unavoidable. E.g. 'Mara must sit with the knowledge that her loyalty was never returned.'"),
+  characterPressure: z.string().describe("The external or relational force applied to the character that makes the beat happen — what creates the dramatic situation. E.g. 'Marcus arrives to collect on a debt she cannot pay, in front of the one person whose respect she cannot afford to lose.'"),
+  requiredChange: z.string().describe("How the character's internal or external state MUST be different by the end of this beat — the irreversible shift. E.g. 'By the end, Mara has publicly defended Marcus while privately pocketing the evidence against him — she has crossed a line she cannot uncross.'"),
+  physicalExecution: z.string().describe("A concrete physical element present in this beat — an object, a location detail, or a physical action — left open so the screenwriter invents the specific form. Give the dramatic engine, not the scene. E.g. 'A physical document changes hands (or is hidden). The screenwriter decides what it contains.'"),
   tonalShift: z.enum([
     "intrigue",
     "tension",
@@ -97,12 +100,24 @@ export async function generateBeatSheet(
 YOUR JOB:
 Produce 5–7 beats that together form a story that is impossible to look away from. The beat sheet is what the writer will execute against — if it's flat, the story will be flat.
 
-HARD REQUIREMENTS (enforce these — do not produce a beat sheet that violates them):
-1. AT LEAST ONE REVERSAL: somewhere mid-to-late, a beat must overturn what the audience expected from earlier beats. Mark it with isReversal=true.
-2. TONAL VARIATION: no two consecutive beats may share the same tonalShift. The story should feel like it's BREATHING, not droning.
-3. STAKE DYNAMICS: stakes should escalate overall, but include at least one drop — a false victory, a quiet beat, or a moment of warmth — so the next escalation lands harder.
-4. ESCALATING SPECIFICITY: each beat should reveal something concrete (a name, a number, an object, a turn) — not just "things get worse".
-5. A REAL ENDING BEAT: the final beat must either land a punch (closed), refuse to land it (open), or pivot into a new question (cliffhanger) — matching the brief's resolutionType.
+BEAT STRUCTURE — each beat has four components:
+1. emotionalFunction: what the character must feel or face — the internal experience that is unavoidable.
+2. characterPressure: the external or relational force applied — what creates the dramatic situation.
+3. requiredChange: how the character's internal or external state MUST be different by the end of this beat — the irreversible shift.
+4. physicalExecution: a concrete physical element present (object, location, action) — give the dramatic engine, leave the specific form open for the screenwriter to invent.
+
+PHYSICALEXECUTION RULE (critical):
+This field gives the screenwriter a dramatic engine without pre-writing the scene. It must name a concrete physical element — an object that appears, a location with a specific quality, a physical action with consequences — but leave what it contains or means open.
+- WRONG: "The truth comes out." (no physical anchor)
+- WRONG: "Mara finds the invoice and learns her father paid for the room." (over-specified — the screenwriter has nothing to discover)
+- RIGHT: "A physical document changes hands or is hidden. The screenwriter decides what it reveals."
+- RIGHT: "An object from their shared past reappears in a context that makes its original meaning impossible."
+
+HARD REQUIREMENTS:
+1. AT LEAST ONE REVERSAL: somewhere mid-to-late, a beat must overturn what the audience expected. Mark it isReversal=true.
+2. TONAL VARIATION: no two consecutive beats may share the same tonalShift.
+3. STAKE DYNAMICS: escalate overall, but include at least one drop so the next escalation lands harder.
+4. A REAL ENDING BEAT: closed punch, open ambiguity, or cliffhanger — matching the brief's resolutionType.
 
 CREATIVE BRIEF (the beat sheet must serve this):
 - Concept: ${brief.concept}
@@ -112,14 +127,14 @@ CREATIVE BRIEF (the beat sheet must serve this):
 - Reveal timing: ${brief.formatConstraints.revealTiming}
 - Resolution type: ${brief.formatConstraints.resolutionType}
 - Opening hook: ${brief.formatConstraints.openingHook}
-- Scene budget downstream: ${brief.durationGuidance.sceneBudget.min}–${brief.durationGuidance.sceneBudget.max} scenes (your beats need not map 1:1 to scenes)
+- Scene budget downstream: ${brief.durationGuidance.sceneBudget.min}–${brief.durationGuidance.sceneBudget.max} scenes
 ${formatFrameworkSkeleton(brief.narrativeFramework)}${formatAudienceForBeats(brief.audience)}
 
 VOICE:
 Pick a SPECIFIC narrator stance with attitude. "Neutral observer" is forbidden. The voice should have a stake, a bias, a tone. The writer will channel it.
 
 OUTPUT LANGUAGE:
-- The beat sheet is internal scaffolding — write all fields in English regardless of the story's final language (${langName}). The downstream writer will translate when executing.${researchBlock}`;
+All fields in English regardless of the story's final language (${langName}).${researchBlock}`;
 
   const userPrompt = `Design the beat sheet for this story idea: ${topicIdea}\n\nVisual style context: ${style}.`;
 
@@ -154,9 +169,16 @@ export function formatBeatSheetForPrompt(beatSheet: BeatSheet): string {
   const lines = beatSheet.beats.map((b, i) => {
     const flags: string[] = [`tone=${b.tonalShift}`, `stakes=${b.stakeLevel}/5`];
     if (b.isReversal) flags.push("REVERSAL");
-    return `  ${i + 1}. ${b.name} [${flags.join(", ")}]\n     Purpose: ${b.purpose}\n     What happens: ${b.contentSummary}`;
+    return [
+      `  ${i + 1}. ${b.name} [${flags.join(", ")}]`,
+      `     Purpose: ${b.purpose}`,
+      `     Emotional function: ${b.emotionalFunction}`,
+      `     Character pressure: ${b.characterPressure}`,
+      `     Required change: ${b.requiredChange}`,
+      `     Physical engine: ${b.physicalExecution}`,
+    ].join("\n");
   });
-  return `BEAT SHEET (the dynamic skeleton you must execute):
+  return `BEAT SHEET (execute this arc — honor emotional function and required change per beat; the physical engine is yours to realize):
 Premise: ${beatSheet.premiseLine}
 Voice: ${beatSheet.voice}
 

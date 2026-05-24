@@ -9,9 +9,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   ART_STYLES,
   CAPTION_STYLES,
-  DEFAULT_LLM_MODEL,
-  DEFAULT_IMAGE_MODEL,
-  DEFAULT_VIDEO_MODEL,
   DEFAULT_VIDEO_SIZE,
   getDefaultVideoResolution,
   LANGUAGES,
@@ -31,7 +28,6 @@ import {
   VideoSizeSelector,
 } from "@/components/model-selectors";
 import { GenerateCharacterModal } from "@/components/generate-character-modal";
-import { ModelSettings } from "@/types/llm-common";
 
 type AssetType = "character" | "location" | "prop";
 
@@ -69,11 +65,8 @@ export default function CreateVideoPage() {
     videoType: "standalone" as string,
     style: ART_STYLES[0].id as string,
     captionStyle: CAPTION_STYLES[0].id as string,
-    llmModel: DEFAULT_LLM_MODEL as string,
     modelSettings: MODEL_SETTINGS,
-    imageModel: DEFAULT_IMAGE_MODEL as string,
-    videoModel: DEFAULT_VIDEO_MODEL as string,
-    videoResolution: getDefaultVideoResolution(DEFAULT_VIDEO_MODEL) ?? "",
+    videoResolution: getDefaultVideoResolution(MODEL_SETTINGS.videoModel) ?? "",
     videoSize: DEFAULT_VIDEO_SIZE as string,
     language: DEFAULT_LANGUAGE as string,
     webResearch: false,
@@ -146,11 +139,7 @@ export default function CreateVideoPage() {
           videoSize: form.videoSize,
           language: form.language,
           voiceId: form.voiceId || undefined,
-          modelSettings: {
-            ...form.modelSettings,
-            imageModel: form.imageModel,
-            videoModel: form.videoModel,
-          },
+          modelSettings: form.modelSettings,
           ...(form.videoResolution ? { videoResolution: form.videoResolution } : {}),
           duration: form.durationPreferred,
           webResearch: form.webResearch,
@@ -254,20 +243,20 @@ export default function CreateVideoPage() {
               overrides={form.modelSettings}
               onOverridesChange={(overrides) => setForm({ ...form, modelSettings: overrides })}
             />
-            <ImageModelSelector value={form.imageModel} onChange={(v) => setForm({ ...form, imageModel: v })} />
+            <ImageModelSelector value={form.modelSettings.imageModel} onChange={(v) => setForm({ ...form, modelSettings: { ...form.modelSettings, imageModel: v } })} />
             <VideoModelSelector
-              value={form.videoModel}
+              value={form.modelSettings.videoModel}
               onChange={(v) => {
-                const nextResolution = getDefaultVideoResolution(v as typeof DEFAULT_VIDEO_MODEL);
+                const nextResolution = getDefaultVideoResolution(v);
                 setForm({
                   ...form,
-                  videoModel: v,
+                  modelSettings: { ...form.modelSettings, videoModel: v },
                   videoResolution: nextResolution ?? "",
                 });
               }}
             />
             <VideoQualitySelector
-              videoModelId={form.videoModel}
+              videoModelId={form.modelSettings.videoModel}
               value={form.videoResolution}
               onChange={(v) => setForm({ ...form, videoResolution: v })}
             />
