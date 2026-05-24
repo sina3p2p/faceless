@@ -1,7 +1,10 @@
-import { AI_VIDEO, VIDEO_MODELS, LIPSYNC } from "@/lib/constants";
+import type { ModelMessage } from "ai";
+import { AI_VIDEO, VIDEO_MODELS, LLM } from "@/lib/constants";
 import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
 import { sleep } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
+import { generateText } from "@/server/services/ai-audit";
+import { openrouter } from "@/server/services/ai/llm";
 
 const REPLICATE_API = "https://api.replicate.com/v1";
 
@@ -16,6 +19,20 @@ const NEGATIVE_PROMPTS: Partial<Record<TVideoModelId, string>> = {
   "pixverse-v6":
     "extra fingers, distorted hands, morphing, warping, deformed face, text, watermark, shaky camera, sudden cuts, fast zoom, jitter, flicker, low quality",
 };
+
+const CORRECTION_AGENT_SYSTEM_PROMPT =
+  "You are a video prompt safety editor for an AI video generation system. " +
+  "Rewrite prompts that were rejected by content moderation while preserving visual and narrative intent. " +
+  "Remove or rephrase: graphic violence, gore, explicit content, nudity, dangerous acts, real person likenesses, self-harm. " +
+  "You will be shown your previous corrections and told they were still flagged — learn from each rejection and try a different approach. " +
+  "Respond with ONLY the rewritten prompt. No explanation, no preamble, no quotes.";
+
+const SENSITIVE_CONTENT_RETRY_LIMIT = 3;
+
+function isSensitiveContentError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return msg.includes("E005") || msg.toLowerCase().includes("flagged as sensitive");
+}
 
 function extractOutputUrl(out: unknown): string {
   if (typeof out === "string" && (out.startsWith("http://") || out.startsWith("https://"))) {
@@ -82,36 +99,63 @@ export class ReplicateVideoProvider implements IVideoProvider {
     const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
     const predictionId = prediction.data.id;
     let status = 'pending';
+    let errorDetail: string = status;
     while (status !== 'succeeded' && status !== 'failed' && status !== 'canceled') {
-      await sleep(2000);
+      await sleep(3000);
       const response = await this.client.get(`predictions/${predictionId}`);
       status = response.data.status;
+      errorDetail = response.data.error ?? status;
       if (status === 'succeeded') {
         return { videoUrl: extractOutputUrl(response.data.output), durationSeconds: req.duration };
       }
     }
-    throw new Error(`Replicate: prediction ${status}`);
+    throw new Error(`Replicate: prediction ${status}: ${errorDetail}`);
   }
 
   /**
-   * Lip-sync a clip to an audio track via a dedicated Replicate model (e.g.
-   * `sync/lipsync-2`). Separate from the i2v path so the i2v input switch is
-   * untouched. Inputs are URLs (Replicate pulls them), mirroring how i2v
-   * passes the image URL.
+   * Like generateFromImage but with a built-in correction agent: on sensitive-
+   * content rejections (E005) the agent rewrites the prompt using a growing
+   * chat history so each attempt is informed by every prior failure.
    */
-  async lipSync(videoUrl: string, audioUrl: string): Promise<VideoResult> {
-    const input = { video: videoUrl, audio: audioUrl };
-    const prediction = await this.client.post('predictions', { input, version: LIPSYNC.version });
-    const predictionId = prediction.data.id;
-    let status = 'pending';
-    while (status !== 'succeeded' && status !== 'failed' && status !== 'canceled') {
-      await sleep(2000);
-      const response = await this.client.get(`predictions/${predictionId}`);
-      status = response.data.status;
-      if (status === 'succeeded') {
-        return { videoUrl: extractOutputUrl(response.data.output), durationSeconds: 0 };
+  async generateFromImageSafe(req: I2vRequest, model: TVideoModelId): Promise<VideoResult> {
+    let currentPrompt = req.prompt;
+    let lastCorrection: string | null = null;
+    const history: ModelMessage[] = [
+      { role: "system", content: CORRECTION_AGENT_SYSTEM_PROMPT },
+      {
+        role: "user",
+        content: `This video generation prompt was flagged by content moderation. Rewrite it to pass safety filters:\n\n${currentPrompt}`,
+      },
+    ];
+
+    for (let attempt = 1; attempt <= SENSITIVE_CONTENT_RETRY_LIMIT; attempt++) {
+      try {
+        return await this.generateFromImage({ ...req, prompt: currentPrompt }, model);
+      } catch (err) {
+        if (attempt < SENSITIVE_CONTENT_RETRY_LIMIT && isSensitiveContentError(err)) {
+          console.warn(
+            `[replicate] Prompt flagged as sensitive (attempt ${attempt}/${SENSITIVE_CONTENT_RETRY_LIMIT}), asking correction agent…`
+          );
+          if (lastCorrection !== null) {
+            history.push({ role: "assistant", content: lastCorrection });
+            history.push({
+              role: "user",
+              content:
+                "That rewrite was still flagged. Try a completely different approach — " +
+                "avoid whatever you changed in your previous attempt.",
+            });
+          }
+          const { text } = await generateText({
+            model: openrouter.chat(LLM.fallbackModel),
+            messages: history,
+          });
+          lastCorrection = text.trim();
+          currentPrompt = lastCorrection;
+        } else {
+          throw err;
+        }
       }
     }
-    throw new Error(`Replicate: lip-sync prediction ${status}`);
+    throw new Error("Replicate: video generation failed after all content moderation retries");
   }
 }

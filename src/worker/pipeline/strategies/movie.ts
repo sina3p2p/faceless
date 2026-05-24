@@ -1,5 +1,3 @@
-import * as fs from "fs/promises";
-import * as path from "path";
 import { db, schema, eq, resolveStoryAssets, execAsync } from "../../shared";
 import {
   generateScreenplay,
@@ -7,10 +5,7 @@ import {
 } from "@/server/services/ai/llm";
 import { countNarrationWords, estimateDurationSec } from "@/server/services/ai/llm/pacing";
 import { listVoices } from "@/server/services/tts";
-import { lipSyncClip } from "@/server/services/ai/video";
-import { uploadFile, mediaUrl } from "@/lib/storage";
-import { downloadFile } from "@/server/services/composer";
-import { TTS, LIPSYNC, WORKER } from "@/lib/constants";
+import { TTS } from "@/lib/constants";
 import { deriveSubseed } from "@/lib/seed";
 import { mergeProjectConfig } from "../shared";
 import { generateMovieDialogueAudio } from "../movieDialogue";
@@ -23,7 +18,6 @@ import type {
   SplitStageInput,
   SuperviseStageInput,
   TtsStageInput,
-  ComposeHookInput,
 } from "./types";
 import type { VideoType } from "../topology";
 import type { CharacterEntry, ContinuityNotes } from "@/types/pipeline";
@@ -151,16 +145,6 @@ export class MovieStrategy extends StandaloneStrategy {
 
     await persistPerSceneAudio(videoProjectId, scenes, audioPaths, ttsResults);
   }
-
-  async beforeCompose(input: ComposeHookInput): Promise<void> {
-    const project = await db.query.videoProjects.findFirst({
-      where: eq(schema.videoProjects.id, input.videoProjectId),
-      columns: { config: true },
-    });
-    if (project?.config?.lipSyncEnabled ?? true) {
-      await applyLipSync(input.videoProjectId, input.userId, input.workDir);
-    }
-  }
 }
 
 /**
@@ -205,157 +189,4 @@ async function castCharacterVoices(
     const userVoice = userVoiceByName.get(c.canonicalName.toLowerCase());
     return { ...c, voiceId: userVoice ?? pickFromPool(c.voiceProfile ?? null) };
   });
-}
-
-interface LipSyncTarget {
-  frameId: string;
-  videoUrl: string;
-  audioSegPath: string;
-}
-
-async function ffprobeDurationSafe(file: string): Promise<number> {
-  try {
-    const { stdout } = await execAsync(
-      `ffprobe -v error -show_entries format=duration -of csv=p=0 "${file}"`
-    );
-    return parseFloat(stdout.trim()) || 0;
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * Lip-sync the speaking-close-up frames to their scene audio. Idempotent —
- * frames whose current clip is already lip-synced are skipped, so re-runs are
- * safe and cheap. Per-frame failures are swallowed: the original clip is kept
- * and compose proceeds. Lip-sync never blocks the render.
- */
-async function applyLipSync(
-  videoProjectId: string,
-  userId: string,
-  workDir: string
-): Promise<void> {
-  if (!LIPSYNC.replicateToken) {
-    console.warn("[compose-final] lip-sync skipped: REPLICATE_API_TOKEN not set");
-    return;
-  }
-
-  const scenes = await db.query.videoScenes.findMany({
-    where: eq(schema.videoScenes.videoProjectId, videoProjectId),
-    orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
-  });
-
-  const targets: LipSyncTarget[] = [];
-
-  for (const scene of scenes) {
-    const speaker = scene.speaker?.trim().toLowerCase();
-    if (!speaker || speaker === "narrator" || !scene.audioUrl) continue;
-
-    const frames = await db.query.sceneFrames.findMany({
-      where: eq(schema.sceneFrames.sceneId, scene.id),
-      orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
-      with: { videoMedia: true },
-    });
-
-    const flagged = frames.filter(
-      (f) => f.isSpeakingCloseup && f.videoMediaId && f.videoMedia?.url
-    );
-    if (flagged.length === 0) continue;
-
-    const sceneAudioPath = path.join(workDir, `lipsync_audio_${scene.id}.mp3`);
-    try {
-      await downloadFile(mediaUrl(scene.audioUrl), sceneAudioPath);
-    } catch (err) {
-      console.warn(
-        `[compose-final] lip-sync: scene ${scene.id} audio download failed (${err instanceof Error ? err.message : err}) — skipping scene`
-      );
-      continue;
-    }
-    const audioDur = await ffprobeDurationSafe(sceneAudioPath);
-    if (audioDur <= 0) continue;
-
-    let cursor = 0;
-    for (const frame of frames) {
-      const clip = frame.clipDuration ?? 5;
-      const isFlagged = flagged.some((f) => f.id === frame.id);
-      const single = frames.length === 1;
-      const start = single ? 0 : Math.min(cursor, audioDur);
-      const end = single ? audioDur : Math.min(cursor + clip, audioDur);
-      cursor += clip;
-
-      if (!isFlagged) continue;
-
-      const meta = frame.videoMedia?.metadata as { lipSync?: boolean; nativeLipSync?: boolean } | null;
-      if (meta?.lipSync === true || meta?.nativeLipSync === true) continue;
-      if (end - start < 0.3) continue;
-
-      const audioSegPath = path.join(workDir, `lipsync_seg_${frame.id}.mp3`);
-      try {
-        await execAsync(
-          `ffmpeg -y -hide_banner -i "${sceneAudioPath}" -ss ${start.toFixed(3)} -to ${end.toFixed(3)} ` +
-            `-c:a libmp3lame -q:a 4 "${audioSegPath}"`
-        );
-      } catch {
-        continue;
-      }
-      targets.push({
-        frameId: frame.id,
-        videoUrl: mediaUrl(frame.videoMedia!.url),
-        audioSegPath,
-      });
-    }
-  }
-
-  if (targets.length === 0) {
-    console.log("[compose-final] lip-sync: no speaking-close-up frames to sync");
-    return;
-  }
-
-  console.log(`[compose-final] lip-sync: ${targets.length} frame(s)`);
-
-  const BATCH = WORKER.parallelVideos;
-  for (let i = 0; i < targets.length; i += BATCH) {
-    const batch = targets.slice(i, i + BATCH);
-    await Promise.all(
-      batch.map(async (t) => {
-        try {
-          const segBuffer = await fs.readFile(t.audioSegPath);
-          const segKey = `scenes/${videoProjectId}/lipsync_seg_${t.frameId}_${Date.now()}.mp3`;
-          await uploadFile(segKey, segBuffer, "audio/mpeg");
-
-          const result = await lipSyncClip(t.videoUrl, mediaUrl(segKey));
-
-          const resp = await fetch(result.videoUrl);
-          if (!resp.ok) throw new Error(`download lip-synced clip failed (${resp.status})`);
-          const outBuffer = Buffer.from(await resp.arrayBuffer());
-          const key = `frames/${videoProjectId}/lipsync_${t.frameId}_${Date.now()}.mp4`;
-          await uploadFile(key, outBuffer, "video/mp4");
-
-          const [newMedia] = await db
-            .insert(schema.media)
-            .values({
-              userId,
-              frameId: t.frameId,
-              type: "video",
-              url: key,
-              prompt: "lip-sync",
-              modelUsed: LIPSYNC.model,
-              metadata: { lipSync: true },
-            })
-            .returning();
-
-          await db
-            .update(schema.sceneFrames)
-            .set({ videoMediaId: newMedia.id })
-            .where(eq(schema.sceneFrames.id, t.frameId));
-
-          console.log(`[compose-final] lip-sync: frame ${t.frameId} synced`);
-        } catch (err) {
-          console.error(
-            `[compose-final] lip-sync: frame ${t.frameId} failed (${err instanceof Error ? err.message : err}) — keeping original clip`
-          );
-        }
-      })
-    );
-  }
 }

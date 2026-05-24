@@ -114,18 +114,6 @@ export const AI_VIDEO = {
   get replicateToken() { return env("REPLICATE_API_TOKEN"); },
 } as const;
 
-// ── Lip-sync (Replicate; movie type only) ──
-
-export const LIPSYNC = {
-  get replicateToken() { return env("REPLICATE_API_TOKEN"); },
-  /**
-   * Replicate model `version` for the lip-sync prediction. `sync/lipsync-2`
-   * takes `{ video, audio }` URLs and returns one video URL. Override the
-   * pinned version hash via env if the model is updated.
-   */
-  get model() { return env("LIPSYNC_REPLICATE_MODEL", "sync/lipsync-2"); },
-  get version() { return env("LIPSYNC_REPLICATE_VERSION", "sync/lipsync-2"); },
-} as const;
 
 /**
  * Image-to-video backend: `"fal"` (Fal.ai) or `"replicate"` (Replicate for models with `replicateModel` in `VIDEO_MODELS`).

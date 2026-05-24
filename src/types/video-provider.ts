@@ -53,4 +53,6 @@ export interface I2vRequest {
 export interface IVideoProvider {
   readonly client: AxiosInstance;
   generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult>;
+  /** Like generateFromImage but retries with an LLM correction agent on sensitive-content rejections. */
+  generateFromImageSafe(req: I2vRequest, model: TVideoModelId): Promise<VideoResult>;
 }

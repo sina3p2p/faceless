@@ -31,16 +31,7 @@ export async function generateVideoFromImage(
     generateAudio,
   };
 
-  return replicate.generateFromImage(req, videoModelId);
-}
-
-/** Lip-sync a generated clip to a voice track (Replicate; movie type only). */
-export async function lipSyncClip(
-  videoUrl: string,
-  audioUrl: string
-): Promise<VideoResult> {
-  const replicate = new ReplicateVideoProvider();
-  return replicate.lipSync(videoUrl, audioUrl);
+  return replicate.generateFromImageSafe(req, videoModelId);
 }
 
 export async function downloadAIVideo(videoUrl: string, destPath: string): Promise<void> {

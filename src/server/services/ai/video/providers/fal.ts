@@ -191,4 +191,9 @@ export class FalVideoProvider implements IVideoProvider {
     // const durationSeconds = readDurationSeconds(result.data, req.apiDuration);
     // return { videoUrl, durationSeconds };
   }
+  async generateFromImageSafe(req: I2vRequest, modelId: TVideoModelId): Promise<VideoResult> {
+    // Fal provider not yet active — delegates straight through.
+    // Wire in a correction agent here once the Fal path is re-enabled.
+    return this.generateFromImage(req, modelId);
+  }
 }
