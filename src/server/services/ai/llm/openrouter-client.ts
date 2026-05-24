@@ -11,7 +11,7 @@ export const openrouter = createOpenRouter({
   // a compatible provider while plain-text calls are unaffected.
   extraBody: {
     provider: {
-      ignore: ['amazon-bedrock/eu-west-1']
+      ignore: ['amazon-bedrock/eu-west-1', 'azure']
     },
   },
 });
