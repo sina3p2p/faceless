@@ -1,7 +1,7 @@
 type LLMModelId =
     | "anthropic/claude-opus-4.7"
     | "anthropic/claude-opus-4.6"
-    | "anthropic/claude-sonnet-4"
+    | "anthropic/claude-sonnet-4.6"
     | "openai/gpt-5.5"
     | "openai/gpt-4.1"
     | "openai/gpt-4.1-mini"

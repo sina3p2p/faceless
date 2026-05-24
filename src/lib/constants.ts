@@ -46,7 +46,7 @@ export const MODEL_SETTINGS: ModelSettings = {
   storyModel: "anthropic/claude-opus-4.7",
   directorModel: "anthropic/claude-opus-4.7",
   // Analytical — continuity tracking, entity extraction
-  supervisorModel: "anthropic/claude-sonnet-4",
+  supervisorModel: "anthropic/claude-sonnet-4.6",
   // Technical / precise structured output
   cinematographerModel: "openai/gpt-5.5",
   storyboardModel: "openai/gpt-5.5",
@@ -62,7 +62,7 @@ export const MODEL_SETTINGS: ModelSettings = {
 export const LLM_MODELS: Record<LLMModelId, LLMModel> = {
   "anthropic/claude-opus-4.7": { id: "anthropic/claude-opus-4.7", label: "Claude Opus 4.7", description: "Newest Opus; best for complex scripts (~$0.04+/script)" },
   "anthropic/claude-opus-4.6": { id: "anthropic/claude-opus-4.6", label: "Claude Opus 4.6", description: "Best quality, higher cost (~$0.04/script)" },
-  "anthropic/claude-sonnet-4": { id: "anthropic/claude-sonnet-4", label: "Claude Sonnet 4", description: "Great quality, moderate cost (~$0.02/script)" },
+  "anthropic/claude-sonnet-4.6": { id: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6", description: "Great quality, moderate cost (~$0.02/script)" },
   "openai/gpt-5.5": { id: "openai/gpt-5.5", label: "GPT-5.5", description: "Latest GPT flagships; strong reasoning and long context" },
   "openai/gpt-4.1": { id: "openai/gpt-4.1", label: "GPT-4.1", description: "Good quality, lower cost (~$0.01/script)" },
   "openai/gpt-4.1-mini": { id: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini", description: "Decent quality, cheapest (~$0.003/script)" },
