@@ -6,14 +6,13 @@ import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
 import { firstJob, resolveVideoType } from "@/worker/pipeline/topology";
-import { IMAGE_MODEL_IDS, MODEL_SETTINGS, VIDEO_MODEL_IDS } from "@/lib/constants";
+import { IMAGE_MODEL_IDS, LLM_MODEL_IDS, MODEL_SETTINGS, VIDEO_MODEL_IDS } from "@/lib/constants";
 import type { PipelineConfig } from "@/types/pipeline";
 import { z } from "zod/v4";
 import { generateSeed } from "@/lib/seed";
 
 const modelId = z.string().min(1);
-const textModelOpt = z.string().min(1).optional();
-const mediaModelOpt = z.string().min(1);
+const textModelOpt = z.enum(LLM_MODEL_IDS).optional();
 
 const standaloneSchema = z.object({
   prompt: z.string().min(1, "Prompt is required"),

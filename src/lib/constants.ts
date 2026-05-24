@@ -262,6 +262,7 @@ export const MUSIC = {
 } as const;
 
 export const IMAGE_MODEL_IDS = Object.keys(IMAGE_MODELS) as TImageModelId[]
+export const LLM_MODEL_IDS = Object.keys(LLM_MODELS) as LLMModelId[];
 export const VIDEO_MODEL_IDS = Object.keys(VIDEO_MODELS) as TVideoModelId[];
 
 export function videoModelsForProvider(p: TVideoProviderId) {
