@@ -126,6 +126,19 @@ const PIXVERSE_V6: MotionModelProfile = {
   endFrameSupported: false,
 };
 
+const VIDU_Q3_PRO: MotionModelProfile = {
+  label: "Vidu Q3 Pro",
+  strengths:
+    "strongest-in-class explicit camera control via natural language (20+ cinematic lens controls — focal length, aperture, depth of field, lens distortion); holds 15s @ 1080p as a single coherent generation without the inter-clip drift of V4/V5; excellent start-frame fidelity (analyzes subject/environment/lighting before generating motion); stylized output (anime, 3d animation, clay, comic, cyberpunk) is a documented strength; rewards literal-descriptive prompts — no metaphor needed.",
+  weaknesses:
+    "high re-roll rate on photoreal scenes (~3.2 takes per usable clip vs 1.4 Kling 3.0 / 1.3 Runway Gen-4.5); hands and small anatomy break (extra fingers, distorted hands); camera direction obedience asymmetric — pull-back / rise / dolly-in / push-in work but rightward pans are frequently ignored and exotic moves degrade; multi-subject 'clone army' and face-morphing on long durations; no end-frame support; text/signage rendering unreliable; burying negatives in the positive prompt actually HURTS quality.",
+  prefer:
+    "echo the subject from the image in the opening clause (5-part structure: Subject + Action + Atmospheric motion + Camera + Style/Mood); ONE primary action with a concrete physical verb (drifting, rotating, rising, falling, swaying, rippling); reliable camera moves only (slow dolly-in / push-in / pull-back, slow rise, crane, tilt, tracking, orbit, static locked-off); encode trajectory into the action verb itself (the model has no terminal-frame conditioning).",
+  avoid:
+    "rightward pans, whip pans, dolly zoom, snap zooms, compound moves; metaphorical or aesthetic-tag prompts ('dances with the soul of the cosmos'); multiple competing actions; readable text/signage; ending-state instructions (no end_image to align to); inline negative lists in the positive prompt; multi-subject scenes with distinct actions; durations beyond 10s without slowing the action and simplifying the camera.",
+  endFrameSupported: false,
+};
+
 const PROFILES: Record<TVideoModelId, MotionModelProfile> = {
   "seedance-2-pro": SEEDANCE,
   "seedance-2-fast": SEEDANCE,
@@ -138,6 +151,7 @@ const PROFILES: Record<TVideoModelId, MotionModelProfile> = {
   "runway-gen4.5": LUMA_RAY2,
   "grok-imagine": GROK_IMAGINE,
   "pixverse-v6": PIXVERSE_V6,
+  "vidu-q3-pro": VIDU_Q3_PRO,
 };
 
 export function getMotionModelProfile(modelId: TVideoModelId | undefined | null): MotionModelProfile | null {
