@@ -93,9 +93,9 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
         const inputs = frameMediaPaths.map((p) => `-i "${p}"`).join(" ");
         await execAsync(
           `ffmpeg -y ${inputs} -filter_complex "${chain.filter}" ` +
-            `-map "${chain.outLabel}" -an ` +
-            `-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p ` +
-            `"${mediaPath}"`
+          `-map "${chain.outLabel}" -an ` +
+          `-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p ` +
+          `"${mediaPath}"`
         );
         totalDuration = chain.effectiveTotalDuration;
       } else {

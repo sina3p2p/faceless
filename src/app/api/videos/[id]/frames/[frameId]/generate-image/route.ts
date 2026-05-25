@@ -3,10 +3,10 @@ import { db } from "@/server/db";
 import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { generateImage, type CharacterRef, type AspectRatio } from "@/server/services/media";
+import { generateImage, type CharacterRef } from "@/server/services/media";
 import { serializeCanonicalForImageProvider } from "@/server/services/ai/llm/prompt-contract";
 import { uploadFile, mediaUrl } from "@/lib/storage";
-import { getVideoSize, IMAGE_MODEL_IDS } from "@/lib/constants";
+import { IMAGE_MODEL_IDS } from "@/lib/constants";
 import { z } from "zod";
 import { getStoryAssetInputsForVideoProject } from "@/server/db/story-assets";
 
@@ -42,8 +42,7 @@ export async function POST(
   if (!parsed.success) return badRequest(parsed.error.message);
 
   const imageModel = parsed.data.imageModel || video.modelSettings.imageModel;
-  const sizeConfig = getVideoSize(video.videoSize);
-  const aspectRatio = sizeConfig.id as AspectRatio;
+  const aspectRatio = video.videoSize;
 
   const canonicalPrompt = parsed.data.imagePrompt || frame.imagePrompt || "scene image";
   const { providerPrompt } = serializeCanonicalForImageProvider(canonicalPrompt);

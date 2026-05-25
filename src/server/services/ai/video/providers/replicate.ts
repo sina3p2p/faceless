@@ -90,6 +90,15 @@ export class ReplicateVideoProvider implements IVideoProvider {
           aspect_ratio: req.aspectRatio,
           quality: req.resolution,
         };
+      case "vidu-q3-pro":
+        return {
+          prompt: req.prompt,
+          start_image: req.startImageUrl,
+          end_image: req.endImageUrl,
+          duration: req.duration,
+          resolution: req.resolution,
+          aspect_ratio: req.aspectRatio,
+        };
       default:
         throw new Error(`Replicate: video model ${model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);
     }

@@ -191,6 +191,16 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
     durations: [5, 8, 10, 15],
     endFrameSupported: false,
   },
+  "vidu-q3-pro": {
+    id: "vidu-q3-pro",
+    label: "Vidu Q3 Pro",
+    endpoint: "vidu/q3-pro",
+    provider: "replicate",
+    supportedResolution: ["540p", "720p", "1080p"],
+    description: "Vidu Q3 Pro i2v (via Replicate) — up to 16s, end-frame support, #2 globally",
+    durations: [5, 8, 10, 16],
+    endFrameSupported: true,
+  },
 };
 
 export const DEFAULT_LLM_MODEL = LLM.defaultModel;

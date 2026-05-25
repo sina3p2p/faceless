@@ -17,7 +17,8 @@ type TVideoModelId =
     | 'veo-31-fast'
     | 'kling-3-standard'
     | 'kling-3-pro'
-    | 'pixverse-v6';
+    | 'pixverse-v6'
+    | 'vidu-q3-pro';
 
 type TVideoModelEndpoint =
     | "bytedance/seedance-2.0"
@@ -33,7 +34,8 @@ type TVideoModelEndpoint =
     | "fal-ai/kling-video/v3/standard/image-to-video"
     | "fal-ai/kling-video/v3/pro/image-to-video"
     | "fal-ai/kling-video/v2.6/pro/image-to-video"
-    | "pixverse/pixverse-v6";
+    | "pixverse/pixverse-v6"
+    | "vidu/q3-pro";
 
 type TAspectRatio = "auto" | "21:9" | "16:9" | "4:3" | "1:1" | "3:4" | "9:16";
 

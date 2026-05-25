@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
 import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, resolveStoryAssets, filterAssetsByRefs, failJob } from "../shared";
-import { getVideoSize } from "@/lib/constants";
 import type { RenderJobData } from "@/lib/queue";
 import { serializeCanonicalForImageProvider } from "@/server/services/ai/llm/prompt-contract";
 import { uploadFile, mediaUrl } from "@/lib/storage";
-import { generateImage, type AspectRatio } from "@/server/services/media";
+import { generateImage } from "@/server/services/media";
 import {
   reviewFrameImage,
   type FrameMediaMetadata,
@@ -38,8 +37,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     await updateVideoStatus(videoProjectId, "IMAGE_GENERATION");
 
     const imageModel = videoProject.modelSettings.imageModel;
-    const sizeConfig = getVideoSize(videoProject.videoSize);
-    const ar = sizeConfig.id as AspectRatio;
+    const ar = videoProject.videoSize;
 
     const cfg = await loadProjectConfig(videoProjectId);
     const reviewEnabled = cfg.imageReviewEnabled !== false;
@@ -48,25 +46,17 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
     const reviewerModel = getAgentModels(videoProject.modelSettings, "reviewerModel");
 
     const allAssets = await resolveStoryAssets(videoProjectId);
+    // Pre-build a name→asset map for deterministic character ref injection below.
+    const assetByName = new Map(allAssets.map((a) => [a.name.toLowerCase(), a]));
+    const continuityNotes = cfg.continuityNotes;
 
-    const existingScenes = await db.query.videoScenes.findMany({
-      where: eq(schema.videoScenes.videoProjectId, videoProjectId),
-      orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
+    const allFrames = await db.query.sceneFrames.findMany({
+      where: eq(schema.sceneFrames.videoProjectId, videoProjectId),
+      orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
+      with: { imageMedia: true },
     });
 
-    const allFrames: Array<{ frame: typeof schema.sceneFrames.$inferSelect & { imageMedia: typeof schema.media.$inferSelect | null }; sceneIdx: number }> = [];
-    for (let i = 0; i < existingScenes.length; i++) {
-      const frames = await db.query.sceneFrames.findMany({
-        where: eq(schema.sceneFrames.sceneId, existingScenes[i].id),
-        orderBy: (sf, { asc }) => [asc(sf.frameOrder)],
-        with: { imageMedia: true },
-      });
-      for (const frame of frames) {
-        allFrames.push({ frame, sceneIdx: i });
-      }
-    }
-
-    const targets = allFrames.filter(({ frame }) => !frame.imageMediaId);
+    const targets = allFrames.filter((frame) => !frame.imageMediaId);
 
     if (targets.length === 0) {
       console.log(`[generate-frame-images] All frames already have images`);
@@ -79,17 +69,17 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
     let previousFrameStorageKey: string | null = null;
 
-    const firstTargetIdx = allFrames.findIndex(({ frame }) => frame.id === targets[0].frame.id);
+    const firstTargetIdx = allFrames.findIndex((frame) => frame.id === targets[0].id);
     if (firstTargetIdx > 0) {
-      const prevFrame = allFrames[firstTargetIdx - 1].frame;
+      const prevFrame = allFrames[firstTargetIdx - 1];
       if (prevFrame.imageMedia?.url) {
         previousFrameStorageKey = prevFrame.imageMedia.url;
       }
     }
 
     for (let i = 0; i < targets.length; i++) {
-      const { frame, sceneIdx } = targets[i];
-      const canonicalPrompt = frame.imagePrompt || `Scene ${sceneIdx + 1}`;
+      const frame = targets[i];
+      const canonicalPrompt = frame.imagePrompt || `Frame ${frame.frameOrder + 1}`;
       const { providerPrompt: prompt } = serializeCanonicalForImageProvider(canonicalPrompt);
       const frameAssetRefs = frame.assetRefs as string[] | null;
       const matchedAssets = filterAssetsByRefs(allAssets, frameAssetRefs);
@@ -113,6 +103,27 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
         const effectivePrompt = prompt + correctionSuffix;
 
         const sceneRefs = [...baseSceneRefs];
+
+        // Deterministically inject reference sheets for characters whose name
+        // appears in this frame's prompt but were missed by the prompt agent's
+        // assetRefs tagging. The prompt already contains canonical character
+        // names (injected by the prompt contract), so this is frame-precise —
+        // no risk of pushing a character's face into frames they're not in.
+        if (continuityNotes) {
+          const promptLower = frame.imagePrompt?.toLowerCase() ?? "";
+          const alreadyInjected = new Set(sceneRefs.map((r) => r.name.toLowerCase()));
+          for (const char of continuityNotes.characterRegistry) {
+            if (!char.assetRef) continue;
+            const key = char.canonicalName.toLowerCase();
+            if (alreadyInjected.has(key)) continue;
+            if (!promptLower.includes(key)) continue;
+            const asset = assetByName.get(key);
+            if (!asset) continue;
+            sceneRefs.push({ ...asset, url: asset.sheetUrl || asset.url });
+            alreadyInjected.add(key);
+          }
+        }
+
         if (previousFrameStorageKey) {
           sceneRefs.push({
             id: "prev-frame",
@@ -171,7 +182,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
           acceptedMediaId = attemptMedia.id;
           acceptedStorageKey = storageKey;
           console.log(
-            `[generate-frame-images] frame ${i + 1}/${targets.length} (scene ${sceneIdx}) attempt ${attempt} accepted (review disabled)`
+            `[generate-frame-images] frame ${i + 1}/${targets.length} (frame ${frame.frameOrder + 1}) attempt ${attempt} accepted (review disabled)`
           );
           break;
         }
@@ -222,7 +233,7 @@ export async function generateFrameImagesJob(job: Job<RenderJobData>) {
 
         const retry = shouldRetry(verdict, severityFloor) && attempt < maxRetries;
         console.log(
-          `[generate-frame-images] frame ${i + 1}/${targets.length} (scene ${sceneIdx}) attempt ${attempt}/${maxRetries} verdict=${verdict.verdict} failures=${verdict.failures.length} ${retry ? "→ retry" : "→ accept"}`
+          `[generate-frame-images] frame ${i + 1}/${targets.length} (frame ${frame.frameOrder + 1}) attempt ${attempt}/${maxRetries} verdict=${verdict.verdict} failures=${verdict.failures.length} ${retry ? "→ retry" : "→ accept"}`
         );
 
         if (!retry) {

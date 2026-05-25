@@ -13,27 +13,25 @@ export interface MediaAsset {
   height: number;
 }
 
-export type AspectRatio = "9:16" | "16:9" | "1:1";
-
-function gptImage15Size(ar: AspectRatio): "1024x1536" | "1536x1024" | "1024x1024" {
+function gptImage15Size(ar: TAspectRatio): "1024x1536" | "1536x1024" | "1024x1024" {
   if (ar === "16:9") return "1536x1024";
   if (ar === "1:1") return "1024x1024";
   return "1024x1536";
 }
 
-function gptImage15Dimensions(ar: AspectRatio): { width: number; height: number } {
+function gptImage15Dimensions(ar: TAspectRatio): { width: number; height: number } {
   if (ar === "16:9") return { width: 1536, height: 1024 };
   if (ar === "1:1") return { width: 1024, height: 1024 };
   return { width: 1024, height: 1536 };
 }
 
-function fallbackDimensions(ar: AspectRatio): { width: number; height: number } {
+function fallbackDimensions(ar: TAspectRatio): { width: number; height: number } {
   if (ar === "16:9") return { width: 1344, height: 768 };
   if (ar === "1:1") return { width: 1024, height: 1024 };
   return { width: 768, height: 1344 };
 }
 
-function compositionSuffix(ar: AspectRatio): string {
+function compositionSuffix(ar: TAspectRatio): string {
   if (ar === "16:9") return "Landscape 16:9 composition";
   if (ar === "1:1") return "Square 1:1 composition";
   return "Vertical 9:16 composition";
@@ -45,7 +43,7 @@ type OpenAiGptImageModelId = "gpt-image-1.5" | "gpt-image-2";
 async function generateOpenAiGptImageModel(
   model: OpenAiGptImageModelId,
   prompt: string,
-  aspectRatio: AspectRatio = "9:16"
+  aspectRatio: TAspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   try {
     const dims = gptImage15Dimensions(aspectRatio);
@@ -110,7 +108,7 @@ async function generateOpenAiGptImageModel(
 
 export async function generateImageGptImage15(
   prompt: string,
-  aspectRatio: AspectRatio = "9:16"
+  aspectRatio: TAspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   return generateOpenAiGptImageModel("gpt-image-1.5", prompt, aspectRatio);
 }
@@ -122,7 +120,7 @@ export async function generateImageGptImage15(
 async function generateOpenAiGptImageWithRefs(
   requestedModel: OpenAiGptImageModelId,
   prompt: string,
-  aspectRatio: AspectRatio,
+  aspectRatio: TAspectRatio,
   characterRefs: CharacterRef[],
 ): Promise<MediaAsset | null> {
   const refs = characterRefs.slice(0, 4);
@@ -241,7 +239,7 @@ async function base64ImageToUploadable(
  */
 export async function editImageViaGptImage2(
   editPrompt: string,
-  aspectRatio: AspectRatio,
+  aspectRatio: TAspectRatio,
   sourceImg: { base64: string; mimeType: string },
   options?: {
     annotatedImg?: { base64: string; mimeType: string } | null;
@@ -318,9 +316,6 @@ export async function editImageViaGptImage2(
       }),
     );
 
-    console.log(response);
-
-
     const item = response.data?.[0];
     const b64 = item?.b64_json;
     if (b64) {
@@ -370,7 +365,7 @@ export async function generateViaOpenRouter(
   prompt: string,
   model: string,
   characterRefs?: CharacterRef[],
-  aspectRatio: AspectRatio = "9:16"
+  aspectRatio: TAspectRatio = "9:16"
 ): Promise<MediaAsset | null> {
   const hasRefs = characterRefs && characterRefs.length > 0;
   const fb = fallbackDimensions(aspectRatio);
@@ -506,7 +501,7 @@ export async function generateViaOpenRouter(
 export async function editImageViaGemini(
   editPrompt: string,
   sourceImageUrl: string,
-  aspectRatio: AspectRatio = "1:1"
+  aspectRatio: TAspectRatio = "1:1"
 ): Promise<MediaAsset | null> {
   const fb = fallbackDimensions(aspectRatio);
 
@@ -614,7 +609,7 @@ export async function generateImage(
   prompt: string,
   imageModel = "gpt-image-1.5",
   characterRefs?: CharacterRef[],
-  aspectRatio: AspectRatio = "9:16"
+  aspectRatio: TAspectRatio = "9:16"
 ): Promise<MediaAsset> {
   const hasRefs = !!characterRefs && characterRefs.length > 0;
   const models = {
