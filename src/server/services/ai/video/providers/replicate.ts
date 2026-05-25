@@ -1,10 +1,7 @@
-import type { ModelMessage } from "ai";
-import { AI_VIDEO, VIDEO_MODELS, LLM } from "@/lib/constants";
+import { AI_VIDEO, VIDEO_MODELS } from "@/lib/constants";
 import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
 import { sleep } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
-import { generateText } from "@/server/services/ai-audit";
-import { openrouter } from "@/server/services/ai/llm";
 
 const REPLICATE_API = "https://api.replicate.com/v1";
 
@@ -19,20 +16,6 @@ const NEGATIVE_PROMPTS: Partial<Record<TVideoModelId, string>> = {
   "pixverse-v6":
     "extra fingers, distorted hands, morphing, warping, deformed face, text, watermark, shaky camera, sudden cuts, fast zoom, jitter, flicker, low quality",
 };
-
-const CORRECTION_AGENT_SYSTEM_PROMPT =
-  "You are a video prompt safety editor for an AI video generation system. " +
-  "Rewrite prompts that were rejected by content moderation while preserving visual and narrative intent. " +
-  "Remove or rephrase: graphic violence, gore, explicit content, nudity, dangerous acts, real person likenesses, self-harm. " +
-  "You will be shown your previous corrections and told they were still flagged — learn from each rejection and try a different approach. " +
-  "Respond with ONLY the rewritten prompt. No explanation, no preamble, no quotes.";
-
-const SENSITIVE_CONTENT_RETRY_LIMIT = 3;
-
-function isSensitiveContentError(err: unknown): boolean {
-  const msg = err instanceof Error ? err.message : String(err);
-  return msg.includes("E005") || msg.toLowerCase().includes("flagged as sensitive");
-}
 
 function extractOutputUrl(out: unknown): string {
   if (typeof out === "string" && (out.startsWith("http://") || out.startsWith("https://"))) {
@@ -119,52 +102,5 @@ export class ReplicateVideoProvider implements IVideoProvider {
       }
     }
     throw new Error(`Replicate: prediction ${status}: ${errorDetail}`);
-  }
-
-  /**
-   * Like generateFromImage but with a built-in correction agent: on sensitive-
-   * content rejections (E005) the agent rewrites the prompt using a growing
-   * chat history so each attempt is informed by every prior failure.
-   */
-  async generateFromImageSafe(req: I2vRequest, model: TVideoModelId, correctionAgentModelId: string): Promise<VideoResult> {
-    let currentPrompt = req.prompt;
-    let lastCorrection: string | null = null;
-    const history: ModelMessage[] = [
-      { role: "system", content: CORRECTION_AGENT_SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: `This video generation prompt was flagged by content moderation. Rewrite it to pass safety filters:\n\n${currentPrompt}`,
-      },
-    ];
-
-    for (let attempt = 1; attempt <= SENSITIVE_CONTENT_RETRY_LIMIT; attempt++) {
-      try {
-        return await this.generateFromImage({ ...req, prompt: currentPrompt }, model);
-      } catch (err) {
-        if (attempt < SENSITIVE_CONTENT_RETRY_LIMIT && isSensitiveContentError(err)) {
-          console.warn(
-            `[replicate] Prompt flagged as sensitive (attempt ${attempt}/${SENSITIVE_CONTENT_RETRY_LIMIT}), asking correction agent…`
-          );
-          if (lastCorrection !== null) {
-            history.push({ role: "assistant", content: lastCorrection });
-            history.push({
-              role: "user",
-              content:
-                "That rewrite was still flagged. Try a completely different approach — " +
-                "avoid whatever you changed in your previous attempt.",
-            });
-          }
-          const { text } = await generateText({
-            model: openrouter.chat(correctionAgentModelId),
-            messages: history,
-          });
-          lastCorrection = text.trim();
-          currentPrompt = lastCorrection;
-        } else {
-          throw err;
-        }
-      }
-    }
-    throw new Error("Replicate: video generation failed after all content moderation retries");
   }
 }

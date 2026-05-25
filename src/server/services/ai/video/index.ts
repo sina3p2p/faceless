@@ -32,7 +32,7 @@ export async function generateVideoFromImage(
     generateAudio,
   };
 
-  return replicate.generateFromImageSafe(req, videoModelId, correctionAgentModelId);
+  return replicate.generateFromImage(req, videoModelId);
 }
 
 export async function downloadAIVideo(videoUrl: string, destPath: string): Promise<void> {
