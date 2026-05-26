@@ -2,7 +2,6 @@ import { Output, type ImagePart, type TextPart } from "ai";
 import { z } from "zod";
 import { openrouter } from "./index";
 import { mediaUrl } from "@/lib/storage";
-import type { AspectRatio } from "@/server/services/media";
 import type { StoryAssetInput } from "@/types/worker";
 import { generateText } from "../../ai-audit";
 
@@ -58,7 +57,7 @@ export interface ReviewFrameImageInput {
   assetRefs?: string[] | null;
   /** Story-asset reference sheets matched to those assetRefs (0..N). */
   matchedAssets: StoryAssetInput[];
-  aspectRatio: AspectRatio;
+  aspectRatio: TAspectRatio;
   /** 1-based attempt number this review is for. */
   attempt: number;
   /** Correction hints accumulated from prior failed attempts. */
@@ -201,7 +200,6 @@ The first image labeled CANDIDATE is the one you are reviewing.${input.prevImage
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userContent }],
     temperature: 0,
-    maxOutputTokens: 600,
   });
 
   if (!output) {

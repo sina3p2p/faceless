@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
-import { editImageViaGptImage2, type AspectRatio } from "@/server/services/media";
+import { editImageViaGptImage2 } from "@/server/services/media";
 import { mediaUrl, uploadFile } from "@/lib/storage";
 import { LLM } from "@/lib/constants";
 import { z } from "zod";
@@ -23,7 +23,7 @@ const MODEL_MAP: Record<string, string> = {
 
 const OPENROUTER_BASE = "https://openrouter.ai/api/v1";
 
-function compositionSuffix(ar: AspectRatio): string {
+function compositionSuffix(ar: TAspectRatio): string {
   if (ar === "16:9") return "Landscape 16:9 composition";
   if (ar === "1:1") return "Square 1:1 composition";
   return "Vertical 9:16 composition";
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     if (model === "gpt-image-2") {
       const editedUrl = await editImageViaGptImage2(
         editPrompt,
-        aspectRatio as AspectRatio,
+        aspectRatio,
         sourceImg,
         {
           annotatedImg: annotatedImg,
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
         },
         {
           type: "text",
-          text: `Edit ONLY the highlighted areas from the reference image above. Apply this change to the clean image: ${editPrompt}. Keep everything outside the highlighted areas exactly the same. ${compositionSuffix(aspectRatio as AspectRatio)}, highly detailed, no text or watermarks. Do NOT include any highlights, markers, or selection rectangles in the output.`,
+          text: `Edit ONLY the highlighted areas from the reference image above. Apply this change to the clean image: ${editPrompt}. Keep everything outside the highlighted areas exactly the same. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks. Do NOT include any highlights, markers, or selection rectangles in the output.`,
         },
       );
     } else {
@@ -168,7 +168,7 @@ export async function POST(req: NextRequest) {
         },
         {
           type: "text",
-          text: `Edit this image: ${editPrompt}. ${compositionSuffix(aspectRatio as AspectRatio)}, highly detailed, no text or watermarks.`,
+          text: `Edit this image: ${editPrompt}. ${compositionSuffix(aspectRatio)}, highly detailed, no text or watermarks.`,
         },
       );
     }

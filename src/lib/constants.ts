@@ -75,6 +75,7 @@ export const IMAGE_MODELS: Record<TImageModelId, TImageModel> = {
   "gpt-image-2": { id: "gpt-image-2", label: "GPT Image 2", description: "State-of-the-art OpenAI image generation, text and editing (OpenAI)" },
   "nano-banana-2": { id: "nano-banana-2", label: "Nano Banana 2", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
   "nano-banana-pro": { id: "nano-banana-pro", label: "Nano Banana Pro", description: "High quality, character consistency, ~$0.04/image (Gemini)" },
+  "seedream-5-lite": { id: "seedream-5-lite", label: "SeeDream 5 Lite", description: "ByteDance SeeDream 5 Lite — trusted by Seedance 2.0 moderation, reference image support (Replicate)" },
 };
 
 const SEEDANCE2_DURATIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];

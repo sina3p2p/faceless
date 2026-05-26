@@ -130,7 +130,7 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-3">
             {videos.slice(0, 5).map((video) => (
-              <Link key={video.id} href={`/dashboard/videos/${video.id}`}>
+              <Link key={video.id} href={`/videos/${video.id}`}>
                 <Card className="hover:bg-white/[0.04] transition-colors cursor-pointer">
                   <CardContent className="flex items-center justify-between py-4">
                     <div>

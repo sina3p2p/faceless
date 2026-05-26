@@ -5,6 +5,7 @@ type TImageModelId =
     | "gpt-image-2"
     | "nano-banana-2"
     | "nano-banana-pro"
+    | "seedream-5-lite"
 
 type TVideoModelId =
     | 'seedance-2-pro'

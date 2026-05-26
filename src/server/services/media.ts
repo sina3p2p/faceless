@@ -1,5 +1,6 @@
 import OpenAI, { toFile } from "openai";
-import { MEDIA, LLM } from "@/lib/constants";
+import { MEDIA, LLM, AI_VIDEO } from "@/lib/constants";
+import { sleep } from "@/lib/utils";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { recordAiCall } from "@/server/services/ai-audit";
 
@@ -605,6 +606,73 @@ export async function editImageViaGemini(
   }
 }
 
+const REPLICATE_API = "https://api.replicate.com/v1";
+
+async function generateViaSeedream5Lite(
+  prompt: string,
+  characterRefs?: CharacterRef[],
+  aspectRatio: TAspectRatio = "9:16"
+): Promise<MediaAsset | null> {
+  const token = AI_VIDEO.replicateToken;
+  if (!token) throw new Error("REPLICATE_API_TOKEN is not set");
+
+  const ar = aspectRatio === "auto" ? "9:16" : aspectRatio;
+  const dims = fallbackDimensions(ar);
+
+  let finalPrompt = prompt;
+  if (characterRefs && characterRefs.length > 0) {
+    const refDescriptions = characterRefs
+      .map((r) => `${r.name ?? "Character"}: ${r.description}`)
+      .join(". ");
+    finalPrompt = `${finalPrompt}. ${refDescriptions}`;
+  }
+  finalPrompt += `. ${compositionSuffix(ar)}, cinematic lighting, photorealistic, no text or watermarks.`;
+
+  const input: Record<string, unknown> = {
+    prompt: finalPrompt,
+    size: "2K",
+    aspect_ratio: ar,
+  };
+
+  if (characterRefs && characterRefs.length > 0) {
+    input.image_input = characterRefs.slice(0, 4).map((r) => r.url);
+  }
+
+  const startRes = await fetch(`${REPLICATE_API}/models/bytedance/seedream-5-lite/predictions`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ input }),
+  });
+  if (!startRes.ok) throw new Error(`SeeDream 5 Lite API error ${startRes.status}: ${await startRes.text()}`);
+  const prediction = await startRes.json();
+  const predictionId = prediction.id as string;
+
+  let status: string = prediction.status;
+  let output: unknown = prediction.output;
+  while (status !== "succeeded" && status !== "failed" && status !== "canceled") {
+    await sleep(3000);
+    const pollRes = await fetch(`${REPLICATE_API}/predictions/${predictionId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const pollData = await pollRes.json();
+    status = pollData.status;
+    output = pollData.output;
+  }
+
+  if (status !== "succeeded" || !output) return null;
+
+  const imageUrl = Array.isArray(output) ? output[0] : typeof output === "string" ? output : null;
+  if (!imageUrl) return null;
+
+  const imgRes = await fetch(imageUrl as string);
+  if (!imgRes.ok) throw new Error("Failed to download SeeDream 5 Lite image");
+  const buffer = Buffer.from(await imgRes.arrayBuffer());
+  const key = `generated/seedream5lite_${Date.now()}.jpg`;
+  await uploadFile(key, buffer, "image/jpeg");
+
+  return { url: mediaUrl(key), type: "image", source: "openai", width: dims.width, height: dims.height };
+}
+
 export async function generateImage(
   prompt: string,
   imageModel = "gpt-image-1.5",
@@ -623,6 +691,7 @@ export async function generateImage(
       hasRefs
         ? generateOpenAiGptImageWithRefs("gpt-image-2", prompt, aspectRatio, characterRefs!)
         : generateOpenAiGptImageModel("gpt-image-2", prompt, aspectRatio),
+    "seedream-5-lite": () => generateViaSeedream5Lite(prompt, characterRefs, aspectRatio),
   }
 
   const result = await models[imageModel as keyof typeof models]?.();
