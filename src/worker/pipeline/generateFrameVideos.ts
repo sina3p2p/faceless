@@ -6,7 +6,7 @@ import { Job } from "bullmq";
 import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { WORKER, VIDEO_MODELS } from "@/lib/constants";
-import { generateVideoFromImage } from "@/server/services/ai/video";
+import { generateVideoFromImage, type VideoResult } from "@/server/services/ai/video";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
 import { and, isNotNull } from "drizzle-orm";
@@ -40,6 +40,38 @@ async function addSeedanceNoise(imageUrl: string, label: string, videoProjectId:
   const key = `frames/${videoProjectId}/noised_${label}_${Date.now()}.jpg`;
   await uploadFile(key, outputBuffer, "image/jpeg");
   return mediaUrl(key);
+}
+
+/** Stacked perturbation for E005 retry: hue shift + JPEG precompress + higher sigma noise. */
+async function addSeedanceNoiseEnhanced(imageUrl: string, label: string, videoProjectId: string): Promise<string> {
+  const resp = await fetch(imageUrl);
+  if (!resp.ok) throw new Error(`noise fetch failed: ${resp.status}`);
+  const inputBuffer = Buffer.from(await resp.arrayBuffer());
+
+  // Hue rotation + JPEG recompress creates a shifted base before noise is applied.
+  const precompressed = await sharp(inputBuffer)
+    .modulate({ hue: 4 })
+    .jpeg({ quality: 72 })
+    .toBuffer();
+
+  const { data, info } = await sharp(precompressed).raw().toBuffer({ resolveWithObject: true });
+
+  for (let i = 0; i < data.length; i++) {
+    const z = Math.sqrt(-2 * Math.log(Math.random() || 1e-10)) * Math.cos(2 * Math.PI * Math.random());
+    data[i] = Math.max(0, Math.min(255, data[i] + Math.round(15 * z)));
+  }
+
+  const outputBuffer = await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: info.channels as 1 | 2 | 3 | 4 },
+  }).jpeg({ quality: 95 }).toBuffer();
+
+  const key = `frames/${videoProjectId}/noised_enh_${label}_${Date.now()}.jpg`;
+  await uploadFile(key, outputBuffer, "image/jpeg");
+  return mediaUrl(key);
+}
+
+function isE005(err: unknown): boolean {
+  return err instanceof Error && err.message.includes("E005");
 }
 
 /** Build an `atempo` filter chain that handles ratios outside the [0.5, 2.0] per-filter limit. */
@@ -192,17 +224,28 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
               }
             }
 
-            const videoResult = await generateVideoFromImage(
-              startUrl,
-              finalPrompt,
-              desiredDuration,
-              videoModelId,
-              videoProject.modelSettings.motionModel,
-              endUrl,
-              aspectRatio,
-              videoResolution,
-              isSpeakingFrame ? true : undefined,
-            );
+            const callGenerate = (s: string, e: string | undefined): Promise<VideoResult> =>
+              generateVideoFromImage(s, finalPrompt, desiredDuration, videoModelId, videoProject.modelSettings.motionModel, e, aspectRatio, videoResolution, isSpeakingFrame ? true : undefined);
+
+            let videoResult: VideoResult;
+            try {
+              videoResult = await callGenerate(startUrl, endUrl);
+            } catch (err) {
+              if (SEEDANCE2_MODELS.has(videoModelId) && isE005(err)) {
+                console.warn(`[generate-frame-videos] Frame ${frame.id}: E005 on attempt 1 — retrying with enhanced perturbation`);
+                let enhStartUrl = imageSignedUrl;
+                let enhEndUrl = endImageUrl;
+                try {
+                  enhStartUrl = await addSeedanceNoiseEnhanced(imageSignedUrl, frame.id, videoProjectId);
+                  if (endImageUrl) enhEndUrl = await addSeedanceNoiseEnhanced(endImageUrl, `end_${frame.id}`, videoProjectId);
+                } catch (noiseErr2) {
+                  console.warn(`[generate-frame-videos] Frame ${frame.id}: enhanced noise failed (${noiseErr2 instanceof Error ? noiseErr2.message : noiseErr2}) — using original for retry`);
+                }
+                videoResult = await callGenerate(enhStartUrl, enhEndUrl);
+              } else {
+                throw err;
+              }
+            }
 
             // For speaking frames: replace the model's audio with the TTS voice.
             let finalVideoUrl = videoResult.videoUrl;
