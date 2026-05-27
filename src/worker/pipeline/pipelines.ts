@@ -77,7 +77,7 @@ export const PIPELINES: Record<string, readonly PipelineStep[]> = {
     { name: "generate-tts:movie-dialogue" },
     ...sharedVisualTail.slice(0, -2), // up to generate-frame-images + motion
     { name: "generate-frame-videos:audio-lipsync", gate: "REVIEW_PRODUCTION" },
-    { name: "compose-final" },
+    { name: "compose-final:seedance-2" },
   ],
 
   "timelapse:default": [

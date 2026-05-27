@@ -26,6 +26,7 @@ export type StageName =
   | "generate-frame-videos"
   | "generate-frame-videos:audio-lipsync"
   | "compose-final"
+  | "compose-final:seedance-2"
   | "supervise-script"
   | "cast-character-voices"
   | "timelapse-plan"

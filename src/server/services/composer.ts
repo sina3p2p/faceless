@@ -219,9 +219,11 @@ export async function composeVideo(
       const scene = scenes[i];
       const sceneOutput = path.join(workDir, `scene_${i}.mp4`);
 
-      const duration = useGlobalAudio
+      const nativeAudio = scene.nativeAudio === true;
+      const hasExternalAudio = !nativeAudio && !!scene.audioPath;
+      const duration = useGlobalAudio || nativeAudio || !hasExternalAudio
         ? Math.max(scene.duration, 1)
-        : Math.max(await getAudioDuration(scene.audioPath) + 0.5, 2);
+        : Math.max(await getAudioDuration(scene.audioPath!) + 0.5, 2);
       sceneDurations.push(duration);
 
       const fadeFilter = ''
@@ -251,13 +253,30 @@ export async function composeVideo(
             `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-t ${duration} "${sceneOutput}"`
           );
-        } else {
+        } else if (nativeAudio) {
+          // Video already has audio baked in — preserve it, just re-encode video track.
+          await execAsync(
+            `ffmpeg -y -i "${scene.mediaPath}" ` +
+            `-vf "${videoFilters}" ` +
+            `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
+            `-c:a aac -b:a 192k -ar 44100 ` +
+            `-t ${duration} "${sceneOutput}"`
+          );
+        } else if (hasExternalAudio) {
           await execAsync(
             `ffmpeg -y -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
             `-filter_complex "[0:v]${videoFilters}[outv];[1:a]aresample=44100[outa]" ` +
             `-map "[outv]" -map "[outa]" ` +
             `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
+            `-t ${duration} "${sceneOutput}"`
+          );
+        } else {
+          // Silent scene — no audio track.
+          await execAsync(
+            `ffmpeg -y -i "${scene.mediaPath}" ` +
+            `-vf "${videoFilters}" -an ` +
+            `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-t ${duration} "${sceneOutput}"`
           );
         }
@@ -285,13 +304,21 @@ export async function composeVideo(
             `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-t ${duration} "${sceneOutput}"`
           );
-        } else {
+        } else if (hasExternalAudio) {
           await execAsync(
             `ffmpeg -y -loop 1 -i "${scene.mediaPath}" -i "${scene.audioPath}" ` +
             `-filter_complex "[0:v]${imageFilter}[outv];[1:a]aresample=44100[outa]" ` +
             `-map "[outv]" -map "[outa]" ` +
             `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-c:a aac -b:a 192k -ar 44100 ` +
+            `-t ${duration} "${sceneOutput}"`
+          );
+        } else {
+          // Silent scene — no audio track.
+          await execAsync(
+            `ffmpeg -y -loop 1 -i "${scene.mediaPath}" ` +
+            `-vf "${imageFilter}" -an ` +
+            `-c:v libx264 -preset ${enc.preset} -crf ${enc.crf} -pix_fmt yuv420p ` +
             `-t ${duration} "${sceneOutput}"`
           );
         }

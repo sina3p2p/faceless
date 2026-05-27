@@ -5,12 +5,19 @@ export type QualityTier = "draft" | "standard" | "hero";
 export type ColorGrade = "warm" | "cool" | "teal-orange" | "mono";
 
 export interface ComposerScene {
-  audioPath: string;
+  /** Path to an external audio file to mix into this scene. Omit for silent scenes. */
+  audioPath?: string;
   mediaPath: string;
   mediaType: "video" | "image";
   text: string;
   duration: number;
   wordTimestamps: WordTimestamp[];
+  /**
+   * When true, the video clip already has dialogue audio baked in (e.g. Seedance
+   * native lipsync). The composer preserves the video's audio stream instead of
+   * mixing in an external file.
+   */
+  nativeAudio?: boolean;
 }
 
 /**

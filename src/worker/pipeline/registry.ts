@@ -33,7 +33,7 @@ import { generateFrameImagesJob } from "./generateFrameImages";
 import { generateMotionJob } from "./generateMotion";
 import { generateFrameVideosJob } from "./generateFrameVideos";
 import { generateFrameVideosAudioLipsyncJob } from "./generateFrameVideosAudioLipsync";
-import { composeFinalJob } from "./composeFinal";
+import { composeFinalJob, composeFinalSeedance2Job } from "./composeFinal";
 import { timelapsePlanJob } from "./timelapse/plan";
 
 type StageHandler = (job: Job<RenderJobData>) => Promise<void>;
@@ -60,5 +60,6 @@ export const STAGE_REGISTRY: Record<StageName, StageHandler> = {
   "generate-frame-videos": generateFrameVideosJob,
   "generate-frame-videos:audio-lipsync": generateFrameVideosAudioLipsyncJob,
   "compose-final": composeFinalJob,
+  "compose-final:seedance-2": composeFinalSeedance2Job,
   "timelapse-plan": timelapsePlanJob,
 };
