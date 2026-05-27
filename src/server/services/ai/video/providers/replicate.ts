@@ -1,5 +1,5 @@
 import { AI_VIDEO, VIDEO_MODELS } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
+import type { I2vRequest, IVideoProvider, ReferenceModeRequest, VideoResult } from "@/types/video-provider";
 import { sleep } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
 
@@ -86,10 +86,7 @@ export class ReplicateVideoProvider implements IVideoProvider {
         throw new Error(`Replicate: video model ${model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);
     }
   }
-  async generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult> {
-    const input = this.generateInput(model, req);
-    const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
-    const predictionId = prediction.data.id;
+  private async pollPrediction(predictionId: string, expectedDuration: number): Promise<VideoResult> {
     let status = 'pending';
     let errorDetail: string = status;
     while (status !== 'succeeded' && status !== 'failed' && status !== 'canceled') {
@@ -98,9 +95,35 @@ export class ReplicateVideoProvider implements IVideoProvider {
       status = response.data.status;
       errorDetail = response.data.error ?? status;
       if (status === 'succeeded') {
-        return { videoUrl: extractOutputUrl(response.data.output), durationSeconds: req.duration };
+        return { videoUrl: extractOutputUrl(response.data.output), durationSeconds: expectedDuration };
       }
     }
     throw new Error(`Replicate: prediction ${status}: ${errorDetail}`);
+  }
+
+  async generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult> {
+    const input = this.generateInput(model, req);
+    const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
+    return this.pollPrediction(prediction.data.id, req.duration);
+  }
+
+  /**
+   * Reference-mode generation for Seedance 2: drives lipsync from an audio file
+   * and maintains character consistency via a reference image — no start/last frame.
+   */
+  async generateFromReferences(req: ReferenceModeRequest, model: TVideoModelId): Promise<VideoResult> {
+    const input: Record<string, unknown> = {
+      reference_images: req.referenceImages,
+      prompt: req.prompt,
+      duration: req.duration,
+      aspect_ratio: req.aspectRatio,
+      resolution: req.resolution,
+      generate_audio: true,
+    };
+    if (req.referenceAudios && req.referenceAudios.length > 0) {
+      input.reference_audios = req.referenceAudios;
+    }
+    const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
+    return this.pollPrediction(prediction.data.id, req.duration);
   }
 }

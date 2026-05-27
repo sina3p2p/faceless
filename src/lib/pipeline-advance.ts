@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { renderQueue } from "@/lib/queue";
 import {
   resolveVideoType,
+  resolveModelFamily,
   stepAfterGate,
   type ReviewGateStatus,
 } from "@/worker/pipeline/topology";
@@ -21,13 +22,16 @@ export async function enqueueAfterReviewGate(
 ): Promise<string | null> {
   const project = await db.query.videoProjects.findFirst({
     where: eq(videoProjects.id, videoProjectId),
-    columns: { videoType: true, config: true },
+    columns: { videoType: true, config: true, modelSettings: true },
   });
   if (!project) return null;
 
   const job = stepAfterGate(
     {
       videoType: resolveVideoType(project.videoType),
+      modelFamily: resolveModelFamily(
+        (project.modelSettings as { videoModel?: string } | null)?.videoModel ?? ""
+      ),
       config: project.config ?? {},
     },
     reviewStatus

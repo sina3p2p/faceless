@@ -4,7 +4,6 @@ import type { RenderJobData } from "@/lib/queue";
 import { superviseScript } from "@/server/services/ai/llm";
 import { countNarrationWords, estimateDurationSec } from "@/server/services/ai/llm/pacing";
 import { getAgentModels, mergeProjectConfig } from "./shared";
-import { getStrategy } from "./strategies";
 
 export async function superviseScriptJob(job: Job<RenderJobData>) {
   const { videoProjectId } = job.data;
@@ -27,50 +26,45 @@ export async function superviseScriptJob(job: Job<RenderJobData>) {
     if (existingScenes.length === 0) throw new Error("No scenes to supervise");
 
     const assets = await resolveStoryAssets(videoProjectId);
-
-    const supervisorModel = getAgentModels(videoProject.modelSettings, 'supervisorModel');
+    const supervisorModel = getAgentModels(videoProject.modelSettings, "supervisorModel");
 
     console.log(`[supervise-script] Supervising ${existingScenes.length} scenes for ${videoProjectId}`);
 
-    const result = await superviseScript(
-      existingScenes,
-      config.creativeBrief,
-      assets,
-      supervisorModel
-    );
-
-    const continuityNotes = await getStrategy(videoProject.videoType).finalizeContinuity({
-      project: videoProject,
-      continuityNotes: result.continuityNotes,
-      assets,
-    });
+    const result = await superviseScript(existingScenes, config.creativeBrief, assets, supervisorModel);
 
     await db.delete(schema.videoScenes).where(eq(schema.videoScenes.videoProjectId, videoProjectId));
+    await db.insert(schema.videoScenes).values(
+      result.scenes.map((s, i) => {
+        const baseNote = s.directorNote.replace(/^\[Scene function:[^\]]*\]\s*/i, "");
+        const surpriseLine = s.surpriseInjection
+          ? `\n[Surprise injection: ${s.surpriseInjection}]`
+          : "";
+        const imageabilityScore = Math.min(5, Math.max(1, Math.round(s.imageabilityScore)));
+        return {
+          videoProjectId,
+          sceneOrder: i,
+          sceneTitle: s.sceneTitle,
+          speaker: s.speaker ?? null,
+          emotion: s.emotion ?? null,
+          emotionIntensity: s.emotionIntensity ?? null,
+          directorNote: `[Scene function: ${s.sceneFunction}]\n${baseNote}${surpriseLine}`,
+          text: s.text,
+          estimatedDurationSec: estimateDurationSec(
+            countNarrationWords(s.text),
+            s.voicePace ?? "standard"
+          ),
+          imageabilityScore,
+        };
+      })
+    );
 
-    await db.insert(schema.videoScenes).values(result.scenes.map((s, i) => {
-      const baseNote = s.directorNote.replace(/^\[Scene function:[^\]]*\]\s*/i, "");
-      const surpriseLine = s.surpriseInjection ? `\n[Surprise injection: ${s.surpriseInjection}]` : "";
-      const imageabilityScore = Math.min(5, Math.max(1, Math.round(s.imageabilityScore)));
-      return {
-        videoProjectId,
-        sceneOrder: i,
-        sceneTitle: s.sceneTitle,
-        speaker: s.speaker ?? null,
-        emotion: s.emotion ?? null,
-        emotionIntensity: s.emotionIntensity ?? null,
-        directorNote: `[Scene function: ${s.sceneFunction}]\n${baseNote}${surpriseLine}`,
-        text: s.text,
-        estimatedDurationSec: estimateDurationSec(
-          countNarrationWords(s.text),
-          s.voicePace ?? "standard"
-        ),
-        imageabilityScore,
-      };
-    }));
+    await mergeProjectConfig(videoProjectId, { continuityNotes: result.continuityNotes });
 
-    await mergeProjectConfig(videoProjectId, { continuityNotes });
-
-    console.log(`[supervise-script] Supervised: ${result.scenes.length} scenes, ${continuityNotes.characterRegistry.length} characters, ${continuityNotes.locationRegistry.length} locations`);
+    console.log(
+      `[supervise-script] Supervised: ${result.scenes.length} scenes, ` +
+        `${result.continuityNotes.characterRegistry.length} characters, ` +
+        `${result.continuityNotes.locationRegistry.length} locations`
+    );
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[supervise-script] Failed for ${videoProjectId}:`, msg);

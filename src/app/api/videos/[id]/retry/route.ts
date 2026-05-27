@@ -5,7 +5,7 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { renderQueue } from "@/lib/queue";
 import { desc, eq } from "drizzle-orm";
 import { canRetryOrResumeFromFailure } from "@/lib/pipeline-resume";
-import { firstJob, resolveVideoType } from "@/worker/pipeline/topology";
+import { firstJob, resolveVideoType, resolveModelFamily } from "@/worker/pipeline/topology";
 
 export async function POST(
   _req: NextRequest,
@@ -49,6 +49,9 @@ export async function POST(
 
   const startJob = firstJob({
     videoType: resolveVideoType(video.videoType),
+    modelFamily: resolveModelFamily(
+      (video.modelSettings as { videoModel?: string } | null)?.videoModel ?? ""
+    ),
     config: video.config ?? {},
   });
 

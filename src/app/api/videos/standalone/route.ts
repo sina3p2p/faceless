@@ -5,7 +5,7 @@ import { linkStoryAssetsToVideo } from "@/server/db/story-assets";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { renderQueue } from "@/lib/queue";
 import { checkUsageLimit } from "@/lib/usage";
-import { firstJob, resolveVideoType } from "@/worker/pipeline/topology";
+import { firstJob, resolveVideoType, resolveModelFamily } from "@/worker/pipeline/topology";
 import { IMAGE_MODEL_IDS, LLM_MODEL_IDS, MODEL_SETTINGS, VIDEO_MODEL_IDS } from "@/lib/constants";
 import type { PipelineConfig } from "@/types/pipeline";
 import { z } from "zod/v4";
@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
 
   const startJob = firstJob({
     videoType: resolveVideoType(data.videoType),
+    modelFamily: resolveModelFamily(data.modelSettings.videoModel),
     config: (hasConfig ? config : {}) as PipelineConfig,
   });
 

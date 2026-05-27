@@ -1,34 +1,22 @@
 /**
  * Pipeline topology engine.
  *
- * Before this module the flow was implicit: every worker hardcoded the next
- * job in its tail (`renderQueue.add(...)`, `autoChainOrReview(...)`), and the
- * six `approve-*` endpoints hardcoded the job to resume after their review
- * gate. The graph was smeared across ~20 files and no single place answered
- * "what does the movie pipeline look like".
- *
- * Now: each video type owns an ordered list of steps in
- * ./strategies/pipelines.ts (a step may carry a review `gate` that pauses the
- * pipeline in manual mode, and/or a `when` predicate that skips it). This file
- * is the type-agnostic engine over those lists — the runner asks `nextStep()`
- * what to do after a stage completes; the approve endpoints ask
+ * Each video type + model family owns an ordered list of steps in ./pipelines.ts.
+ * This file is the type-agnostic engine over those lists — the runner asks
+ * `nextStep()` what to do after a stage completes; the approve endpoints ask
  * `stepAfterGate()` what to enqueue when a human clears a review.
  *
- * Topology decides WHERE to go; the per-type pipeline decides the route.
- * Strategies (./strategies) decide WHAT each stage does. Stage shells handle
- * HOW results are persisted.
+ * Topology decides WHERE to go; pipelines.ts decides the route per (type, model).
+ * Stage implementations live in individual worker files registered in registry.ts.
  */
 
 import type { PipelineConfig } from "@/types/pipeline";
-import { STRATEGY_PIPELINES } from "./strategies/pipelines";
+import { PIPELINES } from "./pipelines";
 
-export type JobName =
+export type StageName =
+  // type-agnostic stages
   | "executive-produce"
   | "web-research"
-  | "generate-story"
-  | "split-scenes"
-  | "supervise-script"
-  | "generate-tts"
   | "cinematography"
   | "extract-hero-assets"
   | "storyboard"
@@ -36,8 +24,20 @@ export type JobName =
   | "generate-frame-images"
   | "generate-pipeline-motion"
   | "generate-frame-videos"
+  | "generate-frame-videos:audio-lipsync"
   | "compose-final"
-  | "timelapse-plan";
+  | "supervise-script"
+  | "cast-character-voices"
+  | "timelapse-plan"
+  // type-specific variants — name carries the full identity
+  | "generate-story:voiceover"
+  | "generate-story:lyrics"
+  | "generate-story:screenplay"
+  | "split-scenes:director"
+  | "split-scenes:screenplay"
+  | "generate-tts:voiceover"
+  | "generate-tts:song"
+  | "generate-tts:movie-dialogue";
 
 /** Review statuses that act as pipeline pause points (manual mode). */
 export type ReviewGateStatus =
@@ -50,6 +50,14 @@ export type ReviewGateStatus =
 
 export type VideoType = "standalone" | "music_video" | "movie" | "timelapse";
 
+/**
+ * Groups model IDs into families. Pipelines are defined per (VideoType, ModelFamily).
+ * Add new families here as model-specific pipelines diverge.
+ */
+export type ModelFamily = "default" | "seedance-2";
+
+const SEEDANCE_2_IDS = new Set(["seedance-2-pro", "seedance-2-fast"]);
+
 const VIDEO_TYPES: ReadonlySet<string> = new Set([
   "standalone",
   "music_video",
@@ -57,29 +65,29 @@ const VIDEO_TYPES: ReadonlySet<string> = new Set([
   "timelapse",
 ]);
 
-/** `video_projects.video_type` is a plain text column; normalize unknowns. */
 export function resolveVideoType(raw: string | null | undefined): VideoType {
   return raw && VIDEO_TYPES.has(raw) ? (raw as VideoType) : "standalone";
 }
 
+export function resolveModelFamily(modelId: string): ModelFamily {
+  if (SEEDANCE_2_IDS.has(modelId)) return "seedance-2";
+  return "default";
+}
+
 export interface PipelineCtx {
   videoType: VideoType;
+  modelFamily: ModelFamily;
   config: PipelineConfig;
 }
 
 export interface PipelineStep {
-  name: JobName;
-  /**
-   * If set, the pipeline pauses with this review status after this step
-   * completes (manual mode only). In auto mode it chains straight through.
-   */
+  name: StageName;
   gate?: ReviewGateStatus;
-  /** When present and false for the project, this step is skipped entirely. */
   when?: (ctx: PipelineCtx) => boolean;
 }
 
 export type NextStep =
-  | { kind: "enqueue"; job: JobName }
+  | { kind: "enqueue"; job: StageName }
   | { kind: "review"; status: ReviewGateStatus }
   | { kind: "done" };
 
@@ -92,25 +100,25 @@ export function getPipelineMode(config: unknown): "manual" | "auto" {
   return "manual";
 }
 
-/** Steps for this project's type with `when:false` steps removed. */
+function lookupPipeline(ctx: PipelineCtx): readonly PipelineStep[] {
+  const exact = PIPELINES[`${ctx.videoType}:${ctx.modelFamily}`];
+  if (exact) return exact;
+  const typeDefault = PIPELINES[`${ctx.videoType}:default`];
+  if (typeDefault) return typeDefault;
+  return PIPELINES["standalone:default"];
+}
+
 export function resolveSteps(ctx: PipelineCtx): PipelineStep[] {
-  return STRATEGY_PIPELINES[ctx.videoType].filter((s) => !s.when || s.when(ctx));
+  return lookupPipeline(ctx).filter((s) => !s.when || s.when(ctx));
 }
 
-/** First job to enqueue when a project's pipeline starts. */
-export function firstJob(ctx: PipelineCtx): JobName {
-  const steps = resolveSteps(ctx);
-  return steps[0].name;
+export function firstJob(ctx: PipelineCtx): StageName {
+  return resolveSteps(ctx)[0].name;
 }
 
-/**
- * What the runner should do after `currentJob` finishes. The gate on the
- * *completed* step decides whether we pause: e.g. supervise-script carries
- * `gate: REVIEW_STORY`, so finishing it pauses (manual) before generate-tts.
- */
-export function nextStep(ctx: PipelineCtx, currentJob: JobName): NextStep {
+export function nextStep(ctx: PipelineCtx, currentStage: StageName): NextStep {
   const steps = resolveSteps(ctx);
-  const idx = steps.findIndex((s) => s.name === currentJob);
+  const idx = steps.findIndex((s) => s.name === currentStage);
   if (idx === -1) return { kind: "done" };
 
   const current = steps[idx];
@@ -123,24 +131,20 @@ export function nextStep(ctx: PipelineCtx, currentJob: JobName): NextStep {
   return { kind: "enqueue", job: next.name };
 }
 
-/**
- * The job to enqueue when a human clears `reviewStatus`. Resolves against the
- * project's own (possibly conditional) step list so e.g. clearing
- * REVIEW_IMAGES on a timelapse correctly skips motion.
- */
 export function stepAfterGate(
   ctx: PipelineCtx,
   reviewStatus: ReviewGateStatus
-): JobName | null {
+): StageName | null {
   const steps = resolveSteps(ctx);
   const idx = steps.findIndex((s) => s.gate === reviewStatus);
   if (idx === -1) return null;
   return steps[idx + 1]?.name ?? null;
 }
 
-/** Whether a string is a pipeline job (in any type's pipeline) the runner should advance from. */
-export function isPipelineJob(name: string): name is JobName {
-  return Object.values(STRATEGY_PIPELINES).some((steps) =>
-    steps.some((s) => s.name === name)
-  );
+const ALL_STAGE_NAMES: ReadonlySet<string> = new Set(
+  Object.values(PIPELINES).flatMap((steps) => steps.map((s) => s.name))
+);
+
+export function isPipelineStage(name: string): name is StageName {
+  return ALL_STAGE_NAMES.has(name);
 }

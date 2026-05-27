@@ -1,11 +1,5 @@
-/**
- * Shared per-scene audio persistence tail used by the standalone and movie
- * TTS strategies (the music strategy persists differently — one global song
- * with aligned sections — so it does not use this).
- */
-
 import * as fs from "fs/promises";
-import { db, schema, eq, execAsync } from "../../shared";
+import { db, schema, eq, execAsync } from "../shared";
 import { uploadFile } from "@/lib/storage";
 import type { TTSResult } from "@/server/services/tts";
 

@@ -9,8 +9,7 @@ import { getVideoSize } from "@/lib/constants";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { downloadFile, composeVideo, type ComposerScene } from "@/server/services/composer";
 import { buildXfadeFilterChain, sceneNeedsXfade } from "@/server/services/composer/xfade";
-import { getStrategy } from "./strategies";
-import type { TransitionType } from "@/types/pipeline";
+import type { TransitionType, PipelineConfig } from "@/types/pipeline";
 
 export async function composeFinalJob(job: Job<RenderJobData>) {
   const { videoProjectId } = job.data;
@@ -25,18 +24,8 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
 
     await updateVideoStatus(videoProjectId, "RENDERING");
 
-    const strategy = getStrategy(videoProject.videoType);
-
-    // Movie lip-sync runs here as a pre-pass so every entry point that reaches
-    // compose-final (auto-chain, manual approval, recompose, rerender, resume)
-    // gets it. Idempotent and non-blocking.
-    await strategy.beforeCompose?.({
-      videoProjectId,
-      userId: videoProject.userId,
-      workDir,
-    });
-
     const sizeConfig = getVideoSize(videoProject.videoSize);
+    const projectConfig = (videoProject.config ?? {}) as PipelineConfig;
 
     const existingScenes = await db.query.videoScenes.findMany({
       where: eq(schema.videoScenes.videoProjectId, videoProjectId),
@@ -85,42 +74,32 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
         mediaPath = frameMediaPaths[0];
         totalDuration = frameDurations[0];
       } else if (sceneNeedsXfade(frameTransitions)) {
-        // Re-encode with an xfade chain so transitions actually play.
-        // More expensive than concat-copy, used only when the storyboarder
-        // chose a non-cut transition for at least one frame.
         const chain = buildXfadeFilterChain(frameDurations, frameTransitions);
         mediaPath = path.join(workDir, `scene_${i}_combined.mp4`);
         const inputs = frameMediaPaths.map((p) => `-i "${p}"`).join(" ");
         await execAsync(
           `ffmpeg -y ${inputs} -filter_complex "${chain.filter}" ` +
-          `-map "${chain.outLabel}" -an ` +
-          `-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p ` +
-          `"${mediaPath}"`
+            `-map "${chain.outLabel}" -an ` +
+            `-c:v libx264 -preset veryfast -crf 18 -pix_fmt yuv420p ` +
+            `"${mediaPath}"`
         );
         totalDuration = chain.effectiveTotalDuration;
       } else {
         const concatFile = path.join(workDir, `concat_${i}.txt`);
-        const concatContent = frameMediaPaths.map((p) => `file '${p}'`).join("\n");
-        await fs.writeFile(concatFile, concatContent);
+        await fs.writeFile(concatFile, frameMediaPaths.map((p) => `file '${p}'`).join("\n"));
         mediaPath = path.join(workDir, `scene_${i}_combined.mp4`);
         await execAsync(`ffmpeg -y -f concat -safe 0 -i "${concatFile}" -c copy "${mediaPath}"`);
         totalDuration = frameDurations.reduce((a, b) => a + b, 0);
       }
 
-      const wordTimestamps = (scene.captionData as Array<{ word: string; start: number; end: number }>) || [];
+      const wordTimestamps =
+        (scene.captionData as Array<{ word: string; start: number; end: number }>) || [];
 
-      // Accumulate SFX cues using each frame's start time within the scene.
-      // Approximates xfade-compressed timelines slightly; SFX cues are loose
-      // by design so the offset is acceptable for v1.
       let frameCursor = 0;
       for (const frame of frames) {
         const hint = frame.sfxHint;
         if (hint && hint !== "none") {
-          sfxCues.push({
-            type: hint,
-            atSeconds: timelineCursor + frameCursor,
-            durationS: 0.6,
-          });
+          sfxCues.push({ type: hint, atSeconds: timelineCursor + frameCursor, durationS: 0.6 });
         }
         frameCursor += frame.clipDuration ?? 5;
       }
@@ -138,19 +117,22 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
 
     if (composerScenes.length === 0) throw new Error("No scenes to compose");
 
-    const globalAudioPath = await strategy.resolveGlobalAudio?.({
-      config: videoProject.config ?? {},
-      workDir,
-    });
+    // Music videos store a global song track in config.songUrl.
+    let globalAudioPath: string | undefined;
+    if (projectConfig.songUrl) {
+      globalAudioPath = path.join(workDir, "global_song.mp3");
+      await downloadFile(mediaUrl(projectConfig.songUrl), globalAudioPath);
+    }
 
-    console.log(`[compose-final] Composing ${composerScenes.length} scenes${globalAudioPath ? " (global audio track)" : ""}`);
+    console.log(
+      `[compose-final] Composing ${composerScenes.length} scenes${
+        globalAudioPath ? " (global audio track)" : ""
+      }`
+    );
 
-    const projectConfig = videoProject.config ?? {};
     const enableSfx = projectConfig.enableSfx === true;
     const sfx = enableSfx && sfxCues.length > 0 ? sfxCues : undefined;
-    if (sfx) {
-      console.log(`[compose-final] SFX enabled: ${sfx.length} cues`);
-    }
+    if (sfx) console.log(`[compose-final] SFX enabled: ${sfx.length} cues`);
 
     const outputPath = await composeVideo({
       scenes: composerScenes,
@@ -166,13 +148,12 @@ export async function composeFinalJob(job: Job<RenderJobData>) {
     await uploadFile(s3Key, outputBuffer, "video/mp4");
 
     await updateVideoStatus(videoProjectId, "COMPLETED", { outputUrl: s3Key });
-
     console.log(`[compose-final] Video complete: ${s3Key}`);
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
     console.error(`[compose-final] Failed for ${videoProjectId}:`, msg);
     throw error;
   } finally {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => { });
+    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }

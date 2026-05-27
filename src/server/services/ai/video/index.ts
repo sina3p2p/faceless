@@ -35,6 +35,27 @@ export async function generateVideoFromImage(
   return replicate.generateFromImage(req, videoModelId);
 }
 
+/**
+ * Reference-mode generation for Seedance 2: pass a character reference image and
+ * the scene's TTS audio file so the model drives lipsync natively.
+ * No start/last frame — mutually exclusive with generateVideoFromImage.
+ */
+export async function generateVideoFromReferences(
+  referenceImages: string[],
+  referenceAudios: string[],
+  prompt: string,
+  videoModelId: TVideoModelId,
+  aspectRatio: TAspectRatio = "9:16",
+  resolution: TVideoResolution = "480p",
+  duration: number = -1
+): Promise<VideoResult> {
+  const replicate = new ReplicateVideoProvider();
+  return replicate.generateFromReferences(
+    { referenceImages, referenceAudios, prompt, duration, aspectRatio, resolution },
+    videoModelId
+  );
+}
+
 export async function downloadAIVideo(videoUrl: string, destPath: string): Promise<void> {
   const response = await axios.get<ArrayBuffer>(videoUrl, {
     responseType: "arraybuffer",

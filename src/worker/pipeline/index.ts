@@ -1,15 +1,2 @@
-export { executiveProduceJob } from "./executiveProduce";
-export { webResearchJob } from "./webResearch";
-export { generateStoryJob } from "./generateStory";
-export { splitScenesJob } from "./splitScenes";
-export { superviseScriptJob } from "./superviseScript";
-export { generateTTSJob } from "./generateTTS";
-export { cinematographyJob } from "./cinematography";
-export { extractHeroAssetsJob } from "./extractHeroAssets";
-export { storyboardJob } from "./storyboard";
-export { generatePromptsJob } from "./generatePrompts";
-export { generateFrameImagesJob } from "./generateFrameImages";
-export { generateMotionJob } from "./generateMotion";
-export { generateFrameVideosJob } from "./generateFrameVideos";
-export { composeFinalJob } from "./composeFinal";
+export { STAGE_REGISTRY } from "./registry";
 export { timelapsePlanJob } from "./timelapse/plan";
