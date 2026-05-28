@@ -11,27 +11,32 @@ import { downloadFile, composeVideo, type ComposerScene } from "@/server/service
 import { buildXfadeFilterChain, sceneNeedsXfade } from "@/server/services/composer/xfade";
 import type { TransitionType, PipelineConfig } from "@/types/pipeline";
 
+interface SfxCue {
+  type: string;
+  atSeconds: number;
+  durationS: number;
+}
+
 async function buildComposerScenes(
   videoProjectId: string,
   workDir: string,
-  options: { nativeAudio: boolean }
-): Promise<{ scenes: ComposerScene[]; sfxCues: Array<{ type: string; atSeconds: number; durationS: number }> }> {
+  nativeAudio: boolean
+): Promise<{ scenes: ComposerScene[]; sfxCues: SfxCue[] }> {
   const existingScenes = await db.query.videoScenes.findMany({
     where: eq(schema.videoScenes.videoProjectId, videoProjectId),
     orderBy: (vs, { asc }) => [asc(vs.sceneOrder)],
   });
 
   const scenes: ComposerScene[] = [];
-  const sfxCues: Array<{ type: string; atSeconds: number; durationS: number }> = [];
+  const sfxCues: SfxCue[] = [];
   let timelineCursor = 0;
 
   for (let i = 0; i < existingScenes.length; i++) {
     const scene = existingScenes[i];
 
     // nativeAudio: dialogue is baked into the video clip (Seedance lipsync) — skip external download.
-    // Otherwise download the audio file for the composer to mix.
     let audioPath: string | undefined;
-    if (scene.audioUrl && !options.nativeAudio) {
+    if (scene.audioUrl && !nativeAudio) {
       audioPath = path.join(workDir, `audio_${i}.mp3`);
       await downloadFile(mediaUrl(scene.audioUrl), audioPath);
     }
@@ -99,7 +104,7 @@ async function buildComposerScenes(
     scenes.push({
       text: scene.text,
       audioPath,
-      nativeAudio: options.nativeAudio && !!scene.audioUrl,
+      nativeAudio: nativeAudio && !!scene.audioUrl,
       mediaPath,
       mediaType: "video",
       duration: totalDuration,
@@ -110,91 +115,65 @@ async function buildComposerScenes(
   return { scenes, sfxCues };
 }
 
-async function runCompose(
-  videoProjectId: string,
-  workDir: string,
-  nativeAudio: boolean,
-  label: string
-): Promise<void> {
-  const videoProject = await db.query.videoProjects.findFirst({
-    where: eq(schema.videoProjects.id, videoProjectId),
-  });
-  if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
-
-  await updateVideoStatus(videoProjectId, "RENDERING");
-
-  const sizeConfig = getVideoSize(videoProject.videoSize);
-  const projectConfig = (videoProject.config ?? {}) as PipelineConfig;
-
-  const { scenes: composerScenes, sfxCues } = await buildComposerScenes(
-    videoProjectId,
-    workDir,
-    { nativeAudio }
-  );
-
-  if (composerScenes.length === 0) throw new Error("No scenes to compose");
-
-  let globalAudioPath: string | undefined;
-  if (projectConfig.songUrl) {
-    globalAudioPath = path.join(workDir, "global_song.mp3");
-    await downloadFile(mediaUrl(projectConfig.songUrl), globalAudioPath);
-  }
-
-  console.log(
-    `[${label}] Composing ${composerScenes.length} scenes${
-      globalAudioPath ? " (global audio track)" : ""
-    }`
-  );
-
-  const enableSfx = projectConfig.enableSfx === true;
-  const sfx = enableSfx && sfxCues.length > 0 ? sfxCues : undefined;
-  if (sfx) console.log(`[${label}] SFX enabled: ${sfx.length} cues`);
-
-  const outputPath = await composeVideo({
-    scenes: composerScenes,
-    videoWidth: sizeConfig.width,
-    videoHeight: sizeConfig.height,
-    captionStyle: "none",
-    globalAudioPath,
-    sfx,
-  });
-
-  const outputBuffer = await fs.readFile(outputPath);
-  const s3Key = `output/${videoProjectId}/video_${Date.now()}.mp4`;
-  await uploadFile(s3Key, outputBuffer, "video/mp4");
-
-  await updateVideoStatus(videoProjectId, "COMPLETED", { outputUrl: s3Key });
-  console.log(`[${label}] Video complete: ${s3Key}`);
-}
-
-export async function composeFinalJob(job: Job<RenderJobData>) {
+async function runCompose(job: Job<RenderJobData>, nativeAudio: boolean): Promise<void> {
   const { videoProjectId } = job.data;
+  const label = nativeAudio ? "compose-final:seedance-2" : "compose-final";
   const workDir = path.join(os.tmpdir(), `faceless-compose-${uuid()}`);
   await fs.mkdir(workDir, { recursive: true });
+
   try {
-    await runCompose(videoProjectId, workDir, false, "compose-final");
+    const videoProject = await db.query.videoProjects.findFirst({
+      where: eq(schema.videoProjects.id, videoProjectId),
+    });
+    if (!videoProject) throw new Error(`Video project not found: ${videoProjectId}`);
+
+    await updateVideoStatus(videoProjectId, "RENDERING");
+
+    const sizeConfig = getVideoSize(videoProject.videoSize);
+    const projectConfig = (videoProject.config ?? {}) as PipelineConfig;
+
+    const { scenes, sfxCues } = await buildComposerScenes(videoProjectId, workDir, nativeAudio);
+    if (scenes.length === 0) throw new Error("No scenes to compose");
+
+    let globalAudioPath: string | undefined;
+    if (projectConfig.songUrl) {
+      globalAudioPath = path.join(workDir, "global_song.mp3");
+      await downloadFile(mediaUrl(projectConfig.songUrl), globalAudioPath);
+    }
+
+    console.log(
+      `[${label}] Composing ${scenes.length} scenes${globalAudioPath ? " (global audio track)" : ""}`
+    );
+
+    const sfx = projectConfig.enableSfx === true && sfxCues.length > 0 ? sfxCues : undefined;
+    if (sfx) console.log(`[${label}] SFX enabled: ${sfx.length} cues`);
+
+    const outputPath = await composeVideo({
+      scenes,
+      videoWidth: sizeConfig.width,
+      videoHeight: sizeConfig.height,
+      captionStyle: "none",
+      globalAudioPath,
+      sfx,
+    });
+
+    const outputBuffer = await fs.readFile(outputPath);
+    const s3Key = `output/${videoProjectId}/video_${Date.now()}.mp4`;
+    await uploadFile(s3Key, outputBuffer, "video/mp4");
+
+    await updateVideoStatus(videoProjectId, "COMPLETED", { outputUrl: s3Key });
+    console.log(`[${label}] Video complete: ${s3Key}`);
   } catch (error) {
     const msg = await failJob(videoProjectId, error);
-    console.error(`[compose-final] Failed for ${videoProjectId}:`, msg);
+    console.error(`[${label}] Failed for ${videoProjectId}:`, msg);
     throw error;
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
   }
 }
+
+export const composeFinalJob = (job: Job<RenderJobData>) => runCompose(job, false);
 
 // Seedance 2 movie: video clips already have dialogue baked in via reference_audios.
-// The composer preserves native audio streams instead of mixing external files.
-export async function composeFinalSeedance2Job(job: Job<RenderJobData>) {
-  const { videoProjectId } = job.data;
-  const workDir = path.join(os.tmpdir(), `faceless-compose-${uuid()}`);
-  await fs.mkdir(workDir, { recursive: true });
-  try {
-    await runCompose(videoProjectId, workDir, true, "compose-final:seedance-2");
-  } catch (error) {
-    const msg = await failJob(videoProjectId, error);
-    console.error(`[compose-final:seedance-2] Failed for ${videoProjectId}:`, msg);
-    throw error;
-  } finally {
-    await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
-  }
-}
+// The composer preserves the video's native audio stream instead of mixing external files.
+export const composeFinalSeedance2Job = (job: Job<RenderJobData>) => runCompose(job, true);
