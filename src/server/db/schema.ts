@@ -520,3 +520,55 @@ export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
 export const usageEntriesRelations = relations(usageEntries, ({ one }) => ({
   user: one(users, { fields: [usageEntries.userId], references: [users.id] }),
 }));
+
+// ── Story Room (v2) ──────────────────────────────────────────────────────────
+
+export const filmSessionStatusEnum = pgEnum("film_session_status", [
+  "in_progress",
+  "completed",
+  "abandoned",
+]);
+
+export const filmSessionPhaseEnum = pgEnum("film_session_phase", [
+  "generating",
+  "waiting_for_choice",
+  "complete",
+]);
+
+export const filmStepEnum = pgEnum("film_step", [
+  "premise", "logline", "conflict", "theme", "characters",
+  "world", "look", "synopsis", "beat_sheet", "outline",
+  "screenplay", "shot_list", "complete",
+]);
+
+export const filmSessions = pgTable("film_sessions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: filmSessionStatusEnum("status").notNull().default("in_progress"),
+  title: text("title"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Each row is one part of a UIMessage.
+// message_id groups parts belonging to the same assistant/user turn.
+// type identifies the part kind ("text", "tool-presentFork", …).
+// parts stores the full part payload as JSON.
+export const filmSessionMessages = pgTable("film_session_messages", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  messageId: text("message_id").notNull(),
+  sessionId: text("session_id").notNull().references(() => filmSessions.id, { onDelete: "cascade" }),
+  role: text("role").notNull(),
+  type: text("type").notNull(),
+  parts: json("parts").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const filmSessionsRelations = relations(filmSessions, ({ one, many }) => ({
+  user: one(users, { fields: [filmSessions.userId], references: [users.id] }),
+  messages: many(filmSessionMessages),
+}));
+
+export const filmSessionMessagesRelations = relations(filmSessionMessages, ({ one }) => ({
+  session: one(filmSessions, { fields: [filmSessionMessages.sessionId], references: [filmSessions.id] }),
+}));

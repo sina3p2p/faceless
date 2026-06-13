@@ -1,4 +1,3 @@
-import { Providers } from "@/components/providers";
 import { DashboardNav } from "@/components/dashboard-nav";
 
 export default function DashboardLayout({
@@ -7,11 +6,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <Providers>
-      <div className="min-h-screen flex">
-        <DashboardNav />
-        <main className="flex-1 ml-64">{children}</main>
-      </div>
-    </Providers>
+    <div className="min-h-screen flex">
+      <DashboardNav />
+      <main className="flex-1 ml-60">{children}</main>
+    </div>
   );
 }
