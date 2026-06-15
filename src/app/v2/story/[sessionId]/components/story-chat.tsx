@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ForkSelector } from "./fork-selector";
-import type { AssetRef, ClientMessage, ForkCall } from "@/types/v2/story";
+import type { AssetRef, ClientMessage, ForkCall, ShotResult } from "@/types/v2/story";
 
 export function StoryChat({
   sessionId,
@@ -116,6 +116,29 @@ export function StoryChat({
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, assetRef } : m))
       );
+    } else if (event.type === "shot_loading") {
+      const shotResult: ShotResult = { toolCallId: event.toolCallId as string, loading: true };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
+      );
+    } else if (event.type === "shot_generated") {
+      const shotResult: ShotResult = {
+        toolCallId: event.toolCallId as string,
+        loading: false,
+        videoUrl: event.videoUrl as string,
+      };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
+      );
+    } else if (event.type === "shot_error") {
+      const shotResult: ShotResult = {
+        toolCallId: event.toolCallId as string,
+        loading: false,
+        error: event.error as string,
+      };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
+      );
     } else if (event.type === "done") {
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, id: event.messageId as string } : m))
@@ -140,6 +163,68 @@ export function StoryChat({
       )
     );
     await streamResponse({ type: "fork_result", toolCallId, value, optionId });
+  }
+
+  async function handleShotApproval(toolCallId: string, videoUrl: string) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.shotResult?.toolCallId === toolCallId
+          ? { ...m, shotResult: { ...m.shotResult!, approved: true } }
+          : m
+      )
+    );
+    await streamResponse({ type: "shot_approval", toolCallId, videoUrl });
+  }
+
+  async function retryTool(toolCallId: string) {
+    // Pre-emptively show loading on the matching message
+    setMessages((prev) =>
+      prev.map((m) => {
+        if (m.shotResult?.toolCallId === toolCallId)
+          return { ...m, shotResult: { toolCallId, loading: true } };
+        if (m.assetRef?.toolCallId === toolCallId)
+          return { ...m, assetRef: { ...m.assetRef!, loading: true, error: undefined, images: undefined } };
+        return m;
+      })
+    );
+
+    try {
+      const res = await fetch(`/api/v2/story/${sessionId}/retry-tool`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toolCallId }),
+      });
+      if (!res.ok) throw new Error(`Retry failed: ${res.status}`);
+      const data = (await res.json()) as Record<string, unknown>;
+
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.shotResult?.toolCallId === toolCallId)
+            return { ...m, shotResult: { toolCallId, loading: false, videoUrl: data.videoUrl as string } };
+          if (m.assetRef?.toolCallId === toolCallId)
+            return {
+              ...m,
+              assetRef: {
+                ...m.assetRef!,
+                loading: false,
+                error: undefined,
+                images: data.images as string[],
+              },
+            };
+          return m;
+        })
+      );
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.shotResult?.toolCallId === toolCallId)
+            return { ...m, shotResult: { toolCallId, loading: false, error: String(err) } };
+          if (m.assetRef?.toolCallId === toolCallId)
+            return { ...m, assetRef: { ...m.assetRef!, loading: false, error: String(err) } };
+          return m;
+        })
+      );
+    }
   }
 
   async function handleAssetApproval(toolCallId: string, assetHandle: string, approvedUrl: string) {
@@ -265,8 +350,22 @@ export function StoryChat({
                               : (url: string) =>
                                 handleAssetApproval(msg.assetRef!.toolCallId, msg.assetRef!.assetHandle!, url)
                           }
+                          onRetry={!msg.assetRef.approvedUrl && !msg.assetRef.loading ? () => void retryTool(msg.assetRef!.toolCallId) : undefined}
                         />
                       </div>
+                    )}
+
+                    {msg.shotResult && (
+                      <ShotPreviewPanel
+                        shotResult={msg.shotResult}
+                        disabled={isStreaming}
+                        onApprove={
+                          msg.shotResult.videoUrl && !msg.shotResult.approved && !msg.shotResult.loading
+                            ? () => void handleShotApproval(msg.shotResult!.toolCallId, msg.shotResult!.videoUrl!)
+                            : undefined
+                        }
+                        onRetry={!msg.shotResult.loading ? () => void retryTool(msg.shotResult!.toolCallId) : undefined}
+                      />
                     )}
                   </div>
                 );
@@ -331,18 +430,105 @@ function InlineSpinner() {
   );
 }
 
+function ShotPreviewPanel({
+  shotResult,
+  disabled,
+  onApprove,
+  onRetry,
+}: {
+  shotResult: ShotResult;
+  disabled?: boolean;
+  onApprove?: () => void;
+  onRetry?: () => void;
+}) {
+  if (shotResult.loading) {
+    return <p className="text-xs text-gray-600 italic animate-pulse">Rendering shot…</p>;
+  }
+
+  if (shotResult.videoUrl) {
+    return (
+      <div className="mt-2 space-y-3 max-w-sm">
+        <div className="rounded-xl overflow-hidden border-2 border-white/10 transition-all duration-200">
+          <video src={shotResult.videoUrl} controls className="w-full" />
+        </div>
+        <div className="flex items-center gap-2">
+          {shotResult.approved ? (
+            <span className="text-[10px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-2 py-0.5">
+              Approved
+            </span>
+          ) : (
+            <button
+              onClick={onApprove}
+              disabled={disabled || !onApprove}
+              className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 border border-emerald-400/30 hover:border-emerald-300/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
+              </svg>
+              Approve shot
+            </button>
+          )}
+          {!shotResult.approved && onRetry && (
+            <button
+              onClick={onRetry}
+              disabled={disabled}
+              className="text-xs text-gray-500 hover:text-gray-300 border border-white/10 hover:border-white/20 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Regenerate
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-3">
+      <p className="text-xs text-red-400">{shotResult.error ?? "Shot render failed."}</p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          disabled={disabled}
+          className="text-xs text-violet-400 hover:text-violet-300 border border-violet-400/30 hover:border-violet-300/50 rounded-lg px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
 function AssetRefPanel({
   assetRef,
   disabled,
   onApprove,
+  onRetry,
 }: {
   assetRef: AssetRef;
   disabled?: boolean;
   onApprove?: (url: string) => void;
+  onRetry?: () => void;
 }) {
   if (assetRef.loading) {
     return (
       <p className="text-xs text-gray-600 italic animate-pulse">Generating reference images…</p>
+    );
+  }
+
+  if (assetRef.error || !assetRef.images?.length) {
+    return (
+      <div className="mt-2 flex items-center gap-3">
+        <p className="text-xs text-red-400">{assetRef.error ?? "Image generation failed."}</p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            disabled={disabled}
+            className="text-xs text-violet-400 hover:text-violet-300 border border-violet-400/30 hover:border-violet-300/50 rounded-lg px-3 py-1 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Retry
+          </button>
+        )}
+      </div>
     );
   }
 

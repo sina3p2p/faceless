@@ -4,7 +4,7 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
-import { storyTools, MODEL, openrouter } from "@/server/services/showrunner";
+import { storyTools, MODEL, openrouter, generateShotWithFallback } from "@/server/services/showrunner";
 import { rowsToModelMessages } from "@/server/services/showrunner/messages";
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
 import { generateImage } from "@/server/services/media";
@@ -95,6 +95,19 @@ export async function POST(
       }],
       createdAt: new Date(),
     });
+  } else if (body.type === "shot_approval") {
+    await db.insert(filmSessionMessages).values({
+      id: crypto.randomUUID(),
+      messageId: crypto.randomUUID(),
+      sessionId,
+      role: "user",
+      type: "shot_approval",
+      parts: [{
+        toolCallId: body.toolCallId,
+        videoUrl: body.videoUrl,
+      }],
+      createdAt: new Date(),
+    });
   } else if (body.type !== "trigger") {
     return badRequest("Unknown message type");
   }
@@ -135,6 +148,7 @@ export async function POST(
     let fullText = "";
     const toolCalls: RawToolCall[] = [];
     const pendingAssetIndices: number[] = [];
+    const pendingShotIndices: number[] = [];
     const loadReferenceResults = new Map<string, unknown>(); // toolCallId → execute() return value
 
     for await (const chunk of result.fullStream) {
@@ -146,6 +160,8 @@ export async function POST(
           emit({ type: "fork_loading", toolCallId: chunk.id });
         } else if (chunk.toolName === "generateAssetReferences") {
           emit({ type: "asset_ref_loading", toolCallId: chunk.id });
+        } else if (chunk.toolName === "generateShot") {
+          emit({ type: "shot_loading", toolCallId: chunk.id });
         }
       } else if (chunk.type === "tool-call") {
         const args = chunk.input as Record<string, unknown>;
@@ -160,6 +176,8 @@ export async function POST(
           emit({ type: "fork", toolCallId: chunk.toolCallId, ...args });
         } else if (chunk.toolName === "generateAssetReferences") {
           pendingAssetIndices.push(toolCalls.length - 1);
+        } else if (chunk.toolName === "generateShot") {
+          pendingShotIndices.push(toolCalls.length - 1);
         }
       } else if (chunk.type === "tool-result" && chunk.toolName === "loadReference") {
         loadReferenceResults.set(chunk.toolCallId, chunk.output);
@@ -187,6 +205,30 @@ export async function POST(
           emit({ type: "asset_ref", toolCallId: tc.id, assetHandle: args.assetHandle, assetKind: args.assetKind, images: generatedImages });
         })
       );
+    }
+
+    // Render shots sequentially (one per call per SKILL.md contract)
+    for (const idx of pendingShotIndices) {
+      const tc = toolCalls[idx]!;
+      const args = tc.function.arguments as {
+        prompt: string;
+        referenceImageUrls: string[];
+        duration: number;
+        aspectRatio: "16:9" | "9:16" | "1:1";
+      };
+      try {
+        const result = await generateShotWithFallback(
+          args.referenceImageUrls,
+          args.prompt,
+          args.aspectRatio,
+          args.duration,
+          sessionId
+        );
+        tc.function.arguments = { ...args, videoUrl: result.videoUrl };
+        emit({ type: "shot_generated", toolCallId: tc.id, videoUrl: result.videoUrl });
+      } catch (err) {
+        emit({ type: "shot_error", toolCallId: tc.id, error: String(err) });
+      }
     }
 
     await db.insert(filmSessionMessages).values({

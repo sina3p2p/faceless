@@ -1,5 +1,5 @@
 import type { ModelMessage } from "ai";
-import type { AssetRef, ClientMessage, ForkCall } from "@/types/v2/story";
+import type { AssetRef, ClientMessage, ForkCall, ShotResult } from "@/types/v2/story";
 
 type DbRow = {
   messageId: string;
@@ -37,6 +37,7 @@ function getToolCalls(d: Record<string, unknown>): RawToolCall[] {
 export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
   const forkResults = new Map<string, { optionId?: string; value: string }>();
   const assetApprovals = new Map<string, string>();
+  const shotApprovals = new Set<string>();
 
   for (const row of rows) {
     if (row.role === "user" && row.type === "fork_result") {
@@ -45,12 +46,15 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
     } else if (row.role === "user" && row.type === "asset_approval") {
       const d = rowData(row);
       assetApprovals.set(d.toolCallId as string, d.approvedUrl as string);
+    } else if (row.role === "user" && row.type === "shot_approval") {
+      const d = rowData(row);
+      shotApprovals.add(d.toolCallId as string);
     }
   }
 
   const messages: ClientMessage[] = [];
   for (const row of rows) {
-    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval")) continue;
+    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval" || row.type === "shot_approval")) continue;
 
     const d = rowData(row);
     if (row.role === "user") {
@@ -59,6 +63,7 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
       const calls = getToolCalls(d);
       let fork: ForkCall | undefined;
       let assetRef: AssetRef | undefined;
+      let shotResult: ShotResult | undefined;
 
       for (const tc of calls) {
         const args = tc.function.arguments;
@@ -80,10 +85,17 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
             images: (args.generatedImages ?? args.images) as string[] | undefined,
             approvedUrl: assetApprovals.get(tc.id),
           };
+        } else if (tc.function.name === "generateShot") {
+          shotResult = {
+            toolCallId: tc.id,
+            loading: false,
+            videoUrl: args.videoUrl as string | undefined,
+            approved: shotApprovals.has(tc.id),
+          };
         }
       }
 
-      messages.push({ id: row.messageId, role: "assistant", text: (d.text as string) ?? "", fork, assetRef });
+      messages.push({ id: row.messageId, role: "assistant", text: (d.text as string) ?? "", fork, assetRef, shotResult });
     }
   }
   return messages;
@@ -112,13 +124,19 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
         d.toolCallId as string,
         `User approved reference image for "${d.assetHandle as string}": ${d.approvedUrl as string}`
       );
+    } else if (row.role === "user" && row.type === "shot_approval") {
+      const d = rowData(row);
+      collectedResults.set(
+        d.toolCallId as string,
+        `Shot rendered and approved by user: ${d.videoUrl as string}. Proceed to the next shot.`
+      );
     }
   }
 
   const msgs: ModelMessage[] = [];
 
   for (const row of rows) {
-    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval")) continue;
+    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval" || row.type === "shot_approval")) continue;
 
     const d = rowData(row);
 
@@ -136,7 +154,7 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
           toolName: tc.function.name,
           // Strip server-side augmentation before sending to model
           input: Object.fromEntries(
-            Object.entries(tc.function.arguments).filter(([k]) => k !== "generatedImages")
+            Object.entries(tc.function.arguments).filter(([k]) => k !== "generatedImages" && k !== "videoUrl")
           ),
         }));
         msgs.push({
@@ -162,6 +180,10 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
           const resultText = collectedResults.get(tc.id) ?? (
             tc.function.name === "generateAssetReferences"
               ? `Reference images have been generated for "${tc.function.arguments.assetHandle as string}". User has not yet approved one.`
+              : tc.function.name === "generateShot"
+              ? tc.function.arguments.videoUrl
+                ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval.`
+                : "Shot render in progress."
               : "User has not yet responded to this decision."
           );
           return {

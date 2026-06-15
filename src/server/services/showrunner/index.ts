@@ -3,8 +3,41 @@ import { z } from "zod";
 import { openrouter } from "@/server/services/ai/llm/index";
 import { readFileSync, existsSync } from "node:fs";
 import { join, resolve, normalize } from "node:path";
+import { generateVideoFromReferences, type VideoResult } from "@/server/services/ai/video";
+import { SEEDANCE2_MODELS, isE005, addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
 
 export const MODEL = "anthropic/claude-sonnet-4.6";
+export const SEEDANCE_MODEL = "seedance-2-pro" as const satisfies TVideoModelId;
+
+/**
+ * Generate a shot via Seedance reference mode, with an automatic E005 fallback:
+ * if Seedance rejects the images with E005, apply enhanced Gaussian perturbation
+ * to all reference images and retry once.
+ */
+export async function generateShotWithFallback(
+  referenceImageUrls: string[],
+  prompt: string,
+  aspectRatio: "16:9" | "9:16" | "1:1" = "16:9",
+  duration: number,
+  sessionId: string
+): Promise<VideoResult> {
+  const run = (urls: string[]) =>
+    generateVideoFromReferences(urls, [], prompt, SEEDANCE_MODEL, aspectRatio, "480p", duration);
+
+  try {
+    return await run(referenceImageUrls);
+  } catch (err) {
+    if (SEEDANCE2_MODELS.has(SEEDANCE_MODEL) && isE005(err)) {
+      const noisedUrls = await Promise.all(
+        referenceImageUrls.map((url, i) =>
+          addSeedanceNoiseEnhanced(url, `ref${i}`, `story_${sessionId}`)
+        )
+      );
+      return await run(noisedUrls);
+    }
+    throw err;
+  }
+}
 
 const SKILLS_BASE = resolve(process.cwd(), "src/server/prompts/skills");
 
@@ -20,6 +53,7 @@ const loadReference = tool({
       "pipeline-steps.md",
       "deliverable-templates.md",
       "medium-constraints.md",
+      "shot-compilation-recipe.md",
     ]).describe("Relative path within the skills folder, e.g. 'references/pipeline-steps.md'"),
   }),
   execute: async ({ file }: { file: string }) => {
@@ -55,6 +89,32 @@ export const storyTools = {
         .describe(
           "Full image generation prompt: expand the locked spec + the locked Look block into a single self-contained prompt ready for an image model."
         ),
+    }),
+  }),
+  generateShot: tool({
+    description:
+      "Render one approved shot (or multi-shot group) via Seedance 2.0. " +
+      "Call this ONLY after the user has approved the compiled prompt. " +
+      "Present the returned clip, wait for the user's approval, then call again for the next shot. " +
+      "Never batch multiple independent shots in a single call — one call = one generation. " +
+      "Only available after the Bible is locked and all asset images are approved.",
+    inputSchema: z.object({
+      prompt: z
+        .string()
+        .describe("Full compiled Seedance 2.0 prompt, assembled from the Bible per the shot-compilation-recipe."),
+      referenceImageUrls: z
+        .array(z.string())
+        .describe("Approved reference image URLs for the @material handles that appear in this shot, in binding order ([Image1], [Image2], …). Max 9."),
+      duration: z
+        .number()
+        .int()
+        .min(4)
+        .max(15)
+        .describe("Target clip duration in seconds (4–15). Use the value from the shot row."),
+      aspectRatio: z
+        .enum(["16:9", "9:16", "1:1"])
+        .default("16:9")
+        .describe("Aspect ratio — default 16:9 for cinematic film."),
     }),
   }),
   presentFork: tool({

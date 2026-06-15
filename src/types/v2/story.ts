@@ -23,6 +23,15 @@ export type AssetRef = {
   assetKind?: "character" | "location";
   images?: string[];
   approvedUrl?: string;
+  error?: string;
+};
+
+export type ShotResult = {
+  toolCallId: string;
+  loading: boolean;
+  videoUrl?: string;
+  error?: string;
+  approved?: boolean;
 };
 
 export type ClientMessage = {
@@ -31,4 +40,5 @@ export type ClientMessage = {
   text: string;
   fork?: ForkCall;
   assetRef?: AssetRef;
+  shotResult?: ShotResult;
 };
