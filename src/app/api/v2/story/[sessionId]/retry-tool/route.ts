@@ -5,6 +5,7 @@ import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils
 import { eq } from "drizzle-orm";
 import { generateImage } from "@/server/services/media";
 import { generateShotWithFallback } from "@/server/services/showrunner";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 
 const ASSET_CANDIDATE_COUNT = 2;
 
@@ -70,8 +71,13 @@ export async function POST(
       tcArgs.duration as number,
       sessionId
     );
-    await patchRow({ videoUrl: result.videoUrl });
-    return NextResponse.json({ videoUrl: result.videoUrl });
+    const videoResp = await fetch(result.videoUrl);
+    const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
+    const key = `v2/shots/${sessionId}/${toolCallId}-retry-${Date.now()}.mp4`;
+    await uploadFile(key, videoBuffer, "video/mp4");
+    const persistentUrl = mediaUrl(key);
+    await patchRow({ videoUrl: persistentUrl });
+    return NextResponse.json({ videoUrl: persistentUrl });
   }
 
   if (toolName === "generateAssetReferences") {

@@ -8,6 +8,7 @@ import { storyTools, MODEL, openrouter, generateShotWithFallback } from "@/serve
 import { rowsToModelMessages } from "@/server/services/showrunner/messages";
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
 import { generateImage } from "@/server/services/media";
+import { uploadFile, mediaUrl } from "@/lib/storage";
 
 const ASSET_CANDIDATE_COUNT = 2;
 
@@ -224,8 +225,14 @@ export async function POST(
           args.duration,
           sessionId
         );
-        tc.function.arguments = { ...args, videoUrl: result.videoUrl };
-        emit({ type: "shot_generated", toolCallId: tc.id, videoUrl: result.videoUrl });
+        // Download from Replicate and upload to R2 so the URL never expires
+        const videoResp = await fetch(result.videoUrl);
+        const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
+        const key = `v2/shots/${sessionId}/${tc.id}.mp4`;
+        await uploadFile(key, videoBuffer, "video/mp4");
+        const persistentUrl = mediaUrl(key);
+        tc.function.arguments = { ...args, videoUrl: persistentUrl };
+        emit({ type: "shot_generated", toolCallId: tc.id, videoUrl: persistentUrl });
       } catch (err) {
         emit({ type: "shot_error", toolCallId: tc.id, error: String(err) });
       }
