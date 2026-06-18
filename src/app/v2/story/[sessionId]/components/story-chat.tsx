@@ -34,6 +34,7 @@ export function StoryChat({
     if (typeof window === "undefined") return 400;
     return Number(localStorage.getItem("chat-sidebar-width") ?? 400);
   });
+  const [chatVisible, setChatVisible] = useState(true);
   const isDraggingRef = useRef(false);
   const dragStartXRef = useRef(0);
   const dragStartWidthRef = useRef(0);
@@ -320,7 +321,7 @@ export function StoryChat({
   }
 
   return (
-    <div className="h-screen flex overflow-hidden">
+    <div className="h-screen flex overflow-hidden relative">
       {/* ── Center: Video Editor ── */}
       <VideoEditorPanel
         clips={clips}
@@ -329,31 +330,54 @@ export function StoryChat({
         onSelectClip={setSelectedClipId}
       />
 
-      {/* ── Drag handle ── */}
-      <div
-        onPointerDown={onDragHandlePointerDown}
-        onPointerMove={onDragHandlePointerMove}
-        onPointerUp={onDragHandlePointerUp}
-        onPointerCancel={onDragHandlePointerUp}
-        className="w-1 shrink-0 cursor-col-resize group relative flex items-center justify-center hover:bg-violet-500/20 active:bg-violet-500/30 transition-colors z-10"
-        title="Drag to resize"
-      >
-        {/* visible grabber line */}
-        <div className="absolute inset-y-0 w-px bg-white/8 group-hover:bg-violet-500/60 group-active:bg-violet-500 transition-colors" />
-      </div>
+      {/* ── Show-chat button (when sidebar is hidden) ── */}
+      {!chatVisible && (
+        <button
+          onClick={() => setChatVisible(true)}
+          title="Show chat"
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-20 w-6 h-12 flex items-center justify-center bg-gray-900 border border-white/10 border-r-0 rounded-l-lg text-gray-500 hover:text-white hover:bg-gray-800 transition-colors"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+      )}
+
+      {/* ── Drag handle (only when sidebar is visible) ── */}
+      {chatVisible && (
+        <div
+          onPointerDown={onDragHandlePointerDown}
+          onPointerMove={onDragHandlePointerMove}
+          onPointerUp={onDragHandlePointerUp}
+          onPointerCancel={onDragHandlePointerUp}
+          className="w-1 shrink-0 cursor-col-resize group relative flex items-center justify-center hover:bg-violet-500/20 active:bg-violet-500/30 transition-colors z-10"
+          title="Drag to resize"
+        >
+          <div className="absolute inset-y-0 w-px bg-white/8 group-hover:bg-violet-500/60 group-active:bg-violet-500 transition-colors" />
+        </div>
+      )}
 
       {/* ── Right: Chat Sidebar ── */}
       <div
-        style={{ width: chatWidth }}
-        className="shrink-0 flex flex-col border-l border-white/10 bg-gray-950 overflow-hidden relative"
+        style={{ width: chatVisible ? chatWidth : 0 }}
+        className="shrink-0 flex flex-col border-l border-white/10 bg-gray-950 overflow-hidden relative transition-[width] duration-200"
       >
-        {/* seed label */}
-        <div className="border-b border-white/10 px-4 py-3 shrink-0">
-          <p className="text-xs text-gray-500 truncate">&ldquo;{seed}&rdquo;</p>
+        {/* seed label + toggle */}
+        <div className="border-b border-white/10 px-4 py-3 shrink-0 flex items-center gap-2">
+          <p className="text-xs text-gray-500 truncate flex-1">&ldquo;{seed}&rdquo;</p>
+          <button
+            onClick={() => setChatVisible(false)}
+            title="Hide chat"
+            className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-gray-600 hover:text-gray-300 hover:bg-white/8 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
         </div>
 
         {/* messages */}
-        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5">
+        <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
           <div className="space-y-7 pb-4">
             {messages.map((msg) => {
               if (msg.role === "user") {

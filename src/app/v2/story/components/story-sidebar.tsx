@@ -148,11 +148,12 @@ export function StorySidebar() {
   const isLibrary = pathname === "/v2/story/library";
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [pinned, setPinned] = useState(() => {
-    if (typeof window === "undefined") return true;
+  const [pinned, setPinned] = useState(true);
+
+  useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored !== null ? stored === "true" : true;
-  });
+    if (stored !== null) setPinned(stored === "true");
+  }, []);
   const menuRef = useRef<HTMLDivElement>(null);
 
   function togglePin() {
@@ -244,7 +245,7 @@ export function StorySidebar() {
               <div className="px-4 py-3 border-b border-white/6">
                 <p className="text-sm font-semibold text-white">Recents</p>
               </div>
-              <div className="max-h-96 overflow-y-auto py-1.5 px-1.5">
+              <div className="max-h-96 overflow-y-auto py-1.5 px-1.5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
                 <SessionList sessions={sessions} activeSessionId={activeSessionId} />
               </div>
             </div>
@@ -327,7 +328,7 @@ export function StorySidebar() {
       )}
 
       {/* Sessions list */}
-      <div className="flex-1 overflow-y-auto px-1.5 pb-2">
+      <div className="flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
         <SessionList sessions={sessions} activeSessionId={activeSessionId} />
       </div>
 
