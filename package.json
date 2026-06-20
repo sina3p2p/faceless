@@ -26,6 +26,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@fal-ai/client": "^1.9.5",
     "@openrouter/ai-sdk-provider": "^2.5.0",
+    "@remotion/lambda": "^4.0.481",
     "@remotion/media-utils": "^4.0.445",
     "@remotion/player": "^4.0.445",
     "@tailwindcss/typography": "^0.5.19",

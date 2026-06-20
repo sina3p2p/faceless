@@ -325,7 +325,6 @@ export function StoryChat({
       {/* ── Center: Video Editor ── */}
       <VideoEditorPanel
         clips={clips}
-        onReorderClips={setClipOrder}
         selectedClipId={selectedClipId}
         onSelectClip={setSelectedClipId}
       />
