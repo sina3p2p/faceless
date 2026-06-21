@@ -33,6 +33,15 @@ export interface ReferenceModeRequest {
   resolution: TVideoResolution;
 }
 
+export interface VideoEditRequest {
+  /** URL of the source video to edit. */
+  videoUrl: string;
+  prompt: string;
+  duration: number;
+  aspectRatio: TAspectRatio;
+  resolution: TVideoResolution;
+}
+
 export interface IVideoProvider {
   readonly client: AxiosInstance;
   generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult>;

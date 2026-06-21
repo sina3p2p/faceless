@@ -1,5 +1,7 @@
 # Shot Compilation Recipe — Turning the Locked Bible into Seedance 2.0 Prompts
 
+> **DO NOT LOAD THIS FILE DURING STAGE 1.** It is useless before reference images exist, and reading it while authoring the story or shot list will contaminate that work with premature render-prompt thinking. Load it ONLY after Stage 1 is fully complete — the Bible is locked AND every `@material` has an approved reference image — at the moment you begin writing Seedance prompts in Stage 2. If you are still developing premise, characters, screenplay, shot-list intent, or generating asset images, this file is not yet relevant.
+
 This is the reference the showrunner loads when Stage 1 is complete (Bible locked, all assets approved) and it begins writing the final Seedance prompts. It is **not** a story tool — every creative decision was already made and frozen in the Bible. This document is purely about *compiling* those locked decisions into precise, renderable Seedance 2.0 prompts.
 
 ---
@@ -70,6 +72,15 @@ When a shot is flagged static-lock (subject must not change/morph during the sho
 - The identity anchor: `Stable identity, natural proportions, clean edges throughout.`
 
 Never write "the pyramid does not grow" or "no morphing" — write the fixed state as a present fact and let only the camera move. This is the fix for the morphing-pyramid bug; it is mandatory wherever the State Schedule says a thing is fixed within a shot but changes between shots (structure heights, glow levels, etc.).
+
+**CRITICAL — lock RIGID things, NEVER lock ORGANIC/atmospheric things.** Static-lock exists to stop *rigid* subjects from morphing (a structure's shape/height, a character's identity, a vehicle's form). It must NOT be applied to organic or atmospheric elements, which in a living environment are *supposed* to be in constant gentle motion. If you lock a whole environment, you get a beautiful frozen photograph that a character walks through — the #1 cause of "the background feels static / looks AI." **Always request ambient environmental motion explicitly** for anything organic in frame:
+- Foliage, vines, leaves, grass: "leaves and vines sway gently in a soft breeze."
+- Water (streams, sea, drips): "the stream flows steadily, surface catching light."
+- Mist, smoke, dust, haze: "mist drifts slowly across the ground."
+- Light through moving canopy/clouds: "dappled light shafts shimmer faintly as the canopy stirs."
+- Fire, embers, fabric, hair, banners: "flames flicker, embers drift; fabric stirs in the air."
+
+So a shot's motion instruction has THREE tiers, not two: **(a) the deliberate action** (scripted: a block slides, a beam fires); **(b) ambient life** (organic elements always breathing — foliage, water, mist, light); **(c) the genuinely rigid lock** (a structure or identity that must not morph). Only (c) gets the FIXED clause. Give (b) explicit gentle motion. A frame with NO (b) motion will read as static even when the subject moves — name the ambient life in every shot that has an organic or atmospheric environment.
 
 **The lock-vs-motion tension (important):** when a shot has BOTH a thing that must move (a sliding block, a raised hand) AND a large fixed structure (the pyramid), asking the model to freeze most of the frame while animating one small piece is hard — its safe resolution is to barely move anything, producing the "static image with a few moves" look. Two fixes: (1) **frame tighter** — if the motion is a block and a hand, frame on the block-and-hand, not the whole monument, so the locked structure isn't dominating the frame and fighting the motion; (2) **only lock what's actually in frame and at risk of drifting** — don't burn the model's attention locking a pyramid that's barely in a tight shot. Reserve the full structure-lock for wide shots where the structure is the subject. A motion-rich shot wants a framing that lets the motion be the main event.
 

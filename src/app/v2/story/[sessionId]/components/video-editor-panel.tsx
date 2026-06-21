@@ -37,7 +37,7 @@ type AudioClip = {
   volume: number;
 };
 
-type ToolTab = "speed" | "volume" | "text" | "audio" | "effects" | "export";
+type ToolTab = "speed" | "volume" | "text" | "audio" | "effects" | "export" | "ai-edit";
 type SpeedMode = "normal" | "curve";
 type CurvePoint = { x: number; y: number }; // both 0–1; y=0→0.1×, y=0.5→1×, y=1→10×
 
@@ -55,7 +55,7 @@ function getCurveSpeedAt(pts: CurvePoint[], t: number): number {
       const u = (t - a.x) / (b.x - a.x);
       const p0 = i > 0 ? pts[i - 1] : a;
       const p3 = i + 2 < pts.length ? pts[i + 2] : b;
-      const y = 0.5 * ((2 * a.y) + (-p0.y + b.y) * u + (2*p0.y - 5*a.y + 4*b.y - p3.y) * u*u + (-p0.y + 3*a.y - 3*b.y + p3.y) * u*u*u);
+      const y = 0.5 * ((2 * a.y) + (-p0.y + b.y) * u + (2 * p0.y - 5 * a.y + 4 * b.y - p3.y) * u * u + (-p0.y + 3 * a.y - 3 * b.y + p3.y) * u * u * u);
       return speedFromY(Math.max(0.001, Math.min(1, y)));
     }
   }
@@ -76,25 +76,26 @@ function buildCurveSvgPath(pts: CurvePoint[], W: number, H: number, pL: number, 
   const ext = [pts[0], ...pts, pts[pts.length - 1]];
   let d = `M ${mx(ext[1].x)} ${my(ext[1].y)}`;
   for (let i = 1; i < ext.length - 2; i++) {
-    const p0 = ext[i-1], p1 = ext[i], p2 = ext[i+1], p3 = ext[i+2];
+    const p0 = ext[i - 1], p1 = ext[i], p2 = ext[i + 1], p3 = ext[i + 2];
     d += ` C ${mx(p1.x + (p2.x - p0.x) / 6)} ${my(p1.y + (p2.y - p0.y) / 6)}, ${mx(p2.x - (p3.x - p1.x) / 6)} ${my(p2.y - (p3.y - p1.y) / 6)}, ${mx(p2.x)} ${my(p2.y)}`;
   }
   return d;
 }
 
 const CURVE_PRESETS: { id: string; label: string; points: CurvePoint[]; icon: string }[] = [
-  { id: "none",      label: "None",     points: [{x:0,y:0.5},{x:1,y:0.5}], icon: "M 5 20 L 55 20" },
-  { id: "montage",   label: "Montage",  points: [{x:0,y:0.5},{x:0.15,y:0.5},{x:0.32,y:0.76},{x:0.55,y:0.24},{x:0.72,y:0.5},{x:1,y:0.5}], icon: "M 5 20 C 11 20 15 8 25 8 C 36 8 39 32 46 32 C 51 32 52 20 55 20" },
-  { id: "hero",      label: "Hero",     points: [{x:0,y:0.5},{x:0.2,y:0.5},{x:0.36,y:0.82},{x:0.62,y:0.18},{x:0.78,y:0.5},{x:1,y:0.5}], icon: "M 5 20 C 13 20 19 5 29 5 C 40 5 43 35 49 35 C 53 35 54 20 55 20" },
-  { id: "bullet",    label: "Bullet",   points: [{x:0,y:0.5},{x:0.25,y:0.5},{x:0.5,y:0.1},{x:0.75,y:0.5},{x:1,y:0.5}], icon: "M 5 20 C 13 20 20 37 30 37 C 40 37 46 20 55 20" },
-  { id: "jump-cut",  label: "Jump Cut", points: [{x:0,y:0.5},{x:0.3,y:0.5},{x:0.38,y:0.8},{x:0.46,y:0.5},{x:1,y:0.5}], icon: "M 5 20 L 22 20 C 26 20 28 7 30 7 C 32 7 34 20 38 20 L 55 20" },
-  { id: "flash-in",  label: "Flash In", points: [{x:0,y:0.5},{x:0.58,y:0.5},{x:0.74,y:0.76},{x:1,y:0.76}], icon: "M 5 20 L 34 20 C 43 20 48 8 55 8" },
-  { id: "flash-out", label: "Flash Out",points: [{x:0,y:0.76},{x:0.26,y:0.76},{x:0.42,y:0.5},{x:1,y:0.5}], icon: "M 5 8 C 12 8 17 20 26 20 L 55 20" },
-  { id: "custom",    label: "Custom",   points: [], icon: "" },
+  { id: "none", label: "None", points: [{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }], icon: "M 5 20 L 55 20" },
+  { id: "montage", label: "Montage", points: [{ x: 0, y: 0.5 }, { x: 0.15, y: 0.5 }, { x: 0.32, y: 0.76 }, { x: 0.55, y: 0.24 }, { x: 0.72, y: 0.5 }, { x: 1, y: 0.5 }], icon: "M 5 20 C 11 20 15 8 25 8 C 36 8 39 32 46 32 C 51 32 52 20 55 20" },
+  { id: "hero", label: "Hero", points: [{ x: 0, y: 0.5 }, { x: 0.2, y: 0.5 }, { x: 0.36, y: 0.82 }, { x: 0.62, y: 0.18 }, { x: 0.78, y: 0.5 }, { x: 1, y: 0.5 }], icon: "M 5 20 C 13 20 19 5 29 5 C 40 5 43 35 49 35 C 53 35 54 20 55 20" },
+  { id: "bullet", label: "Bullet", points: [{ x: 0, y: 0.5 }, { x: 0.25, y: 0.5 }, { x: 0.5, y: 0.1 }, { x: 0.75, y: 0.5 }, { x: 1, y: 0.5 }], icon: "M 5 20 C 13 20 20 37 30 37 C 40 37 46 20 55 20" },
+  { id: "jump-cut", label: "Jump Cut", points: [{ x: 0, y: 0.5 }, { x: 0.3, y: 0.5 }, { x: 0.38, y: 0.8 }, { x: 0.46, y: 0.5 }, { x: 1, y: 0.5 }], icon: "M 5 20 L 22 20 C 26 20 28 7 30 7 C 32 7 34 20 38 20 L 55 20" },
+  { id: "flash-in", label: "Flash In", points: [{ x: 0, y: 0.5 }, { x: 0.58, y: 0.5 }, { x: 0.74, y: 0.76 }, { x: 1, y: 0.76 }], icon: "M 5 20 L 34 20 C 43 20 48 8 55 8" },
+  { id: "flash-out", label: "Flash Out", points: [{ x: 0, y: 0.76 }, { x: 0.26, y: 0.76 }, { x: 0.42, y: 0.5 }, { x: 1, y: 0.5 }], icon: "M 5 8 C 12 8 17 20 26 20 L 55 20" },
+  { id: "custom", label: "Custom", points: [], icon: "" },
 ];
 
 interface VideoEditorPanelProps {
   clips: Clip[];
+  sessionId: string;
   selectedClipId: string | null;
   onSelectClip: (id: string | null) => void;
 }
@@ -175,9 +176,8 @@ function TrimHandle({ edge, onPointerDown }: { edge: "start" | "end"; onPointerD
   return (
     <div
       onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); onPointerDown(e); }}
-      className={`absolute top-0 bottom-0 w-3 z-10 flex items-center justify-center cursor-ew-resize group/h pointer-events-auto ${
-        edge === "start" ? "left-0" : "right-0"
-      }`}
+      className={`absolute top-0 bottom-0 w-3 z-10 flex items-center justify-center cursor-ew-resize group/h pointer-events-auto ${edge === "start" ? "left-0" : "right-0"
+        }`}
     >
       {/* visible bar */}
       <div className="w-[3px] h-9 rounded-full bg-white/30 group-hover/h:bg-white transition-colors" />
@@ -200,7 +200,7 @@ const MAX_TRACKS = 8;
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
-export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoEditorPanelProps) {
+export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectClip }: VideoEditorPanelProps) {
   const [internalClips, setInternalClips] = useState<InternalClip[]>(() => {
     // Space clips sequentially on track 0 with a 5s placeholder gap.
     // Real durations load asynchronously via onLoadedMetadata.
@@ -230,6 +230,11 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
   interface TransitionSetting { type: TransitionType; duration: number; }
   const [clipTransitions, setClipTransitions] = useState<Map<string, TransitionSetting>>(new Map());
   const [transitionPickerFor, setTransitionPickerFor] = useState<string | null>(null);
+
+  // ── AI Edit ───────────────────────────────────────────────────────────────
+  const [aiEditPrompt, setAiEditPrompt] = useState("");
+  const [aiEditLoading, setAiEditLoading] = useState(false);
+  const [aiEditError, setAiEditError] = useState<string | null>(null);
 
   // ── Audio clips ───────────────────────────────────────────────────────────
   const [audioClips, setAudioClips] = useState<AudioClip[]>([]);
@@ -291,7 +296,7 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
   const pxPerSecRef = useRef(pxPerSec);
   pxPerSecRef.current = pxPerSec;
   const totalDurationRef = useRef(0); // updated after totalDuration is computed
-  const seekToRef = useRef<(t: number) => void>(() => {}); // updated after seekTo is defined
+  const seekToRef = useRef<(t: number) => void>(() => { }); // updated after seekTo is defined
   const pendingScrollRef = useRef<number | null>(null);
 
   // Trim drag tooltip
@@ -798,6 +803,47 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
   const totalTicks = totalDuration > 0 ? Math.ceil(totalDuration / tickInterval) + 2 : 20;
   const timelineContentWidth = Math.max(totalDuration * pxPerSec + 96, 600);
 
+  // ── AI edit ──────────────────────────────────────────────────────────────
+
+  async function handleAiEdit() {
+    if (!selectedClipId || !aiEditPrompt.trim() || aiEditLoading) return;
+    const clip = internalClips.find((c) => c.id === selectedClipId);
+    if (!clip) return;
+    const rawDur = getRawDuration(selectedClipId);
+    setAiEditLoading(true);
+    setAiEditError(null);
+    try {
+      const res = await fetch(`/api/v2/story/${sessionId}/edit-clip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoUrl: clip.videoUrl,
+          prompt: aiEditPrompt.trim(),
+          duration: rawDur > 0 ? rawDur : 5,
+          aspectRatio: "16:9",
+        }),
+      });
+      const data = await res.json() as { videoUrl?: string; error?: string };
+      if (!res.ok || data.error) throw new Error(data.error ?? "Edit failed");
+      // Replace the clip's video URL and reset its trim/meta
+      const newId = `${clip.sourceId}-edit-${Date.now()}`;
+      setInternalClips((prev) =>
+        prev.map((c) =>
+          c.id === selectedClipId
+            ? { ...c, id: newId, videoUrl: data.videoUrl!, trimStart: 0, trimEnd: null }
+            : c
+        )
+      );
+      setClipMeta((prev) => { const m = new Map(prev); m.delete(selectedClipId); return m; });
+      onSelectClip(newId);
+      setAiEditPrompt("");
+    } catch (err) {
+      setAiEditError(String(err));
+    } finally {
+      setAiEditLoading(false);
+    }
+  }
+
   // ── tab config ────────────────────────────────────────────────────────────
 
   const TABS: { id: ToolTab; label: string; icon: React.ReactNode }[] = [
@@ -807,6 +853,7 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
     { id: "audio", label: "Audio", icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z" /></svg> },
     { id: "effects", label: "Effects", icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" /></svg> },
     { id: "export", label: "Export", icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg> },
+    { id: "ai-edit", label: "AI Edit", icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" /></svg> },
   ];
 
   const currentSpeed = selectedClipId ? (clipSpeeds.get(selectedClipId) ?? 1) : 1;
@@ -883,11 +930,10 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
                   setPopupOpen(true);
                 }
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shrink-0 ${
-                isActive
-                  ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
-                  : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shrink-0 ${isActive
+                ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
+                : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                }`}
             >
               {tab.icon}{tab.label}
             </button>
@@ -1068,6 +1114,56 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
                 </div>
               )}
 
+              {/* ── AI EDIT TAB ── */}
+              {activeTab === "ai-edit" && (
+                <div className="flex flex-col gap-3 px-4 py-3">
+                  {!selectedClipId ? (
+                    <span className="text-xs text-gray-500">Select a clip in the timeline to edit it with AI.</span>
+                  ) : (
+                    <>
+                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                        Describe the change to apply. The selected clip will be sent to Seedance and replaced with the AI-edited version.
+                      </p>
+                      <textarea
+                        value={aiEditPrompt}
+                        onChange={(e) => setAiEditPrompt(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { void handleAiEdit(); } }}
+                        placeholder="e.g. Change the lighting to golden hour, add slow motion to the action sequence…"
+                        rows={4}
+                        disabled={aiEditLoading}
+                        className="w-full bg-white/6 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-gray-600 resize-none focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
+                      />
+                      {aiEditError && (
+                        <p className="text-[11px] text-red-400 leading-relaxed">{aiEditError}</p>
+                      )}
+                      <button
+                        onClick={() => { void handleAiEdit(); }}
+                        disabled={!aiEditPrompt.trim() || aiEditLoading}
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
+                      >
+                        {aiEditLoading ? (
+                          <>
+                            <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4l3-3-3-3v4a8 8 0 00-8 8h4z" />
+                            </svg>
+                            Editing…
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                            </svg>
+                            Edit with AI
+                          </>
+                        )}
+                      </button>
+                      <p className="text-[10px] text-gray-600">⌘↵ to submit</p>
+                    </>
+                  )}
+                </div>
+              )}
+
               {/* ── COMING SOON TABS ── */}
               {(activeTab === "text" || activeTab === "audio" || activeTab === "effects") && (
                 <div className="flex items-center gap-2 px-4 py-4">
@@ -1119,7 +1215,7 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
             </p>
           </div>
         ) : (
-            <Player
+          <Player
             ref={playerRef}
             component={StoryComposition}
             inputProps={compositionProps}
@@ -1163,16 +1259,16 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
               <div className="px-3 py-3 flex flex-col gap-3">
                 <div className="grid grid-cols-4 gap-1.5">
                   {([
-                    { type: "cut",         label: "Cut",      icon: "✂" },
-                    { type: "dissolve",    label: "Dissolve", icon: "⊕" },
-                    { type: "fade-black",  label: "Fade",     icon: "◼" },
-                    { type: "slide-left",  label: "Slide ←",  icon: "←" },
-                    { type: "slide-right", label: "Slide →",  icon: "→" },
-                    { type: "slide-up",    label: "Slide ↑",  icon: "↑" },
-                    { type: "slide-down",  label: "Slide ↓",  icon: "↓" },
-                    { type: "zoom-in",     label: "Zoom",     icon: "⊙" },
-                    { type: "wipe-left",   label: "Wipe →",   icon: "▶" },
-                    { type: "wipe-right",  label: "Wipe ←",   icon: "◀" },
+                    { type: "cut", label: "Cut", icon: "✂" },
+                    { type: "dissolve", label: "Dissolve", icon: "⊕" },
+                    { type: "fade-black", label: "Fade", icon: "◼" },
+                    { type: "slide-left", label: "Slide ←", icon: "←" },
+                    { type: "slide-right", label: "Slide →", icon: "→" },
+                    { type: "slide-up", label: "Slide ↑", icon: "↑" },
+                    { type: "slide-down", label: "Slide ↓", icon: "↓" },
+                    { type: "zoom-in", label: "Zoom", icon: "⊙" },
+                    { type: "wipe-left", label: "Wipe →", icon: "▶" },
+                    { type: "wipe-right", label: "Wipe ←", icon: "◀" },
                   ] as const).map(({ type, label, icon }) => {
                     const active = (trans?.type ?? "cut") === type;
                     return (
@@ -1186,11 +1282,10 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
                             return next;
                           })
                         }
-                        className={`flex flex-col items-center gap-0.5 py-2 rounded-xl text-[10px] font-semibold transition-all ${
-                          active
-                            ? "bg-violet-600 text-white shadow shadow-violet-900/50"
-                            : "bg-white/6 text-gray-400 hover:bg-white/12 hover:text-white"
-                        }`}
+                        className={`flex flex-col items-center gap-0.5 py-2 rounded-xl text-[10px] font-semibold transition-all ${active
+                          ? "bg-violet-600 text-white shadow shadow-violet-900/50"
+                          : "bg-white/6 text-gray-400 hover:bg-white/12 hover:text-white"
+                          }`}
                       >
                         <span className="text-base leading-none">{icon}</span>
                         <span>{label}</span>
@@ -1262,9 +1357,8 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
             onClick={toggleReverse}
             disabled={!selectedClipId}
             title="Reverse clip"
-            className={`w-8 h-8 flex items-center justify-center rounded transition-all disabled:opacity-25 disabled:cursor-not-allowed ${
-              selectedClip?.reversed ? "text-amber-400 bg-amber-500/15 hover:bg-amber-500/25" : "text-gray-500 hover:text-white hover:bg-white/10"
-            }`}
+            className={`w-8 h-8 flex items-center justify-center rounded transition-all disabled:opacity-25 disabled:cursor-not-allowed ${selectedClip?.reversed ? "text-amber-400 bg-amber-500/15 hover:bg-amber-500/25" : "text-gray-500 hover:text-white hover:bg-white/10"
+              }`}
           >
             <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
@@ -1329,25 +1423,6 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
-          </button>
-          <div className="w-px h-5 bg-white/10 mx-1" />
-          <button onClick={exportVideo} disabled={isExporting || internalClips.length === 0} title="Export MP4 via Lambda"
-            className="flex items-center gap-1.5 h-7 px-3 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            {isExporting ? (
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-              </svg>
-            )}
-            {isExporting
-              ? exportProgress !== null && exportProgress > 0
-                ? `${exportProgress}%`
-                : "Queuing…"
-              : "Export"}
           </button>
         </div>
       </div>
@@ -1462,13 +1537,12 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
               return (
                 <div
                   key={clip.id}
-                  className={`absolute rounded-lg overflow-hidden select-none border-2 transition-[border,box-shadow] cursor-grab active:cursor-grabbing ${
-                    isSelected
-                      ? "border-violet-500 ring-2 ring-violet-500/30 z-20"
-                      : isActive
+                  className={`absolute rounded-lg overflow-hidden select-none border-2 transition-[border,box-shadow] cursor-grab active:cursor-grabbing ${isSelected
+                    ? "border-violet-500 ring-2 ring-violet-500/30 z-20"
+                    : isActive
                       ? "border-violet-400/50 z-10"
                       : "border-white/10 hover:border-white/30 z-10"
-                  }`}
+                    }`}
                   style={{ left, top: top + 4, width: w, height: CLIP_TRACK_H - 8 }}
                   onClick={(e) => { e.stopPropagation(); onSelectClip(clip.id); }}
                   onPointerDown={(e) => {
@@ -1611,13 +1685,12 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
                     return (
                       <button
                         key={`tj-${clipA.id}-${clipB.id}`}
-                        className={`absolute z-40 rounded-full border-2 flex items-center justify-center transition-all shadow-xl group ${
-                          isOpen
-                            ? "bg-violet-600 border-violet-300 text-white scale-110"
-                            : hasTransition
+                        className={`absolute z-40 rounded-full border-2 flex items-center justify-center transition-all shadow-xl group ${isOpen
+                          ? "bg-violet-600 border-violet-300 text-white scale-110"
+                          : hasTransition
                             ? "bg-violet-700/90 border-violet-400 text-white hover:scale-110"
                             : "bg-[#18181c] border-white/25 text-gray-400 hover:border-violet-400 hover:text-violet-300 hover:scale-110"
-                        }`}
+                          }`}
                         style={{
                           left: joinX - BTN / 2,
                           top: joinY + 4 + (CLIP_TRACK_H - 8 - BTN) / 2,
@@ -1652,9 +1725,8 @@ export function VideoEditorPanel({ clips, selectedClipId, onSelectClip }: VideoE
               return (
                 <div
                   key={ac.id}
-                  className={`absolute rounded-lg overflow-hidden select-none border-2 cursor-grab active:cursor-grabbing transition-[border,box-shadow] ${
-                    isSelected ? "border-teal-400 ring-2 ring-teal-400/30 z-20" : "border-teal-900/60 hover:border-teal-700/80 z-10"
-                  }`}
+                  className={`absolute rounded-lg overflow-hidden select-none border-2 cursor-grab active:cursor-grabbing transition-[border,box-shadow] ${isSelected ? "border-teal-400 ring-2 ring-teal-400/30 z-20" : "border-teal-900/60 hover:border-teal-700/80 z-10"
+                    }`}
                   style={{ left, top: top + 4, width: w, height: CLIP_TRACK_H - 8 }}
                   onClick={(e) => { e.stopPropagation(); setSelectedAudioId(ac.id); onSelectClip(null); }}
                   onPointerDown={(e) => {

@@ -1,5 +1,5 @@
 import { AI_VIDEO, VIDEO_MODELS } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, ReferenceModeRequest, VideoResult } from "@/types/video-provider";
+import type { I2vRequest, IVideoProvider, ReferenceModeRequest, VideoEditRequest, VideoResult } from "@/types/video-provider";
 import { sleep } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
 
@@ -103,6 +103,22 @@ export class ReplicateVideoProvider implements IVideoProvider {
 
   async generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult> {
     const input = this.generateInput(model, req);
+    const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
+    return this.pollPrediction(prediction.data.id, req.duration);
+  }
+
+  /**
+   * Video-to-video editing with Seedance 2: sends the source video + edit prompt,
+   * returns the AI-edited result.
+   */
+  async generateVideoEdit(req: VideoEditRequest, model: TVideoModelId): Promise<VideoResult> {
+    const input: Record<string, unknown> = {
+      reference_videos: [req.videoUrl],
+      prompt: `[Video1] ${req.prompt}`,
+      duration: req.duration,
+      aspect_ratio: req.aspectRatio,
+      resolution: req.resolution,
+    };
     const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
     return this.pollPrediction(prediction.data.id, req.duration);
   }

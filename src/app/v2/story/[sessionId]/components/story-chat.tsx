@@ -325,6 +325,7 @@ export function StoryChat({
       {/* ── Center: Video Editor ── */}
       <VideoEditorPanel
         clips={clips}
+        sessionId={sessionId}
         selectedClipId={selectedClipId}
         onSelectClip={setSelectedClipId}
       />
