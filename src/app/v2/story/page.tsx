@@ -64,11 +64,10 @@ export default function StoryLandingPage() {
               <p className="mt-2 text-red-400 text-sm">{error?.message || "Something went wrong"}</p>
             )}
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-xs text-gray-600">{length} / 500</span>
               <Button
                 onClick={handleCreate}
                 loading={isPending}
-                disabled={length === 0 || length > 500}
+                disabled={length === 0}
                 size="lg"
               >
                 Start the story room
