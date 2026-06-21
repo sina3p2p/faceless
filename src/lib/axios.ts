@@ -1,8 +1,7 @@
 import axios from "axios";
-import { APP } from "./constants";
 
 const instance = axios.create({
-    baseURL: `${APP.url}/api`,
+    baseURL: `${process.env.NEXT_PUBLIC_APP_URL}/api`,
     headers: {
         "Content-Type": "application/json",
     },
