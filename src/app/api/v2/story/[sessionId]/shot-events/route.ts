@@ -1,13 +1,15 @@
 import { NextRequest } from "next/server";
-import IORedis from "ioredis";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { db } from "@/server/db";
-import { filmSessions } from "@/server/db/schema";
+import { filmSessions, filmShotJobs } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
-import { shotEventsChannel } from "@/lib/shot-queue";
-import { REDIS } from "@/lib/constants";
 
 export const runtime = "nodejs";
+
+// How often the server checks the DB for completed shots while the client is waiting.
+const POLL_MS = 3_000;
+// Safety ceiling — close the stream after 10 min regardless.
+const MAX_WAIT_MS = 10 * 60 * 1_000;
 
 export async function GET(
   _req: NextRequest,
@@ -27,44 +29,54 @@ export async function GET(
 
   const encoder = new TextEncoder();
 
-  // Each SSE connection gets its own subscriber so different sessions (or tabs)
-  // don't share a connection. ioredis subscriber connections must not be reused
-  // for regular commands, so we create a dedicated instance here.
-  const subscriber = new IORedis(REDIS.url, { maxRetriesPerRequest: null });
-
   const body = new ReadableStream({
     async start(controller) {
-      const send = (data: object) =>
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-
-      // Keep-alive ping every 25 s so proxies don't close the connection.
-      const pingInterval = setInterval(() => {
+      const enqueue = (data: object) => {
         try {
-          controller.enqueue(encoder.encode(": ping\n\n"));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
         } catch {
-          clearInterval(pingInterval);
+          // controller already closed (client disconnected)
         }
+      };
+
+      const notified = new Set<string>(); // toolCallIds already pushed to client
+      const start = Date.now();
+
+      // Keep a ping running so proxies don't time out the connection.
+      const ping = setInterval(() => {
+        try { controller.enqueue(encoder.encode(": ping\n\n")); } catch { clearInterval(ping); }
       }, 25_000);
 
-      await subscriber.subscribe(shotEventsChannel(sessionId));
+      while (Date.now() - start < MAX_WAIT_MS) {
+        await sleep(POLL_MS);
 
-      subscriber.on("message", (_channel: string, message: string) => {
-        try {
-          const event = JSON.parse(message) as object;
-          send(event);
-        } catch {
-          // malformed publish — ignore
+        const jobs = await db
+          .select()
+          .from(filmShotJobs)
+          .where(eq(filmShotJobs.sessionId, sessionId));
+
+        for (const job of jobs) {
+          if (notified.has(job.toolCallId)) continue;
+
+          if (job.status === "succeeded" && job.videoUrl) {
+            notified.add(job.toolCallId);
+            enqueue({ type: "shot_complete", toolCallId: job.toolCallId, videoUrl: job.videoUrl });
+          } else if (job.status === "failed") {
+            notified.add(job.toolCallId);
+            enqueue({ type: "shot_error", toolCallId: job.toolCallId, error: job.error ?? "Generation failed" });
+          }
         }
-      });
 
-      subscriber.on("error", () => {
-        clearInterval(pingInterval);
-        try { controller.close(); } catch { /* already closed */ }
-      });
+        // Stop polling once all known jobs are in a terminal state.
+        const running = jobs.filter((j) => j.status === "pending" || j.status === "in_progress");
+        if (jobs.length > 0 && running.length === 0) break;
+      }
+
+      clearInterval(ping);
+      try { controller.close(); } catch { /* already closed */ }
     },
     cancel() {
-      subscriber.unsubscribe().catch(() => undefined);
-      subscriber.quit().catch(() => undefined);
+      // Client disconnected — the while-loop will exit on the next sleep iteration.
     },
   });
 
@@ -75,4 +87,8 @@ export async function GET(
       Connection: "keep-alive",
     },
   });
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }

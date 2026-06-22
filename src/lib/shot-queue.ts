@@ -13,11 +13,6 @@ export interface ShotJobData {
   duration: number;
 }
 
-// Redis pub/sub channel key for notifying the client SSE connection.
-export function shotEventsChannel(sessionId: string) {
-  return `shot-events:${sessionId}`;
-}
-
 export const shotQueue = new Queue(SHOT_QUEUE_NAME, {
   connection: redis,
   defaultJobOptions: {

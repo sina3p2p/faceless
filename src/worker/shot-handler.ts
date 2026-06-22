@@ -1,16 +1,9 @@
 import type { Job } from "bullmq";
-import IORedis from "ioredis";
 import { db, schema, eq } from "./shared";
 import type { ShotJobData } from "@/lib/shot-queue";
-import { shotEventsChannel } from "@/lib/shot-queue";
 import { generateShotWithFallback } from "@/server/services/showrunner";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { logger } from "@/lib/logger";
-import { REDIS } from "@/lib/constants";
-
-// Separate Redis connection for publishing (BullMQ connection has maxRetriesPerRequest=null
-// which is incompatible with subscribe/publish in some ioredis versions).
-const publisher = new IORedis(REDIS.url, { maxRetriesPerRequest: null });
 
 type StoredTc = {
   id: string;
@@ -64,27 +57,17 @@ export async function handleShotJob(job: Job<ShotJobData>) {
     // Patch the assistant message so the client sees an error state on reload.
     await patchMessageToolCall(assistantMessageRowId, toolCallId, { shotError: errorMsg, pending: false });
 
-    // Notify the client so it stops waiting.
-    await publisher.publish(
-      shotEventsChannel(sessionId),
-      JSON.stringify({ type: "shot_error", toolCallId, error: errorMsg })
-    );
     throw err; // let BullMQ handle retries / failure logging
   }
 
-  // Persist success.
+  // Persist success. The /shot-events SSE route polls filmShotJobs and will
+  // push the result to the client within the next poll cycle (~3 s).
   await db
     .update(schema.filmShotJobs)
     .set({ status: "succeeded", videoUrl, updatedAt: new Date() })
     .where(eq(schema.filmShotJobs.toolCallId, toolCallId));
 
   await patchMessageToolCall(assistantMessageRowId, toolCallId, { videoUrl, pending: false });
-
-  // Push real-time notification to the client SSE endpoint.
-  await publisher.publish(
-    shotEventsChannel(sessionId),
-    JSON.stringify({ type: "shot_complete", toolCallId, videoUrl })
-  );
 
   logger.info("Shot job completed", { jobId: job.id, sessionId, toolCallId, videoUrl });
   return { videoUrl };
