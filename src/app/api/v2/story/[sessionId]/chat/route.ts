@@ -1,14 +1,14 @@
 import { NextRequest } from "next/server";
 import { streamText, stepCountIs } from "ai";
 import { db } from "@/server/db";
-import { filmSessions, filmSessionMessages } from "@/server/db/schema";
+import { filmSessions, filmSessionMessages, filmShotJobs } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
-import { storyTools, MODEL, openrouter, generateShotWithFallback } from "@/server/services/showrunner";
+import { storyTools, MODEL, openrouter } from "@/server/services/showrunner";
 import { rowsToModelMessages } from "@/server/services/showrunner/messages";
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
 import { generateImage } from "@/server/services/media";
-import { uploadFile, mediaUrl } from "@/lib/storage";
+import { shotQueue } from "@/lib/shot-queue";
 
 const ASSET_CANDIDATE_COUNT = 2;
 
@@ -208,38 +208,21 @@ export async function POST(
       );
     }
 
-    // Render shots sequentially (one per call per SKILL.md contract)
+    // Mark each pending shot as `pending: true` in its tool-call arguments before
+    // saving to DB. The worker will clear this flag (and set videoUrl / shotError)
+    // when Replicate finishes, so rowsToClientMessages knows to show a loading state
+    // on page reload while the job is still running.
     for (const idx of pendingShotIndices) {
       const tc = toolCalls[idx]!;
-      const args = tc.function.arguments as {
-        prompt: string;
-        referenceImageUrls: string[];
-        duration: number;
-        aspectRatio: "16:9" | "9:16" | "1:1";
-      };
-      try {
-        const result = await generateShotWithFallback(
-          args.referenceImageUrls,
-          args.prompt,
-          args.aspectRatio,
-          args.duration,
-          sessionId
-        );
-        // Download from Replicate and upload to R2 so the URL never expires
-        const videoResp = await fetch(result.videoUrl);
-        const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
-        const key = `v2/shots/${sessionId}/${tc.id}.mp4`;
-        await uploadFile(key, videoBuffer, "video/mp4");
-        const persistentUrl = mediaUrl(key);
-        tc.function.arguments = { ...args, videoUrl: persistentUrl };
-        emit({ type: "shot_generated", toolCallId: tc.id, videoUrl: persistentUrl });
-      } catch (err) {
-        emit({ type: "shot_error", toolCallId: tc.id, error: String(err) });
-      }
+      tc.function.arguments = { ...tc.function.arguments, pending: true };
     }
 
+    // Save the assistant message now — before enqueueing shot jobs — so the row
+    // exists in DB for the worker to patch, and so the message is not lost if
+    // the browser disconnects mid-generation.
+    const assistantRowId = crypto.randomUUID();
     await db.insert(filmSessionMessages).values({
-      id: crypto.randomUUID(),
+      id: assistantRowId,
       messageId: assistantMsgId,
       sessionId,
       role: "assistant",
@@ -251,6 +234,41 @@ export async function POST(
       }],
       createdAt: new Date(),
     });
+
+    // Enqueue one background job per shot. The worker calls Replicate, uploads to
+    // R2, patches the DB row, and publishes a Redis event to the client SSE stream.
+    for (const idx of pendingShotIndices) {
+      const tc = toolCalls[idx]!;
+      const args = tc.function.arguments as {
+        prompt: string;
+        referenceImageUrls: string[];
+        duration: number;
+        aspectRatio: "16:9" | "9:16" | "1:1";
+      };
+
+      // Insert a tracker row so we can surface status on reload.
+      await db.insert(filmShotJobs).values({
+        id: crypto.randomUUID(),
+        sessionId,
+        toolCallId: tc.id,
+        assistantMessageRowId: assistantRowId,
+        status: "pending",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+
+      await shotQueue.add("generate-shot", {
+        sessionId,
+        toolCallId: tc.id,
+        assistantMessageRowId: assistantRowId,
+        referenceImageUrls: args.referenceImageUrls,
+        prompt: args.prompt,
+        aspectRatio: args.aspectRatio ?? "16:9",
+        duration: args.duration,
+      });
+
+      emit({ type: "shot_submitted", toolCallId: tc.id });
+    }
 
     emit({ type: "done", messageId: assistantMsgId });
   });

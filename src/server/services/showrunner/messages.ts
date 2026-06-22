@@ -88,8 +88,10 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
         } else if (tc.function.name === "generateShot") {
           shotResult = {
             toolCallId: tc.id,
-            loading: false,
+            // pending=true means the background worker is still running
+            loading: (args.pending as boolean | undefined) === true,
             videoUrl: args.videoUrl as string | undefined,
+            error: args.shotError as string | undefined,
             approved: shotApprovals.has(tc.id),
           };
         }

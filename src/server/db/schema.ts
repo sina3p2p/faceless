@@ -564,9 +564,26 @@ export const filmSessionMessages = pgTable("film_session_messages", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Tracks background BullMQ shot-generation jobs so results survive browser disconnects.
+// The chat route inserts a row (status=pending) before enqueueing the BullMQ job.
+// The worker updates status/videoUrl here and patches filmSessionMessages when done,
+// then publishes a Redis event so the client SSE connection can notify the user instantly.
+export const filmShotJobs = pgTable("film_shot_jobs", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  sessionId: text("session_id").notNull().references(() => filmSessions.id, { onDelete: "cascade" }),
+  toolCallId: text("tool_call_id").notNull(),
+  assistantMessageRowId: text("assistant_message_row_id").notNull(),
+  status: text("status").notNull().default("pending"), // pending | in_progress | succeeded | failed
+  videoUrl: text("video_url"),
+  error: text("error"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const filmSessionsRelations = relations(filmSessions, ({ one, many }) => ({
   user: one(users, { fields: [filmSessions.userId], references: [users.id] }),
   messages: many(filmSessionMessages),
+  shotJobs: many(filmShotJobs),
 }));
 
 export const filmSessionMessagesRelations = relations(filmSessionMessages, ({ one }) => ({

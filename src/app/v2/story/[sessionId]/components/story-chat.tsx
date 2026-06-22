@@ -121,6 +121,81 @@ export function StoryChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ── Shot-events SSE (Redis → client push when background jobs finish) ────────
+  // We keep a ref to the active EventSource so we can close it when no longer needed.
+  const shotEventsRef = useRef<EventSource | null>(null);
+
+  function openShotEventsStream() {
+    if (shotEventsRef.current) return; // already open
+    const es = new EventSource(`/api/v2/story/${sessionId}/shot-events`);
+    shotEventsRef.current = es;
+
+    es.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data as string) as Record<string, unknown>;
+        if (event.type === "shot_complete") {
+          const toolCallId = event.toolCallId as string;
+          const videoUrl = event.videoUrl as string;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.shotResult?.toolCallId === toolCallId
+                ? { ...m, shotResult: { toolCallId, loading: false, videoUrl } }
+                : m
+            )
+          );
+          // Close the stream once no more pending shots remain.
+          setMessages((prev) => {
+            const stillPending = prev.some((m) => m.shotResult?.loading);
+            if (!stillPending) closeShotEventsStream();
+            return prev;
+          });
+        } else if (event.type === "shot_error") {
+          const toolCallId = event.toolCallId as string;
+          const error = event.error as string;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.shotResult?.toolCallId === toolCallId
+                ? { ...m, shotResult: { toolCallId, loading: false, error } }
+                : m
+            )
+          );
+          setMessages((prev) => {
+            const stillPending = prev.some((m) => m.shotResult?.loading);
+            if (!stillPending) closeShotEventsStream();
+            return prev;
+          });
+        }
+      } catch {
+        // malformed event — ignore
+      }
+    };
+
+    es.onerror = () => {
+      // EventSource auto-reconnects on error; close only if all shots are done.
+      setMessages((prev) => {
+        const stillPending = prev.some((m) => m.shotResult?.loading);
+        if (!stillPending) closeShotEventsStream();
+        return prev;
+      });
+    };
+  }
+
+  function closeShotEventsStream() {
+    shotEventsRef.current?.close();
+    shotEventsRef.current = null;
+  }
+
+  // Close the shot-events stream when the component unmounts.
+  useEffect(() => () => closeShotEventsStream(), []);
+
+  // Open the shot-events stream on mount if there are already pending shots
+  // (i.e. the user reloaded mid-generation).
+  useEffect(() => {
+    const hasPending = initialMessages.some((m) => m.shotResult?.loading);
+    if (hasPending) openShotEventsStream();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function streamResponse(body: object) {
     setStatus("streaming");
     const tempId = crypto.randomUUID();
@@ -204,6 +279,13 @@ export function StoryChat({
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
       );
+    } else if (event.type === "shot_submitted") {
+      // Shot handed off to background worker — show loading and open the push stream.
+      const shotResult: ShotResult = { toolCallId: event.toolCallId as string, loading: true };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
+      );
+      openShotEventsStream();
     } else if (event.type === "shot_generated") {
       const shotResult: ShotResult = {
         toolCallId: event.toolCallId as string,
