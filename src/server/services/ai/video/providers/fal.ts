@@ -1,6 +1,6 @@
 import { fal } from "@fal-ai/client";
 import { AI_VIDEO } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, VideoResult } from "@/types/video-provider";
+import type { I2vRequest, IProvider, VideoResult } from "@/types/video-provider";
 import axios, { AxiosInstance } from "axios";
 
 // type FalResponse = {
@@ -157,7 +157,7 @@ import axios, { AxiosInstance } from "axios";
 /**
  * @deprecated
  */
-export class FalVideoProvider implements IVideoProvider {
+export class FalVideoProvider implements IProvider {
   readonly client: AxiosInstance;
   constructor() {
     this.client = axios.create({
@@ -168,7 +168,10 @@ export class FalVideoProvider implements IVideoProvider {
       },
     });
   }
-  async generateFromImage(req: I2vRequest, modelId: TVideoModelId): Promise<VideoResult> {
+  findModel(model: TVideoModelId): string | undefined {
+    return ""
+  }
+  async generateVideo(req: I2vRequest): Promise<VideoResult> {
     return {
       videoUrl: "",
       durationSeconds: 0,

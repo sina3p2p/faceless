@@ -79,12 +79,10 @@ export const IMAGE_MODELS: Record<TImageModelId, TImageModel> = {
 };
 
 const SEEDANCE2_DURATIONS = [4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
+export const VIDEO_MODELS: Partial<Record<TVideoModelId, TVideoModel>> = {
   "seedance-2-pro": {
     id: "seedance-2-pro",
     label: "Seedance 2 Pro",
-    endpoint: "bytedance/seedance-2.0",
-    provider: "replicate",
     supportedResolution: ["480p", "720p", "1080p"],
     description: "ByteDance Seedance 2.0 i2v on Fal (4–15s, optional last frame, up to 1080p)",
     durations: SEEDANCE2_DURATIONS,
@@ -94,10 +92,17 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   "seedance-2-fast": {
     id: "seedance-2-fast",
     label: "Seedance 2 Fast",
-    endpoint: "bytedance/seedance-2.0/fast/image-to-video",
-    provider: "replicate",
     supportedResolution: ["480p", "720p"],
     description: "Seedance 2.0 Fast on Fal — lower latency; 480p/720p only on API",
+    durations: SEEDANCE2_DURATIONS,
+    endFrameSupported: true,
+    supportsAudio: true,
+  },
+  "seedance-2-mini": {
+    id: "seedance-2-mini",
+    label: "Seedance 2 Mini",
+    supportedResolution: ["480p", "720p"],
+    description: "Seedance 2.0 Mini on Fal — lower latency; 480p/720p only on API",
     durations: SEEDANCE2_DURATIONS,
     endFrameSupported: true,
     supportsAudio: true,
@@ -105,38 +110,14 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   "kling-v2.5-turbo-pro": {
     id: "kling-v2.5-turbo-pro",
     label: "Kling V2.5 Turbo Pro",
-    endpoint: "kwaivgi/kling-v2.5-turbo-pro",
-    provider: "replicate",
     supportedResolution: [],
     description: "Kling V2.5 Turbo Pro on Fal — higher quality; 5s / 10s",
     durations: [5, 10],
     endFrameSupported: true,
   },
-  "runway-gen4-turbo": {
-    id: "runway-gen4-turbo",
-    label: "Runway Gen-4 Turbo",
-    endpoint: "fal-ai/luma-dream-machine/ray-2-flash/image-to-video",
-    provider: "fal",
-    supportedResolution: ["540p", "720p", "1080p"],
-    description: "Strong motion quality (via Fal — Luma Ray 2), 5s or 9s",
-    durations: [5, 9],
-    endFrameSupported: false,
-  },
-  "runway-gen4.5": {
-    id: "runway-gen4.5",
-    label: "Runway Gen-4.5",
-    endpoint: "fal-ai/luma-dream-machine/ray-2/image-to-video",
-    provider: "fal",
-    supportedResolution: ["540p", "720p", "1080p"],
-    description: "Premium motion (via Fal — Luma Ray 2 @ 1080p), 5s or 9s",
-    durations: [5, 9],
-    endFrameSupported: false,
-  },
   "grok-imagine": {
     id: "grok-imagine",
     label: "Grok Imagine Video",
-    endpoint: "xai/grok-imagine-video/image-to-video",
-    provider: "fal",
     supportedResolution: ["480p", "720p"],
     description: "xAI Grok Imagine i2v with audio (via Fal), 1–15s",
     durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
@@ -145,8 +126,6 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   "veo-31-lite": {
     id: "veo-31-lite",
     label: "Veo 3.1 Lite",
-    endpoint: "fal-ai/veo3.1/image-to-video",
-    provider: "fal",
     supportedResolution: ["720p", "1080p", "4k"],
     description: "Google Veo 3.1 i2v (via Fal), 720p, 4s / 6s / 8s",
     durations: [4, 6, 8],
@@ -155,8 +134,6 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   "veo-31-fast": {
     id: "veo-31-fast",
     label: "Veo 3.1 Fast",
-    endpoint: "fal-ai/veo3.1/fast/image-to-video",
-    provider: "fal",
     supportedResolution: ["720p", "1080p", "4k"],
     description: "Google Veo 3.1 i2v (via Fal), 1080p, 4s / 6s / 8s",
     durations: [4, 6, 8],
@@ -165,8 +142,6 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   "kling-3-standard": {
     id: "kling-3-standard",
     label: "Kling 3.0 Standard",
-    endpoint: "fal-ai/kling-video/v3/standard/image-to-video",
-    provider: "fal",
     supportedResolution: [],
     description: "Kling i2v with optional last frame (via Fal — v1.6 pro)",
     durations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
@@ -175,32 +150,10 @@ export const VIDEO_MODELS: Record<TVideoModelId, TVideoModel> = {
   "kling-3-pro": {
     id: "kling-3-pro",
     label: "Kling 3.0 Pro",
-    endpoint: "fal-ai/kling-video/v3/pro/image-to-video",
-    provider: "fal",
     supportedResolution: [],
     description: "Kling master-quality i2v (via Fal — v2.1 master)",
     durations: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     endFrameSupported: false,
-  },
-  "pixverse-v6": {
-    id: "pixverse-v6",
-    label: "Pixverse V6",
-    endpoint: "pixverse/pixverse-v6",
-    provider: "replicate",
-    supportedResolution: ["360p", "540p", "720p", "1080p"],
-    description: "Pixverse V6 i2v (via Replicate), 1–15s",
-    durations: [5, 8, 10, 15],
-    endFrameSupported: false,
-  },
-  "vidu-q3-pro": {
-    id: "vidu-q3-pro",
-    label: "Vidu Q3 Pro",
-    endpoint: "vidu/q3-pro",
-    provider: "replicate",
-    supportedResolution: ["540p", "720p", "1080p"],
-    description: "Vidu Q3 Pro i2v (via Replicate) — up to 16s, end-frame support, #2 globally",
-    durations: [5, 8, 10, 16],
-    endFrameSupported: true,
   },
 };
 
@@ -255,6 +208,7 @@ export const RESEARCH = {
 export const AI_VIDEO = {
   get falKey() { return env("FAL_KEY"); },
   get replicateToken() { return env("REPLICATE_API_TOKEN"); },
+  get kieApiKey() { return env("KIE_API_KEY"); },
 } as const;
 
 
@@ -276,10 +230,8 @@ export const IMAGE_MODEL_IDS = Object.keys(IMAGE_MODELS) as TImageModelId[]
 export const LLM_MODEL_IDS = Object.keys(LLM_MODELS) as LLMModelId[];
 export const VIDEO_MODEL_IDS = Object.keys(VIDEO_MODELS) as TVideoModelId[];
 
-export function videoModelsForProvider(p: TVideoProviderId) {
-  const models = Object.values(VIDEO_MODELS);
-  if (p === "replicate") return models.filter((m) => m.provider === "replicate");
-  return models;
+export function videoModels(): TVideoModel[] {
+  return Object.values(VIDEO_MODELS);
 }
 
 export function videoResolutionsForModel(modelId: TVideoModelId): TVideoResolution[] {
@@ -417,25 +369,6 @@ export const CAPTION_STYLES = [
 
 export const LANGUAGES = [
   { id: "en", label: "English", name: "English" },
-  { id: "es", label: "Spanish (Español)", name: "Spanish" },
-  { id: "fr", label: "French (Français)", name: "French" },
-  { id: "de", label: "German (Deutsch)", name: "German" },
-  { id: "pt", label: "Portuguese (Português)", name: "Portuguese" },
-  { id: "it", label: "Italian (Italiano)", name: "Italian" },
-  { id: "nl", label: "Dutch (Nederlands)", name: "Dutch" },
-  { id: "ru", label: "Russian (Русский)", name: "Russian" },
-  { id: "ja", label: "Japanese (日本語)", name: "Japanese" },
-  { id: "ko", label: "Korean (한국어)", name: "Korean" },
-  { id: "zh", label: "Chinese (中文)", name: "Chinese" },
-  { id: "ar", label: "Arabic (العربية)", name: "Arabic" },
-  { id: "fa", label: "Persian (فارسی)", name: "Persian" },
-  { id: "tr", label: "Turkish (Türkçe)", name: "Turkish" },
-  { id: "hi", label: "Hindi (हिन्दी)", name: "Hindi" },
-  { id: "id", label: "Indonesian (Bahasa)", name: "Indonesian" },
-  { id: "pl", label: "Polish (Polski)", name: "Polish" },
-  { id: "sv", label: "Swedish (Svenska)", name: "Swedish" },
-  { id: "th", label: "Thai (ไทย)", name: "Thai" },
-  { id: "vi", label: "Vietnamese (Tiếng Việt)", name: "Vietnamese" },
 ] as const;
 
 export const DEFAULT_LANGUAGE = "en";

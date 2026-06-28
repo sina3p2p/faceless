@@ -91,17 +91,18 @@ export const storyTools = {
         ),
     }),
   }),
-  generateShot: tool({
+  compileShot: tool({
     description:
-      "Render one approved shot (or multi-shot group) via Seedance 2.0. " +
-      "Call this ONLY after the user has approved the compiled prompt. " +
-      "Present the returned clip, wait for the user's approval, then call again for the next shot. " +
-      "Never batch multiple independent shots in a single call — one call = one generation. " +
+      "Compile a shot prompt package and present it to the user for review before any rendering happens. " +
+      "Assemble the full Seedance 2.0 prompt from the Bible per the shot-compilation-recipe, then call this tool. " +
+      "The user will review and optionally edit the prompt, then approve — rendering starts only after their approval. " +
+      "Wait for the user's shot approval before calling this again for the next shot. " +
+      "Never batch multiple independent shots in a single call — one call = one shot. " +
       "Only available after the Bible is locked and all asset images are approved.",
     inputSchema: z.object({
       prompt: z
         .string()
-        .describe("Full compiled Seedance 2.0 prompt, assembled from the Bible per the shot-compilation-recipe."),
+        .describe("Full compiled Seedance 2.0 prompt, assembled from the Bible per the shot-compilation-recipe. This is what the user will review and optionally edit before rendering."),
       referenceImageUrls: z
         .array(z.string())
         .describe("Approved reference image URLs for the @material handles that appear in this shot, in binding order ([Image1], [Image2], …). Max 9."),

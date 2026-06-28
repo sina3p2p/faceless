@@ -40,7 +40,7 @@ export function mediaUrl(keyOrUrl: string | null | undefined): string | null {
     const base = R2_PUBLIC_URL.replace(/\/$/, "");
     return `${base}/${key}`;
   }
-  const base = APP.url.replace(/\/$/, "");
+  const base = (typeof window !== "undefined" ? window.location.origin : APP.url).replace(/\/$/, "");
   return `${base}/api/media/${key}`;
 }
 

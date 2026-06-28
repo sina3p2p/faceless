@@ -142,6 +142,7 @@ const VIDU_Q3_PRO: MotionModelProfile = {
 const PROFILES: Record<TVideoModelId, MotionModelProfile> = {
   "seedance-2-pro": SEEDANCE,
   "seedance-2-fast": SEEDANCE,
+  "seedance-2-mini": SEEDANCE,
   "kling-v2.5-turbo-pro": KLING_V25,
   "kling-3-standard": KLING_V26_PRO,
   "kling-3-pro": KLING_V3_PRO,

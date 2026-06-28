@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
+import { cn } from "@/lib/utils";
 import { Player, type PlayerRef } from "@remotion/player";
 import { StoryComposition, type StoryCompositionProps, type AudioClipConfig, computeSequenceLayout, FPS } from "@/remotion/StoryComposition";
 import { FloatingPanel } from "./floating-panel";
+import { MediaPickerDialog, type MediaItem as LibraryMediaItem } from "@/components/ui/media-picker-dialog";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -239,7 +241,11 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
   // ── Audio clips ───────────────────────────────────────────────────────────
   const [audioClips, setAudioClips] = useState<AudioClip[]>([]);
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
-  const audioFileRef = useRef<HTMLInputElement>(null);
+
+  // ── Media pickers ──────────────────────────────────────────────────────
+  const [videoPickerOpen, setVideoPickerOpen] = useState(false);
+  const [audioPickerOpen, setAudioPickerOpen] = useState(false);
+
   const audioDragRef = useRef<{ id: string; startX: number; startY: number; originStart: number; originTrack: number } | null>(null);
   const audioTrimDragRef = useRef<{ id: string; edge: "start" | "end"; startX: number; initialValue: number; rawDuration: number; otherEdge: number } | null>(null);
 
@@ -249,25 +255,31 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
     return Math.max(0, end - ac.trimStart);
   }, []);
 
-  function handleAudioFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-    const url = URL.createObjectURL(file);
+  function addVideoToTimeline(videoUrl: string, id?: string) {
+    const clipId = id ?? `user-${Date.now()}`;
+    const lastEnd = Math.max(0, ...internalClipsRef.current.filter((c) => c.trackIndex === 0).map((c) => c.startTime + (clipMetaRef.current.get(c.id) ?? 5)));
+    setInternalClips((prev) => [...prev, { id: clipId, sourceId: clipId, videoUrl, startTime: lastEnd, trackIndex: 0, trimStart: 0, trimEnd: null, reversed: false }]);
+    onSelectClip(clipId);
+  }
+
+  function handleVideoSelect(item: LibraryMediaItem) {
+    addVideoToTimeline(item.url, item.id);
+  }
+
+  function handleAudioSelect(item: LibraryMediaItem) {
     const el = new window.Audio();
-    el.src = url;
+    el.src = item.url;
     el.addEventListener("loadedmetadata", () => {
       const dur = isFinite(el.duration) ? el.duration : 0;
       const id = `audio-${Date.now()}`;
       setAudioClips((prev) => {
-        // Find the first track row with no video or audio clips on it
         const usedTracks = new Set([
           ...internalClipsRef.current.map((c) => c.trackIndex),
           ...prev.map((ac) => ac.trackIndex),
         ]);
         let trackIndex = 0;
         while (usedTracks.has(trackIndex)) trackIndex++;
-        return [...prev, { id, url, name: file.name.replace(/\.[^.]+$/, ""), startTime: 0, trackIndex, trimStart: 0, trimEnd: null, rawDuration: dur, volume: 1 }];
+        return [...prev, { id, url: item.url, name: item.prompt ?? "audio", startTime: 0, trackIndex, trimStart: 0, trimEnd: null, rawDuration: dur, volume: 1 }];
       });
       setSelectedAudioId(id);
     }, { once: true });
@@ -882,15 +894,15 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
   // ── render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-[#0f0f11] overflow-hidden relative">
-      {/* Hidden metadata loaders */}
-      {internalClips.filter((c) => !clipMeta.has(c.id)).map((c) => (
+    <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      {/* Hidden preloaders — keep all clips buffered so OffthreadVideo has no seek delay at clip boundaries */}
+      {internalClips.map((c) => (
         <video
           key={c.id}
           src={c.videoUrl}
           className="hidden"
-          preload="metadata"
-          onLoadedMetadata={(e) => {
+          preload="auto"
+          onLoadedMetadata={clipMeta.has(c.id) ? undefined : (e) => {
             const dur = (e.target as HTMLVideoElement).duration;
             const realDur = isFinite(dur) ? dur : 0;
             setClipMeta((prev) => new Map(prev).set(c.id, realDur));
@@ -916,7 +928,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
       ))}
 
       {/* ── Tool Tab Bar ── */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b border-white/8 bg-[#16161a] shrink-0 overflow-x-auto">
+      <div className="flex items-center gap-1 px-3 h-12 border-b border-white/10 bg-black/20 backdrop-blur-md shrink-0 overflow-x-auto">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id && popupOpen;
           return (
@@ -930,10 +942,12 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                   setPopupOpen(true);
                 }
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shrink-0 ${isActive
-                ? "bg-violet-600/20 text-violet-300 border border-violet-500/30"
-                : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
-                }`}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all shrink-0",
+                isActive
+                  ? "bg-primary/20 text-primary border border-primary/30"
+                  : "text-muted-foreground/60 hover:text-muted-foreground hover:bg-white/5"
+              )}
             >
               {tab.icon}{tab.label}
             </button>
@@ -963,7 +977,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                   <div className="flex gap-0 bg-white/6 rounded-lg p-0.5 w-48 shrink-0">
                     {(["normal", "curve"] as SpeedMode[]).map((m) => (
                       <button key={m} onClick={() => setSpeedMode(m)} disabled={!selectedClipId}
-                        className={`flex-1 py-1.5 rounded-md text-xs font-semibold capitalize transition-all disabled:opacity-40 ${selectedSpeedMode === m ? "bg-white/90 text-black shadow" : "text-gray-500 hover:text-gray-300"}`}
+                        className={`flex-1 py-1.5 rounded-md text-xs font-semibold capitalize transition-all disabled:opacity-40 ${selectedSpeedMode === m ? "bg-white/90 text-black shadow" : "text-muted-foreground/60 hover:text-muted-foreground"}`}
                       >{m}</button>
                     ))}
                   </div>
@@ -972,37 +986,37 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-semibold text-white/80">Basic</span>
-                        <button onClick={() => setSpeed(1)} disabled={!selectedClipId} title="Reset speed" className="text-gray-600 hover:text-gray-400 transition-colors disabled:opacity-30">
+                        <button onClick={() => setSpeed(1)} disabled={!selectedClipId} title="Reset speed" className="text-muted-foreground/40 hover:text-muted-foreground transition-colors disabled:opacity-30">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                         </button>
                       </div>
                       <div>
-                        <span className="text-[11px] text-gray-500 mb-2 block">Speed</span>
+                        <span className="text-[11px] text-muted-foreground/60 mb-2 block">Speed</span>
                         <div className="flex items-center gap-3">
                           <input type="range" min={0.1} max={8} step={0.05} value={currentSpeed} onChange={(e) => setSpeed(Number(e.target.value))} disabled={!selectedClipId}
                             className="flex-1 h-1 appearance-none bg-white/15 rounded-full cursor-pointer disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
                           />
-                          <span className="text-xs font-mono bg-white/8 text-white rounded-lg px-3 py-1.5 w-14 text-center shrink-0">
+                          <span className="text-xs font-mono bg-white/8 text-foreground rounded-lg px-3 py-1.5 w-14 text-center shrink-0">
                             {currentSpeed % 1 === 0 ? `${currentSpeed}x` : `${currentSpeed.toFixed(1)}x`}
                           </span>
                         </div>
                       </div>
                       {rawDuration > 0 && (
                         <div>
-                          <span className="text-[11px] text-gray-500 mb-1.5 block">Duration</span>
+                          <span className="text-[11px] text-muted-foreground/60 mb-1.5 block">Duration</span>
                           <div className="flex items-center gap-2">
-                            <span className="text-xs text-gray-400 font-mono">{rawDuration.toFixed(1)}s</span>
+                            <span className="text-xs text-muted-foreground font-mono">{rawDuration.toFixed(1)}s</span>
                             <div className="flex-1 flex items-center gap-px">
                               {Array.from({ length: 20 }, (_, i) => (
                                 <div key={i} className={`flex-1 rounded-full ${i < Math.round(20 * Math.min(currentSpeed, 1)) ? "bg-white/25 h-[5px]" : "bg-white/10 h-[3px]"}`} />
                               ))}
                               <div className="w-0 h-0 border-t-4 border-b-4 border-l-[5px] border-t-transparent border-b-transparent border-l-white/30 ml-0.5" />
                             </div>
-                            <span className="text-xs font-mono bg-white/8 text-white rounded-lg px-3 py-1.5 w-14 text-center shrink-0">{curveDuration.toFixed(1)}s</span>
+                            <span className="text-xs font-mono bg-white/8 text-foreground rounded-lg px-3 py-1.5 w-14 text-center shrink-0">{curveDuration.toFixed(1)}s</span>
                           </div>
                         </div>
                       )}
-                      {!selectedClipId && <span className="text-xs text-gray-600">Select a clip to adjust speed</span>}
+                      {!selectedClipId && <span className="text-xs text-muted-foreground/40">Select a clip to adjust speed</span>}
                     </div>
                   )}
 
@@ -1026,15 +1040,15 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                                 <path d={preset.icon} />
                               </svg>
                             )}
-                            <span className="text-[9px] text-gray-400 font-medium leading-tight text-center">{preset.label}</span>
+                            <span className="text-[9px] text-muted-foreground font-medium leading-tight text-center">{preset.label}</span>
                           </button>
                         ))}
                       </div>
                       {rawDuration > 0 && (
-                        <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground/60">
                           <span>Duration:</span><span className="font-mono">{rawDuration.toFixed(1)}s</span>
                           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
-                          <span className="font-mono font-semibold text-white">{curveDuration.toFixed(1)}s</span>
+                          <span className="font-mono font-semibold text-foreground">{curveDuration.toFixed(1)}s</span>
                         </div>
                       )}
                       <div className="relative rounded-lg overflow-hidden bg-white/3 border border-white/8">
@@ -1048,12 +1062,12 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                               </g>
                             );
                           })}
-                          {activeCurvePoints.length >= 2 && <path d={curveSvgPath} fill="none" stroke="#38bdf8" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />}
+                          {activeCurvePoints.length >= 2 && <path d={curveSvgPath} fill="none" stroke="currentColor" className="text-primary" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />}
                           {activeCurvePoints.map((pt, idx) => {
                             const cx = GP_L + pt.x * (GRAPH_VW - GP_L - GP_R);
                             const cy = GRAPH_VH - GP_B - pt.y * (GRAPH_VH - GP_T - GP_B);
                             return (
-                              <circle key={idx} cx={cx} cy={cy} r={6} fill="#0f0f11" stroke="#38bdf8" strokeWidth={2} className="cursor-grab active:cursor-grabbing" style={{ touchAction: "none" }}
+                              <circle key={idx} cx={cx} cy={cy} r={6} fill="currentColor" className="text-background" stroke="currentColor" className="text-primary" strokeWidth={2} className="cursor-grab active:cursor-grabbing" style={{ touchAction: "none" }}
                                 onPointerDown={(e) => { if (!selectedClipId || !curveGraphRef.current) return; startCurvePtDrag({ idx, svgRect: curveGraphRef.current.getBoundingClientRect(), clipId: selectedClipId }, e); }}
                               />
                             );
@@ -1061,14 +1075,14 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                         </svg>
                       </div>
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => { if (selectedClipId) selectCurvePreset("none"); }} disabled={!selectedClipId} title="Reset curve" className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/6 text-gray-500 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30">
+                        <button onClick={() => { if (selectedClipId) selectCurvePreset("none"); }} disabled={!selectedClipId} title="Reset curve" className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/6 text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-30">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                         </button>
-                        <button onClick={() => { if (!selectedClipId) return; const flat = activeCurvePoints.map((p) => ({ ...p, y: 0.5 })); setClipCurvePoints((prev) => new Map(prev).set(selectedClipId, flat)); setClipCurvePresets((prev) => new Map(prev).set(selectedClipId, "custom")); }} disabled={!selectedClipId} title="Flatten curve" className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/6 text-gray-500 hover:text-white hover:bg-white/10 transition-all disabled:opacity-30">
+                        <button onClick={() => { if (!selectedClipId) return; const flat = activeCurvePoints.map((p) => ({ ...p, y: 0.5 })); setClipCurvePoints((prev) => new Map(prev).set(selectedClipId, flat)); setClipCurvePresets((prev) => new Map(prev).set(selectedClipId, "custom")); }} disabled={!selectedClipId} title="Flatten curve" className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/6 text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-30">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5" /></svg>
                         </button>
                       </div>
-                      {!selectedClipId && <span className="text-xs text-gray-600">Select a clip to edit the speed curve</span>}
+                      {!selectedClipId && <span className="text-xs text-muted-foreground/40">Select a clip to edit the speed curve</span>}
                     </div>
                   )}
                 </div>
@@ -1079,38 +1093,38 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                 <div className="flex flex-col px-4 pt-3 pb-3 gap-4 select-none">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-white/80">Audio</span>
-                    <button onClick={resetVolumeSettings} disabled={!selectedClipId} title="Reset" className="text-gray-600 hover:text-gray-400 transition-colors disabled:opacity-30">
+                    <button onClick={resetVolumeSettings} disabled={!selectedClipId} title="Reset" className="text-muted-foreground/40 hover:text-muted-foreground transition-colors disabled:opacity-30">
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                     </button>
                   </div>
                   <div>
-                    <span className="text-[11px] text-gray-500 mb-2 block">Volume</span>
+                    <span className="text-[11px] text-muted-foreground/60 mb-2 block">Volume</span>
                     <div className="flex items-center gap-3">
                       <input type="range" min={-60} max={0} step={0.5} value={currentVolumeDb} onChange={(e) => setVolume(dbToLinear(Number(e.target.value)))} disabled={!selectedClipId}
                         className="flex-1 h-1 appearance-none bg-white/15 rounded-full cursor-pointer disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
                       />
-                      <span className="text-xs font-mono bg-white/8 text-white rounded-lg px-3 py-1.5 w-16 text-center shrink-0">{formatDb(currentVolumeDb)}</span>
+                      <span className="text-xs font-mono bg-white/8 text-foreground rounded-lg px-3 py-1.5 w-16 text-center shrink-0">{formatDb(currentVolumeDb)}</span>
                     </div>
                   </div>
                   <div>
-                    <span className="text-[11px] text-gray-500 mb-2 block">Fade-in duration</span>
+                    <span className="text-[11px] text-muted-foreground/60 mb-2 block">Fade-in duration</span>
                     <div className="flex items-center gap-3">
                       <input type="range" min={0} max={5} step={0.1} value={currentFadeIn} onChange={(e) => setFadeIn(Number(e.target.value))} disabled={!selectedClipId}
                         className="flex-1 h-1 appearance-none bg-white/15 rounded-full cursor-pointer disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
                       />
-                      <span className="text-xs font-mono bg-white/8 text-white rounded-lg px-3 py-1.5 w-16 text-center shrink-0">{currentFadeIn.toFixed(1)}s</span>
+                      <span className="text-xs font-mono bg-white/8 text-foreground rounded-lg px-3 py-1.5 w-16 text-center shrink-0">{currentFadeIn.toFixed(1)}s</span>
                     </div>
                   </div>
                   <div>
-                    <span className="text-[11px] text-gray-500 mb-2 block">Fade-out duration</span>
+                    <span className="text-[11px] text-muted-foreground/60 mb-2 block">Fade-out duration</span>
                     <div className="flex items-center gap-3">
                       <input type="range" min={0} max={5} step={0.1} value={currentFadeOut} onChange={(e) => setFadeOut(Number(e.target.value))} disabled={!selectedClipId}
                         className="flex-1 h-1 appearance-none bg-white/15 rounded-full cursor-pointer disabled:opacity-30 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md"
                       />
-                      <span className="text-xs font-mono bg-white/8 text-white rounded-lg px-3 py-1.5 w-16 text-center shrink-0">{currentFadeOut.toFixed(1)}s</span>
+                      <span className="text-xs font-mono bg-white/8 text-foreground rounded-lg px-3 py-1.5 w-16 text-center shrink-0">{currentFadeOut.toFixed(1)}s</span>
                     </div>
                   </div>
-                  {!selectedClipId && <span className="text-xs text-gray-600">Select a clip to adjust audio</span>}
+                  {!selectedClipId && <span className="text-xs text-muted-foreground/40">Select a clip to adjust audio</span>}
                 </div>
               )}
 
@@ -1118,10 +1132,10 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
               {activeTab === "ai-edit" && (
                 <div className="flex flex-col gap-3 px-4 py-3">
                   {!selectedClipId ? (
-                    <span className="text-xs text-gray-500">Select a clip in the timeline to edit it with AI.</span>
+                    <span className="text-xs text-muted-foreground/60">Select a clip in the timeline to edit it with AI.</span>
                   ) : (
                     <>
-                      <p className="text-[11px] text-gray-500 leading-relaxed">
+                      <p className="text-[11px] text-muted-foreground/60 leading-relaxed">
                         Describe the change to apply. The selected clip will be sent to Seedance and replaced with the AI-edited version.
                       </p>
                       <textarea
@@ -1131,7 +1145,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                         placeholder="e.g. Change the lighting to golden hour, add slow motion to the action sequence…"
                         rows={4}
                         disabled={aiEditLoading}
-                        className="w-full bg-white/6 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-gray-600 resize-none focus:outline-none focus:border-violet-500/50 disabled:opacity-50"
+                        className="w-full bg-white/6 border border-white/10 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/40 resize-none focus:outline-none focus:border-primary/50 disabled:opacity-50"
                       />
                       {aiEditError && (
                         <p className="text-[11px] text-red-400 leading-relaxed">{aiEditError}</p>
@@ -1139,7 +1153,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                       <button
                         onClick={() => { void handleAiEdit(); }}
                         disabled={!aiEditPrompt.trim() || aiEditLoading}
-                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors"
+                        className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary disabled:opacity-40 disabled:cursor-not-allowed text-foreground text-xs font-semibold transition-colors"
                       >
                         {aiEditLoading ? (
                           <>
@@ -1158,7 +1172,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                           </>
                         )}
                       </button>
-                      <p className="text-[10px] text-gray-600">⌘↵ to submit</p>
+                      <p className="text-[10px] text-muted-foreground/40">⌘↵ to submit</p>
                     </>
                   )}
                 </div>
@@ -1167,10 +1181,10 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
               {/* ── COMING SOON TABS ── */}
               {(activeTab === "text" || activeTab === "audio" || activeTab === "effects") && (
                 <div className="flex items-center gap-2 px-4 py-4">
-                  <svg className="w-4 h-4 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-4 h-4 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-xs text-gray-600">
+                  <span className="text-xs text-muted-foreground/40">
                     {activeTab === "text" ? "Text overlays" : activeTab === "audio" ? "Audio mixing" : "Visual effects"} — coming soon
                   </span>
                 </div>
@@ -1180,13 +1194,13 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
               {activeTab === "export" && (
                 <div className="flex flex-col gap-2 px-4 py-3">
                   {internalClips.length === 0 ? (
-                    <span className="text-xs text-gray-600">No clips to export yet</span>
+                    <span className="text-xs text-muted-foreground/40">No clips to export yet</span>
                   ) : (
                     <>
-                      <span className="text-[11px] text-gray-500 mb-1">Download clips</span>
+                      <span className="text-[11px] text-muted-foreground/60 mb-1">Download clips</span>
                       {internalClips.map((clip, i) => (
                         <a key={clip.id} href={clip.videoUrl} download={`shot-${i + 1}.mp4`}
-                          className="flex items-center gap-2 text-xs text-violet-400 hover:text-violet-300 border border-violet-500/20 hover:border-violet-400/40 rounded-lg px-3 py-2 transition-colors"
+                          className="flex items-center gap-2 text-xs text-primary hover:text-primary border border-primary/20 hover:border-primary/40 rounded-lg px-3 py-2 transition-colors"
                         >
                           <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -1205,12 +1219,12 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
         {internalClips.length === 0 ? (
           <div className="flex flex-col items-center gap-3 text-center px-6">
             <div className="w-16 h-16 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
-              <svg className="w-8 h-8 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
+              <svg className="w-8 h-8 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0118 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0118 7.125v-1.5m1.5 2.625c.621 0 1.125.504 1.125 1.125v1.5m-7.5-6v5.625m0 0c0 .621.504 1.125 1.125 1.125h.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125h-.75A1.125 1.125 0 0010.5 9.375v.75" />
               </svg>
             </div>
-            <p className="text-sm text-gray-400 font-medium">No clips yet</p>
-            <p className="text-xs text-gray-600 max-w-xs">
+            <p className="text-sm text-muted-foreground font-medium">No clips yet</p>
+            <p className="text-xs text-muted-foreground/40 max-w-xs">
               Chat with the AI showrunner to generate shots — they&apos;ll appear here in the timeline
             </p>
           </div>
@@ -1283,8 +1297,8 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                           })
                         }
                         className={`flex flex-col items-center gap-0.5 py-2 rounded-xl text-[10px] font-semibold transition-all ${active
-                          ? "bg-violet-600 text-white shadow shadow-violet-900/50"
-                          : "bg-white/6 text-gray-400 hover:bg-white/12 hover:text-white"
+                          ? "bg-primary text-foreground shadow shadow-violet-900/50"
+                          : "bg-white/6 text-muted-foreground hover:bg-white/12 hover:text-foreground"
                           }`}
                       >
                         <span className="text-base leading-none">{icon}</span>
@@ -1297,8 +1311,8 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                 {trans && trans.type !== "cut" && (
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] text-gray-500">Duration</span>
-                      <span className="text-[11px] font-mono text-white">{trans.duration.toFixed(1)}s</span>
+                      <span className="text-[11px] text-muted-foreground/60">Duration</span>
+                      <span className="text-[11px] font-mono text-foreground">{trans.duration.toFixed(1)}s</span>
                     </div>
                     <input
                       type="range" min={0.1} max={2} step={0.1}
@@ -1320,14 +1334,14 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
       </div>
 
       {/* ── Transport Controls ── */}
-      <div className="shrink-0 h-11 flex items-center justify-between px-4 border-t border-white/6 bg-black">
+      <div className="shrink-0 h-11 flex items-center justify-between px-4 border-t border-white/10 bg-black/20 backdrop-blur-md">
         {/* Left: edit actions */}
         <div className="flex items-center gap-0.5">
           <button
             onClick={deleteClip}
             disabled={!selectedClipId}
             title="Delete clip"
-            className="w-8 h-8 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
           >
             <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
@@ -1337,7 +1351,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             onClick={splitAtPlayhead}
             disabled={!canSplit}
             title="Split at playhead"
-            className="w-8 h-8 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
           >
             <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="m7.848 8.25 1.536.887M7.848 8.25a3 3 0 1 1-5.196-3 3 3 0 0 1 5.196 3Zm1.536.887a2.165 2.165 0 0 1 1.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 1 1-5.196 3 3 3 0 0 1 5.196-3Zm1.536-.887a2.165 2.165 0 0 0 1.083-1.839c.005-.351.054-.695.14-1.024m0 0 2.077-1.199m0-3.328a4.323 4.323 0 0 1 2.068-1.379l5.325-1.628a4.5 4.5 0 0 1 2.48-.044l.803.215-7.794 4.5m-2.882-1.664A4.33 4.33 0 0 0 10.607 12m3.736 0 7.794 4.5-.802.215a4.5 4.5 0 0 1-2.48-.043l-5.326-1.629a4.324 4.324 0 0 1-2.068-1.379M14.343 12l-2.882 1.664" />
@@ -1347,7 +1361,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             onClick={duplicateClip}
             disabled={!selectedClipId}
             title="Duplicate clip"
-            className="w-8 h-8 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
           >
             <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
@@ -1357,7 +1371,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             onClick={toggleReverse}
             disabled={!selectedClipId}
             title="Reverse clip"
-            className={`w-8 h-8 flex items-center justify-center rounded transition-all disabled:opacity-25 disabled:cursor-not-allowed ${selectedClip?.reversed ? "text-amber-400 bg-amber-500/15 hover:bg-amber-500/25" : "text-gray-500 hover:text-white hover:bg-white/10"
+            className={`w-8 h-8 flex items-center justify-center rounded transition-all disabled:opacity-25 disabled:cursor-not-allowed ${selectedClip?.reversed ? "text-amber-400 bg-amber-500/15 hover:bg-amber-500/25" : "text-muted-foreground/60 hover:text-foreground hover:bg-white/10"
               }`}
           >
             <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -1369,11 +1383,11 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
         {/* Center: transport */}
         <div className="flex items-center gap-1">
           <button onClick={goToStart} disabled={internalClips.length === 0} title="Go to start"
-            className="w-8 h-8 flex items-center justify-center rounded text-gray-500 hover:text-white transition-all disabled:opacity-25 disabled:cursor-not-allowed">
+            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all disabled:opacity-25 disabled:cursor-not-allowed">
             <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
           </button>
           <button onClick={prevClip} disabled={internalClips.length === 0} title="Previous clip"
-            className="w-8 h-8 flex items-center justify-center rounded text-gray-500 hover:text-white transition-all disabled:opacity-25 disabled:cursor-not-allowed">
+            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all disabled:opacity-25 disabled:cursor-not-allowed">
             <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm12 12L8 12l10-6z" /></svg>
           </button>
           <button onClick={togglePlay} disabled={internalClips.length === 0} title={isPlaying ? "Pause" : "Play"}
@@ -1384,11 +1398,11 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             }
           </button>
           <button onClick={nextClip} disabled={internalClips.length === 0} title="Next clip"
-            className="w-8 h-8 flex items-center justify-center rounded text-gray-500 hover:text-white transition-all disabled:opacity-25 disabled:cursor-not-allowed">
+            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all disabled:opacity-25 disabled:cursor-not-allowed">
             <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l10-6L6 6v12zm12-12v12h2V6h-2z" /></svg>
           </button>
           <button onClick={goToEnd} disabled={internalClips.length === 0} title="Go to end"
-            className="w-8 h-8 flex items-center justify-center rounded text-gray-500 hover:text-white transition-all disabled:opacity-25 disabled:cursor-not-allowed">
+            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all disabled:opacity-25 disabled:cursor-not-allowed">
             <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm8.5 0h2V6h-2v12z" /></svg>
           </button>
         </div>
@@ -1396,7 +1410,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
         {/* Right: zoom + export */}
         <div className="flex items-center gap-2">
           <button onClick={() => setPxPerSec((p) => Math.max(20, Math.round(p * 0.8)))} title="Zoom out"
-            className="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:text-white transition-all">
+            className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35M8 11h6" />
             </svg>
@@ -1405,7 +1419,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             className="w-20 h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white/70 hover:[&::-webkit-slider-thumb]:bg-white"
           />
           <button onClick={() => setPxPerSec((p) => Math.min(300, Math.round(p * 1.25)))} title="Zoom in"
-            className="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:text-white transition-all">
+            className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
             </svg>
@@ -1414,7 +1428,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
           <button
             onClick={() => setTimelineCollapsed((c) => !c)}
             title={timelineCollapsed ? "Expand timeline" : "Collapse timeline"}
-            className="w-7 h-7 flex items-center justify-center rounded text-gray-500 hover:text-white transition-all"
+            className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all"
           >
             <svg
               className="w-4 h-4 transition-transform duration-200"
@@ -1429,7 +1443,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
 
       {/* ── Timeline ── */}
       <div
-        className="shrink-0 border-t border-white/8 bg-[#0d0d10] flex flex-col overflow-hidden"
+        className="shrink-0 border-t border-white/8 bg-black/25 backdrop-blur-md flex flex-col overflow-hidden"
         style={{ height: timelineCollapsed ? 0 : timelineH, transition: "height 200ms ease" }}
       >
         {/* Scrollable track area */}
@@ -1454,7 +1468,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
               <div className="absolute top-0 bottom-0 z-20 pointer-events-none" style={{ left: LABEL_W + hoverTime * pxPerSec }}>
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center">
                   <div className="w-0 h-0 border-l-[5px] border-r-[5px] border-t-8 border-l-transparent border-r-transparent border-t-sky-400" />
-                  <span className="text-[9px] font-mono text-sky-300 bg-[#0d0d10]/80 px-1 rounded mt-0.5 whitespace-nowrap">
+                  <span className="text-[9px] font-mono text-sky-300 bg-black/50 px-1 rounded mt-0.5 whitespace-nowrap">
                     {formatTime(hoverTime)}
                   </span>
                 </div>
@@ -1476,12 +1490,12 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             </div>
 
             {/* ── Ruler ── */}
-            <div className="absolute top-0 left-0 right-0 bg-[#111115] border-b border-white/8 z-10" style={{ height: RULER_H }}>
+            <div className="absolute top-0 left-0 right-0 bg-black/40 border-b border-white/8 z-10" style={{ height: RULER_H }}>
               <div
-                className="absolute top-0 bottom-0 bg-[#0a0a0d] border-r border-white/8 flex items-center justify-center z-20"
+                className="absolute top-0 bottom-0 bg-black/40 border-r border-white/8 flex items-center justify-center z-20"
                 style={{ width: LABEL_W, position: "sticky", left: 0 }}
               >
-                <span className="text-[9px] text-gray-700 font-mono select-none">TIME</span>
+                <span className="text-[9px] text-muted-foreground/30 font-mono select-none">TIME</span>
               </div>
               <div className="absolute top-0 bottom-0" style={{ left: LABEL_W }}>
                 {Array.from({ length: totalTicks }, (_, i) => {
@@ -1491,7 +1505,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                   return (
                     <div key={t} className="absolute bottom-0 flex flex-col-reverse items-start" style={{ left: x }}>
                       <div className={`w-px ${isMajor ? "bg-white/20" : "bg-white/8"}`} style={{ height: isMajor ? 10 : 5 }} />
-                      {isMajor && <span className="text-[9px] text-gray-600 ml-1 select-none mb-1 font-mono">{formatTime(t)}</span>}
+                      {isMajor && <span className="text-[9px] text-muted-foreground/40 ml-1 select-none mb-1 font-mono">{formatTime(t)}</span>}
                     </div>
                   );
                 })}
@@ -1507,10 +1521,10 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
               >
                 {/* Sticky left label */}
                 <div
-                  className="absolute top-0 bottom-0 z-10 flex flex-col items-center justify-center border-r border-white/8 bg-[#0a0a0d]"
+                  className="absolute top-0 bottom-0 z-10 flex flex-col items-center justify-center border-r border-white/8 bg-black/40"
                   style={{ width: LABEL_W, position: "sticky", left: 0 }}
                 >
-                  <span className="text-[9px] text-gray-700 font-mono select-none">
+                  <span className="text-[9px] text-muted-foreground/30 font-mono select-none">
                     {ti === 0 ? "Main" : `T${ti + 1}`}
                   </span>
                 </div>
@@ -1520,7 +1534,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             {/* ── Empty state hint ── */}
             {internalClips.length === 0 && (
               <div className="absolute pointer-events-none" style={{ left: LABEL_W + 16, top: RULER_H + 24 }}>
-                <span className="text-[10px] text-gray-700">Generate shots to start editing</span>
+                <span className="text-[10px] text-muted-foreground/30">Generate shots to start editing</span>
               </div>
             )}
 
@@ -1538,9 +1552,9 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                 <div
                   key={clip.id}
                   className={`absolute rounded-lg overflow-hidden select-none border-2 transition-[border,box-shadow] cursor-grab active:cursor-grabbing ${isSelected
-                    ? "border-violet-500 ring-2 ring-violet-500/30 z-20"
+                    ? "border-primary ring-2 ring-primary/30 z-20"
                     : isActive
-                      ? "border-violet-400/50 z-10"
+                      ? "border-primary/50 z-10"
                       : "border-white/10 hover:border-white/30 z-10"
                     }`}
                   style={{ left, top: top + 4, width: w, height: CLIP_TRACK_H - 8 }}
@@ -1627,7 +1641,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                     {clip.reversed && <span className="text-[8px] font-bold text-amber-400 bg-black/60 px-1 py-0.5 rounded">REV</span>}
                     {clip.approved && (
                       <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 flex items-center justify-center">
-                        <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" /></svg>
+                        <svg className="w-2 h-2 text-foreground" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" /></svg>
                       </span>
                     )}
                   </div>
@@ -1652,7 +1666,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                   {isSelected && (
                     <button
                       data-trim
-                      className="absolute top-1 left-1.5 w-5 h-5 rounded bg-black/60 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors z-10"
+                      className="absolute top-1 left-1.5 w-5 h-5 rounded bg-black/60 flex items-center justify-center text-muted-foreground hover:text-red-400 transition-colors z-10"
                       onClick={(e) => { e.stopPropagation(); deleteClipById(clip.id); }}
                     >
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1686,10 +1700,10 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                       <button
                         key={`tj-${clipA.id}-${clipB.id}`}
                         className={`absolute z-40 rounded-full border-2 flex items-center justify-center transition-all shadow-xl group ${isOpen
-                          ? "bg-violet-600 border-violet-300 text-white scale-110"
+                          ? "bg-primary border-primary text-foreground scale-110"
                           : hasTransition
-                            ? "bg-violet-700/90 border-violet-400 text-white hover:scale-110"
-                            : "bg-[#18181c] border-white/25 text-gray-400 hover:border-violet-400 hover:text-violet-300 hover:scale-110"
+                            ? "bg-primary/20 border-primary text-foreground hover:scale-110"
+                            : "bg-background/30 border-white/20 text-muted-foreground hover:border-primary hover:text-primary hover:scale-110"
                           }`}
                         style={{
                           left: joinX - BTN / 2,
@@ -1706,7 +1720,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
                           <path d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
                         </svg>
-                        <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold bg-gray-900 text-white px-2 py-1 rounded-lg shadow-lg border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                        <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold bg-gray-900 text-foreground px-2 py-1 rounded-lg shadow-lg border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                           {hasTransition ? trans.type : "Add transition"}
                         </span>
                       </button>
@@ -1803,7 +1817,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                   </div>
                   {isSelected && (
                     <button data-audio-trim
-                      className="absolute top-1 left-1.5 w-5 h-5 rounded bg-black/60 flex items-center justify-center text-gray-400 hover:text-red-400 transition-colors z-10"
+                      className="absolute top-1 left-1.5 w-5 h-5 rounded bg-black/60 flex items-center justify-center text-muted-foreground hover:text-red-400 transition-colors z-10"
                       onClick={(e) => { e.stopPropagation(); setAudioClips((prev) => prev.filter((x) => x.id !== ac.id)); setSelectedAudioId(null); }}
                     >
                       <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1818,37 +1832,56 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
 
         {/* Timeline footer */}
         <div className="shrink-0 border-t border-white/8 flex items-center px-3 gap-4" style={{ height: FOOTER_H }}>
-          <span className="text-[10px] text-gray-700">
+          <span className="text-[10px] text-muted-foreground/30">
             {internalClips.length} {internalClips.length === 1 ? "clip" : "clips"}
             {totalDuration > 0 && ` · ${formatTime(totalDuration)} total`}
           </span>
           {selectedClip && (
-            <span className="text-[10px] text-violet-500">
+            <span className="text-[10px] text-primary">
               Shot {internalClips.findIndex((c) => c.id === selectedClipId) + 1}
               {selectedClip.approved && " · ✓ approved"}
               {selectedClip.reversed && " · reversed"}
               {(selectedClip.trimStart > 0 || selectedClip.trimEnd !== null) && " · trimmed"}
             </span>
           )}
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => audioFileRef.current?.click()}
+              onClick={() => setVideoPickerOpen(true)}
+              className="flex items-center gap-1.5 h-5 px-2 rounded text-[10px] text-primary hover:text-primary hover:bg-primary/10 border border-primary/20 hover:border-primary/50 transition-all"
+            >
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+              Add Video
+            </button>
+            <button
+              onClick={() => setAudioPickerOpen(true)}
               className="flex items-center gap-1.5 h-5 px-2 rounded text-[10px] text-teal-500 hover:text-teal-300 hover:bg-teal-500/10 border border-teal-800/50 hover:border-teal-600/50 transition-all"
             >
-              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
               Add Audio
             </button>
           </div>
         </div>
-        <input ref={audioFileRef} type="file" accept="audio/*" className="hidden" onChange={handleAudioFileChange} />
       </div>
+
+      <MediaPickerDialog
+        open={videoPickerOpen}
+        onOpenChange={setVideoPickerOpen}
+        accept={["video"]}
+        title="Add Video"
+        onSelect={handleVideoSelect}
+      />
+      <MediaPickerDialog
+        open={audioPickerOpen}
+        onOpenChange={setAudioPickerOpen}
+        accept={["audio"]}
+        title="Add Audio"
+        onSelect={handleAudioSelect}
+      />
 
       {/* Trim drag tooltip */}
       {trimTooltip && (
         <div
-          className="fixed z-50 bg-gray-900/95 text-violet-300 text-xs font-mono px-2 py-1 rounded shadow-xl border border-white/10 pointer-events-none -translate-x-1/2"
+          className="fixed z-50 bg-gray-900/95 text-primary text-xs font-mono px-2 py-1 rounded shadow-xl border border-white/10 pointer-events-none -translate-x-1/2"
           style={{ left: trimTooltip.x, top: trimTooltip.y - 32 }}
         >
           {trimTooltip.time.toFixed(2)}s

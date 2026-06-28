@@ -5,7 +5,7 @@ import type { ModelSettings } from "@/types/llm-common";
 import type { AgentModels } from "@/types/worker-pipeline";
 
 export function getModelDurationsArray(videoModel: TVideoModelId): number[] {
-  return VIDEO_MODELS[videoModel].durations;
+  return VIDEO_MODELS[videoModel]?.durations ?? [];
 }
 
 export function getAgentModels(

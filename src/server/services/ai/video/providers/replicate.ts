@@ -1,21 +1,7 @@
-import { AI_VIDEO, VIDEO_MODELS } from "@/lib/constants";
-import type { I2vRequest, IVideoProvider, ReferenceModeRequest, VideoEditRequest, VideoResult } from "@/types/video-provider";
-import { sleep } from "@/lib/utils";
+import { AI_VIDEO } from "@/lib/constants";
+import type { I2vRequest, IProvider, VideoResult } from "@/types/video-provider";
+import { pollUntil } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
-
-const REPLICATE_API = "https://api.replicate.com/v1";
-
-// Per-model `negative_prompt` baselines. Both Kling v2.5 Turbo Pro and
-// Pixverse V6 expose a dedicated `negative_prompt` Replicate input — using it
-// outperforms burying negatives in the positive prompt (documented to HURT
-// Pixverse V6 quality, and Kling responds best to 5–8 focused terms rather
-// than long inline lists). See docs/video-model-prompts.md for sources.
-const NEGATIVE_PROMPTS: Partial<Record<TVideoModelId, string>> = {
-  "kling-v2.5-turbo-pro":
-    "blur, distortion, warping, extra fingers, jittery motion, low quality, watermark",
-  "pixverse-v6":
-    "extra fingers, distorted hands, morphing, warping, deformed face, text, watermark, shaky camera, sudden cuts, fast zoom, jitter, flicker, low quality",
-};
 
 function extractOutputUrl(out: unknown): string {
   if (typeof out === "string" && (out.startsWith("http://") || out.startsWith("https://"))) {
@@ -29,7 +15,7 @@ function extractOutputUrl(out: unknown): string {
   }
   throw new Error("Replicate returned no video URL in output");
 }
-export class ReplicateVideoProvider implements IVideoProvider {
+export class ReplicateVideoProvider implements IProvider {
   readonly client: AxiosInstance;
   constructor() {
     const token = AI_VIDEO.replicateToken;
@@ -37,109 +23,54 @@ export class ReplicateVideoProvider implements IVideoProvider {
       throw new Error("REPLICATE_API_TOKEN is not set (required for Replicate video generation)");
     }
     this.client = axios.create({
-      baseURL: REPLICATE_API,
+      baseURL: "https://api.replicate.com/v1",
       headers: { Authorization: `Bearer ${token}` },
     });
   }
-  generateInput(model: TVideoModelId, req: I2vRequest): Record<string, unknown> {
-    switch (model) {
+  findModel(model: TVideoModelId): string | undefined {
+    return ({
+      'seedance-2-pro': 'bytedance/seedance-2.0',
+      'seedance-2-fast': 'bytedance/seedance-2.0-fast',
+    } as Partial<Record<TVideoModelId, string>>)[model];
+  }
+  generateInput(req: I2vRequest): Record<string, unknown> {
+    switch (req.model) {
       case "seedance-2-pro":
       case "seedance-2-fast":
         return {
           image: req.startImageUrl,
           last_frame_image: req.endImageUrl,
+          reference_images: req.referenceImages,
           prompt: req.prompt,
           duration: req.duration,
           aspect_ratio: req.aspectRatio,
           resolution: req.resolution,
           generate_audio: req.generateAudio ?? false,
         };
-      case "kling-v2.5-turbo-pro":
-        return {
-          start_image: req.startImageUrl,
-          end_image: req.endImageUrl,
-          prompt: req.prompt,
-          negative_prompt: NEGATIVE_PROMPTS[model],
-          duration: req.duration,
-          aspect_ratio: req.aspectRatio,
-        };
-      case "pixverse-v6":
-        return {
-          image: req.startImageUrl,
-          last_frame_image: req.endImageUrl,
-          prompt: req.prompt,
-          negative_prompt: NEGATIVE_PROMPTS[model],
-          duration: req.duration,
-          aspect_ratio: req.aspectRatio,
-          quality: req.resolution,
-        };
-      case "vidu-q3-pro":
-        return {
-          prompt: req.prompt,
-          start_image: req.startImageUrl,
-          end_image: req.endImageUrl,
-          duration: req.duration,
-          resolution: req.resolution,
-          aspect_ratio: req.aspectRatio,
-        };
       default:
-        throw new Error(`Replicate: video model ${model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);
+        throw new Error(`Replicate: video model ${req.model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);
     }
   }
-  private async pollPrediction(predictionId: string, expectedDuration: number): Promise<VideoResult> {
-    let status = 'pending';
-    let errorDetail: string = status;
-    while (status !== 'succeeded' && status !== 'failed' && status !== 'canceled') {
-      await sleep(3000);
-      const response = await this.client.get(`predictions/${predictionId}`);
-      status = response.data.status;
-      errorDetail = response.data.error ?? status;
-      if (status === 'succeeded') {
-        return { videoUrl: extractOutputUrl(response.data.output), durationSeconds: expectedDuration };
+  private pollPrediction(predictionId: string, expectedDuration: number): Promise<VideoResult> {
+    return pollUntil(async () => {
+      const { data } = await this.client.get(`predictions/${predictionId}`);
+      if (data.status === 'succeeded') {
+        return { videoUrl: extractOutputUrl(data.output), durationSeconds: expectedDuration };
       }
+      if (data.status === 'failed' || data.status === 'canceled') {
+        throw new Error(`Replicate: prediction ${data.status}: ${data.error ?? data.status}`);
+      }
+      return null;
+    });
+  }
+
+  async generateVideo(req: I2vRequest): Promise<VideoResult> {
+    const input = this.generateInput(req);
+    const model = this.findModel(req.model);
+    if (!model) {
+      throw new Error(`Replicate: video model ${req.model} is not implemented for Replicate. Use Fal.ai or a mapped Seedance model.`);
     }
-    throw new Error(`Replicate: prediction ${status}: ${errorDetail}`);
-  }
-
-  async generateFromImage(req: I2vRequest, model: TVideoModelId): Promise<VideoResult> {
-    const input = this.generateInput(model, req);
-    const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
-    return this.pollPrediction(prediction.data.id, req.duration);
-  }
-
-  /**
-   * Video-to-video editing with Seedance 2: sends the source video + edit prompt,
-   * returns the AI-edited result.
-   */
-  async generateVideoEdit(req: VideoEditRequest, model: TVideoModelId): Promise<VideoResult> {
-    const input: Record<string, unknown> = {
-      reference_videos: [req.videoUrl],
-      prompt: `[Video1] ${req.prompt}`,
-      duration: req.duration,
-      aspect_ratio: req.aspectRatio,
-      resolution: req.resolution,
-    };
-    const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
-    return this.pollPrediction(prediction.data.id, req.duration);
-  }
-
-  /**
-   * Reference-mode generation for Seedance 2: drives lipsync from an audio file
-   * and maintains character consistency via a reference image — no start/last frame.
-   */
-  async generateFromReferences(req: ReferenceModeRequest, model: TVideoModelId): Promise<VideoResult> {
-    const input: Record<string, unknown> = {
-      reference_images: req.referenceImages,
-      prompt: req.prompt,
-      duration: req.duration,
-      aspect_ratio: req.aspectRatio,
-      resolution: req.resolution,
-      generate_audio: true,
-    };
-    if (req.referenceAudios && req.referenceAudios.length > 0) {
-      input.reference_audios = req.referenceAudios;
-    }
-    const prediction = await this.client.post('predictions', { input, version: VIDEO_MODELS[model].endpoint });
+    const prediction = await this.client.post('predictions', { input, version: model });
     return this.pollPrediction(prediction.data.id, req.duration);
   }
 }

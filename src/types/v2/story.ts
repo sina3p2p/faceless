@@ -34,6 +34,15 @@ export type ShotResult = {
   approved?: boolean;
 };
 
+export type ShotCompile = {
+  toolCallId: string;
+  loading: boolean;
+  renderPrompt?: string;
+  referenceImageUrls?: string[];
+  duration?: number;
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+};
+
 export type ClientMessage = {
   id: string;
   role: "user" | "assistant";
@@ -41,4 +50,5 @@ export type ClientMessage = {
   fork?: ForkCall;
   assetRef?: AssetRef;
   shotResult?: ShotResult;
+  shotCompile?: ShotCompile;
 };

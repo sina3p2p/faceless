@@ -63,7 +63,7 @@ export async function POST(
       .where(eq(filmSessionMessages.id, targetRowId!));
   }
 
-  if (toolName === "generateShot") {
+  if (toolName === "compileShot") {
     const result = await generateShotWithFallback(
       tcArgs.referenceImageUrls as string[],
       tcArgs.prompt as string,

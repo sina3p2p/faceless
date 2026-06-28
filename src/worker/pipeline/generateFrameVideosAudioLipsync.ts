@@ -204,7 +204,6 @@ export async function generateFrameVideosAudioLipsyncJob(job: Job<RenderJobData>
                   motionDescription,
                   desiredDuration,
                   videoModelId,
-                  videoProject.modelSettings.motionModel,
                   e,
                   aspectRatio,
                   videoResolution
@@ -225,10 +224,10 @@ export async function generateFrameVideosAudioLipsyncJob(job: Job<RenderJobData>
                     );
                     const ee = endImageUrl
                       ? await addSeedanceNoiseEnhanced(
-                          endImageUrl,
-                          `end_${frame.id}`,
-                          videoProjectId
-                        )
+                        endImageUrl,
+                        `end_${frame.id}`,
+                        videoProjectId
+                      )
                       : undefined;
                     videoResult = await callGen(es, ee);
                   } catch {

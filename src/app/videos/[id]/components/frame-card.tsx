@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { VIDEO_I2V_PROVIDER, videoModelsForProvider } from "@/lib/constants";
+import { videoModels } from "@/lib/constants";
 import type { SceneFrame, FrameVariant } from "@/types/video-detail";
 
 export function FrameCard({
@@ -425,7 +425,7 @@ function VideoModelSelector({
   onGenerate: () => void;
   onCancel: () => void;
 }) {
-  const modelList = videoModelsForProvider(VIDEO_I2V_PROVIDER);
+  const modelList = videoModels();
   return (
     <div className="mt-1.5 rounded-lg bg-black/30 border border-white/10 p-2 space-y-1.5">
       <div className="flex flex-wrap gap-1">

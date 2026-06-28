@@ -12,7 +12,6 @@ export async function generateVideoFromImage(
   prompt: string,
   desiredDuration: number = 5,
   videoModelId: TVideoModelId,
-  correctionAgentModelId: string,
   endImageUrl?: string,
   aspectRatio: TAspectRatio = "9:16",
   resolution: TVideoResolution = "480p",
@@ -20,7 +19,7 @@ export async function generateVideoFromImage(
 ): Promise<VideoResult> {
   const replicate = new ReplicateVideoProvider();
 
-  const duration = pickBestDuration(desiredDuration, VIDEO_MODELS[videoModelId].durations);
+  const duration = pickBestDuration(desiredDuration, VIDEO_MODELS[videoModelId]?.durations ?? []);
 
   const req = {
     startImageUrl,
@@ -30,9 +29,10 @@ export async function generateVideoFromImage(
     aspectRatio,
     resolution,
     generateAudio,
+    model: videoModelId
   };
 
-  return replicate.generateFromImage(req, videoModelId);
+  return replicate.generateVideo(req);
 }
 
 /**
@@ -50,9 +50,9 @@ export async function generateVideoFromReferences(
   duration: number = -1
 ): Promise<VideoResult> {
   const replicate = new ReplicateVideoProvider();
-  return replicate.generateFromReferences(
-    { referenceImages, referenceAudios, prompt, duration, aspectRatio, resolution },
-    videoModelId
+  return replicate.generateVideo(
+    { model: videoModelId, referenceImages, referenceAudios, prompt, duration, aspectRatio, resolution },
+
   );
 }
 
@@ -69,10 +69,9 @@ export async function editVideo(
   videoModelId: TVideoModelId = "seedance-2-pro"
 ): Promise<VideoResult> {
   const replicate = new ReplicateVideoProvider();
-  const snapped = pickBestDuration(duration, VIDEO_MODELS[videoModelId].durations);
-  return replicate.generateVideoEdit(
-    { videoUrl, prompt, duration: snapped, aspectRatio, resolution },
-    videoModelId
+  const snapped = pickBestDuration(duration, VIDEO_MODELS[videoModelId]?.durations ?? []);
+  return replicate.generateVideo(
+    { videoUrl, prompt, duration: snapped, aspectRatio, resolution, model: videoModelId }
   );
 }
 

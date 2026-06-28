@@ -1,0 +1,51 @@
+"use client";
+
+import { useRef, useState } from "react";
+
+export function ChatInput({
+  isStreaming,
+  onSend,
+}: {
+  isStreaming: boolean;
+  onSend: (text: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [hasInput, setHasInput] = useState(false);
+
+  function send() {
+    const trimmed = inputRef.current?.value.trim() ?? "";
+    if (!trimmed || isStreaming) return;
+    if (inputRef.current) { inputRef.current.value = ""; setHasInput(false); }
+    onSend(trimmed);
+  }
+
+  return (
+    <div className="px-3 py-3 shrink-0 border-t border-white/10">
+      <div className="flex gap-2 bg-white/10 rounded-2xl px-3 py-2 items-center">
+        <input
+          ref={inputRef}
+          type="text"
+          onChange={(e) => setHasInput(e.target.value.length > 0)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              send();
+            }
+          }}
+          placeholder={isStreaming ? "Showrunner is writing…" : "Ask a question or give feedback…"}
+          disabled={isStreaming}
+          className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none disabled:opacity-50 py-0.5"
+        />
+        <button
+          onClick={send}
+          disabled={!hasInput || isStreaming}
+          className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-black hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors shrink-0"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}

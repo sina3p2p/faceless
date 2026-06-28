@@ -6,8 +6,6 @@ import {
   LLM_MODELS,
   DEFAULT_LLM_MODEL,
   IMAGE_MODELS,
-  VIDEO_I2V_PROVIDER,
-  videoModelsForProvider,
   videoResolutionsForModel,
   getDefaultVideoResolution,
   coerceVideoResolution,
@@ -15,6 +13,7 @@ import {
   VIDEO_SIZES,
   DEFAULT_VIDEO_SIZE,
   MODEL_SETTINGS,
+  videoModels,
 } from "@/lib/constants";
 import type { AgentModels } from "@/types/worker-pipeline";
 import { ModelSettings } from "@/types/llm-common";
@@ -107,7 +106,7 @@ export function VideoQualitySelector({ videoModelId, value, onChange }: VideoQua
 }
 
 export function VideoModelSelector({ value, onChange }: ModelSelectorProps<TVideoModelId>) {
-  const models = videoModelsForProvider(VIDEO_I2V_PROVIDER);
+  const models = videoModels();
   return (
     <OptionSelect
       label="Video Generation Model"

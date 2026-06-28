@@ -2,6 +2,14 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { IMAGE_MODELS } from "@/lib/constants";
 import { SceneRefTextarea } from "./scene-ref-textarea";
 import type { Scene } from "@/types/video-detail";
@@ -57,21 +65,19 @@ export function PromptEditModal({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="p-6">
-          <h3 className="text-lg font-semibold text-white mb-4">
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent showCloseButton className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
             {mode === "edit" ? "Edit Image" : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
-          </h3>
+          </DialogTitle>
+        </DialogHeader>
 
+        <DialogBody className="space-y-4">
           {scene.assetUrl && (
-            <div className="mb-4 relative">
+            <div className="relative">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={scene.assetUrl}
-                alt="Current preview"
-                className="w-full rounded-lg border border-white/10"
-              />
+              <img src={scene.assetUrl} alt="Current preview" className="w-full rounded-lg border border-white/10" />
               {onUndo && (
                 <button
                   onClick={onUndo}
@@ -89,7 +95,7 @@ export function PromptEditModal({
           )}
 
           {scene.media && scene.media.length > 1 && (
-            <div className="mb-4">
+            <div>
               <label className="block text-xs font-medium text-gray-400 mb-2">
                 Previous versions ({scene.media.length})
               </label>
@@ -100,13 +106,8 @@ export function PromptEditModal({
                     <button
                       key={m.id}
                       type="button"
-                      onClick={() => {
-                        if (!isCurrent) onSelectMedia(scene.id, m.id);
-                      }}
-                      className={`relative shrink-0 rounded-lg overflow-hidden border-2 transition-all hover:opacity-100 ${isCurrent
-                        ? "border-violet-500 ring-1 ring-violet-500/30 opacity-100"
-                        : "border-white/10 opacity-60 hover:border-white/30"
-                        }`}
+                      onClick={() => { if (!isCurrent) onSelectMedia(scene.id, m.id); }}
+                      className={`relative shrink-0 rounded-lg overflow-hidden border-2 transition-all hover:opacity-100 ${isCurrent ? "border-violet-500 ring-1 ring-violet-500/30 opacity-100" : "border-white/10 opacity-60 hover:border-white/30"}`}
                       title={`${m.modelUsed || "Unknown model"} — ${new Date(m.createdAt).toLocaleTimeString()}`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -126,7 +127,7 @@ export function PromptEditModal({
           )}
 
           {canEdit && (
-            <div className="flex gap-1 mb-4 p-1 bg-white/5 rounded-lg">
+            <div className="flex gap-1 p-1 bg-white/5 rounded-lg">
               <button
                 onClick={() => setMode("regenerate")}
                 className={`flex-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${mode === "regenerate" ? "bg-violet-600 text-white" : "text-gray-400 hover:text-white"}`}
@@ -142,7 +143,7 @@ export function PromptEditModal({
             </div>
           )}
 
-          <div className="mb-4">
+          <div>
             <label className="block text-xs font-medium text-gray-400 mb-1.5">Image Model</label>
             <div className="flex gap-1.5 flex-wrap">
               {Object.values(IMAGE_MODELS).map((m) => (
@@ -153,10 +154,7 @@ export function PromptEditModal({
                     setSelectedModel(m.id);
                     if (mode === "edit" && !scene.assetUrl) setMode("regenerate");
                   }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${selectedModel === m.id
-                    ? "bg-violet-600 text-white"
-                    : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"
-                    }`}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${selectedModel === m.id ? "bg-violet-600 text-white" : "bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:border-white/20"}`}
                 >
                   {m.label}
                 </button>
@@ -170,7 +168,7 @@ export function PromptEditModal({
           </div>
 
           {mode === "regenerate" && (
-            <>
+            <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Image Prompt</label>
               <SceneRefTextarea
                 value={regenPrompt}
@@ -180,17 +178,17 @@ export function PromptEditModal({
                 rows={6}
                 placeholder="Describe the image you want to generate..."
               />
-              <div className="flex items-center justify-between mt-2 mb-4">
+              <div className="flex items-center justify-between mt-2">
                 <span className="text-xs text-gray-600">{regenPrompt.length} chars</span>
-                {(selectedModel === "nano-banana-2") && (
+                {selectedModel === "nano-banana-2" && (
                   <span className="text-xs text-gray-600">Type @ to reference another scene</span>
                 )}
               </div>
-            </>
+            </div>
           )}
 
           {mode === "edit" && (
-            <>
+            <div>
               <label className="block text-sm font-medium text-gray-300 mb-1.5">Edit Instruction</label>
               <SceneRefTextarea
                 value={editInstruction}
@@ -200,11 +198,11 @@ export function PromptEditModal({
                 rows={3}
                 placeholder='e.g. "change the hair color to look like @scene1" or "add dramatic fog"'
               />
-              <div className="flex items-center justify-between mt-2 mb-4">
+              <div className="flex items-center justify-between mt-2">
                 <span className="text-xs text-gray-600">{editInstruction.length} chars</span>
                 <span className="text-xs text-gray-600">Type @ to reference another scene</span>
               </div>
-            </>
+            </div>
           )}
 
           <input
@@ -218,30 +216,24 @@ export function PromptEditModal({
               e.target.value = "";
             }}
           />
+        </DialogBody>
 
-          <div className="flex gap-3">
-            <Button variant="ghost" onClick={onClose} className="flex-1">
-              Cancel
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => modalFileInputRef.current?.click()}
-              className="flex-1"
-            >
-              Upload Image
-            </Button>
-            <Button
-              variant="primary"
-              loading={regenerating}
-              onClick={handleSubmit}
-              disabled={mode === "edit" && !editInstruction.trim()}
-              className="flex-1"
-            >
-              {mode === "edit" ? "Edit Image" : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} className="flex-1">Cancel</Button>
+          <Button variant="outline" onClick={() => modalFileInputRef.current?.click()} className="flex-1">
+            Upload Image
+          </Button>
+          <Button
+            variant="primary"
+            loading={regenerating}
+            onClick={handleSubmit}
+            disabled={mode === "edit" && !editInstruction.trim()}
+            className="flex-1"
+          >
+            {mode === "edit" ? "Edit Image" : (scene.assetUrl ? "Regenerate Image" : "Generate Image")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

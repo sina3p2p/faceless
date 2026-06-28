@@ -1,14 +1,13 @@
 import { NextRequest } from "next/server";
 import { streamText, stepCountIs } from "ai";
 import { db } from "@/server/db";
-import { filmSessions, filmSessionMessages, filmShotJobs } from "@/server/db/schema";
+import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
 import { storyTools, MODEL, openrouter } from "@/server/services/showrunner";
 import { rowsToModelMessages } from "@/server/services/showrunner/messages";
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
 import { generateImage } from "@/server/services/media";
-import { shotQueue } from "@/lib/shot-queue";
 
 const ASSET_CANDIDATE_COUNT = 2;
 
@@ -161,8 +160,8 @@ export async function POST(
           emit({ type: "fork_loading", toolCallId: chunk.id });
         } else if (chunk.toolName === "generateAssetReferences") {
           emit({ type: "asset_ref_loading", toolCallId: chunk.id });
-        } else if (chunk.toolName === "generateShot") {
-          emit({ type: "shot_loading", toolCallId: chunk.id });
+        } else if (chunk.toolName === "compileShot") {
+          emit({ type: "shot_compile_loading", toolCallId: chunk.id });
         }
       } else if (chunk.type === "tool-call") {
         const args = chunk.input as Record<string, unknown>;
@@ -177,7 +176,7 @@ export async function POST(
           emit({ type: "fork", toolCallId: chunk.toolCallId, ...args });
         } else if (chunk.toolName === "generateAssetReferences") {
           pendingAssetIndices.push(toolCalls.length - 1);
-        } else if (chunk.toolName === "generateShot") {
+        } else if (chunk.toolName === "compileShot") {
           pendingShotIndices.push(toolCalls.length - 1);
         }
       } else if (chunk.type === "tool-result" && chunk.toolName === "loadReference") {
@@ -208,18 +207,8 @@ export async function POST(
       );
     }
 
-    // Mark each pending shot as `pending: true` in its tool-call arguments before
-    // saving to DB. The worker will clear this flag (and set videoUrl / shotError)
-    // when Replicate finishes, so rowsToClientMessages knows to show a loading state
-    // on page reload while the job is still running.
-    for (const idx of pendingShotIndices) {
-      const tc = toolCalls[idx]!;
-      tc.function.arguments = { ...tc.function.arguments, pending: true };
-    }
-
-    // Save the assistant message now — before enqueueing shot jobs — so the row
-    // exists in DB for the worker to patch, and so the message is not lost if
-    // the browser disconnects mid-generation.
+    // Save the assistant message before emitting shot_compiled events so the
+    // row exists in DB for the /render-shot endpoint to find and patch later.
     const assistantRowId = crypto.randomUUID();
     await db.insert(filmSessionMessages).values({
       id: assistantRowId,
@@ -235,8 +224,9 @@ export async function POST(
       createdAt: new Date(),
     });
 
-    // Enqueue one background job per shot. The worker calls Replicate, uploads to
-    // R2, patches the DB row, and publishes a Redis event to the client SSE stream.
+    // Emit the compiled prompt for each shot so the client can show it for
+    // user review. No render is started here — the client calls /render-shot
+    // after the user approves (or edits) the prompt.
     for (const idx of pendingShotIndices) {
       const tc = toolCalls[idx]!;
       const args = tc.function.arguments as {
@@ -245,29 +235,14 @@ export async function POST(
         duration: number;
         aspectRatio: "16:9" | "9:16" | "1:1";
       };
-
-      // Insert a tracker row so we can surface status on reload.
-      await db.insert(filmShotJobs).values({
-        id: crypto.randomUUID(),
-        sessionId,
+      emit({
+        type: "shot_compiled",
         toolCallId: tc.id,
-        assistantMessageRowId: assistantRowId,
-        status: "pending",
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      await shotQueue.add("generate-shot", {
-        sessionId,
-        toolCallId: tc.id,
-        assistantMessageRowId: assistantRowId,
+        renderPrompt: args.prompt,
         referenceImageUrls: args.referenceImageUrls,
-        prompt: args.prompt,
-        aspectRatio: args.aspectRatio ?? "16:9",
         duration: args.duration,
+        aspectRatio: args.aspectRatio ?? "16:9",
       });
-
-      emit({ type: "shot_submitted", toolCallId: tc.id });
     }
 
     emit({ type: "done", messageId: assistantMsgId });

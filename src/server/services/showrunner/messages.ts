@@ -1,5 +1,5 @@
 import type { ModelMessage } from "ai";
-import type { AssetRef, ClientMessage, ForkCall, ShotResult } from "@/types/v2/story";
+import type { AssetRef, ClientMessage, ForkCall, ShotCompile, ShotResult } from "@/types/v2/story";
 
 type DbRow = {
   messageId: string;
@@ -64,6 +64,7 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
       let fork: ForkCall | undefined;
       let assetRef: AssetRef | undefined;
       let shotResult: ShotResult | undefined;
+      let shotCompile: ShotCompile | undefined;
 
       for (const tc of calls) {
         const args = tc.function.arguments;
@@ -85,19 +86,33 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
             images: (args.generatedImages ?? args.images) as string[] | undefined,
             approvedUrl: assetApprovals.get(tc.id),
           };
-        } else if (tc.function.name === "generateShot") {
-          shotResult = {
-            toolCallId: tc.id,
-            // pending=true means the background worker is still running
-            loading: (args.pending as boolean | undefined) === true,
-            videoUrl: args.videoUrl as string | undefined,
-            error: args.shotError as string | undefined,
-            approved: shotApprovals.has(tc.id),
-          };
+        } else if (tc.function.name === "compileShot") {
+          const isPending = (args.pending as boolean | undefined) === true;
+          const hasVideo = !!(args.videoUrl as string | undefined);
+          if (isPending || hasVideo) {
+            // Render has started (or finished) — show the video panel
+            shotResult = {
+              toolCallId: tc.id,
+              loading: isPending,
+              videoUrl: args.videoUrl as string | undefined,
+              error: args.shotError as string | undefined,
+              approved: shotApprovals.has(tc.id),
+            };
+          } else {
+            // Render not started yet — show the compile-review panel
+            shotCompile = {
+              toolCallId: tc.id,
+              loading: false,
+              renderPrompt: args.prompt as string,
+              referenceImageUrls: args.referenceImageUrls as string[],
+              duration: args.duration as number,
+              aspectRatio: args.aspectRatio as ShotCompile["aspectRatio"],
+            };
+          }
         }
       }
 
-      messages.push({ id: row.messageId, role: "assistant", text: (d.text as string) ?? "", fork, assetRef, shotResult });
+      messages.push({ id: row.messageId, role: "assistant", text: (d.text as string) ?? "", fork, assetRef, shotResult, shotCompile });
     }
   }
   return messages;
@@ -156,7 +171,7 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
           toolName: tc.function.name,
           // Strip server-side augmentation before sending to model
           input: Object.fromEntries(
-            Object.entries(tc.function.arguments).filter(([k]) => k !== "generatedImages" && k !== "videoUrl")
+            Object.entries(tc.function.arguments).filter(([k]) => !["generatedImages", "videoUrl", "pending", "shotError"].includes(k))
           ),
         }));
         msgs.push({
@@ -182,10 +197,12 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
           const resultText = collectedResults.get(tc.id) ?? (
             tc.function.name === "generateAssetReferences"
               ? `Reference images have been generated for "${tc.function.arguments.assetHandle as string}". User has not yet approved one.`
-              : tc.function.name === "generateShot"
+              : tc.function.name === "compileShot"
               ? tc.function.arguments.videoUrl
-                ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval.`
-                : "Shot render in progress."
+                ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval to add to timeline.`
+                : (tc.function.arguments.pending as boolean | undefined) === true
+                ? "Shot render in progress — waiting for the video to finish."
+                : "Shot prompt compiled and shown to user for review. Awaiting their approval before rendering starts."
               : "User has not yet responded to this decision."
           );
           return {

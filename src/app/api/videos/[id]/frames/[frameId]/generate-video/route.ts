@@ -66,7 +66,7 @@ export async function POST(
     }
 
     const callGenerate = (url: string) =>
-      generateVideoFromImage(url, prompt, duration, videoModel, video.modelSettings.motionModel, undefined, video.videoSize, video.videoResolution);
+      generateVideoFromImage(url, prompt, duration, videoModel, undefined, video.videoSize, video.videoResolution);
 
     const result = await callGenerate(startUrl).catch(async (err) => {
       if (SEEDANCE2_MODELS.has(videoModel) && isE005(err)) {

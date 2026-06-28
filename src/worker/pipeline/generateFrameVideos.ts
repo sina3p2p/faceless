@@ -163,7 +163,7 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
             }
 
             const callGenerate = (s: string, e: string | undefined): Promise<VideoResult> =>
-              generateVideoFromImage(s, finalPrompt, desiredDuration, videoModelId, videoProject.modelSettings.motionModel, e, aspectRatio, videoResolution, isSpeakingFrame ? true : undefined);
+              generateVideoFromImage(s, finalPrompt, desiredDuration, videoModelId, e, aspectRatio, videoResolution, isSpeakingFrame ? true : undefined);
 
             let videoResult: VideoResult;
             try {

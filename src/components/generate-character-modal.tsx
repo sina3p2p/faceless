@@ -2,6 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from "@/components/ui/dialog";
 
 interface GenerateCharacterModalProps {
   open: boolean;
@@ -143,43 +150,15 @@ export function GenerateCharacterModal({
     onClose();
   }
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      <div className="relative w-full max-w-lg bg-gray-900 border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-white">
-            {labels.title}
-          </h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent showCloseButton className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{labels.title}</DialogTitle>
+        </DialogHeader>
 
         {/* Chat area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-[250px]">
+        <DialogBody className="space-y-4 min-h-[250px]">
           {messages.length === 0 && !loading && (
             <div className="text-center py-8">
               <div className="w-12 h-12 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center mx-auto mb-3">
@@ -215,41 +194,24 @@ export function GenerateCharacterModal({
               <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-3">
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1.5">
-                    <span
-                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "0ms" }}
-                    />
-                    <span
-                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "150ms" }}
-                    />
-                    <span
-                      className="w-2 h-2 bg-gray-500 rounded-full animate-bounce"
-                      style={{ animationDelay: "300ms" }}
-                    />
+                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                   </div>
-                  {messages.length > 0 &&
-                    messages[messages.length - 1].role === "user" && (
-                      <span className="text-xs text-gray-600 ml-1">
-                        Thinking...
-                      </span>
-                    )}
+                  {messages.length > 0 && messages[messages.length - 1].role === "user" && (
+                    <span className="text-xs text-gray-600 ml-1">Thinking...</span>
+                  )}
                 </div>
               </div>
             </div>
           )}
 
+          {error && <p className="text-red-400 text-sm">{error}</p>}
           <div ref={chatEndRef} />
-        </div>
-
-        {error && (
-          <div className="px-6 pb-2">
-            <p className="text-red-400 text-sm">{error}</p>
-          </div>
-        )}
+        </DialogBody>
 
         {/* Input area */}
-        <div className="px-6 py-4 border-t border-white/10">
+        <div className="px-6 py-4 border-t border-white/10 shrink-0">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <textarea
               ref={inputRef}
@@ -272,32 +234,16 @@ export function GenerateCharacterModal({
               disabled={loading}
               className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 focus:outline-none transition-colors resize-none disabled:opacity-50"
             />
-            <Button
-              type="submit"
-              disabled={!input.trim() || loading}
-              className="self-end shrink-0"
-            >
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                />
+            <Button type="submit" disabled={!input.trim() || loading} className="self-end shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </Button>
           </form>
-          <p className="text-xs text-gray-600 mt-1.5">
-            Press Enter to send, Shift+Enter for new line
-          </p>
+          <p className="text-xs text-gray-600 mt-1.5">Press Enter to send, Shift+Enter for new line</p>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

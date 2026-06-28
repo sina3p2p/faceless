@@ -4,6 +4,8 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "@/lib/axios";
 import Image from "next/image";
+import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type MediaType = "image" | "video" | "audio";
 type Tab = "all" | MediaType;
@@ -92,7 +94,7 @@ function IconAudio() {
 
 function MediaTypeIcon({ type }: { type: MediaType }) {
   const colors: Record<MediaType, string> = {
-    image: "text-violet-400",
+    image: "text-primary",
     video: "text-blue-400",
     audio: "text-emerald-400",
   };
@@ -145,7 +147,7 @@ function GridThumbnail({ item }: { item: MediaItem }) {
   return (
     <div className="aspect-square rounded-xl bg-white/5 flex flex-col items-center justify-center gap-2">
       <MediaTypeIcon type={item.type} />
-      <span className="text-xs text-gray-500 capitalize">{item.type}</span>
+      <span className="text-xs text-muted-foreground/60 capitalize">{item.type}</span>
     </div>
   );
 }
@@ -213,14 +215,14 @@ export default function LibraryPage() {
     (imageQ.data?.total ?? 0) + (videoQ.data?.total ?? 0) + (audioQ.data?.total ?? 0);
 
   return (
-    <div className="flex flex-col h-full bg-[#0f0f0f] text-white">
+    <div className="flex flex-col h-full text-foreground">
       {/* Header */}
       <div className="flex items-center justify-between px-8 pt-8 pb-4 shrink-0">
         <h1 className="text-2xl font-semibold tracking-tight">Library</h1>
         <div className="flex items-center gap-3">
           {/* Search */}
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 pointer-events-none">
               <IconSearch />
             </span>
             <input
@@ -228,7 +230,7 @@ export default function LibraryPage() {
               placeholder="Search library"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="bg-white/6 border border-white/10 rounded-full pl-9 pr-4 py-2 text-sm text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-white/20 w-52 transition-all"
+              className="bg-white/6 border border-white/10 rounded-full pl-9 pr-4 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-white/20 w-52 transition-all"
             />
           </div>
         </div>
@@ -236,36 +238,24 @@ export default function LibraryPage() {
 
       {/* Tab bar + view toggle */}
       <div className="flex items-center justify-between px-8 pb-4 shrink-0 border-b border-white/6">
-        <div className="flex items-center gap-1">
-          {TABS.map(({ key, label }) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                tab === key
-                  ? "bg-white text-black"
-                  : "text-gray-400 hover:text-white hover:bg-white/8"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+          <TabsList variant="chip">
+            {TABS.map(({ key, label }) => (
+              <TabsTrigger key={key} value={key}>{label}</TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
         <div className="flex items-center gap-1">
           <button
             onClick={() => setView("grid")}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-              view === "grid" ? "bg-white/12 text-white" : "text-gray-500 hover:text-white hover:bg-white/8"
-            }`}
+            className={cn("w-8 h-8 flex items-center justify-center rounded-lg transition-colors", view === "grid" ? "bg-white/12 text-foreground" : "text-muted-foreground/60 hover:text-foreground hover:bg-white/8")}
             title="Grid view"
           >
             <IconGrid />
           </button>
           <button
             onClick={() => setView("list")}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
-              view === "list" ? "bg-white/12 text-white" : "text-gray-500 hover:text-white hover:bg-white/8"
-            }`}
+            className={cn("w-8 h-8 flex items-center justify-center rounded-lg transition-colors", view === "list" ? "bg-white/12 text-foreground" : "text-muted-foreground/60 hover:text-foreground hover:bg-white/8")}
             title="List view"
           >
             <IconList />
@@ -281,14 +271,14 @@ export default function LibraryPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4 text-gray-600">
+            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4 text-muted-foreground/40">
               <IconImage />
             </div>
-            <p className="text-gray-500 text-sm">
+            <p className="text-muted-foreground/60 text-sm">
               {search ? "No results found" : "Your library is empty"}
             </p>
             {!search && (
-              <p className="text-gray-700 text-xs mt-1">
+              <p className="text-muted-foreground/30 text-xs mt-1">
                 Generated media will appear here
               </p>
             )}
@@ -296,7 +286,7 @@ export default function LibraryPage() {
         ) : view === "list" ? (
           <div className="w-full">
             {/* List header */}
-            <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-3 pb-2 text-xs font-medium text-gray-600 uppercase tracking-wider border-b border-white/6">
+            <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-3 pb-2 text-xs font-medium text-muted-foreground/40 uppercase tracking-wider border-b border-white/6">
               <span>Name</span>
               <span className="w-32 text-right">Modified</span>
               <span className="w-24 text-right">Type</span>
@@ -309,21 +299,21 @@ export default function LibraryPage() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <ItemThumbnail item={item} />
-                    <span className="text-sm text-gray-200 truncate leading-tight">
+                    <span className="text-sm text-foreground truncate leading-tight">
                       {item.prompt ?? `${item.type}-${item.id.slice(0, 8)}`}
                     </span>
                   </div>
-                  <span className="text-sm text-gray-500 w-32 text-right shrink-0">
+                  <span className="text-sm text-muted-foreground/60 w-32 text-right shrink-0">
                     {formatDate(item.createdAt)}
                   </span>
-                  <span className="text-xs text-gray-600 w-24 text-right shrink-0 capitalize">
+                  <span className="text-xs text-muted-foreground/40 w-24 text-right shrink-0 capitalize">
                     {item.model ?? item.type}
                   </span>
                 </div>
               ))}
             </div>
             {totalCount > filtered.length && !search && (
-              <p className="text-center text-xs text-gray-600 py-4">
+              <p className="text-center text-xs text-muted-foreground/40 py-4">
                 Showing {filtered.length} of {totalCount} items
               </p>
             )}
@@ -333,10 +323,10 @@ export default function LibraryPage() {
             {filtered.map((item) => (
               <div key={item.id} className="group cursor-pointer">
                 <GridThumbnail item={item} />
-                <p className="mt-1.5 text-xs text-gray-400 truncate px-0.5 group-hover:text-gray-200 transition-colors">
+                <p className="mt-1.5 text-xs text-muted-foreground truncate px-0.5 group-hover:text-foreground transition-colors">
                   {item.prompt ?? `${item.type}-${item.id.slice(0, 8)}`}
                 </p>
-                <p className="text-xs text-gray-600 px-0.5">{formatDate(item.createdAt)}</p>
+                <p className="text-xs text-muted-foreground/40 px-0.5">{formatDate(item.createdAt)}</p>
               </div>
             ))}
           </div>

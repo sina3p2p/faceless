@@ -119,21 +119,63 @@ For a multi-shot group: `Shot 1: [context/action/camera] … Shot 2: …` then O
 
 ---
 
+## Structured output — emit a JSON render package, not loose prose
+
+Every compile produces ONE structured object, not free text. This makes the result machine-checkable (the app can show the user the prompt, run assertions, route gaps) instead of something a human has to eyeball. Emit exactly this shape:
+
+```json
+{
+  "status": "ok" | "gap",
+  "shot_id": "14",
+  "render_prompt": "CONTEXT: ... PRIMARY ACTION: ... CAMERA: ... STATE: ... [STATIC-LOCK: ...] GLOBAL RENDER NOTES: ... [Image1] = ... [Image2] = ...",
+  "duration_seconds": 8,
+  "references": [
+    {"slot": "Image1", "handle": "@hero_charsheet", "controls": "identity and wardrobe"},
+    {"slot": "Image2", "handle": "@site_plate", "controls": "environment, architecture, composition"}
+  ],
+  "gaps": []
+}
+```
+
+- `render_prompt` is the assembled prompt in the section order below — this is the text shown to the user for approval/edit before any render.
+- `references` maps each `[Image#]` slot to its `@material` handle and the attribute it controls (the binding grammar, made explicit).
+- On a missing/ambiguous/over-budget input, emit `status: "gap"` with `render_prompt: null` and the `gaps` array naming each problem, e.g.:
+  - `"Shot 14: no State Schedule lighting value for this beat — needs a lighting state."`
+  - `"Shot 9: references @ship but no approved image is bound to that handle."`
+  - `"Shot 12: 6 distinct assets named, exceeds the focused-reference budget — scene likely too crowded; confirm which are essential."`
+
+A gap is a success — it caught an incompleteness cheaply, before a video generation. The gap goes back to the showrunner, which fixes the Bible (with full story context) and recompiles.
+
+---
+
 ## Gap report format
 
-When a required value is missing or ambiguous, do not render. Return a gap naming the shot and the exact missing input, e.g.:
-
-- `Shot 14: no State Schedule lighting value for this beat — needs a lighting state.`
-- `Shot 9: references @ship but no approved image is bound to that handle.`
-- `Group 12–15: 6 distinct assets named, exceeds focused-reference budget — scene likely too crowded, confirm which assets are essential.`
-
-The gap goes back to the showrunner, which fixes the Bible (with full story context) and recompiles. A gap is a success — it caught an incompleteness cheaply, before spending a video generation.
+(Folded into the structured output above — a gap is `status: "gap"` with `render_prompt: null` and the named problems in `gaps`. Never emit a prompt and a gap together; it's one or the other.)
 
 ---
 
 # CRAFT REFERENCE (knowledge tables — apply, don't let them dictate impact-thinking)
 
 The following are reusable craft tables. Use them to phrase a camera move, a lighting state, or a grade precisely. Ignore any instinct in them toward hooks, per-shot grading freedom, or movement-for-its-own-sake — those are governed by the narrative rules above.
+
+## Camera language — how to phrase camera so Seedance obeys it
+
+A camera instruction has four parts: **shot size, angle, lens character, and movement.** The shot row gives you the move and usually the size; phrase all four the way the model actually parses them. The rules below are Seedance-specific and matter more than the vocabulary:
+
+**The five phrasing rules (these prevent the most common failures):**
+1. **One primary camera move per shot.** Stacking moves ("push in, then pan, then orbit") produces jitter and drift. If you need a compound move, sequence it as beats: "Begins as a slow dolly-in; for the final 2 seconds, eases into a gentle pan right." Sequence, don't jam.
+2. **Use rhythmic, plain words — NOT technical specs.** "slow, smooth, steady, gradual, gentle, drifting" all work. "24fps, f/2.8, ISO 800, 85mm" is **ignored** by the model — it's prompt decoration that does nothing. Describe the camera the way you'd tell an operator the feel, not the way you'd set a camera body.
+3. **Separate camera motion from subject motion — only one thing moves fast at a time.** "The dancer spins; the camera holds a fixed frame" works. "Camera spins around a spinning dancer" produces chaos. If the subject is the action, lock or slow the camera; if the camera is the action, calm the subject.
+4. **"Fast" is the single most quality-degrading word.** Fast camera + fast cuts + busy scene almost guarantees artifacts. Default to slow/medium; reserve speed for a deliberate, isolated moment.
+5. **A reference video beats text for an exact camera move.** Text is best for *spatial* decisions (framing, subject, look); if you need a precise camera trajectory or pacing, a short stabilized reference clip (`@Video1 for camera movement`) carries it better than any words. (If the reference is shaky, the model copies the shake.)
+
+**Shot size** (state it — the model defaults vaguely otherwise): extreme wide / wide / full / medium-wide / medium / medium close-up / close-up / extreme close-up. Match size to intent: wide for scale and place, medium for behavior and interaction, close for emotion. Name it explicitly ("medium close-up on his face") rather than implying it.
+
+**Camera angle** (state when it carries meaning): eye-level (neutral), low angle (subject looms, power/scale), high angle (subject diminished, vulnerability), overhead/top-down (god's-eye, layout), over-the-shoulder (spatial relationship in a two-person beat), Dutch/tilted (unease). A flat eye-level default is fine for most shots; use a non-neutral angle only when the beat's meaning wants it.
+
+**Lens character** comes from the Bible's Look (e.g. "35mm fine grain, subtle anamorphic oval bokeh") and is stated identically every shot — it is NOT a per-shot choice. Depth-of-field, however, *can* vary by shot intent: "shallow focus, background soft" to isolate a subject in an emotional beat; "deep focus, everything sharp" for an establishing wide. Phrase it as the feel ("shallow focus, soft background"), not as an f-number.
+
+**Putting it together — a camera line reads:** [shot size] + [angle if non-neutral] + [one movement, phrased rhythmically] + [focus feel]. E.g. *"Medium close-up, slight low angle, slow dolly-in over the shot, shallow focus with a soft background."* One size, one angle, one move, one focus note — clean and obeyed.
 
 ## Camera Movement Encyclopedia (match to the beat's mood)
 

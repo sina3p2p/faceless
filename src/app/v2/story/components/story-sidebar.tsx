@@ -6,6 +6,22 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
 import axios from "@/lib/axios";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
+import { GlassPanel } from "@/components/ui/glass-panel";
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e: MediaQueryListEvent) => setMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return mobile;
+}
 
 interface StorySession {
   id: string;
@@ -67,35 +83,35 @@ function UserMenuPopup({
   onClose: () => void;
 }) {
   return (
-    <div className="bg-[#1c1c1c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden w-56">
-      <div className="px-4 py-3 flex items-center gap-3 border-b border-white/6">
-        <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
+    <div className="rounded-2xl border border-white/15 w-56 overflow-hidden bg-card/95 backdrop-blur-2xl shadow-2xl">
+      <div className="px-4 py-3 flex items-center gap-3 border-b border-white/10">
+        <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0">
           {initials}
         </div>
         <div className="min-w-0">
-          <p className="text-sm font-medium text-white truncate">{name}</p>
-          <p className="text-xs text-gray-500 truncate">{email}</p>
+          <p className="text-sm font-medium text-foreground truncate">{name}</p>
+          <p className="text-xs text-muted-foreground/60 truncate">{email}</p>
         </div>
       </div>
       <div className="py-1">
         <Link
           href="/dashboard"
           onClick={onClose}
-          className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+          className="flex items-center gap-3 px-4 py-2.5 text-sm text-foreground/80 hover:bg-white/8 transition-colors"
         >
-          <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-muted-foreground/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
           Dashboard
         </Link>
       </div>
-      <div className="border-t border-white/6" />
+      <div className="border-t border-white/10" />
       <div className="py-1">
         <button
           onClick={() => void signOut({ callbackUrl: "/auth/signin" })}
-          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-white/5 transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground/80 hover:bg-white/8 transition-colors"
         >
-          <svg className="w-4 h-4 text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="w-4 h-4 text-muted-foreground/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
           Log out
@@ -113,7 +129,7 @@ function SessionList({
   activeSessionId?: string;
 }) {
   if (sessions.length === 0) {
-    return <p className="text-xs text-gray-600 px-3 py-3">No stories yet</p>;
+    return <p className="text-xs text-muted-foreground/40 px-3 py-3">No stories yet</p>;
   }
   return (
     <>
@@ -124,17 +140,111 @@ function SessionList({
           <Link
             key={s.id}
             href={`/v2/story/${s.id}`}
-            className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+            className={cn(
+              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors mb-1",
               isActive
-                ? "bg-white/10 text-white"
-                : "text-gray-400 hover:bg-white/5 hover:text-gray-200"
-            }`}
+                ? "bg-primary/15 text-foreground"
+                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+            )}
           >
-            <span className="shrink-0 opacity-50"><IconFilm /></span>
+            <span className={cn("shrink-0 transition-colors", isActive ? "text-primary/70" : "opacity-40")}><IconFilm /></span>
             <span className="truncate leading-tight">{label}</span>
           </Link>
         );
       })}
+    </>
+  );
+}
+
+// ── Expanded sidebar content (shared between desktop and mobile Sheet) ────────
+
+function ExpandedSidebarContent({
+  isLibrary,
+  sessions,
+  activeSessionId,
+  name,
+  email,
+  initials,
+  menuOpen,
+  setMenuOpen,
+  menuRef,
+  togglePin,
+}: {
+  isLibrary: boolean;
+  sessions: StorySession[];
+  activeSessionId?: string;
+  name: string;
+  email: string;
+  initials: string;
+  menuOpen: boolean;
+  setMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  menuRef: React.RefObject<HTMLDivElement | null>;
+  togglePin: () => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between px-3 pt-3 pb-1">
+        <span className="text-[15px] font-semibold text-foreground px-2">Story Room</span>
+        <button
+          onClick={togglePin}
+          title="Collapse sidebar"
+          className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground/60 hover:text-foreground hover:bg-white/8 transition-colors"
+        >
+          <IconSidebarToggle />
+        </button>
+      </div>
+
+      <div className="px-2 pt-1 pb-2 flex flex-col gap-0.5">
+        <Link
+          href="/v2/story"
+          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-foreground/80 hover:bg-white/8 hover:text-foreground transition-colors group"
+        >
+          <span className="text-muted-foreground/60 group-hover:text-muted-foreground transition-colors"><IconEdit /></span>
+          New story
+        </Link>
+        <Link
+          href="/v2/story/library"
+          className={cn(
+            "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-colors group",
+            isLibrary ? "bg-white/10 text-foreground" : "text-muted-foreground hover:bg-white/8 hover:text-foreground"
+          )}
+        >
+          <span className={cn("transition-colors", isLibrary ? "text-muted-foreground" : "text-muted-foreground/60 group-hover:text-muted-foreground")}>
+            <IconLibrary />
+          </span>
+          Library
+        </Link>
+      </div>
+
+      {sessions.length > 0 && (
+        <p className="px-5 pb-1 text-[11px] font-semibold text-muted-foreground/40 uppercase tracking-wider">Recents</p>
+      )}
+
+      <div className="flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
+        <SessionList sessions={sessions} activeSessionId={activeSessionId} />
+      </div>
+
+      <div className="px-2 py-2 border-t border-white/6 relative" ref={menuRef}>
+        {menuOpen && (
+          <div className="absolute bottom-full left-2 right-2 mb-2">
+            <UserMenuPopup initials={initials} name={name} email={email} onClose={() => setMenuOpen(false)} />
+          </div>
+        )}
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/8 transition-colors group"
+        >
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0">{initials}</div>
+          <div className="flex-1 text-left min-w-0">
+            <p className="text-sm text-foreground truncate leading-tight">{name}</p>
+          </div>
+          <svg className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" fill="currentColor" viewBox="0 0 16 16">
+            <circle cx="8" cy="3" r="1.2" />
+            <circle cx="8" cy="8" r="1.2" />
+            <circle cx="8" cy="13" r="1.2" />
+          </svg>
+        </button>
+      </div>
     </>
   );
 }
@@ -148,12 +258,13 @@ export function StorySidebar() {
   const isLibrary = pathname === "/v2/story/library";
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [pinned, setPinned] = useState(true);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) setPinned(stored === "true");
-  }, []);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [pinned, setPinned] = useState(
+    () => typeof window !== "undefined"
+      ? (localStorage.getItem(STORAGE_KEY) ?? "true") === "true"
+      : true
+  );
+  const isMobile = useIsMobile();
   const menuRef = useRef<HTMLDivElement>(null);
 
   function togglePin() {
@@ -196,146 +307,45 @@ export function StorySidebar() {
     .toUpperCase()
     .slice(0, 2);
 
-  // ── COLLAPSED ───────────────────────────────────────────────────────────────
-  if (!pinned) {
+  // ── MOBILE ──────────────────────────────────────────────────────────────────
+  if (isMobile) {
     return (
-      <div className="w-[52px] shrink-0 flex flex-col h-full bg-[#0f0f0f] border-r border-white/6 py-2 items-center">
-        {/* Toggle expand */}
+      <>
         <button
-          onClick={togglePin}
-          title="Expand sidebar"
-          className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/8 transition-colors"
+          onClick={() => setSheetOpen(true)}
+          className="fixed top-3 left-3 z-40 w-9 h-9 flex items-center justify-center rounded-lg glass-base text-muted-foreground hover:text-foreground transition-colors"
+          title="Open menu"
         >
           <IconSidebarToggle />
         </button>
-
-        <div className="h-3" />
-
-        {/* New story */}
-        <Link
-          href="/v2/story"
-          title="New story"
-          className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/8 transition-colors"
-        >
-          <IconEdit />
-        </Link>
-
-        {/* Library */}
-        <Link
-          href="/v2/story/library"
-          title="Library"
-          className={`w-9 h-9 flex items-center justify-center rounded-lg transition-colors mt-1 ${
-            isLibrary ? "bg-white/12 text-white" : "text-gray-400 hover:text-white hover:bg-white/8"
-          }`}
-        >
-          <IconLibrary />
-        </Link>
-
-        {/* Stories — hover flyout */}
-        <div className="group relative w-9 mt-1">
-          <button
-            title="Recent stories"
-            className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-white hover:bg-white/8 transition-colors"
-          >
-            <IconFilm />
-          </button>
-
-          <div className="absolute left-full top-0 ml-2 w-64 pointer-events-none opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-150 ease-out z-50">
-            <div className="bg-[#1c1c1c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/6">
-                <p className="text-sm font-semibold text-white">Recents</p>
-              </div>
-              <div className="max-h-96 overflow-y-auto py-1.5 px-1.5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
-                <SessionList sessions={sessions} activeSessionId={activeSessionId} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* User avatar */}
-        <div className="relative pb-1" ref={menuRef}>
-          {menuOpen && (
-            <div className="absolute bottom-full left-0 mb-2">
-              <UserMenuPopup
-                initials={initials}
-                name={name}
-                email={email}
-                onClose={() => setMenuOpen(false)}
-              />
-            </div>
-          )}
-          <button
-            onClick={() => setMenuOpen((o) => !o)}
-            title={name}
-            className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-xs font-bold text-white hover:ring-2 hover:ring-violet-400/50 transition-all"
-          >
-            {initials}
-          </button>
-        </div>
-      </div>
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent side="left" showCloseButton={false} className="w-72 p-0 bg-sidebar border-white/6">
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <ExpandedSidebarContent
+              isLibrary={isLibrary}
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              name={name}
+              email={email}
+              initials={initials}
+              menuOpen={menuOpen}
+              setMenuOpen={setMenuOpen}
+              menuRef={menuRef}
+              togglePin={() => setSheetOpen(false)}
+            />
+          </SheetContent>
+        </Sheet>
+      </>
     );
   }
 
-  // ── EXPANDED ────────────────────────────────────────────────────────────────
-  return (
-    <div className="w-64 shrink-0 flex flex-col h-full bg-[#0f0f0f] border-r border-white/6">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-1">
-        <span className="text-[15px] font-semibold text-white px-2">Story Room</span>
-        <button
-          onClick={togglePin}
-          title="Collapse sidebar"
-          className="w-9 h-9 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-white/8 transition-colors"
-        >
-          <IconSidebarToggle />
-        </button>
-      </div>
-
-      {/* Nav items */}
-      <div className="px-2 pt-1 pb-2 flex flex-col gap-0.5">
-        <Link
-          href="/v2/story"
-          className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-gray-300 hover:bg-white/8 hover:text-white transition-colors group"
-        >
-          <span className="text-gray-500 group-hover:text-gray-300 transition-colors">
-            <IconEdit />
-          </span>
-          New story
-        </Link>
-        <Link
-          href="/v2/story/library"
-          className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-colors group ${
-            isLibrary
-              ? "bg-white/10 text-white"
-              : "text-gray-300 hover:bg-white/8 hover:text-white"
-          }`}
-        >
-          <span className={`transition-colors ${isLibrary ? "text-gray-300" : "text-gray-500 group-hover:text-gray-300"}`}>
-            <IconLibrary />
-          </span>
-          Library
-        </Link>
-      </div>
-
-      {/* Recents label */}
-      {sessions.length > 0 && (
-        <p className="px-5 pb-1 text-[11px] font-semibold text-gray-600 uppercase tracking-wider">
-          Recents
-        </p>
-      )}
-
-      {/* Sessions list */}
-      <div className="flex-1 overflow-y-auto px-1.5 pb-2 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
-        <SessionList sessions={sessions} activeSessionId={activeSessionId} />
-      </div>
-
-      {/* Footer */}
-      <div className="px-2 py-2 border-t border-white/6 relative" ref={menuRef}>
+  // ── COLLAPSED ───────────────────────────────────────────────────────────────
+  if (!pinned) {
+    return (
+      <div className="relative shrink-0 h-full" ref={menuRef}>
+        {/* User menu popup — outside GlassPanel so overflow-hidden doesn't clip it */}
         {menuOpen && (
-          <div className="absolute bottom-full left-2 right-2 mb-2">
+          <div className="absolute bottom-2 left-full ml-2 z-50">
             <UserMenuPopup
               initials={initials}
               name={name}
@@ -344,23 +354,90 @@ export function StorySidebar() {
             />
           </div>
         )}
-        <button
-          onClick={() => setMenuOpen((o) => !o)}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/8 transition-colors group"
-        >
-          <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
-            {initials}
+        <GlassPanel displacement={30} aberration={2} blur={32} tint="light" className="w-[52px] h-full rounded-2xl border border-white/10 shadow-xl flex flex-col py-2 items-center" childrenClassName="flex flex-col flex-1 items-center w-full min-h-0">
+          {/* Toggle expand */}
+          <button
+            onClick={togglePin}
+            title="Expand sidebar"
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors"
+          >
+            <IconSidebarToggle />
+          </button>
+
+          <div className="h-3" />
+
+          {/* New story */}
+          <Link
+            href="/v2/story"
+            title="New story"
+            className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors"
+          >
+            <IconEdit />
+          </Link>
+
+          {/* Library */}
+          <Link
+            href="/v2/story/library"
+            title="Library"
+            className={cn("w-9 h-9 flex items-center justify-center rounded-lg transition-colors mt-1", isLibrary ? "bg-primary/20 text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-white/8")}
+          >
+            <IconLibrary />
+          </Link>
+
+          {/* Stories — hover flyout */}
+          <div className="group relative w-9 mt-1">
+            <button
+              title="Recent stories"
+              className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors"
+            >
+              <IconFilm />
+            </button>
+
+            <div className="absolute left-full top-0 ml-2 w-64 pointer-events-none opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-150 ease-out z-50">
+              <GlassPanel displacement={32} aberration={2} blur={28} className="rounded-2xl border border-white/20 shadow-2xl">
+                <div className="px-4 py-3 border-b border-white/10">
+                  <p className="text-sm font-semibold text-foreground">Recent</p>
+                </div>
+                <div className="max-h-96 overflow-y-auto py-1.5 px-1.5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
+                  <SessionList sessions={sessions} activeSessionId={activeSessionId} />
+                </div>
+              </GlassPanel>
+            </div>
           </div>
-          <div className="flex-1 text-left min-w-0">
-            <p className="text-sm text-white truncate leading-tight">{name}</p>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* User avatar */}
+          <div className="pb-1">
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              title={name}
+              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground hover:ring-2 hover:ring-ring/50 transition-all"
+            >
+              {initials}
+            </button>
           </div>
-          <svg className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors shrink-0" fill="currentColor" viewBox="0 0 16 16">
-            <circle cx="8" cy="3" r="1.2" />
-            <circle cx="8" cy="8" r="1.2" />
-            <circle cx="8" cy="13" r="1.2" />
-          </svg>
-        </button>
+        </GlassPanel>
       </div>
-    </div>
+    );
+  }
+
+  // ── EXPANDED ────────────────────────────────────────────────────────────────
+  return (
+    <GlassPanel displacement={38} aberration={3} blur={32} className="w-64 shrink-0 rounded-2xl border border-white/10 flex flex-col" childrenClassName="flex flex-col flex-1 min-h-0">
+      <ExpandedSidebarContent
+        isLibrary={isLibrary}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        name={name}
+        email={email}
+        initials={initials}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        menuRef={menuRef}
+        togglePin={togglePin}
+      />
+    </GlassPanel>
   );
 }

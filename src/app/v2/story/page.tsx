@@ -33,18 +33,18 @@ export default function StoryLandingPage() {
         <div className="w-full max-w-2xl">
           {/* Hero */}
           <div className="mb-12 text-center">
-            <h1 className="text-4xl font-bold tracking-tight mb-4">
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight mb-4">
               One sentence.<br />
-              <span className="text-violet-400">A complete Film Bible.</span>
+              <span className="text-primary">A complete Film Bible.</span>
             </h1>
-            <p className="text-gray-400 text-lg leading-relaxed max-w-lg mx-auto">
+            <p className="text-muted-foreground text-lg leading-relaxed max-w-lg mx-auto">
               Collaborate with an AI showrunner to develop your idea — one decision at a time — into a premise, cast, visual look, beat sheet, screenplay, and shot list.
             </p>
           </div>
 
           {/* Input */}
-          <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-            <label className="block text-sm font-medium text-gray-300 mb-3">
+          <div className="glass-subtle rounded-2xl p-6">
+            <label className="block text-sm font-medium text-muted-foreground mb-3">
               Your idea, in one sentence
             </label>
             <textarea
@@ -58,7 +58,7 @@ export default function StoryLandingPage() {
               }}
               placeholder="e.g. Aliens helped build the pyramids, and one archaeologist is about to prove it"
               rows={3}
-              className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-gray-600 resize-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none text-sm leading-relaxed"
+              className="w-full bg-background/40 border border-white/10 rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground/40 resize-none focus:border-primary focus:ring-1 focus:ring-ring outline-none text-sm leading-relaxed"
             />
             {isError && (
               <p className="mt-2 text-red-400 text-sm">{error?.message || "Something went wrong"}</p>
