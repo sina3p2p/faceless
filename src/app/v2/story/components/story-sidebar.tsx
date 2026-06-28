@@ -258,6 +258,10 @@ export function StorySidebar() {
   const isLibrary = pathname === "/v2/story/library";
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [storiesOpen, setStoriesOpen] = useState(false);
+  const storiesCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const openStories = () => { clearTimeout(storiesCloseTimer.current); setStoriesOpen(true); };
+  const closeStories = () => { storiesCloseTimer.current = setTimeout(() => setStoriesOpen(false), 120); };
   const [sheetOpen, setSheetOpen] = useState(false);
   const [pinned, setPinned] = useState(
     () => typeof window !== "undefined"
@@ -354,7 +358,7 @@ export function StorySidebar() {
             />
           </div>
         )}
-        <GlassPanel displacement={30} aberration={2} blur={32} tint="light" className="w-[52px] h-full rounded-2xl border border-white/10 shadow-xl flex flex-col py-2 items-center" childrenClassName="flex flex-col flex-1 items-center w-full min-h-0">
+        <GlassPanel displacement={30} aberration={2} blur={32} tint="light" noClip className="w-[52px] h-full rounded-2xl border border-white/10 shadow-xl flex flex-col py-2 items-center" childrenClassName="flex flex-col flex-1 items-center w-full min-h-0">
           {/* Toggle expand */}
           <button
             onClick={togglePin}
@@ -385,7 +389,7 @@ export function StorySidebar() {
           </Link>
 
           {/* Stories — hover flyout */}
-          <div className="group relative w-9 mt-1">
+          <div className="relative w-9 mt-1" onMouseEnter={openStories} onMouseLeave={closeStories}>
             <button
               title="Recent stories"
               className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors"
@@ -393,12 +397,16 @@ export function StorySidebar() {
               <IconFilm />
             </button>
 
-            <div className="absolute left-full top-0 ml-2 w-64 pointer-events-none opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-150 ease-out z-50">
-              <GlassPanel displacement={32} aberration={2} blur={28} className="rounded-2xl border border-white/20 shadow-2xl">
+            <div
+              onMouseEnter={openStories}
+              onMouseLeave={closeStories}
+              className={`absolute left-full top-0 ml-4 w-64 z-50 transition-all duration-150 ease-out ${storiesOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}
+            >
+              <GlassPanel displacement={32} aberration={2} blur={28} tint="dark">
                 <div className="px-4 py-3 border-b border-white/10">
                   <p className="text-sm font-semibold text-foreground">Recent</p>
                 </div>
-                <div className="max-h-96 overflow-y-auto py-1.5 px-1.5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
+                <div className="max-h-96 overflow-y-auto py-1.5 px-1.5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30]">
                   <SessionList sessions={sessions} activeSessionId={activeSessionId} />
                 </div>
               </GlassPanel>

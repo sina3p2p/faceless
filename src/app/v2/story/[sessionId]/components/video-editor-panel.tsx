@@ -1067,7 +1067,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                             const cx = GP_L + pt.x * (GRAPH_VW - GP_L - GP_R);
                             const cy = GRAPH_VH - GP_B - pt.y * (GRAPH_VH - GP_T - GP_B);
                             return (
-                              <circle key={idx} cx={cx} cy={cy} r={6} fill="currentColor" className="text-background" stroke="currentColor" className="text-primary" strokeWidth={2} className="cursor-grab active:cursor-grabbing" style={{ touchAction: "none" }}
+                              <circle key={idx} cx={cx} cy={cy} r={6} fill="currentColor" stroke="currentColor" strokeWidth={2} className="text-primary cursor-grab active:cursor-grabbing" style={{ touchAction: "none" }}
                                 onPointerDown={(e) => { if (!selectedClipId || !curveGraphRef.current) return; startCurvePtDrag({ idx, svgRect: curveGraphRef.current.getBoundingClientRect(), clipId: selectedClipId }, e); }}
                               />
                             );

@@ -56,6 +56,8 @@ export interface GlassPanelProps extends React.ComponentProps<"div"> {
   tint?: "light" | "dark" | string
   /** className forwarded to the inner content wrapper div. */
   childrenClassName?: string
+  /** Allow children to overflow (e.g. flyout menus). Glass layers are still clipped via border-radius. */
+  noClip?: boolean
   /** Border radius in px. Default 24. */
   borderRadius?: number
   /** Border width in px. Default 1. */
@@ -79,6 +81,7 @@ export function GlassPanel({
   borderWidth = 1,
   borderColor = "#ffffff1a",
   tint = "light",
+  noClip = false,
   className,
   childrenClassName,
   style,
@@ -99,7 +102,7 @@ export function GlassPanel({
   const scaleB = displacement * (1 - aberration * 0.03)
 
   return (
-    <div className={cn("relative overflow-hidden", className)} style={{ ...style, borderRadius: `${borderRadius}px`, borderWidth: `${borderWidth}px`, borderColor }} {...props}>
+    <div className={cn("relative", !noClip && "overflow-hidden", className)} style={{ ...style, borderRadius: `${borderRadius}px`, borderWidth: `${borderWidth}px`, borderColor }} {...props}>
 
       {/* Warp layer: backdrop-filter blur + SVG displacement applied on top */}
       <span
@@ -119,8 +122,8 @@ export function GlassPanel({
       {/* White tint overlay */}
       <span
         aria-hidden
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: tintColor }}
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+        style={{ background: tintColor, borderRadius: `${borderRadius}px` }}
       />
 
       {/* Top-edge specular highlight — the defining liquid glass property */}
