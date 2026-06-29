@@ -1,15 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { useMutation } from "@tanstack/react-query";
 import axios from "@/lib/axios";
+import { AIChatInput } from "@/components/ui/ai-chat-input";
 
 export default function StoryLandingPage() {
   const router = useRouter();
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [length, setLength] = useState(0);
 
   const { mutateAsync, isPending, isError, error } = useMutation({
     mutationFn: async ({ message }: { message: string }) => {
@@ -20,12 +17,6 @@ export default function StoryLandingPage() {
       router.push(`/v2/story/${data.sessionId}`);
     },
   });
-
-  function handleCreate() {
-    const trimmed = textareaRef.current?.value.trim() ?? "";
-    if (!trimmed || isPending) return;
-    void mutateAsync({ message: trimmed });
-  }
 
   return (
     <div className="h-full flex flex-col">
@@ -42,41 +33,11 @@ export default function StoryLandingPage() {
             </p>
           </div>
 
-          {/* Input */}
-          <div className="glass-subtle rounded-2xl p-6">
-            <label className="block text-sm font-medium text-muted-foreground mb-3">
-              Your idea, in one sentence
-            </label>
-            <textarea
-              ref={textareaRef}
-              onChange={(e) => setLength(e.target.value.length)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey && !isPending) {
-                  e.preventDefault();
-                  handleCreate();
-                }
-              }}
-              placeholder="e.g. Aliens helped build the pyramids, and one archaeologist is about to prove it"
-              rows={3}
-              className="w-full bg-background/40 border border-white/10 rounded-xl px-4 py-3 text-foreground placeholder:text-muted-foreground/40 resize-none focus:border-primary focus:ring-1 focus:ring-ring outline-none text-sm leading-relaxed"
-            />
-            {isError && (
-              <p className="mt-2 text-red-400 text-sm">{error?.message || "Something went wrong"}</p>
-            )}
-            <div className="mt-4 flex items-center justify-between">
-              <Button
-                onClick={handleCreate}
-                loading={isPending}
-                disabled={length === 0}
-                size="lg"
-              >
-                Start the story room
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-              </Button>
-            </div>
-          </div>
+          <AIChatInput
+            onSubmit={(message) => void mutateAsync({ message })}
+            loading={isPending}
+            error={isError ? (error?.message || "Something went wrong") : null}
+          />
         </div>
       </main>
     </div>
