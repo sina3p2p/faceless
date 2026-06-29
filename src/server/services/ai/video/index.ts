@@ -51,7 +51,7 @@ export async function generateVideoFromReferences(
 ): Promise<VideoResult> {
   const replicate = new ReplicateVideoProvider();
   return replicate.generateVideo(
-    { model: videoModelId, referenceImages, referenceAudios, prompt, duration, aspectRatio, resolution },
+    { model: videoModelId, referenceImages, referenceAudios, prompt, duration, aspectRatio, resolution, generateAudio: true },
 
   );
 }
