@@ -1,5 +1,4 @@
 import { NextAuthOptions } from "next-auth";
-import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import GitHubProvider from "next-auth/providers/github";
@@ -9,7 +8,6 @@ import { eq } from "drizzle-orm";
 import { AUTH } from "@/lib/constants";
 
 export const authOptions: NextAuthOptions = {
-  adapter: DrizzleAdapter(db) as NextAuthOptions["adapter"],
   providers: [
     ...(AUTH.google.clientId
       ? [
@@ -36,23 +34,28 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email) return null;
 
-        const existing = await db.query.users.findFirst({
-          where: eq(users.email, credentials.email),
-        });
+        try {
+          const existing = await db.query.users.findFirst({
+            where: eq(users.email, credentials.email),
+          });
 
-        if (existing) {
-          return { id: existing.id, email: existing.email, name: existing.name };
+          if (existing) {
+            return { id: existing.id, email: existing.email, name: existing.name };
+          }
+
+          const [newUser] = await db
+            .insert(users)
+            .values({
+              email: credentials.email,
+              name: credentials.email.split("@")[0],
+            })
+            .returning();
+
+          return { id: newUser.id, email: newUser.email, name: newUser.name };
+        } catch (e) {
+          console.error("[auth] authorize error:", e);
+          return null;
         }
-
-        const [newUser] = await db
-          .insert(users)
-          .values({
-            email: credentials.email,
-            name: credentials.email.split("@")[0],
-          })
-          .returning();
-
-        return { id: newUser.id, email: newUser.email, name: newUser.name };
       },
     }),
   ],

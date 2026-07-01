@@ -20,7 +20,7 @@ export function ChatInput({
   }
 
   return (
-    <div className="px-3 py-3 shrink-0 border-t border-white/10">
+    <div className="px-3 pt-3 shrink-0 border-t border-white/10" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
       <div className="flex gap-2 bg-white/10 rounded-2xl px-3 py-2 items-center">
         <input
           ref={inputRef}
@@ -34,7 +34,7 @@ export function ChatInput({
           }}
           placeholder={isStreaming ? "Showrunner is writing…" : "Ask a question or give feedback…"}
           disabled={isStreaming}
-          className="flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none disabled:opacity-50 py-0.5"
+          className="flex-1 bg-transparent text-base md:text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none disabled:opacity-50 py-0.5"
         />
         <button
           onClick={send}

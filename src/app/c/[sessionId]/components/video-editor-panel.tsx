@@ -100,6 +100,7 @@ interface VideoEditorPanelProps {
   sessionId: string;
   selectedClipId: string | null;
   onSelectClip: (id: string | null) => void;
+  isHidden?: boolean;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -202,7 +203,7 @@ const MAX_TRACKS = 8;
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
-export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectClip }: VideoEditorPanelProps) {
+export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectClip, isHidden }: VideoEditorPanelProps) {
   const [internalClips, setInternalClips] = useState<InternalClip[]>(() => {
     // Space clips sequentially on track 0 with a 5s placeholder gap.
     // Real durations load asynchronously via onLoadedMetadata.
@@ -892,6 +893,8 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
   const timelineH = RULER_H + numTracks * CLIP_TRACK_H + FOOTER_H;
 
   // ── render ────────────────────────────────────────────────────────────────
+
+  if (isHidden) return null;
 
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">

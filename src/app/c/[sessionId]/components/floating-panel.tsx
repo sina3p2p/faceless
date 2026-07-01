@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, type RefObject } from "react"
-import { GlassPanel } from "@/components/ui/glass-panel"
+import { Card } from "@/components/ui/card"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
 interface FloatingPanelProps {
@@ -105,12 +105,11 @@ export function FloatingPanel({
   }
 
   return (
-    <GlassPanel
+    <Card
       ref={selfRef}
-      displacement={35}
-      aberration={3}
+      variant="panel-dark"
+      padding="none"
       className="absolute"
-      tint="dark"
       style={{ left: pos.x, top: pos.y, width, zIndex }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -118,6 +117,6 @@ export function FloatingPanel({
         {header}
       </div>
       {children}
-    </GlassPanel>
+    </Card>
   )
 }

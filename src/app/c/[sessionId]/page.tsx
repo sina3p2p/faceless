@@ -23,7 +23,7 @@ export default async function StorySessionPage({
     .from(filmSessions)
     .where(eq(filmSessions.id, sessionId));
 
-  if (!session || session.userId !== userId) redirect("/v2/story");
+  if (!session || session.userId !== userId) redirect("/");
 
   const rows = await db
     .select()

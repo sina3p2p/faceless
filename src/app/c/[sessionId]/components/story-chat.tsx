@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, startTransition } from "react";
 import { VideoEditorPanel, type Clip } from "./video-editor-panel";
-import { GlassPanel } from "@/components/ui/glass-panel";
+import { Card } from "@/components/ui/card";
 import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
 import type { AssetRef, ClientMessage, ForkCall, ShotCompile, ShotResult } from "@/types/v2/story";
+import { useMobileTab } from "../../../story-shell";
+import { cn } from "@/lib/utils";
 
 const CHAT_MIN = 280;
 const CHAT_MAX = 640;
@@ -33,12 +35,15 @@ export function StoryChat({
   });
   const [chatVisible, setChatVisible] = useState(true);
   const [chatExpanded, setChatExpanded] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const isDraggingRef = useRef(false);
   const dragStartXRef = useRef(0);
   const dragStartWidthRef = useRef(0);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
 
   const isStreaming = status === "streaming";
   const seed = useMemo(() => messages.find((m) => m.role === "user")?.text ?? "", [messages]);
+  const mobileTab = useMobileTab();
 
   useEffect(() => {
     setClipOrder((prev) => {
@@ -195,9 +200,11 @@ export function StoryChat({
 
   function handleEvent(event: Record<string, unknown>, tempId: string) {
     if (event.type === "text_delta") {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === tempId ? { ...m, text: m.text + (event.text as string) } : m
+      startTransition(() =>
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === tempId ? { ...m, text: m.text + (event.text as string) } : m
+          )
         )
       );
     } else if (event.type === "fork_loading") {
@@ -392,6 +399,7 @@ export function StoryChat({
   function onDragHandlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault();
     isDraggingRef.current = true;
+    setIsDragging(true);
     dragStartXRef.current = e.clientX;
     dragStartWidthRef.current = chatWidth;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -401,39 +409,44 @@ export function StoryChat({
     if (!isDraggingRef.current) return;
     const delta = dragStartXRef.current - e.clientX;
     const next = Math.min(CHAT_MAX, Math.max(CHAT_MIN, dragStartWidthRef.current + delta));
-    setChatWidth(next);
+    if (chatPanelRef.current) chatPanelRef.current.style.width = next + "px";
   }
 
   function onDragHandlePointerUp() {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
-    localStorage.setItem("chat-sidebar-width", String(chatWidth));
+    setIsDragging(false);
+    const w = chatPanelRef.current ? parseFloat(chatPanelRef.current.style.width) || chatWidth : chatWidth;
+    setChatWidth(w);
+    localStorage.setItem("chat-sidebar-width", String(w));
   }
 
   return (
-    <div className="h-full flex flex-col md:flex-row overflow-hidden relative gap-1.5">
+    <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative min-h-0">
       {/* ── Center: Video Editor ── */}
-      <GlassPanel
-        displacement={38}
-        aberration={3}
-        blur={32}
-        className={chatExpanded ? "hidden" : "flex-1 rounded-xl border border-white/10 shadow-xl flex flex-col min-w-0"}
-        childrenClassName="flex flex-col flex-1 min-h-0"
+      <Card
+        variant="panel"
+        padding="none"
+        className={cn(
+          chatExpanded ? "hidden" : "flex-1 rounded-none min-w-0 min-h-0",
+          mobileTab && mobileTab.tab !== "editor" && "max-md:hidden"
+        )}
       >
         <VideoEditorPanel
           clips={clips}
           sessionId={sessionId}
           selectedClipId={selectedClipId}
           onSelectClip={setSelectedClipId}
+          isHidden={!!(mobileTab && mobileTab.tab !== "editor")}
         />
-      </GlassPanel>
+      </Card>
 
       {/* ── Show-chat button (when sidebar is hidden and not expanded) ── */}
       {!chatVisible && !chatExpanded && (
         <button
           onClick={() => setChatVisible(true)}
           title="Show chat"
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-6 h-12 flex items-center justify-center glass-base rounded-l-lg text-muted-foreground/60 hover:text-foreground transition-colors"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-6 h-12 hidden md:flex items-center justify-center glass-base rounded-l-lg text-muted-foreground/60 hover:text-foreground transition-colors"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -441,75 +454,84 @@ export function StoryChat({
         </button>
       )}
 
-      {/* ── Drag handle (only when sidebar is visible and not expanded) ── */}
-      {chatVisible && !chatExpanded && (
-        <div
-          onPointerDown={onDragHandlePointerDown}
-          onPointerMove={onDragHandlePointerMove}
-          onPointerUp={onDragHandlePointerUp}
-          onPointerCancel={onDragHandlePointerUp}
-          className="w-1 shrink-0 cursor-col-resize group relative flex items-center justify-center z-10"
-          title="Drag to resize"
-        >
-          <div className="absolute inset-y-0 w-px bg-white/6 group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
-        </div>
-      )}
-
       {/* ── Right: Chat Sidebar ── */}
-      <GlassPanel
+      <div
+        ref={chatPanelRef}
         style={chatExpanded ? undefined : { width: chatVisible ? chatWidth : 0 }}
-        displacement={38}
-        aberration={3}
-        blur={32}
-        className={chatExpanded
-          ? "flex-1 rounded-xl border border-white/10 shadow-xl flex flex-col transition-all duration-200"
-          : "shrink-0 rounded-xl border border-white/10 shadow-xl flex flex-col transition-all duration-200"}
-        childrenClassName="flex flex-col flex-1 min-h-0"
+        className={cn(
+          chatExpanded ? "flex-1" : "shrink-0",
+          "min-h-0 relative",
+          !isDragging && "transition-all duration-200",
+          mobileTab && mobileTab.tab !== "chat" && "max-md:hidden",
+          mobileTab?.tab === "chat" && "max-md:w-full! max-md:flex-1!"
+        )}
       >
-        {/* seed label + toggle */}
-        <div className="border-b border-white/8 px-4 py-3 shrink-0 flex items-center gap-2">
-          <p className="text-xs text-muted-foreground/60 truncate flex-1">&ldquo;{seed}&rdquo;</p>
-          <button
-            onClick={() => setChatExpanded((v) => !v)}
-            title={chatExpanded ? "Shrink chat" : "Expand chat"}
-            className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-white/8 transition-colors"
+        {/* Left-edge drag handle */}
+        {chatVisible && !chatExpanded && (
+          <div
+            onPointerDown={onDragHandlePointerDown}
+            onPointerMove={onDragHandlePointerMove}
+            onPointerUp={onDragHandlePointerUp}
+            onPointerCancel={onDragHandlePointerUp}
+            className="absolute left-0 top-0 h-full w-2 cursor-col-resize z-20 hidden md:block group"
+            title="Drag to resize"
           >
-            {chatExpanded ? (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
-              </svg>
-            ) : (
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
-              </svg>
-            )}
-          </button>
-          {!chatExpanded && (
-            <button
-              onClick={() => setChatVisible(false)}
-              title="Hide chat"
-              className="shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-white/8 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+            <div className="absolute left-0 top-0 h-full w-px bg-white/8 group-hover:bg-primary/50 group-active:bg-primary transition-colors" />
+          </div>
+        )}
+        <Card
+          variant="panel"
+          padding="none"
+          className={cn(
+            "w-full h-full rounded-none min-h-0",
+            mobileTab?.tab === "chat" && "max-md:[box-shadow:none]! max-md:border-0!"
           )}
-        </div>
+        >
+          {/* seed label + toggle */}
+          <div className="border-b border-white/8 px-4 py-3 shrink-0 flex items-center gap-2">
+            <p className="text-xs text-muted-foreground/60 truncate flex-1">&ldquo;{seed}&rdquo;</p>
+            <button
+              onClick={() => setChatExpanded((v) => !v)}
+              title={chatExpanded ? "Shrink chat" : "Expand chat"}
+              className="max-md:hidden shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-white/8 transition-colors"
+            >
+              {chatExpanded ? (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+                </svg>
+              ) : (
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
+                </svg>
+              )}
+            </button>
+            {!chatExpanded && (
+              <button
+                onClick={() => setChatVisible(false)}
+                title="Hide chat"
+                className="max-md:hidden shrink-0 w-6 h-6 flex items-center justify-center rounded text-muted-foreground/40 hover:text-muted-foreground hover:bg-white/8 transition-colors"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+          </div>
 
-        <MessageList
-          messages={messages}
-          isStreaming={isStreaming}
-          streamingMsgId={streamingMsgId}
-          onForkChoice={handleForkChoice}
-          onAssetApproval={handleAssetApproval}
-          onRetry={retryTool}
-          onRenderShot={handleRenderShot}
-          onShotApproval={handleShotApproval}
-        />
+          <MessageList
+            messages={messages}
+            isStreaming={isStreaming}
+            streamingMsgId={streamingMsgId}
+            onForkChoice={handleForkChoice}
+            onAssetApproval={handleAssetApproval}
+            onRetry={retryTool}
+            onRenderShot={handleRenderShot}
+            onShotApproval={handleShotApproval}
+          />
 
-        <ChatInput isStreaming={isStreaming} onSend={(text) => void sendUserMessage(text)} />
-      </GlassPanel>
+          <ChatInput isStreaming={isStreaming} onSend={(text) => void sendUserMessage(text)} />
+        </Card>
+      </div>
     </div>
   );
 }

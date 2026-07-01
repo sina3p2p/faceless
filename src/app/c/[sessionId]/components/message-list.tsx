@@ -32,7 +32,10 @@ export function MessageList({
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (isAtBottom) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   function handleScroll() {
@@ -56,7 +59,7 @@ export function MessageList({
                   <div className="relative max-w-[85%]">
                     <button
                       onClick={() => void navigator.clipboard.writeText(msg.text)}
-                      className="absolute -left-7 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -left-7 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-muted-foreground/40 hover:text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity max-md:hidden"
                       title="Copy"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -4,13 +4,15 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const cardVariants = cva(
-  "group/card flex flex-col overflow-hidden rounded-2xl text-sm text-card-foreground",
+  "group/card relative flex flex-col overflow-hidden rounded-2xl text-sm text-card-foreground",
   {
     variants: {
       variant: {
         flat:     "border border-white/8",
         default:  "border border-white/8 bg-white/3 backdrop-blur-sm",
         raised:   "glass-base",
+        panel:    "bg-card border border-white/10 [box-shadow:0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.055)]",
+        "panel-dark": "bg-[oklch(0.13_0.003_260)] border border-white/10 [box-shadow:0_8px_32px_rgba(0,0,0,0.45),inset_0_1px_0_rgba(255,255,255,0.055)]",
       },
       padding: {
         none: "",

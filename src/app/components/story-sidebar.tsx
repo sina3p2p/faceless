@@ -8,7 +8,9 @@ import { useSession, signOut } from "next-auth/react";
 import axios from "@/lib/axios";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { GlassPanel } from "@/components/ui/glass-panel";
+import { Card } from "@/components/ui/card";
+import { AuthModal } from "@/components/auth-modal";
+import { useMobileTab } from "../story-shell";
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(
@@ -139,7 +141,7 @@ function SessionList({
         return (
           <Link
             key={s.id}
-            href={`/v2/story/${s.id}`}
+            href={`/c/${s.id}`}
             className={cn(
               "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors mb-1",
               isActive
@@ -165,6 +167,8 @@ function ExpandedSidebarContent({
   name,
   email,
   initials,
+  isLoggedIn,
+  onLoginClick,
   menuOpen,
   setMenuOpen,
   menuRef,
@@ -176,6 +180,8 @@ function ExpandedSidebarContent({
   name: string;
   email: string;
   initials: string;
+  isLoggedIn: boolean;
+  onLoginClick: () => void;
   menuOpen: boolean;
   setMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   menuRef: React.RefObject<HTMLDivElement | null>;
@@ -196,14 +202,14 @@ function ExpandedSidebarContent({
 
       <div className="px-2 pt-1 pb-2 flex flex-col gap-0.5">
         <Link
-          href="/v2/story"
+          href="/"
           className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-foreground/80 hover:bg-white/8 hover:text-foreground transition-colors group"
         >
           <span className="text-muted-foreground/60 group-hover:text-muted-foreground transition-colors"><IconEdit /></span>
           New story
         </Link>
         <Link
-          href="/v2/story/library"
+          href="/library"
           className={cn(
             "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm transition-colors group",
             isLibrary ? "bg-white/10 text-foreground" : "text-muted-foreground hover:bg-white/8 hover:text-foreground"
@@ -225,25 +231,42 @@ function ExpandedSidebarContent({
       </div>
 
       <div className="px-2 py-2 border-t border-white/6 relative" ref={menuRef}>
-        {menuOpen && (
-          <div className="absolute bottom-full left-2 right-2 mb-2">
-            <UserMenuPopup initials={initials} name={name} email={email} onClose={() => setMenuOpen(false)} />
+        {isLoggedIn ? (
+          <>
+            {menuOpen && (
+              <div className="absolute bottom-full left-2 right-2 mb-2">
+                <UserMenuPopup initials={initials} name={name} email={email} onClose={() => setMenuOpen(false)} />
+              </div>
+            )}
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/8 transition-colors group"
+            >
+              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0">{initials}</div>
+              <div className="flex-1 text-left min-w-0">
+                <p className="text-sm text-foreground truncate leading-tight">{name}</p>
+              </div>
+              <svg className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" fill="currentColor" viewBox="0 0 16 16">
+                <circle cx="8" cy="3" r="1.2" />
+                <circle cx="8" cy="8" r="1.2" />
+                <circle cx="8" cy="13" r="1.2" />
+              </svg>
+            </button>
+          </>
+        ) : (
+          <div className="px-1 pt-1 pb-0.5 flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5 px-2">
+              <p className="text-sm font-semibold text-foreground">Save your stories</p>
+              <p className="text-xs text-muted-foreground leading-relaxed">Log in to access your library, resume projects, and generate videos.</p>
+            </div>
+            <button
+              onClick={onLoginClick}
+              className="w-full flex items-center justify-center px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-sm font-medium text-foreground transition-colors"
+            >
+              Log in
+            </button>
           </div>
         )}
-        <button
-          onClick={() => setMenuOpen((o) => !o)}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/8 transition-colors group"
-        >
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground shrink-0">{initials}</div>
-          <div className="flex-1 text-left min-w-0">
-            <p className="text-sm text-foreground truncate leading-tight">{name}</p>
-          </div>
-          <svg className="w-4 h-4 text-muted-foreground/40 group-hover:text-muted-foreground transition-colors shrink-0" fill="currentColor" viewBox="0 0 16 16">
-            <circle cx="8" cy="3" r="1.2" />
-            <circle cx="8" cy="8" r="1.2" />
-            <circle cx="8" cy="13" r="1.2" />
-          </svg>
-        </button>
       </div>
     </>
   );
@@ -255,9 +278,10 @@ export function StorySidebar() {
   const params = useParams();
   const pathname = usePathname();
   const activeSessionId = params?.sessionId as string | undefined;
-  const isLibrary = pathname === "/v2/story/library";
+  const isLibrary = pathname === "/v2/library";
   const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
   const [storiesOpen, setStoriesOpen] = useState(false);
   const storiesCloseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const openStories = () => { clearTimeout(storiesCloseTimer.current); setStoriesOpen(true); };
@@ -302,6 +326,7 @@ export function StorySidebar() {
   }, [menuOpen]);
 
   const sessions = data ?? [];
+  const isLoggedIn = !!session?.user;
   const name = session?.user?.name ?? "User";
   const email = session?.user?.email ?? "";
   const initials = name
@@ -312,17 +337,25 @@ export function StorySidebar() {
     .slice(0, 2);
 
   // ── MOBILE ──────────────────────────────────────────────────────────────────
+  const mobileCtx = useMobileTab();
   if (isMobile) {
+    const open = mobileCtx?.sidebarSheetOpen ?? sheetOpen;
+    const setOpen = (v: boolean) =>
+      mobileCtx ? mobileCtx.setSidebarSheetOpen(v) : setSheetOpen(v);
+
     return (
       <>
-        <button
-          onClick={() => setSheetOpen(true)}
-          className="fixed top-3 left-3 z-40 w-9 h-9 flex items-center justify-center rounded-lg glass-base text-muted-foreground hover:text-foreground transition-colors"
-          title="Open menu"
-        >
-          <IconSidebarToggle />
-        </button>
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+        {/* Fixed trigger only when no tab bar is present (standalone usage) */}
+        {!mobileCtx && (
+          <button
+            onClick={() => setOpen(true)}
+            className="fixed top-3 left-3 z-40 w-9 h-9 flex items-center justify-center rounded-lg glass-base text-muted-foreground hover:text-foreground transition-colors"
+            title="Open menu"
+          >
+            <IconSidebarToggle />
+          </button>
+        )}
+        <Sheet open={open} onOpenChange={setOpen}>
           <SheetContent side="left" showCloseButton={false} className="w-72 p-0 bg-sidebar border-white/6">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <ExpandedSidebarContent
@@ -332,13 +365,16 @@ export function StorySidebar() {
               name={name}
               email={email}
               initials={initials}
+              isLoggedIn={isLoggedIn}
+              onLoginClick={() => setAuthModalOpen(true)}
               menuOpen={menuOpen}
               setMenuOpen={setMenuOpen}
               menuRef={menuRef}
-              togglePin={() => setSheetOpen(false)}
+              togglePin={() => setOpen(false)}
             />
           </SheetContent>
         </Sheet>
+        <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
       </>
     );
   }
@@ -358,7 +394,7 @@ export function StorySidebar() {
             />
           </div>
         )}
-        <GlassPanel displacement={30} aberration={2} blur={32} tint="light" noClip className="w-[52px] h-full rounded-2xl border border-white/10 shadow-xl flex flex-col py-2 items-center" childrenClassName="flex flex-col flex-1 items-center w-full min-h-0">
+        <Card variant="panel" padding="none" className="w-[52px] h-full rounded-none overflow-visible flex-col py-2 items-center">
           {/* Toggle expand */}
           <button
             onClick={togglePin}
@@ -372,7 +408,7 @@ export function StorySidebar() {
 
           {/* New story */}
           <Link
-            href="/v2/story"
+            href="/"
             title="New story"
             className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors"
           >
@@ -381,7 +417,7 @@ export function StorySidebar() {
 
           {/* Library */}
           <Link
-            href="/v2/story/library"
+            href="/library"
             title="Library"
             className={cn("w-9 h-9 flex items-center justify-center rounded-lg transition-colors mt-1", isLibrary ? "bg-primary/20 text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-white/8")}
           >
@@ -397,43 +433,58 @@ export function StorySidebar() {
               <IconFilm />
             </button>
 
-            <div
-              onMouseEnter={openStories}
-              onMouseLeave={closeStories}
-              className={`absolute left-full top-0 ml-4 w-64 z-50 transition-all duration-150 ease-out ${storiesOpen ? "opacity-100 translate-y-0 pointer-events-auto" : "opacity-0 -translate-y-1 pointer-events-none"}`}
-            >
-              <GlassPanel displacement={32} aberration={2} blur={28} tint="dark">
-                <div className="px-4 py-3 border-b border-white/10">
-                  <p className="text-sm font-semibold text-foreground">Recent</p>
-                </div>
-                <div className="max-h-96 overflow-y-auto py-1.5 px-1.5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30]">
-                  <SessionList sessions={sessions} activeSessionId={activeSessionId} />
-                </div>
-              </GlassPanel>
-            </div>
+            {storiesOpen && (
+              <div
+                onMouseEnter={openStories}
+                onMouseLeave={closeStories}
+                className="absolute left-full top-0 ml-4 w-64 z-50 transition-all duration-150 ease-out opacity-100 translate-y-0 pointer-events-auto"
+              >
+                <Card variant="panel-dark" padding="none">
+                  <div className="px-4 py-3 border-b border-white/10">
+                    <p className="text-sm font-semibold text-foreground">Recent</p>
+                  </div>
+                  <div className="max-h-96 overflow-y-auto py-1.5 px-1.5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30]">
+                    <SessionList sessions={sessions} activeSessionId={activeSessionId} />
+                  </div>
+                </Card>
+              </div>
+            )}
           </div>
 
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* User avatar */}
+          {/* User avatar / login */}
           <div className="pb-1">
-            <button
-              onClick={() => setMenuOpen((o) => !o)}
-              title={name}
-              className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground hover:ring-2 hover:ring-ring/50 transition-all"
-            >
-              {initials}
-            </button>
+            {isLoggedIn ? (
+              <button
+                onClick={() => setMenuOpen((o) => !o)}
+                title={name}
+                className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-xs font-bold text-primary-foreground hover:ring-2 hover:ring-ring/50 transition-all"
+              >
+                {initials}
+              </button>
+            ) : (
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                title="Log in"
+                className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/8 transition-colors"
+              >
+                <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                </svg>
+              </button>
+            )}
           </div>
-        </GlassPanel>
+        </Card>
+        <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
       </div>
     );
   }
 
   // ── EXPANDED ────────────────────────────────────────────────────────────────
   return (
-    <GlassPanel displacement={38} aberration={3} blur={32} className="w-64 shrink-0 rounded-2xl border border-white/10 flex flex-col" childrenClassName="flex flex-col flex-1 min-h-0">
+    <Card variant="panel" padding="none" className="w-64 shrink-0 rounded-none min-h-0">
       <ExpandedSidebarContent
         isLibrary={isLibrary}
         sessions={sessions}
@@ -441,11 +492,14 @@ export function StorySidebar() {
         name={name}
         email={email}
         initials={initials}
+        isLoggedIn={isLoggedIn}
+        onLoginClick={() => setAuthModalOpen(true)}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
         menuRef={menuRef}
         togglePin={togglePin}
       />
-    </GlassPanel>
+      <AuthModal open={authModalOpen} onOpenChange={setAuthModalOpen} />
+    </Card>
   );
 }

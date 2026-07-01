@@ -4,7 +4,7 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { GlassPanel } from "./glass-panel"
+import { Card } from "./card"
 
 function Dialog(props: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -58,16 +58,11 @@ function DialogContent({
         )}
         {...props}
       >
-        <GlassPanel
-          displacement={38}
-          aberration={3}
-          blur={32}
-          className="rounded-2xl border border-white/20 shadow-2xl w-full"
-        >
+        <Card variant="panel" padding="none" className="rounded-2xl border-white/20 shadow-2xl w-full">
           <div className="flex flex-col max-h-[85vh]">
             {children}
           </div>
-        </GlassPanel>
+        </Card>
         {showCloseButton && (
           <DialogPrimitive.Close
             className="absolute top-4 right-4 rounded-lg p-1.5 text-white/50 hover:text-white hover:bg-white/10 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-white/30"

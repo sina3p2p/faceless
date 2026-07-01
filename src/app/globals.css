@@ -370,6 +370,28 @@ body {
   }
 }
 
+/* ── Warp background replacement ── */
+.warp-bg {
+  background:
+    radial-gradient(ellipse 55% 50% at 25% 20%, oklch(0.28 0.02 265) 0%, transparent 70%),
+    radial-gradient(ellipse 45% 60% at 78% 72%, oklch(0.24 0.015 240) 0%, transparent 65%),
+    radial-gradient(ellipse 70% 40% at 55% 90%, oklch(0.22 0.01 280) 0%, transparent 60%),
+    oklch(0.13 0.005 260);
+  will-change: transform;
+  animation: warp-drift 32s ease-in-out infinite alternate;
+}
+
+@keyframes warp-drift {
+  0%   { transform: translate(0%,   0%); }
+  33%  { transform: translate(6%,   4%); }
+  66%  { transform: translate(-4%,  8%); }
+  100% { transform: translate(8%,  -5%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .warp-bg { animation: none; }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
