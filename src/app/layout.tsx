@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { StorySidebar } from "./components/story-sidebar";
 import { WarpShaderBackground } from "@/components/ui/warp-shader";
@@ -9,6 +9,10 @@ import { cn } from "@/lib/utils";
 
 const dmSans = DM_Sans({ subsets: ['latin'], variable: '--font-sans' });
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' });
+
+export const viewport: Viewport = {
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   title: "Story Room — Faceless",
