@@ -28,20 +28,31 @@ export function MessageList({
   onShotApproval: (toolCallId: string, videoUrl: string) => void;
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isAtBottomRef = useRef(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
+  // Content height can grow without `messages` changing — e.g. the typing
+  // animation in AssistantText reveals a table/hr over many frames after a
+  // single text_delta lands. A ResizeObserver catches that growth directly
+  // instead of relying on the messages array as a proxy for DOM size.
   useEffect(() => {
     const el = scrollContainerRef.current;
-    if (!el) return;
-    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-    if (isAtBottom) messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    const content = contentRef.current;
+    if (!el || !content) return;
+    const ro = new ResizeObserver(() => {
+      if (isAtBottomRef.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, []);
 
   function handleScroll() {
     const el = scrollContainerRef.current;
     if (!el) return;
-    setShowScrollBtn(el.scrollHeight - el.scrollTop - el.clientHeight > 80);
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    setShowScrollBtn(!isAtBottomRef.current);
   }
 
   return (
@@ -51,7 +62,7 @@ export function MessageList({
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30"
       >
-        <div className="space-y-7 pb-4">
+        <div ref={contentRef} className="space-y-7 pb-4 max-w-3xl mx-auto w-full">
           {messages.map((msg) => {
             if (msg.role === "user") {
               return (
@@ -66,7 +77,7 @@ export function MessageList({
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                       </svg>
                     </button>
-                    <div className="glass-subtle rounded-3xl px-4 py-2.5 text-[14px] text-foreground/90 leading-relaxed">
+                    <div className="bg-secondary text-secondary-foreground rounded-3xl px-4 py-2.5 text-[14px] leading-relaxed">
                       <p className="whitespace-pre-wrap">{msg.text}</p>
                     </div>
                   </div>

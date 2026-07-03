@@ -4,12 +4,9 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
-import { storyTools, MODEL, openrouter } from "@/server/services/showrunner";
+import { storyTools, MODEL, openrouter, generateAssetImages } from "@/server/services/showrunner";
 import { rowsToModelMessages } from "@/server/services/showrunner/messages";
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
-import { generateImage } from "@/server/services/media";
-
-const ASSET_CANDIDATE_COUNT = 2;
 
 function sseResponse(
   handler: (emit: (event: object) => void) => Promise<void>
@@ -132,9 +129,11 @@ export async function POST(
       // Allow the model to call loadReference (auto-executed) and then continue
       // responding in the same turn. Cap at 10 to prevent runaway loops.
       stopWhen: stepCountIs(10),
+      // reasoning: "medium",
       providerOptions: {
         openrouter: {
-          cacheControl: { type: "ephemeral" }
+          cacheControl: { type: "ephemeral" },
+          reasoning: { effort: "medium" }
         }
       }
     });
@@ -194,13 +193,7 @@ export async function POST(
             assetKind: "character" | "location";
             imagePrompt: string;
           };
-          const ar = args.assetKind === "location" ? "16:9" as const : "1:1" as const;
-          const results = await Promise.all(
-            Array.from({ length: ASSET_CANDIDATE_COUNT }, () =>
-              generateImage(args.imagePrompt, "gpt-image-1.5", undefined, ar)
-            )
-          );
-          const generatedImages = results.map((r) => r.url);
+          const generatedImages = await generateAssetImages(args.imagePrompt, args.assetKind);
           tc.function.arguments = { ...args, generatedImages };
           emit({ type: "asset_ref", toolCallId: tc.id, assetHandle: args.assetHandle, assetKind: args.assetKind, images: generatedImages });
         })

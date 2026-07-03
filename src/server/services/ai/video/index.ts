@@ -4,6 +4,7 @@ import { pickBestDuration } from "./pick-duration";
 import type { VideoResult } from "@/types/video-provider";
 import { VIDEO_MODELS } from "@/lib/constants";
 import { ReplicateVideoProvider } from "./providers/replicate";
+import { KieVideoProvider } from "./providers/kie";
 
 export type { VideoResult } from "@/types/video-provider";
 
@@ -49,10 +50,9 @@ export async function generateVideoFromReferences(
   resolution: TVideoResolution = "480p",
   duration: number = -1
 ): Promise<VideoResult> {
-  const replicate = new ReplicateVideoProvider();
-  return replicate.generateVideo(
+  const kie = new KieVideoProvider();
+  return kie.generateVideo(
     { model: videoModelId, referenceImages, referenceAudios, prompt, duration, aspectRatio, resolution, generateAudio: true },
-
   );
 }
 

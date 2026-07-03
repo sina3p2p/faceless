@@ -24,7 +24,6 @@ export type StageName =
   | "generate-frame-images"
   | "generate-pipeline-motion"
   | "generate-frame-videos"
-  | "generate-frame-videos:audio-lipsync"
   | "compose-final"
   | "compose-final:seedance-2"
   | "supervise-script"

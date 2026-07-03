@@ -20,8 +20,7 @@ type TVideoModelId =
     | 'runway-gen4-turbo'
     | 'runway-gen4.5'
     | 'pixverse-v6'
-    | 'vidu-q3-pro'
-    | 'seedance-2-mini';
+    | 'vidu-q3-pro';
 
 type TAspectRatio = "auto" | "21:9" | "16:9" | "4:3" | "1:1" | "3:4" | "9:16";
 

@@ -4,7 +4,7 @@ import { videoProjects, sceneFrames, media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
 import { generateVideoFromImage } from "@/server/services/ai/video";
-import { SEEDANCE2_MODELS, isE005, addSeedanceNoise, addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
+import { isE005, addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { z } from "zod";
 import { VIDEO_MODEL_IDS } from "@/lib/constants";
@@ -60,16 +60,13 @@ export async function POST(
 
   try {
     const imageUrl = mediaUrl(frame.imageMedia.url);
-    let startUrl = imageUrl;
-    if (SEEDANCE2_MODELS.has(videoModel)) {
-      try { startUrl = await addSeedanceNoise(imageUrl, frameId, videoId); } catch { startUrl = imageUrl; }
-    }
+    const startUrl = imageUrl;
 
     const callGenerate = (url: string) =>
       generateVideoFromImage(url, prompt, duration, videoModel, undefined, video.videoSize, video.videoResolution);
 
     const result = await callGenerate(startUrl).catch(async (err) => {
-      if (SEEDANCE2_MODELS.has(videoModel) && isE005(err)) {
+      if (isE005(err)) {
         console.warn(`Frame ${frameId}: E005 on attempt 1 — retrying with enhanced perturbation`);
         let enhUrl = imageUrl;
         try { enhUrl = await addSeedanceNoiseEnhanced(imageUrl, frameId, videoId); } catch { /* keep original */ }

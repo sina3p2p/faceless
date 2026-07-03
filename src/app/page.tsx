@@ -14,7 +14,7 @@ export default function StoryLandingPage() {
       return res.data;
     },
     onSuccess: (data) => {
-      router.push(`/v2/${data.sessionId}`);
+      router.push(`/c/${data.sessionId}`);
     },
   });
 

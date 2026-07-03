@@ -3,6 +3,25 @@ import type { I2vRequest, IProvider, VideoResult } from "@/types/video-provider"
 import { pollUntil } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
 
+type KieTaskResult = {
+  code: 200 | 401 | 403 | 404 | 500 | 505,
+  msg: string,
+  data: {
+    taskId: string,
+    model: string,
+    state: "success" | "waiting" | "queuing" | "generating" | "fail",
+    param: string,
+    resultJson: string,
+    failCode: string,
+    failMsg: string,
+    costTime: number,
+    completeTime: number,
+    createTime: number,
+    updateTime: number,
+    progress: number,
+    creditsConsumed: number
+  }
+};
 export class KieVideoProvider implements IProvider {
   readonly client: AxiosInstance;
 
@@ -12,15 +31,16 @@ export class KieVideoProvider implements IProvider {
       throw new Error("KIE_API_KEY is not set (required for KIE video generation)");
     }
     this.client = axios.create({
-      baseURL: "https://api.klingai.com",
+      baseURL: "https://api.kie.ai/api/v1",
       headers: { Authorization: `Bearer ${token}` },
     });
   }
 
   findModel(model: TVideoModelId): string | undefined {
     return ({
-      "seedance-2-pro": "seedance-video-2.0",
-      "seedance-2-fast": "seedance-video-2.0-mini",
+      "seedance-2-pro": "bytedance/seedance-2",
+      "seedance-2-fast": "bytedance/seedance-2-fast",
+      "seedance-2-mini": "bytedance/seedance-2-mini",
     } as Partial<Record<TVideoModelId, string>>)[model];
   }
 
@@ -30,36 +50,40 @@ export class KieVideoProvider implements IProvider {
       throw new Error(`KIE: model "${req.model}" is not mapped. Add it to KieVideoProvider.findModel.`);
     }
 
-    const body: Record<string, unknown> = {
-      model_name: modelName,
+    const input: Record<string, unknown> = {
       prompt: req.prompt,
       duration: req.duration,
       aspect_ratio: req.aspectRatio,
+      resolution: req.resolution,
     };
-    if (req.startImageUrl) body.image = req.startImageUrl;
-    if (req.endImageUrl) body.tail_image = req.endImageUrl;
-    if (req.generateAudio != null) body.generate_audio = req.generateAudio;
+    if (req.startImageUrl) input.first_frame_url = req.startImageUrl;
+    if (req.endImageUrl) input.last_frame_url = req.endImageUrl;
+    if (req.generateAudio != null) input.generate_audio = req.generateAudio;
+    if (req.referenceImages && req.referenceImages.length > 0) input.reference_image_urls = req.referenceImages;
 
-    const { data: task } = await this.client.post<{ data: { task_id: string } }>(
-      "/v1/videos/image2video",
-      body
+    const { data: task } = await this.client.post<{ data: { taskId: string } }>(
+      "/jobs/createTask",
+      {
+        model: modelName,
+        input,
+      }
     );
 
-    return this.pollTask(task.data.task_id, req.duration);
+    return this.pollTask(task.data.taskId, req.duration);
   }
 
   private pollTask(taskId: string, expectedDuration: number): Promise<VideoResult> {
     return pollUntil(async () => {
-      const { data } = await this.client.get<{
-        data: { task_status: string; task_result?: { videos?: { url: string }[] } };
-      }>(`/v1/videos/image2video/${taskId}`);
-      const { task_status, task_result } = data.data;
-      if (task_status === "succeed") {
-        const url = task_result?.videos?.[0]?.url;
+      const { data } = await this.client.get<KieTaskResult>(`/jobs/recordInfo?taskId=${taskId}`);
+      const { state, resultJson } = data.data;
+      if (state === "success") {
+        const result = JSON.parse(resultJson);
+        const url = result.resultUrls[0];
         if (!url) throw new Error("KIE: task succeeded but no video URL in response");
         return { videoUrl: url, durationSeconds: expectedDuration };
+      } else if (state === "fail") {
+        throw new Error(`KIE: task ${taskId} failed: ${data.data.failMsg}`);
       }
-      if (task_status === "failed") throw new Error(`KIE: task ${taskId} failed`);
       return null;
     });
   }

@@ -1,8 +1,7 @@
 import type { Job } from "bullmq";
 import { db, schema, eq } from "./shared";
 import type { ShotJobData } from "@/lib/shot-queue";
-import { generateShotWithFallback } from "@/server/services/showrunner";
-import { uploadFile, mediaUrl } from "@/lib/storage";
+import { renderAndUploadShot } from "@/server/services/showrunner";
 import { logger } from "@/lib/logger";
 
 type StoredTc = {
@@ -31,20 +30,8 @@ export async function handleShotJob(job: Job<ShotJobData>) {
 
   let videoUrl: string;
   try {
-    const result = await generateShotWithFallback(
-      referenceImageUrls,
-      prompt,
-      aspectRatio,
-      duration,
-      sessionId
-    );
-
-    // Download from Replicate and re-upload to R2 so the URL never expires.
-    const videoResp = await fetch(result.videoUrl);
-    const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
     const key = `v2/shots/${sessionId}/${toolCallId}.mp4`;
-    await uploadFile(key, videoBuffer, "video/mp4");
-    videoUrl = mediaUrl(key);
+    videoUrl = await renderAndUploadShot(referenceImageUrls, prompt, aspectRatio, duration, sessionId, key);
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     logger.error("Shot job generation failed", err as Error, { jobId: job.id, sessionId, toolCallId });

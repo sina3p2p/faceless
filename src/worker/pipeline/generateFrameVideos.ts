@@ -6,7 +6,7 @@ import { db, schema, eq, updateVideoStatus, failJob } from "../shared";
 import type { RenderJobData } from "@/lib/queue";
 import { WORKER, VIDEO_MODELS } from "@/lib/constants";
 import { generateVideoFromImage, type VideoResult } from "@/server/services/ai/video";
-import { SEEDANCE2_MODELS, isE005, addSeedanceNoise, addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
+import { isE005, addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { downloadFile } from "@/server/services/composer";
 import { and, isNotNull } from "drizzle-orm";
@@ -150,26 +150,15 @@ export async function generateFrameVideosJob(job: Job<RenderJobData>) {
               ? `${videoPrompt}\n\nCharacter says: "${frame.scene.text}"`
               : videoPrompt;
 
-            // Seedance 2.x: add imperceptible Gaussian noise to bypass E005 moderation.
-            let startUrl = imageSignedUrl;
-            let endUrl = endImageUrl;
-            if (SEEDANCE2_MODELS.has(videoModelId)) {
-              try {
-                startUrl = await addSeedanceNoise(imageSignedUrl, frame.id, videoProjectId);
-                if (endImageUrl) endUrl = await addSeedanceNoise(endImageUrl, `end_${frame.id}`, videoProjectId);
-              } catch (noiseErr) {
-                console.warn(`[generate-frame-videos] Frame ${frame.id}: noise preprocessing failed (${noiseErr instanceof Error ? noiseErr.message : noiseErr}) — using original`);
-              }
-            }
 
             const callGenerate = (s: string, e: string | undefined): Promise<VideoResult> =>
               generateVideoFromImage(s, finalPrompt, desiredDuration, videoModelId, e, aspectRatio, videoResolution, isSpeakingFrame ? true : undefined);
 
             let videoResult: VideoResult;
             try {
-              videoResult = await callGenerate(startUrl, endUrl);
+              videoResult = await callGenerate(imageSignedUrl, endImageUrl);
             } catch (err) {
-              if (SEEDANCE2_MODELS.has(videoModelId) && isE005(err)) {
+              if (isE005(err)) {
                 console.warn(`[generate-frame-videos] Frame ${frame.id}: E005 on attempt 1 — retrying with enhanced perturbation`);
                 let enhStartUrl = imageSignedUrl;
                 let enhEndUrl = endImageUrl;

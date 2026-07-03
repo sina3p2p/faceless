@@ -1,8 +1,6 @@
 import sharp from "sharp";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 
-export const SEEDANCE2_MODELS: ReadonlySet<TVideoModelId> = new Set(["seedance-2-pro", "seedance-2-fast"]);
-
 export function isE005(err: unknown): boolean {
   return err instanceof Error && err.message.includes("E005");
 }
@@ -27,13 +25,6 @@ async function gaussianNoise(input: Buffer, sigma: number): Promise<Buffer> {
 async function store(buf: Buffer, key: string): Promise<string> {
   await uploadFile(key, buf, "image/jpeg");
   return mediaUrl(key);
-}
-
-/** Sigma=8 Gaussian noise — first-attempt bypass for E005. */
-export async function addSeedanceNoise(imageUrl: string, label: string, projectId: string): Promise<string> {
-  const input = await fetchImage(imageUrl);
-  const output = await gaussianNoise(input, 8);
-  return store(output, `frames/${projectId}/noised_${label}_${Date.now()}.jpg`);
 }
 
 /** Stacked perturbation for E005 retry: hue shift + JPEG precompress + sigma=15 noise. */

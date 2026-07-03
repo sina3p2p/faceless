@@ -32,7 +32,6 @@ import { generatePromptsJob } from "./generatePrompts";
 import { generateFrameImagesJob } from "./generateFrameImages";
 import { generateMotionJob } from "./generateMotion";
 import { generateFrameVideosJob } from "./generateFrameVideos";
-import { generateFrameVideosAudioLipsyncJob } from "./generateFrameVideosAudioLipsync";
 import { composeFinalJob, composeFinalSeedance2Job } from "./composeFinal";
 import { timelapsePlanJob } from "./timelapse/plan";
 
@@ -58,7 +57,6 @@ export const STAGE_REGISTRY: Record<StageName, StageHandler> = {
   "generate-frame-images": generateFrameImagesJob,
   "generate-pipeline-motion": generateMotionJob,
   "generate-frame-videos": generateFrameVideosJob,
-  "generate-frame-videos:audio-lipsync": generateFrameVideosAudioLipsyncJob,
   "compose-final": composeFinalJob,
   "compose-final:seedance-2": composeFinalSeedance2Job,
   "timelapse-plan": timelapsePlanJob,

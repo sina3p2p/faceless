@@ -459,7 +459,7 @@ export function StoryChat({
         ref={chatPanelRef}
         style={chatExpanded ? undefined : { width: chatVisible ? chatWidth : 0 }}
         className={cn(
-          chatExpanded ? "flex-1" : "shrink-0",
+          chatExpanded ? "flex-1 w-full" : "shrink-0",
           "min-h-0 relative",
           !isDragging && "transition-all duration-200",
           mobileTab && mobileTab.tab !== "chat" && "max-md:hidden",
@@ -488,8 +488,7 @@ export function StoryChat({
           )}
         >
           {/* seed label + toggle */}
-          <div className="border-b border-white/8 px-4 py-3 shrink-0 flex items-center gap-2">
-            <p className="text-xs text-muted-foreground/60 truncate flex-1">&ldquo;{seed}&rdquo;</p>
+          <div className="border-b border-white/8 px-4 py-3 shrink-0 flex justify-end items-center gap-2">
             <button
               onClick={() => setChatExpanded((v) => !v)}
               title={chatExpanded ? "Shrink chat" : "Expand chat"}

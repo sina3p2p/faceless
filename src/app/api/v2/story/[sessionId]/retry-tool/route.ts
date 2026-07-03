@@ -3,11 +3,7 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { generateImage } from "@/server/services/media";
-import { generateShotWithFallback } from "@/server/services/showrunner";
-import { uploadFile, mediaUrl } from "@/lib/storage";
-
-const ASSET_CANDIDATE_COUNT = 2;
+import { renderAndUploadShot, generateAssetImages } from "@/server/services/showrunner";
 
 type StoredTc = {
   id: string;
@@ -64,18 +60,15 @@ export async function POST(
   }
 
   if (toolName === "compileShot") {
-    const result = await generateShotWithFallback(
+    const key = `v2/shots/${sessionId}/${toolCallId}-retry-${Date.now()}.mp4`;
+    const persistentUrl = await renderAndUploadShot(
       tcArgs.referenceImageUrls as string[],
       tcArgs.prompt as string,
       (tcArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
       tcArgs.duration as number,
-      sessionId
+      sessionId,
+      key
     );
-    const videoResp = await fetch(result.videoUrl);
-    const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
-    const key = `v2/shots/${sessionId}/${toolCallId}-retry-${Date.now()}.mp4`;
-    await uploadFile(key, videoBuffer, "video/mp4");
-    const persistentUrl = mediaUrl(key);
     await patchRow({ videoUrl: persistentUrl });
     return NextResponse.json({ videoUrl: persistentUrl });
   }
@@ -86,13 +79,7 @@ export async function POST(
       assetKind: "character" | "location";
       imagePrompt: string;
     };
-    const ar = assetKind === "location" ? "16:9" as const : "1:1" as const;
-    const results = await Promise.all(
-      Array.from({ length: ASSET_CANDIDATE_COUNT }, () =>
-        generateImage(imagePrompt, "gpt-image-1.5", undefined, ar)
-      )
-    );
-    const generatedImages = results.map((r) => r.url);
+    const generatedImages = await generateAssetImages(imagePrompt, assetKind);
     await patchRow({ generatedImages });
     return NextResponse.json({ assetHandle, assetKind, images: generatedImages });
   }

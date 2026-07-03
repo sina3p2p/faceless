@@ -2,7 +2,7 @@
 
 > **DO NOT LOAD THIS FILE DURING STAGE 1.** It is useless before reference images exist, and reading it while authoring the story or shot list will contaminate that work with premature render-prompt thinking. Load it ONLY after Stage 1 is fully complete — the Bible is locked AND every `@material` has an approved reference image — at the moment you begin writing Seedance prompts in Stage 2. If you are still developing premise, characters, screenplay, shot-list intent, or generating asset images, this file is not yet relevant.
 
-This is the reference the showrunner loads when Stage 1 is complete (Bible locked, all assets approved) and it begins writing the final Seedance prompts. It is **not** a story tool — every creative decision was already made and frozen in the Bible. This document is purely about *compiling* those locked decisions into precise, renderable Seedance 2.0 prompts.
+This is the reference the showrunner loads when Stage 1 is complete (Bible locked, all assets approved) and it begins writing the final Seedance prompts. It is **not** a story tool — every creative decision was already made and frozen in the Bible. This document is purely about _compiling_ those locked decisions into precise, renderable Seedance 2.0 prompts.
 
 ---
 
@@ -10,77 +10,111 @@ This is the reference the showrunner loads when Stage 1 is complete (Bible locke
 
 **Every value in a shot prompt comes from the Bible or the shot row. Nothing is invented here.**
 
-The lighting comes from the shot's State Schedule entry. The color grade comes from the Bible's Look. The character's appearance comes from the approved reference image. The camera move comes from the shot row. If a value you need isn't in the Bible or the row, that is a **gap to flag**, not a blank to fill from imagination. A shot prompt is an act of *translation*, not authorship.
+The lighting comes from the shot's State Schedule entry. The color grade comes from the Bible's Look. The character's appearance comes from the approved reference image. The camera move comes from the shot row. If a value you need isn't in the Bible or the row, that is a **gap to flag**, not a blank to fill from imagination. A shot prompt is an act of _translation_, not authorship.
 
-This is the opposite discipline from viral single-clip prompting, where each clip invents its own hook, grade, and mood to stop a scroll. A film is the reverse: every shot must *subordinate* itself to the whole, because 24 shots that each made their own striking choices do not cut together into a film — they fight.
+This is the opposite discipline from viral single-clip prompting, where each clip invents its own hook, grade, and mood to stop a scroll. A film is the reverse: every shot must _subordinate_ itself to the whole, because 24 shots that each made their own striking choices do not cut together into a film — they fight.
 
 ---
 
 ## Continuity beats impact (read before using the craft tables)
 
-The craft tables below are excellent and come from a skill built for viral clips. Their *knowledge* (camera moves, lighting setups, color science) is reusable. Their *instinct* — open with a hook, move the camera always, grade for maximum punch — is wrong for narrative and must be inverted:
+The craft tables below are excellent and come from a skill built for viral clips. Their _knowledge_ (camera moves, lighting setups, color science) is reusable. Their _instinct_ — open with a hook, move the camera always, grade for maximum punch — is wrong for narrative and must be inverted:
 
 - **No per-shot hooks.** A shot in a film opens by continuing the previous shot, not by re-grabbing attention with a black-to-light burst or a whip. The "2-second hook" thinking that suits TikTok destroys narrative flow. The film's hook is its opening; individual shots serve the scene, not the scroll.
-- **Stillness is a legitimate, frequent choice.** Not every shot needs camera movement. A locked camera is often *correct* — it's observational, it's calm, and critically it's the safest way to avoid the morphing/drift failure mode. Move the camera when the beat's emotion calls for it, not by default.
-- **One Look, applied everywhere.** Do not pick a fresh grade per shot. The Bible's Look is the single grade for the entire film; you *apply* it, you don't choose it. The only per-shot variation is the State Schedule's lighting state.
+- **A locked camera is legitimate — a motionless SHOT is not.** Lock-off is often correct (observational, calm, drift-safe) _when the subject carries the motion_. But stillness must never compound: if the camera is locked AND the subject has no action, the generation is a photograph with drifting mist. Before choosing lock-off, confirm the shot row gives the subject a real verb; if it doesn't, either the camera must carry the motion or the row goes back as a gap.
+- **One Look, applied everywhere.** Do not pick a fresh grade per shot. The Bible's Look is the single grade for the entire film; you _apply_ it, you don't choose it. The only per-shot variation is the State Schedule's lighting state.
 - **Match the camera move to the beat's mood, not to "make it cinematic."** A tense beat might want a slow push-in; a calm one a lock-off; a reveal a pull-back. The mood is in the shot row. Let it choose the move.
+
+---
+
+## The primary-motion rule (check this before anything else in the shot)
+
+**Every prompt must have exactly ONE primary motion source: the SUBJECT or the CAMERA.** This is the first thing to identify when compiling a shot, read straight from the shot row's Primary column (or inferred from its motion arc if the row is in an older format).
+
+- **Primary = SUBJECT:** a character acts or an object moves; the camera calms or locks. The action must be a real verb with a start→end delta (a step taken, a hand raised, a body pushing backward) — not a pose.
+- **Primary = CAMERA:** the camera move develops the frame (push-in, pull-back, truck, crane); the subject calms, but characters still get micro-performance (see below), never total stillness.
+- **Neither:** invalid. Do not "compile it faithfully" into a static tableau — emit `status: "gap"`: `"Shot N: no primary motion — subject has no action and camera is locked; the row needs a delta."` A beautifully lit photograph is the most common quality failure this recipe exists to prevent, and it is caught here, before a generation is spent.
+- **Both fast:** also wrong — one calms (rule 3 of the camera phrasing rules below).
+
+Ambient environmental life (mist, foliage, water, light) is tier (b) seasoning and **never counts as the primary motion.**
 
 ---
 
 ## One shot per generation by default (read this carefully — it's the most common quality mistake)
 
-**Default: render ONE shot per generation.** Seedance can pack multiple shots with hard cuts into a single 15s generation — but doing so **divides the motion budget** across those shots. A 14s generation split into two shots is two thin ~7s fragments, each with little room to develop movement; the result reads as "a static image with a few small moves." A 10s generation spent on ONE shot gives that shot a full, developing, cinematic motion arc. Most of your shots are individually rich (a block sliding and reversing, a slow push-in on a reveal, an emotional beat) — each of those *deserves and needs a whole generation*. Give it one.
+**Default: render ONE shot per generation.** Seedance can pack multiple shots with hard cuts into a single 15s generation — but doing so **divides the motion budget** across those shots. A 14s generation split into two shots is two thin ~7s fragments, each with little room to develop movement; the result reads as "a static image with a few small moves." A 10s generation spent on ONE shot gives that shot a full, developing, cinematic motion arc. Most of your shots are individually rich (a block sliding and reversing, a slow push-in on a reveal, an emotional beat) — each of those _deserves and needs a whole generation_. Give it one.
 
 **The motion-budget rule:** the richer a shot's intended movement, the more it needs its own generation. A shot whose whole point is motion (something sliding, a developing camera move, an action beat) must NOT share a generation. Bundling starves it.
 
 **Multi-shot bundling is the EXCEPTION, used only when ALL of these hold:**
-- The shots share the same location, lighting state, and character(s) — a genuinely continuous moment, not a scene change. (A wide → a close-up of the *same* moment can bundle; a location change cannot.)
-- Each bundled shot is *short and low-motion* — a quick reaction, a held look — so dividing the budget doesn't starve them.
+
+- The shots share the same location, lighting state, and character(s) — a genuinely continuous moment, not a scene change. (A wide → a close-up of the _same_ moment can bundle; a location change cannot.)
+- Each bundled shot is _short and low-motion_ — a quick reaction, a held look — so dividing the budget doesn't starve them.
 - You specifically want the in-model cut's smoothness for closely-related beats.
 - Cap at 2–3 shots (not 5 — that's the absolute model ceiling, not a target), ≤15s total.
 
 When in doubt, render separately and stitch the cut in post — the post-cut is trivial and you keep the full motion budget per shot. **Different location, different lighting, or a motion-heavy shot → always its own generation.**
 
-For the rare multi-shot generation, label each shot (`Shot 1:`, `Shot 2:`) with its own action and camera, and put the **global render notes (Look, grade, lighting, reference bindings) at the END** — Seedance follows closing notes more reliably for camera and lighting.
+For the rare multi-shot generation, open with ONE shared SUBJECT DEFINITIONS block, then label each shot (`Shot 1:`, `Shot 2:`) with its own action and camera — in event order, no timestamps or per-segment durations (in-prompt timing is officially unstable; the model paces the cuts) — and put the **global render notes (Look, grade, lighting)** plus the constraint tail at the END. Seedance follows closing notes more reliably for camera and lighting.
 
 **Grouping is ideally marked in the Bible's shot list during Stage 1.** If unmarked, default to one-per-generation; only bundle when the strict exception above clearly applies.
+
+## Continuity across generations — native extension and track completion
+
+When two shots must connect seamlessly (a continuous action broken across a cut, a character carrying position/light/state into the next shot), prefer Seedance's **native video extension** over manual tricks: pass the approved clip as `<Video_1>` and prompt `Extend <Video_1> backward: [what happens next, same prompt discipline as any shot]`. The model auto-extracts the transition frames and does NOT regenerate the original segment — continuity comes free, each shot keeps its full motion budget, and the per-shot approval loop stays intact. (Phrasing note: for extend/edit tasks say `<Video_1>` directly, never "reference `<Video_1>`" — the word "reference" flips the model into reference-transfer mode.)
+
+- **Quality degrades over repeated extensions** — mottled artifacts accumulate, especially on faces. Keep chains short (2–3 links); never build the whole film as one extension chain.
+- **Joins can jump-cut.** Standard post fix: trim ~6 frames from the end of the earlier clip and ~1 frame from the start of the later one at each join.
+- **Track completion** stitches existing approved clips: up to 3 video inputs, ≤15s combined, with the model generating the transitions (`<Video_1> + [transition description] + followed by <Video_2>`). Useful for bridging two approved shots with a generated connective beat.
+
+Extension is a _continuity_ tool, not a substitute for the grouping rules above: shot selection, primary motion, and approval still work per-shot.
 
 ---
 
 ## Reference binding — the @material → [Image#] translation
 
-Stage 1 wrote `@material` handles (e.g. `@hero_charsheet`, `@giza_plate`). Seedance 2.0 reference mode takes uploaded images addressed as `[Image1]`, `[Image2]`, etc., **in the order they're attached** (first attached = `[Image1]`). Compilation resolves each handle to its approved image URL and assigns it a slot.
+Stage 1 wrote `@material` handles (e.g. `@hero_charsheet`, `@giza_plate`). Seedance 2.0 reference mode takes uploaded images addressed as `[Image1]`, `[Image2]`, etc., **in the order they're attached** (first attached = `[Image1]`). Compilation resolves each handle to its approved image(s) and assigns slots. Note a character handle resolves to TWO slots (headshot + full-body).
 
-Two hard rules:
+Four hard rules:
 
-1. **Attach only the assets that appear in this shot (or group).** Reference mode accepts up to 9 images, but 3–5 focused references beat more. Pull only the character(s) and location(s) actually on screen. If a shot/group names more distinct assets than the cap allows, that's a gap — flag it (the shot is probably too crowded), don't silently drop refs.
+1. **Slot order = precision priority.** The more precisely an asset must be matched, the EARLIER it goes: character headshots first, then character full-bodies, then hero-prop/object refs, then location plates. Seedance weights earlier assets more heavily for precise reference.
 
-2. **State explicitly what to extract from each reference.** Never just attach an image — say what attribute it governs, or the model merges attributes unpredictably. Use the form:
-   - `[Image1] = identity and wardrobe of the protagonist`
-   - `[Image2] = environment, architecture, and composition of the location`
-   - `[Image3] = identity of the second character`
+2. **Attach only the assets that appear in this shot (or group).** Reference mode accepts up to 9 images, but 3–5 focused references beat more (and each character costs two slots). Pull only the character(s) and location(s) actually on screen. If a shot/group names more distinct assets than the budget allows, that's a gap — flag it (the shot is probably too crowded), don't silently drop refs.
 
-For a multi-shot group, the same `[Image#]` set carries across all shots in the generation, which is exactly how Seedance keeps the character consistent across the internal cuts.
+3. **DEFINE each subject up front, then use the label everywhere.** The official binding grammar: open the prompt with definitions —
+   - `Define the [2–3 stable features, e.g. man with the measuring cord and kilt] in [Image1] (facial features) and [Image2] (styling and wardrobe) as **overseer**.`
+   - `Define the terrain in [Image3] as **the crater site**; it governs environment, architecture, and composition.`
+     Then **every subsequent mention of that subject uses the exact same label** ("overseer", never "the man" / "he" at first mention of a new sentence block where ambiguity could arise). An unbound mention is how identity drift starts. For a quick one-off binding without a definition, the inline form `overseer@Image1` also works — but for film work, prefer explicit definitions.
+
+4. **State what each reference governs.** Never attach an image silently — the definition must say what attribute it controls (facial features / styling / environment / object form), or the model merges attributes unpredictably.
+
+For a multi-shot group, the same definitions carry across all shots in the generation, which is exactly how Seedance keeps the character consistent across the internal cuts — keep the labels identical in every shot block.
 
 ---
 
-## Static-lock — positive phrasing only
+## Static-lock — positive phrasing only, and NEVER on characters
 
-When a shot is flagged static-lock (subject must not change/morph during the shot), state it in **positive** terms. Seedance interprets "no X" as a cue for X — negatives backfire. Use the worked phrasings:
+When a shot is flagged static-lock (a rigid subject must not change/morph during the shot), state it in **positive** terms and **name the specific thing being locked**. Seedance interprets "no X" as a cue for X — negatives backfire. Use the worked phrasings:
 
-- For the subject/structure: `CRITICAL: the [subject] is FIXED — it remains exactly as shown in [Image#] throughout this shot; only the camera moves, subject unchanged.`
+- For the structure/object: `CRITICAL: the [named structure/object] is FIXED — it remains exactly as shown in [Image#] throughout this shot; only the camera moves, the [named thing] unchanged.`
 - The identity anchor: `Stable identity, natural proportions, clean edges throughout.`
 
-Never write "the pyramid does not grow" or "no morphing" — write the fixed state as a present fact and let only the camera move. This is the fix for the morphing-pyramid bug; it is mandatory wherever the State Schedule says a thing is fixed within a shot but changes between shots (structure heights, glow levels, etc.).
+Never write "the pyramid does not grow" or "no morphing" — write the fixed state as a present fact. And **never write the blanket clause "only the camera moves, subject unchanged"** — in a frame containing characters, that clause freezes the _characters_, producing mannequins in a diorama. The lock always names its target: "the pyramid unchanged," "the ship's hull unchanged," never "subject unchanged."
 
-**CRITICAL — lock RIGID things, NEVER lock ORGANIC/atmospheric things.** Static-lock exists to stop *rigid* subjects from morphing (a structure's shape/height, a character's identity, a vehicle's form). It must NOT be applied to organic or atmospheric elements, which in a living environment are *supposed* to be in constant gentle motion. If you lock a whole environment, you get a beautiful frozen photograph that a character walks through — the #1 cause of "the background feels static / looks AI." **Always request ambient environmental motion explicitly** for anything organic in frame:
+**Characters are NEVER static-locked.** Character identity consistency comes from the reference-image binding (`[Image#] = identity and wardrobe of...`) plus the identity anchor line — not from freezing motion. Every character in frame gets explicit **performance direction**, always:
+
+- If the character carries the shot's primary motion: the scripted action, phrased as start→end (`she pushes herself back into the roots, heels dragging through the soil, one arm wrapping her belly`).
+- If the character is secondary in a camera-driven shot: written **micro-performance** at minimum — breath, gaze, small gestures (`his chest rises with quickened breath; his eyes track the figure; his fingers tighten in the dirt`). The model does not invent blocking; a character with no written verb stands like a wax figure.
+
+**CRITICAL — lock RIGID things, NEVER lock ORGANIC/atmospheric things.** Static-lock exists to stop _rigid_ subjects from morphing (a structure's shape/height, a vehicle's form, a hero prop). It must NOT be applied to organic or atmospheric elements, which in a living environment are _supposed_ to be in constant gentle motion. If you lock a whole environment, you get a beautiful frozen photograph that a character walks through — the #1 cause of "the background feels static / looks AI." **Always request ambient environmental motion explicitly** for anything organic in frame:
+
 - Foliage, vines, leaves, grass: "leaves and vines sway gently in a soft breeze."
 - Water (streams, sea, drips): "the stream flows steadily, surface catching light."
 - Mist, smoke, dust, haze: "mist drifts slowly across the ground."
 - Light through moving canopy/clouds: "dappled light shafts shimmer faintly as the canopy stirs."
 - Fire, embers, fabric, hair, banners: "flames flicker, embers drift; fabric stirs in the air."
 
-So a shot's motion instruction has THREE tiers, not two: **(a) the deliberate action** (scripted: a block slides, a beam fires); **(b) ambient life** (organic elements always breathing — foliage, water, mist, light); **(c) the genuinely rigid lock** (a structure or identity that must not morph). Only (c) gets the FIXED clause. Give (b) explicit gentle motion. A frame with NO (b) motion will read as static even when the subject moves — name the ambient life in every shot that has an organic or atmospheric environment.
+So a shot's motion instruction has THREE tiers: **(a) the primary motion** (the shot row's designated source — subject action OR camera move; exactly one, always present); **(b) ambient life** (organic elements always breathing — foliage, water, mist, light — plus character micro-performance); **(c) the targeted rigid lock** (a named structure or object that must not morph). Only (c) gets the FIXED clause, and it always names its target. A prompt missing tier (a) is a gap, not a render.
 
 **The lock-vs-motion tension (important):** when a shot has BOTH a thing that must move (a sliding block, a raised hand) AND a large fixed structure (the pyramid), asking the model to freeze most of the frame while animating one small piece is hard — its safe resolution is to barely move anything, producing the "static image with a few moves" look. Two fixes: (1) **frame tighter** — if the motion is a block and a hand, frame on the block-and-hand, not the whole monument, so the locked structure isn't dominating the frame and fighting the motion; (2) **only lock what's actually in frame and at risk of drifting** — don't burn the model's attention locking a pyramid that's barely in a tight shot. Reserve the full structure-lock for wide shots where the structure is the subject. A motion-rich shot wants a framing that lets the motion be the main event.
 
@@ -88,7 +122,7 @@ So a shot's motion instruction has THREE tiers, not two: **(a) the deliberate ac
 
 ## State Schedule injection
 
-The Bible's State Schedule records what changes *between* shots but is *fixed within* a shot (structure completion %, lighting state, a visible-clock value like a draining glow). For each shot, read its scheduled values and state them as explicit present facts in the prompt:
+The Bible's State Schedule records what changes _between_ shots but is _fixed within_ a shot (structure completion %, lighting state, a visible-clock value like a draining glow). For each shot, read its scheduled values and state them as explicit present facts in the prompt:
 
 - `Structure at 70% completion, frozen at this state for the shot.`
 - `Lighting state: [GOLDEN-HOUR] — warm low-angle sun, long shadows.`
@@ -108,14 +142,19 @@ Pull the shot's duration from the shot row; it must be one of Seedance 2.0's all
 
 Assemble in this order, global notes last:
 
-1. **CONTEXT** — one line: what this shot is, where it sits in the scene. (Not a hook. A continuation.)
-2. **PRIMARY ACTION** — what happens / what's in frame, in plain visual terms. **State scale relationships explicitly when scale matters** — the model defaults to wrong proportions if you don't. "Limestone blocks" alone renders person-height boulders and a toy-looking pyramid; instead write the relationship: "limestone blocks roughly waist-to-chest height, the pyramid a monumental structure rising hundreds of feet, human workers tiny against it." Whenever a shot depends on bigness, smallness, or proportion, name the relationship between the elements — don't assume the model infers it.
-3. **CAMERA** — the move from the shot row, matched to the beat's mood (see encyclopedia). State stillness explicitly if locked.
-4. **STATE** — the State Schedule values as present facts.
-5. **STATIC-LOCK** — if flagged, the positive fixed-state clause.
-6. **GLOBAL RENDER NOTES (last):** the Look (grade, lens/film-stock character), the lighting state, and the reference bindings (`[Image#] = ...`). These go at the end because Seedance weights closing notes most for look and camera.
+1. **SUBJECT DEFINITIONS (first):** the Define-as-label bindings for every attached reference (see binding grammar above). These go FIRST — precise references are weighted by early placement, and every later mention depends on the labels existing.
+2. **CONTEXT** — one line: what this shot is, where it sits in the scene — and if the previous shot's row specifies a cut-in for this shot, CONTEXT opens by ANSWERING it ("From the overseer's elevated point of view: the crater below..."; "The turn completes: she now faces the door..."). Honor the scene's Space line: geography and screen direction here must match every other shot in the scene. (Not a hook. A continuation.)
+3. **PRIMARY ACTION** — the shot's primary motion, phrased as a start→end arc with a real verb: what moves, how, and where it ends up. If Primary = SUBJECT, this is the character/object action; if Primary = CAMERA, this states what the developing frame reveals while characters hold micro-performance. This section may never describe a motionless tableau — if the row gives you no delta, that's a gap, not a compile. The action ENDS at the row's cut-out state, written explicitly as the final sentence ("his gaze locks off-frame, down and left, toward the unseen crater"; "she begins to turn"; "the goat exits frame right") — this is the half of the edit this generation owns; the next shot's CONTEXT answers it. **State scale relationships explicitly when scale matters** — the model defaults to wrong proportions if you don't. "Limestone blocks" alone renders person-height boulders and a toy-looking pyramid; instead write the relationship: "limestone blocks roughly waist-to-chest height, the pyramid a monumental structure rising hundreds of feet, human workers tiny against it." Whenever a shot depends on bigness, smallness, or proportion, name the relationship between the elements — don't assume the model infers it.
+4. **PERFORMANCE** — explicit direction for every character in frame (by label): the scripted action if a character is the primary motion, written micro-performance (breath, gaze, small gesture) otherwise. Never omitted when a character is on screen; never replaced by a lock.
+5. **CAMERA** — the move from the shot row, matched to the beat's mood (see encyclopedia). State stillness explicitly if locked — allowed only when the subject carries the primary motion.
+6. **STATE** — the State Schedule values as present facts.
+7. **STATIC-LOCK** — if flagged, the positive fixed-state clause naming its specific rigid target (never "subject unchanged").
+8. **GLOBAL RENDER NOTES:** the Look (grade, lens/film-stock character) and the lighting state. These go at the end because Seedance weights closing notes most for look and camera. (Reference definitions are NOT here — they moved to the top.)
+9. **CONSTRAINT TAIL (very last line):** `Keep it subtitle-free; avoid generating any text or subtitles. Do not generate watermarks or logos.` Mandatory on every prompt — Seedance generates text natively and will occasionally burn unrequested subtitles or a platform watermark into the frame; this is the vendor's own suppression phrasing. This is the ONE sanctioned use of negative phrasing (see the positive-phrasing rule's scope note).
 
-For a multi-shot group: `Shot 1: [context/action/camera] … Shot 2: …` then ONE shared GLOBAL RENDER NOTES block at the end covering all shots.
+**No second-marks anywhere in the prompt.** Seedance's support for precise in-prompt timing ("0–3 seconds", "over 9s") is officially unstable and can produce abnormal generations. Total duration is an API parameter; pace _within_ the shot is controlled with words (slow, gradual, unhurried, brisk) and with the order of described events. Sequence beats by order ("begins as a slow dolly-in, then eases into a gentle pan right"), never by timestamps.
+
+For a multi-shot group: one shared SUBJECT DEFINITIONS block, then `Shot 1: [context/action/camera] … Shot 2: …` (event order, no timestamps), then ONE shared GLOBAL RENDER NOTES block + constraint tail at the end covering all shots.
 
 ---
 
@@ -127,24 +166,69 @@ Every compile produces ONE structured object, not free text. This makes the resu
 {
   "status": "ok" | "gap",
   "shot_id": "14",
-  "render_prompt": "CONTEXT: ... PRIMARY ACTION: ... CAMERA: ... STATE: ... [STATIC-LOCK: ...] GLOBAL RENDER NOTES: ... [Image1] = ... [Image2] = ...",
+  "render_prompt": "SUBJECT DEFINITIONS: Define ... in [Image1] (facial features) and [Image2] (styling) as **hero**. Define ... in [Image3] as **the site**. CONTEXT: ... PRIMARY ACTION: ... PERFORMANCE: ... CAMERA: ... STATE: ... [STATIC-LOCK: ...] GLOBAL RENDER NOTES: ... CONSTRAINT TAIL: Keep it subtitle-free; avoid generating any text or subtitles. Do not generate watermarks or logos.",
   "duration_seconds": 8,
+  "resolution": "1080p",
   "references": [
     {"slot": "Image1", "handle": "@hero_charsheet", "controls": "identity and wardrobe"},
     {"slot": "Image2", "handle": "@site_plate", "controls": "environment, architecture, composition"}
   ],
+  "checks": {
+    "duration_in_range": true,
+    "reference_count_ok": true,
+    "all_assets_onscreen": true,
+    "every_reference_has_controls": true,
+    "subjects_defined_first": true,
+    "labels_consistent": true,
+    "global_notes_last": true,
+    "constraint_tail_present": true,
+    "no_second_marks": true,
+    "positive_lock_only": true,
+    "primary_motion_present": true,
+    "character_performance_present": true,
+    "cut_handoff_compiled": true,
+    "single_lighting_state": true,
+    "arc_entities_bound": true,
+    "ambient_motion_present_if_organic": true,
+    "no_invented_values": true
+  },
   "gaps": []
 }
 ```
 
 - `render_prompt` is the assembled prompt in the section order below — this is the text shown to the user for approval/edit before any render.
+- `resolution` is the render tier as a STRUCTURED FIELD ONLY — the app passes it (with quality and aspect ratio) as parameters on the generateShot API call. It must never appear as words inside `render_prompt`: the model ignores "1080p" in prompt text the same way it ignores f-stops and ISO. Tier policy: the cheap tier (e.g. 480p) is allowed for preview passes; the shot's APPROVED/final render is always the top tier (e.g. 1080p). Never mark a preview-tier render as final — a 480p clip in the edit is a quality bug.
 - `references` maps each `[Image#]` slot to its `@material` handle and the attribute it controls (the binding grammar, made explicit).
+- `checks` is the assertion result — each is a hard rule from this recipe, self-verified before emitting. If any check is false, fix the prompt before emitting (or emit a gap if it can't be fixed from the Bible).
 - On a missing/ambiguous/over-budget input, emit `status: "gap"` with `render_prompt: null` and the `gaps` array naming each problem, e.g.:
   - `"Shot 14: no State Schedule lighting value for this beat — needs a lighting state."`
   - `"Shot 9: references @ship but no approved image is bound to that handle."`
   - `"Shot 12: 6 distinct assets named, exceeds the focused-reference budget — scene likely too crowded; confirm which are essential."`
+  - `"Shot 7: no primary motion — the row is a static tableau (subject has no action, camera locked); it needs a delta before it can render."`
+  - `"Shot 14: lighting written as a transition (Golden Hour → dusk) — pick ONE state for this row; time passes between shots."`
+  - `"Shot 22: the arc lifts the ship but @ship_object_ref is not in materials — bind it or the ship renders invented."`
 
 A gap is a success — it caught an incompleteness cheaply, before a video generation. The gap goes back to the showrunner, which fixes the Bible (with full story context) and recompiles.
+
+**The `checks` are the recipe's rules as assertions** — verify each before emitting, and they are re-run on any user-edited prompt:
+
+- `duration_in_range`: 4–15s (and group total ≤15s if bundled).
+- `reference_count_ok`: ≤9 images attached.
+- `all_assets_onscreen`: every attached asset actually appears in the shot.
+- `every_reference_has_controls`: each reference's definition states what it governs (facial features / styling / environment / object form).
+- `subjects_defined_first`: the prompt opens with Define-as-label bindings for every attached reference; character headshots occupy the earliest slots.
+- `labels_consistent`: every mention of a defined subject uses its exact label; no unbound "the man"/"she" where a label exists.
+- `global_notes_last`: the Look/grade/lighting block is at the end (definitions are at the top, not here).
+- `constraint_tail_present`: the prompt ends with the subtitle/watermark/logo suppression tail.
+- `no_second_marks`: no timestamps or second-counts anywhere in the prompt ("over 9s", "0–3s" fail); pace is expressed in words and event order only.
+- `positive_lock_only`: any static-lock uses positive fixed-state phrasing (no "no/not/don't/never") AND names its specific rigid target — the words "subject unchanged" fail this check. SCOPE: this rule governs content/state/lock phrasing only; the constraint tail is the single sanctioned negative block (vendor's own artifact-suppression phrasing) and is exempt.
+- `primary_motion_present`: the prompt has exactly one primary motion source (subject action with a start→end verb, or a camera move). Ambient motion alone fails; locked camera + actionless subject fails and becomes a gap.
+- `character_performance_present`: every character on screen has explicit performance direction (scripted action or written micro-performance); a character with no verb fails.
+- `cut_handoff_compiled`: the prompt's action ends at the row's cut-out state, and (if the previous row specified a cut-in for this shot) CONTEXT opens by answering it. A "rest" cut-out passes but is noted; a missing cut-out fails.
+- `single_lighting_state`: the prompt carries exactly one canonical lighting state — any in-shot lighting transition fails and becomes a gap ("time passes between shots").
+- `arc_entities_bound`: every character, hero prop, and location named in the action has a reference bound in SUBJECT DEFINITIONS (or is explicitly background-tier per the Bible). An arc that moves the ship with no ship reference attached fails.
+- `ambient_motion_present_if_organic`: if the environment has organic/atmospheric elements (and the subject isn't a deliberately-frozen tableau), ambient-life motion is named.
+- `no_invented_values`: every stateful claim traces to the Bible or shot row.
 
 ---
 
@@ -163,64 +247,65 @@ The following are reusable craft tables. Use them to phrase a camera move, a lig
 A camera instruction has four parts: **shot size, angle, lens character, and movement.** The shot row gives you the move and usually the size; phrase all four the way the model actually parses them. The rules below are Seedance-specific and matter more than the vocabulary:
 
 **The five phrasing rules (these prevent the most common failures):**
-1. **One primary camera move per shot.** Stacking moves ("push in, then pan, then orbit") produces jitter and drift. If you need a compound move, sequence it as beats: "Begins as a slow dolly-in; for the final 2 seconds, eases into a gentle pan right." Sequence, don't jam.
-2. **Use rhythmic, plain words — NOT technical specs.** "slow, smooth, steady, gradual, gentle, drifting" all work. "24fps, f/2.8, ISO 800, 85mm" is **ignored** by the model — it's prompt decoration that does nothing. Describe the camera the way you'd tell an operator the feel, not the way you'd set a camera body.
+
+1. **One primary camera move per shot.** Stacking moves ("push in, then pan, then orbit") produces jitter and drift. If you need a compound move, sequence it as beats in event order, never with timestamps: "Begins as a slow dolly-in, then eases into a gentle pan right for the closing moment." Sequence, don't jam.
+2. **Use rhythmic, plain words — NOT technical specs.** "slow, smooth, steady, gradual, gentle, drifting" all work. "24fps, f/2.8, ISO 800, 85mm" is **ignored** by the model — it's prompt decoration that does nothing. The same goes for output specs: "1080p," "4K," quality tiers, and aspect ratios in prompt text are dead words — those are **API parameters** the app passes on the generateShot call (from the render package's structured fields), never prompt content. Describe the camera the way you'd tell an operator the feel, not the way you'd set a camera body.
 3. **Separate camera motion from subject motion — only one thing moves fast at a time.** "The dancer spins; the camera holds a fixed frame" works. "Camera spins around a spinning dancer" produces chaos. If the subject is the action, lock or slow the camera; if the camera is the action, calm the subject.
 4. **"Fast" is the single most quality-degrading word.** Fast camera + fast cuts + busy scene almost guarantees artifacts. Default to slow/medium; reserve speed for a deliberate, isolated moment.
-5. **A reference video beats text for an exact camera move.** Text is best for *spatial* decisions (framing, subject, look); if you need a precise camera trajectory or pacing, a short stabilized reference clip (`@Video1 for camera movement`) carries it better than any words. (If the reference is shaky, the model copies the shake.)
+5. **A reference video beats text for an exact camera move.** Text is best for _spatial_ decisions (framing, subject, look); if you need a precise camera trajectory or pacing, a short stabilized reference clip (`@Video1 for camera movement`) carries it better than any words. (If the reference is shaky, the model copies the shake.)
 
 **Shot size** (state it — the model defaults vaguely otherwise): extreme wide / wide / full / medium-wide / medium / medium close-up / close-up / extreme close-up. Match size to intent: wide for scale and place, medium for behavior and interaction, close for emotion. Name it explicitly ("medium close-up on his face") rather than implying it.
 
 **Camera angle** (state when it carries meaning): eye-level (neutral), low angle (subject looms, power/scale), high angle (subject diminished, vulnerability), overhead/top-down (god's-eye, layout), over-the-shoulder (spatial relationship in a two-person beat), Dutch/tilted (unease). A flat eye-level default is fine for most shots; use a non-neutral angle only when the beat's meaning wants it.
 
-**Lens character** comes from the Bible's Look (e.g. "35mm fine grain, subtle anamorphic oval bokeh") and is stated identically every shot — it is NOT a per-shot choice. Depth-of-field, however, *can* vary by shot intent: "shallow focus, background soft" to isolate a subject in an emotional beat; "deep focus, everything sharp" for an establishing wide. Phrase it as the feel ("shallow focus, soft background"), not as an f-number.
+**Lens character** comes from the Bible's Look (e.g. "35mm fine grain, subtle anamorphic oval bokeh") and is stated identically every shot — it is NOT a per-shot choice. Depth-of-field, however, _can_ vary by shot intent: "shallow focus, background soft" to isolate a subject in an emotional beat; "deep focus, everything sharp" for an establishing wide. Phrase it as the feel ("shallow focus, soft background"), not as an f-number.
 
-**Putting it together — a camera line reads:** [shot size] + [angle if non-neutral] + [one movement, phrased rhythmically] + [focus feel]. E.g. *"Medium close-up, slight low angle, slow dolly-in over the shot, shallow focus with a soft background."* One size, one angle, one move, one focus note — clean and obeyed.
+**Putting it together — a camera line reads:** [shot size] + [angle if non-neutral] + [one movement, phrased rhythmically] + [focus feel]. E.g. _"Medium close-up, slight low angle, slow dolly-in over the shot, shallow focus with a soft background."_ One size, one angle, one move, one focus note — clean and obeyed.
 
 ## Camera Movement Encyclopedia (match to the beat's mood)
 
-| Movement | When it fits a beat | Seedance phrasing |
-|---|---|---|
-| **Dolly Forward / Push-In** | rising tension, growing intimacy, focus | "Camera dollies forward at constant slow speed, subject centered, sharp focus maintained, no focus breathing." |
-| **Dolly Back / Pull-Out** | reveal, release, isolation, context | "Camera pulls back steadily, subject anchored in frame, background gradually revealed." |
-| **Truck Left/Right** | lateral reveal, following without reframing | "Camera trucks [left/right] smoothly, subject holds frame position, parallax: background moves slower than foreground." |
-| **Pan / Tilt** | survey a space, reveal scale up/down | "Camera [pans/tilts] smoothly with eased start and stop, no jerk, ending on [subject]." |
-| **Handheld** | urgency, documentary realism, unease | "Handheld micro-vibration, subtle breathing motion, not locked-off; human imperfection." |
-| **Steadicam / Gimbal Follow** | flowing, controlled motion with a moving subject | "Gimbal-smooth follow at constant distance, liquid stabilization, subtle breathing only." |
-| **Tracking / Side Follow** | subject moving through environment | "Camera tracks subject from the side at matched speed, environment reveals progressively via parallax." |
-| **Crane Up / Down** | establish scale; descend to intimacy | "Camera [rises/descends] smoothly, [tilt to keep subject in frame], landscape revealed on rise." |
-| **Orbit / 360** | study a subject, hypnotic emphasis | "Camera orbits the subject at constant distance, subject frame-centered, background revealed through rotation." |
-| **Rack Focus** | shift attention between planes | "Focus racks from [foreground] to [background] smoothly; the other plane softens during the shift." |
-| **Dutch Angle** | unease, psychological imbalance | "Frame tilted [15–25]° and held throughout; diagonal horizon; tension without explicit threat." |
-| **Lock-Off / Static** | calm, observation, safety — and drift-avoidance | "Camera locked, zero movement; subject moves within a still frame; observational stillness." |
+| Movement                      | When it fits a beat                              | Seedance phrasing                                                                                                       |
+| ----------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| **Dolly Forward / Push-In**   | rising tension, growing intimacy, focus          | "Camera dollies forward at constant slow speed, subject centered, sharp focus maintained, no focus breathing."          |
+| **Dolly Back / Pull-Out**     | reveal, release, isolation, context              | "Camera pulls back steadily, subject anchored in frame, background gradually revealed."                                 |
+| **Truck Left/Right**          | lateral reveal, following without reframing      | "Camera trucks [left/right] smoothly, subject holds frame position, parallax: background moves slower than foreground." |
+| **Pan / Tilt**                | survey a space, reveal scale up/down             | "Camera [pans/tilts] smoothly with eased start and stop, no jerk, ending on [subject]."                                 |
+| **Handheld**                  | urgency, documentary realism, unease             | "Handheld micro-vibration, subtle breathing motion, not locked-off; human imperfection."                                |
+| **Steadicam / Gimbal Follow** | flowing, controlled motion with a moving subject | "Gimbal-smooth follow at constant distance, liquid stabilization, subtle breathing only."                               |
+| **Tracking / Side Follow**    | subject moving through environment               | "Camera tracks subject from the side at matched speed, environment reveals progressively via parallax."                 |
+| **Crane Up / Down**           | establish scale; descend to intimacy             | "Camera [rises/descends] smoothly, [tilt to keep subject in frame], landscape revealed on rise."                        |
+| **Orbit / 360**               | study a subject, hypnotic emphasis               | "Camera orbits the subject at constant distance, subject frame-centered, background revealed through rotation."         |
+| **Rack Focus**                | shift attention between planes                   | "Focus racks from [foreground] to [background] smoothly; the other plane softens during the shift."                     |
+| **Dutch Angle**               | unease, psychological imbalance                  | "Frame tilted [15–25]° and held throughout; diagonal horizon; tension without explicit threat."                         |
+| **Lock-Off / Static**         | calm, observation, safety — and drift-avoidance  | "Camera locked, zero movement; subject moves within a still frame; observational stillness."                            |
 
 **Combine at most 1–2 moves per shot.** More than that reads as chaos and increases drift.
 
 ## Lighting Library (the State Schedule names which; this is how to phrase it)
 
-| State | Mood | Phrasing (color temp + character) |
-|---|---|---|
-| **Three-Point (neutral)** | controlled, clean | "Warm key at 45°, soft fill at ~1/3 key, gentle rim; soft-edged shadows." |
-| **Chiaroscuro / Low-Key** | mystery, tension | "Single hard key, minimal fill, most of frame in shadow, crushed blacks; noir contrast." |
-| **Silhouette / Backlit** | mystery, separation | "Subject backlit against a bright source, rendered as a shape, rim defines the outline." |
-| **Golden Hour** | warmth, nostalgia, beauty | "Warm ~3000–3200K low-angle light, atmospheric haze, warm-spill soft shadows." |
-| **Moonlight / Cool Night** | isolation, eerie calm | "Cool ~6500K directional light, blue-tinted shadows, low intensity." |
-| **Harsh Midday** | exposure, heat, relentlessness | "Hard ~5500K overhead sun, short hard-edged shadows, high contrast, heat shimmer." |
-| **Practical / Firelight** | intimacy, primal, danger | "Warm ~1800–2000K flickering source, large dancing soft shadows." |
-| **Soft Overcast** | calm, clarity, vulnerability | "Diffuse omnidirectional ~5500K light, soft-edged shadows, even illumination." |
-| **Volumetric / God Rays** | grandeur, otherworldly | "Directional light through particle-filled air, visible beams, dust motes in shafts." |
+| State                      | Mood                           | Phrasing (color temp + character)                                                        |
+| -------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------- |
+| **Three-Point (neutral)**  | controlled, clean              | "Warm key at 45°, soft fill at ~1/3 key, gentle rim; soft-edged shadows."                |
+| **Chiaroscuro / Low-Key**  | mystery, tension               | "Single hard key, minimal fill, most of frame in shadow, crushed blacks; noir contrast." |
+| **Silhouette / Backlit**   | mystery, separation            | "Subject backlit against a bright source, rendered as a shape, rim defines the outline." |
+| **Golden Hour**            | warmth, nostalgia, beauty      | "Warm ~3000–3200K low-angle light, atmospheric haze, warm-spill soft shadows."           |
+| **Moonlight / Cool Night** | isolation, eerie calm          | "Cool ~6500K directional light, blue-tinted shadows, low intensity."                     |
+| **Harsh Midday**           | exposure, heat, relentlessness | "Hard ~5500K overhead sun, short hard-edged shadows, high contrast, heat shimmer."       |
+| **Practical / Firelight**  | intimacy, primal, danger       | "Warm ~1800–2000K flickering source, large dancing soft shadows."                        |
+| **Soft Overcast**          | calm, clarity, vulnerability   | "Diffuse omnidirectional ~5500K light, soft-edged shadows, even illumination."           |
+| **Volumetric / God Rays**  | grandeur, otherworldly         | "Directional light through particle-filled air, visible beams, dust motes in shafts."    |
 
 ## Color Grade (the Bible's Look picks ONE — apply it, don't choose per shot)
 
 The Bible already specifies the film's grade. Phrase it consistently every shot. Common grades, for reference only:
 
-| Grade | Character | Phrasing |
-|---|---|---|
-| **Golden / Warm Nostalgia** | warm amber, warm shadows | "Color temperature ~3200K amber-gold; warm orange-brown shadows (not blue); nostalgic warm glow." |
-| **Teal & Orange** | cyan shadows, orange highlights | "Shadows cyan-teal, highlights orange-gold, midtones neutral; modern cinema palette." |
-| **Cool / Cold Isolation** | blue, desaturated | "~6500K, blue-cyan shadows, slight warmth in highlights, mild desaturation." |
-| **Desaturated + Accent** | muted world, one saturated color | "Overall saturation reduced; one accent color [name] held at full saturation." |
-| **Bleach Bypass** | gritty, lifted blacks, grain | "Blacks lifted to dark grey, compressed contrast, visible grain, analog feel." |
+| Grade                       | Character                        | Phrasing                                                                                          |
+| --------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| **Golden / Warm Nostalgia** | warm amber, warm shadows         | "Color temperature ~3200K amber-gold; warm orange-brown shadows (not blue); nostalgic warm glow." |
+| **Teal & Orange**           | cyan shadows, orange highlights  | "Shadows cyan-teal, highlights orange-gold, midtones neutral; modern cinema palette."             |
+| **Cool / Cold Isolation**   | blue, desaturated                | "~6500K, blue-cyan shadows, slight warmth in highlights, mild desaturation."                      |
+| **Desaturated + Accent**    | muted world, one saturated color | "Overall saturation reduced; one accent color [name] held at full saturation."                    |
+| **Bleach Bypass**           | gritty, lifted blacks, grain     | "Blacks lifted to dark grey, compressed contrast, visible grain, analog feel."                    |
 
 State the film-stock/lens character the Bible specifies (e.g. "35mm fine grain, subtle anamorphic oval bokeh, warm halation") in the same global block, every shot, so the whole film coheres.
 
@@ -233,11 +318,19 @@ In reference mode, synchronized ambient audio is on by default — acceptable fo
 ## Quick checklist before emitting a prompt (or a gap)
 
 - Did every value come from the Bible or the shot row? (If not → gap.)
-- Are only the on-screen assets attached, each with an explicit extract-this binding?
+- **Is there exactly ONE primary motion source — subject action with a real verb, or a camera move?** (Ambient-only or locked-camera-plus-static-subject → gap.)
+- **Does every character on screen have performance direction** (scripted action or micro-performance)? Is no character static-locked?
+- Are only the on-screen assets attached, each opened with a Define-as-label binding stating what it governs — character headshots in the earliest slots — and is every later mention using the exact label?
+- Is the prompt free of timestamps/second-counts (pace in words and event order only)?
+- Does the prompt end with the subtitle/watermark/logo constraint tail?
 - Is the grade the Bible's single Look, not a per-shot choice?
 - Is the lighting the shot's State Schedule state?
-- If anything is fixed-within-shot, is the static-lock clause present in positive phrasing?
+- If anything rigid is fixed-within-shot, does the static-lock clause name that specific thing in positive phrasing (never "subject unchanged")?
 - One shot per generation unless the strict bundling exception applies (shared location/lighting, short low-motion beats, ≤2–3 shots, ≤15s)?
 - Is a motion-rich shot given its own full generation (not starved by sharing)?
 - Are scale relationships stated where proportion matters?
-- No per-shot "hook"; camera move matched to the beat's mood (or locked)?
+- Does the action end at the row's cut-out state, and does CONTEXT answer the previous row's cut-in? Does the framing honor the row's Scale and the scene's Space line?
+- Exactly one lighting state in the prompt (no in-shot transitions)?
+- Is every entity named in the action bound in SUBJECT DEFINITIONS (hero props included) or explicitly background-tier?
+- Is the `resolution` field the final tier for an approved shot (preview tier only for explicitly-labeled preview passes) — and is the prompt text free of resolution/quality/aspect words (those are API parameters, not prompt content)?
+- No per-shot "hook"; camera move matched to the beat's mood (or locked only when the subject carries the motion)?
