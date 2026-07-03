@@ -11,4 +11,4 @@ export const storyTools = {
 };
 
 export { generateAssetImages } from "./generate-asset-references";
-export { generateShotWithFallback, renderAndUploadShot, SEEDANCE_MODEL } from "./compile-shot";
+export { generateShotWithFallback, renderAndUploadShot } from "./compile-shot";
