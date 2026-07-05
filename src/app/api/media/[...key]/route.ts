@@ -27,6 +27,9 @@ export async function GET(
       "Cache-Control",
       `public, max-age=${maxAge}, s-maxage=${maxAge}`
     );
+    // Public + unguessable key (see comment above) — safe to allow any origin
+    // to fetch() it, which browser-side callers like Remotion's prefetch() need.
+    res.headers.set("Access-Control-Allow-Origin", "*");
     return res;
   } catch {
     return new NextResponse("Not found", { status: 404 });
