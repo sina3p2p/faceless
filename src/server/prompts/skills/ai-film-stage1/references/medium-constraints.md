@@ -8,7 +8,7 @@ The story decisions in Stage 1 should be shaped by how AI video generation actua
 - Striking single images and surreal/impossible visuals.
 - Slow, deliberate cinematic camera movement.
 - Physical comedy and big visual gags (these read in images far better than wordplay).
-- Big landscapes, skies, golden-hour light, warm stone, water.
+- Big landscapes, skies, water, and strongly-characterized light of any kind (golden hour, hard noon, neon night, firelight, fog).
 - Silhouettes and scale contrast (tiny figure in vast space).
 
 ## Steer AWAY (current failure modes)
@@ -22,16 +22,16 @@ The story decisions in Stage 1 should be shaped by how AI video generation actua
 
 ## The two structural consequences (enforce in Steps 6–7)
 
-- **Tiny cast.** Each recurring named character = a reference sheet + a drift risk. 2–3 hero faces is the target; everyone else is disposable background.
+- **Tiny cast.** Each recurring named character = a reference image + a drift risk. 2–3 hero faces is the target; everyone else is disposable background.
 - **Few, consolidated locations.** Each distinct location = a reference plate. Treat the film as one master location with zones where possible; keep things offscreen when you can.
 
 ## Character drift is the #1 failure mode
 
 Across essentially all current models, characters subtly change face/hair/proportions between clips because generators recreate each frame rather than remembering an identity. Defeat it BEFORE animation:
 
-- Build a **character reference sheet** per hero (multiple angles: front, profiles, three-quarter; a few medium and full-body), under neutral consistent lighting. Diminishing returns past ~12–15 images; too many slightly-varying images can _reduce_ consistency.
+- Bind **ONE approved turnaround character sheet** per hero (the charsheet spec below) — one image containing the character's views, and only that image. Never bind multiple separate images of one character: separately-bound angles or slightly-varying images of the same person are read as different people and _reduce_ consistency (the twin bug lives in multiple bound images, so the sheet is always a single image). One image per character is absolute (see below).
 - Write the Stage 1 character spec with **fixed anchor features** (the 2–3 things the model must never change) and **unchanging wardrobe** + one instantly-readable detail.
-- **Always animate image-to-video, not text-to-video** when possible: lock composition as a still keyframe, then animate it. Far more control than letting the model invent everything from text.
+- **Anchor generation to approved images, never bare text**: character/location references on every shot, and — in this pipeline — the scene grid as the composition anchor (sequence reference for groups, panel citation for solos; see `grid-storyboards.md`). This pipeline deliberately does NOT use per-shot first-frame/keyframe animation; composition guidance comes from the approved grid, not from generating a still per shot.
 
 ## Expanding a locked spec into a reference-image prompt (Step 16)
 
@@ -40,9 +40,14 @@ A character/location spec is written for a _human_ to understand the design ("fr
 1. **Subject + anchor features** — the spec's 2–3 never-change details stated concretely (silhouette, the one instantly-readable detail, fixed wardrobe). These are the identity the reference must lock.
 2. **The Look, pasted in** — the SAME global block every shot uses: palette, lens/film-stock character, color grade. The reference image must match the film's grade or it will fight every shot it anchors. This is why the Look must be locked (Step 8) before any asset is generated.
 3. **Framing matched to the asset's KIND** — the form differs, the purpose (identity capture, not drama) never does. A moody hero-shot makes a beautiful image and a bad reference — the lighting bakes in and fights every shot it anchors:
-   - _Characters_ → a **headshot + full-body PAIR**, both bound to the one handle. (1) Headshot: _"head-and-shoulders portrait of [subject + anchor features], face fully visible, neutral expression, flat even studio lighting, no props, no scenery."_ (2) Full body: _"full body, front view, standing in a neutral pose, arms relaxed, fixed wardrobe only, flat even studio lighting, no scenery, no props."_ Background for both: a single FLAT, SOLID, NEUTRAL MID-GREY field with NO color tint, no gradient, no texture, no borders or panels. Fold in the Look as palette/grade/film-stock ONLY — never as setting or scene lighting. If a candidate has an environment, scene lighting, a tinted/gradient background, or a hand-prop, it is not a clean reference — regenerate, don't approve. **Never generate multi-view/turnaround sheets** (three views in one image) and never bind multiple angles of the same character as separate references: Seedance identifies the views as different people, which _worsens_ ID drift and invites duplicate-character artifacts. Official guidance: headshot + full-body is sufficient; the dedicated headshot exists because the face needs its own high-weight reference (in a full-body image the face area is too small and gets under-weighted, causing face drift mid-video).
+   - _Characters_ → **the character sheet: exactly ONE image per character**, containing the SAME character in multiple views (a turnaround). One generation, one approval, one handle, one slot. Skeleton: _"character reference sheet (turnaround) of [subject + anchor features]: the SAME character shown three times side by side — front view, side profile, three-quarter view — standing in a neutral pose, BOTH HANDS EMPTY AND OPEN, arms hanging relaxed at the sides, identical fixed wardrobe in every view, neutral expression, full body visible, flat even studio lighting, plain empty studio."_ Say "the SAME character" explicitly and fix the wardrobe identical across views — the whole value of the sheet is one identity from several angles; if the views drift from each other, regenerate. Phrase the empty hands positively — "no props" alone under-weights and held objects slip through; a recurring story object gets its own object reference instead. Background: a single FLAT, SOLID, NEUTRAL MID-GREY field with NO color tint, no gradient, no texture, no borders or panels between views. Fold in the Look as palette/grade/film-stock ONLY — never as setting or scene lighting.
+
+   **Approval checklist.** REJECT a candidate, don't approve "close enough," if ANY of: the views do not read as the SAME person (face, build, or wardrobe differing between views — the sheet's cardinal failure); anything held in any hand, or a bag/strap/tool worn that isn't locked wardrobe; an environment or scene lighting instead of flat studio; a tinted or gradient background (a color cast bleeds into skin tone at render); a non-neutral pose or expression; the face obscured or unclear in the front view. Stateful wardrobe elements (a chest panel that flickers, a garment that degrades) are referenced at their NEUTRAL state — the State Schedule animates them, the sheet must not.
+
+   **One sheet per character is ABSOLUTE.** Never split a character across multiple images (no headshot + full-body sets, no per-angle images bound separately) and never propose or offer a second character image for any reason — the turnaround sheet is the character's single, complete reference. If identity problems are ever observed in renders, report the observation to the user and stop — any policy change is the user's to make.
    - _Locations_ → a **plate**: a clean establishing wide of the space. A location's identity IS its environment, so no plain background here — but ONE lighting state only (pick the most neutral/canonical; the State Schedule re-lights it per shot), and composed as a _working reference, not a money shot_. If the plate is being composed to BE one of the film's spectacular images, stop: that's a keyframe leaking in. The spectacular shot gets generated at shot time, anchored TO the plate.
    - _Vehicles / hero props_ → an **object reference**: the thing itself, clean profile or three-quarter, minimal context. Plate-style scenery around it dilutes the anchor.
+
 4. **What to exclude** — no dramatic action, no other characters, no scene-specific lighting, no readable text. The reference is a clean identity anchor; story happens later, in shots.
 5. **Medium-safe construction** — avoid baking in the known failure modes (complex hands mid-gesture, etc.); present the asset in its most stable, legible form.
 
@@ -80,6 +85,10 @@ The exact opposite failure, from a real clip: a night-forest shot with two chara
 - **Characters are never locked:** identity comes from the reference-image binding; every character on screen gets written performance direction, minimum a micro-performance (breath, gaze, a small gesture). The model does not invent blocking.
   Static-lock and this rule are two sides of one principle: **lock rigid form, direct living motion.** The morphing pyramid came from too little lock; the frozen tableau came from too much.
 
+## Scene grid storyboards
+
+Moved to its own reference: see `references/grid-storyboards.md` for the grid prompt formula, layout geometry, failure catalog, approval protocol, and consumption grammar (Step 17).
+
 ## Render resolution (don't ship previews)
 
 Video models expose resolution tiers; the cheap tier (e.g. 480p) is for fast preview passes only. A clip approved into the edit must be re-rendered (or rendered first-time) at the top tier (e.g. 1080p), with any further upscale in post. A film assembled from 480p drafts reads as low quality no matter how good the prompts are. **Resolution, quality, and aspect ratio are API parameters owned by the app** — the render package carries them as structured fields, the app passes them on the generateShot call, and they never appear as words in the prompt (the model ignores them there). Make the tier an explicit field in every render package so it can't be silently defaulted down.
@@ -98,6 +107,6 @@ A clock the audience can't see does nothing for the image. Bind stakes to an on-
 When the user shares a clip that's "off":
 
 - Extract frames (e.g. `ffmpeg -i clip.mp4 -vf fps=1 frame_%02d.jpg`) and inspect the progression across the shot.
-- Decide whether the problem is **prompt wording** (add a lock or a state instruction) or **missing reference** (needs a Stage 2 `@material` plate/sheet). Many "the model did something weird" problems are really "we let it invent because we fed text, not a reference."
+- Decide whether the problem is **prompt wording** (add a lock or a state instruction) or **missing reference** (needs an `@material` reference image — charsheet image, plate, or object ref). Many "the model did something weird" problems are really "we let it invent because we fed text, not a reference."
 - Feed the lesson back into the Bible as a directive so it can't silently recur.
 - Sometimes a "bug" is beautiful (the morphing structure looked gorgeous). Offer to repurpose it as a deliberate special shot (a vision/dream/transformation beat) rather than forcing it into a normal continuous shot where it would break realism.

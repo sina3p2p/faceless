@@ -546,6 +546,7 @@ export const filmSessions = pgTable("film_sessions", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   status: filmSessionStatusEnum("status").notNull().default("in_progress"),
   title: text("title"),
+  seed: integer("seed"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

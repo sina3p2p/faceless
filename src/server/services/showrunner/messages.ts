@@ -1,5 +1,5 @@
 import type { ModelMessage } from "ai";
-import type { AssetRef, ClientMessage, ForkCall, ShotCompile, ShotResult } from "@/types/v2/story";
+import type { AssetRef, ClientMessage, ForkCall, SceneGrid, ShotCompile, ShotResult } from "@/types/v2/story";
 
 type DbRow = {
   messageId: string;
@@ -37,6 +37,7 @@ function getToolCalls(d: Record<string, unknown>): RawToolCall[] {
 export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
   const forkResults = new Map<string, { optionId?: string; value: string }>();
   const assetApprovals = new Map<string, string>();
+  const gridApprovals = new Map<string, string>();
   const shotApprovals = new Set<string>();
 
   for (const row of rows) {
@@ -46,6 +47,9 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
     } else if (row.role === "user" && row.type === "asset_approval") {
       const d = rowData(row);
       assetApprovals.set(d.toolCallId as string, d.approvedUrl as string);
+    } else if (row.role === "user" && row.type === "grid_approval") {
+      const d = rowData(row);
+      gridApprovals.set(d.toolCallId as string, d.approvedUrl as string);
     } else if (row.role === "user" && row.type === "shot_approval") {
       const d = rowData(row);
       shotApprovals.add(d.toolCallId as string);
@@ -54,7 +58,7 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
 
   const messages: ClientMessage[] = [];
   for (const row of rows) {
-    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval" || row.type === "shot_approval")) continue;
+    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval" || row.type === "grid_approval" || row.type === "shot_approval")) continue;
 
     const d = rowData(row);
     if (row.role === "user") {
@@ -63,6 +67,7 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
       const calls = getToolCalls(d);
       let fork: ForkCall | undefined;
       let assetRef: AssetRef | undefined;
+      let sceneGrid: SceneGrid | undefined;
       let shotResult: ShotResult | undefined;
       let shotCompile: ShotCompile | undefined;
 
@@ -85,6 +90,15 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
             assetKind: args.assetKind as AssetRef["assetKind"],
             images: (args.generatedImages ?? args.images) as string[] | undefined,
             approvedUrl: assetApprovals.get(tc.id),
+          };
+        } else if (tc.function.name === "generateSceneGrid") {
+          sceneGrid = {
+            toolCallId: tc.id,
+            loading: false,
+            sceneId: args.sceneId as string | number,
+            images: (args.generatedImages ?? args.images) as string[] | undefined,
+            aspectRatio: args.aspectRatio as SceneGrid["aspectRatio"],
+            approvedUrl: gridApprovals.get(tc.id),
           };
         } else if (tc.function.name === "compileShot") {
           const isPending = (args.pending as boolean | undefined) === true;
@@ -112,7 +126,7 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
         }
       }
 
-      messages.push({ id: row.messageId, role: "assistant", text: (d.text as string) ?? "", fork, assetRef, shotResult, shotCompile });
+      messages.push({ id: row.messageId, role: "assistant", text: (d.text as string) ?? "", fork, assetRef, sceneGrid, shotResult, shotCompile });
     }
   }
   return messages;
@@ -122,38 +136,44 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
   // Pre-collect all tool results so we can provide synthetic ones for unapproved calls.
   // This prevents AI_MissingToolResultsError when the LLM made multiple tool calls in one
   // turn but the user hasn't responded to all of them yet.
-  const collectedResults = new Map<string, string>(); // toolCallId → human-readable result text
+  const collectedResults = new Map<string, { text: string; imageUrl?: string }>();
 
   for (const row of rows) {
     if (row.role === "user" && row.type === "fork_result") {
       const d = rowData(row);
       const optionId = d.optionId as string | null;
       const value = d.value as string;
-      collectedResults.set(
-        d.toolCallId as string,
-        optionId
+      collectedResults.set(d.toolCallId as string, {
+        text: optionId
           ? `User selected option ${optionId}. Locked content: ${value}`
-          : `User provided a custom direction: ${value}`
-      );
+          : `User provided a custom direction: ${value}`,
+      });
     } else if (row.role === "user" && row.type === "asset_approval") {
       const d = rowData(row);
-      collectedResults.set(
-        d.toolCallId as string,
-        `User approved reference image for "${d.assetHandle as string}": ${d.approvedUrl as string}`
-      );
+      const approvedUrl = d.approvedUrl as string;
+      collectedResults.set(d.toolCallId as string, {
+        text: `User approved this reference image for "${d.assetHandle as string}": ${approvedUrl}`,
+        imageUrl: approvedUrl,
+      });
+    } else if (row.role === "user" && row.type === "grid_approval") {
+      const d = rowData(row);
+      const approvedUrl = d.approvedUrl as string;
+      collectedResults.set(d.toolCallId as string, {
+        text: `User approved this scene grid for scene ${d.sceneId as string | number}: ${approvedUrl}`,
+        imageUrl: approvedUrl,
+      });
     } else if (row.role === "user" && row.type === "shot_approval") {
       const d = rowData(row);
-      collectedResults.set(
-        d.toolCallId as string,
-        `Shot rendered and approved by user: ${d.videoUrl as string}. Proceed to the next shot.`
-      );
+      collectedResults.set(d.toolCallId as string, {
+        text: `Shot rendered and approved by user: ${d.videoUrl as string}. Proceed to the next shot.`,
+      });
     }
   }
 
   const msgs: ModelMessage[] = [];
 
   for (const row of rows) {
-    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval" || row.type === "shot_approval")) continue;
+    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval" || row.type === "grid_approval" || row.type === "shot_approval")) continue;
 
     const d = rowData(row);
 
@@ -194,9 +214,12 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
                 : { type: "text" as const, value: "(reference file content unavailable)" },
             };
           }
-          const resultText = collectedResults.get(tc.id) ?? (
+          const collected = collectedResults.get(tc.id);
+          const resultText = collected?.text ?? (
             tc.function.name === "generateAssetReferences"
               ? `Reference images have been generated for "${tc.function.arguments.assetHandle as string}". User has not yet approved one.`
+              : tc.function.name === "generateSceneGrid"
+              ? `A scene grid candidate has been generated for scene ${tc.function.arguments.sceneId as string | number}. User has not yet approved it.`
               : tc.function.name === "compileShot"
               ? tc.function.arguments.videoUrl
                 ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval to add to timeline.`
@@ -209,7 +232,15 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
             type: "tool-result" as const,
             toolCallId: tc.id,
             toolName: tc.function.name,
-            output: { type: "text" as const, value: resultText },
+            output: collected?.imageUrl
+              ? {
+                  type: "content" as const,
+                  value: [
+                    { type: "text" as const, text: resultText },
+                    { type: "image-url" as const, url: collected.imageUrl },
+                  ],
+                }
+              : { type: "text" as const, value: resultText },
           };
         });
         msgs.push({ role: "tool", content: resultParts });

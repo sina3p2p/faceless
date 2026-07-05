@@ -18,6 +18,7 @@ export const loadReference = tool({
       "deliverable-templates.md",
       "medium-constraints.md",
       "shot-compilation-recipe.md",
+      "grid-storyboards.md",
     ]).describe("Relative path within the skills folder, e.g. 'references/pipeline-steps.md'"),
   }),
   execute: async ({ file }: { file: string }) => {

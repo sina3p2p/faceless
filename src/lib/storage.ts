@@ -36,10 +36,10 @@ export function mediaUrl(keyOrUrl: string | null | undefined): string | null {
   if (!keyOrUrl) return null;
   if (/^https?:\/\//i.test(keyOrUrl)) return keyOrUrl;
   const key = keyOrUrl.replace(/^\/+/, "");
-  if (R2_PUBLIC_URL) {
-    const base = R2_PUBLIC_URL.replace(/\/$/, "");
-    return `${base}/${key}`;
-  }
+  // if (R2_PUBLIC_URL) {
+  //   const base = R2_PUBLIC_URL.replace(/\/$/, "");
+  //   return `${base}/${key}`;
+  // }
   const base = (typeof window !== "undefined" ? window.location.origin : APP.url).replace(/\/$/, "");
   return `${base}/api/media/${key}`;
 }

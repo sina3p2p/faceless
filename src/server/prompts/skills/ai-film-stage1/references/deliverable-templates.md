@@ -1,6 +1,6 @@
 # Deliverable Templates
 
-The two handoff artifacts Stage 1 produces, plus the prompt-assembly mechanism. Fill these from locked decisions only.
+The two TEXT documents of Stage 1's five-artifact handoff (Bible + shot list; the other three parts — approved reference images, scene grids, and the Scene Grid Registry — are produced at Steps 16–17), plus the prompt-assembly mechanism. Fill these from locked decisions only.
 
 ---
 
@@ -10,7 +10,7 @@ The two handoff artifacts Stage 1 produces, plus the prompt-assembly mechanism. 
 [FILM TITLE] — Visual & Tone Bible
 
 ### 1. The Look (inherited identically by every prompt)
-- Aspect ratio: [e.g. 2.39:1 anamorphic widescreen]
+- Aspect ratio: [a value the render API actually supports (check before locking, e.g. 16:9 / 21:9 / 9:16); applied as an API PARAMETER at render time — the ratio NEVER appears as prompt text (§3H); anamorphic LENS character, if wanted, is a Lens/stock entry, not a ratio]
 - Lens/stock: [grain, halation, flares, DoF behavior; warm/clinical]
 - Color grade (ONE, whole film): [name + temp + highlight/shadow bias + saturation;
   name the ONE accent color allowed to pop]
@@ -19,11 +19,19 @@ The two handoff artifacts Stage 1 produces, plus the prompt-assembly mechanism. 
 - Tone north-star: [one sentence]
 
 ### 2. Master @material list (assets Stage 2 builds)
-- Characters: [hero_charsheet (= headshot + full-body PAIR, one handle, two slots), ...] — never multi-view/turnaround sheets
+- Characters: [hero_charsheet (= the turnaround character sheet: exactly ONE image containing front/profile/three-quarter views of the SAME character, one slot), ...] — never multiple images per character
+- **Canonical definition lines** (one per asset, written here ONCE, pasted VERBATIM into every prompt's SUBJECT DEFINITIONS — never re-worded per shot):
+  - hero_charsheet: "Define the [2–3 stable features + anchor details] in [slot] (facial features, styling, wardrobe, build) as **[label]**."
+  - [location]_plate: "Define the [environment] in [slot] as **[label]**; it governs environment, architecture, and composition[, with the [structure] at its [state] version].
 - Locations: [site_plate (versions: ...), ...]
 - Voices: [hero_vo, ...]  (if using an external voice tool fed back as reference)
-- Style: [style_board]  (pasted into every prompt)
-- Background-tier (no sheet): [crowds, one-off figures]
+- Background-tier (no reference image): [crowds, one-off figures]
+
+§2 lists IMAGE-BOUND assets only — each entry must resolve to an approved image and a
+reference slot. The Look is TEXT (Bible §1, pasted into every prompt's global notes);
+it is not an @material, never occupies a slot, and never appears in this list. A
+"style_board" entry here is a category error: the compiler would try to bind an image
+that doesn't exist.
 
 ### 3. Standing directives (apply to ALL prompts automatically)
 - A — Primary motion: every shot has exactly ONE primary motion source — SUBJECT
@@ -70,7 +78,7 @@ SCENE [n] — [location] — [lighting state]
           flows across frame; which side the eyeline crosses]
 ```
 
-The Space line is what keeps geography consistent across the scene's rows (the ship cannot be at the crater in one shot and at the pyramid in the next) and keeps screen direction coherent (a movement that exits right enters the next frame moving right). When a beat spans two locations cutting against each other, that is TWO scenes — the intercut is expressed by alternating rows, not by blurring one scene across both spaces.
+The Space line is what keeps geography consistent across the scene's rows (a hero prop cannot sit in the kitchen in one shot and in the car in the next; a distant landmark stays on the same side of frame) and keeps screen direction coherent (a movement that exits right enters the next frame moving right). When a beat spans two locations cutting against each other, that is TWO scenes — the intercut is expressed by alternating rows, not by blurring one scene across both spaces.
 
 One row per shot. Columns:
 
@@ -94,16 +102,17 @@ One row per shot. Columns:
   Primary = SUBJ, the camera calms or locks; if Primary = CAM, the subject calms.
 - **Cut-out → Cut-in** how this shot hands off to the next — the edit written into
   the rows so it survives independent generation. Cut-out: the state the shot ends
-  in ("his gaze locks off-frame, down-left toward the crater"; "she starts to turn";
-  "goat exits frame right"). Cut-in: how the NEXT shot answers it ("open on his POV
-  of the crater"; "the turn completes"; "—" if a clean scene break). Named handoffs:
+  in ("her eyes lift to the doorway, off-frame left"; "he starts to turn"; "the car
+  exits frame right"). Cut-in: how the NEXT shot answers it ("open on the doorway:
+  it is empty"; "the turn completes — he now faces her"; "—" if a clean scene
+  break). Named handoffs:
   eyeline, cut-on-action, exit/enter (with direction), match, POV-answer, or "rest"
   (a deliberate held cut — allowed, but consecutive "rest" cuts are the slideshow
   failure, so a scene of them is a flag). The final shot's cut-out is "end".
 - **Light** exactly ONE canonical state per row — never a transition ("Golden Hour →
   dusk" inside a shot is a State Schedule violation and a morph trigger; if time must
   visibly pass, it passes BETWEEN two rows at two states).
-- **Dur** seconds, within the model's clip window.
+- **Dur** seconds — an ESTIMATE used for group-partition math and the runtime total; it never appears in a prompt (solos get exact duration via the API parameter; groups get the summed estimate and Seedance paces the internal cuts).
 - **Materials** every asset that APPEARS IN THE MOTION ARC must be listed — characters,
   plates (at which version), AND hero props/objects. If the arc says the ship streaks,
   lifts, or is exited, `ship_object_ref` is in this cell; an entity named in the arc
@@ -119,7 +128,7 @@ A finished video prompt = the renderer's template, with every section filled fro
 already-locked source. Nothing is improvised at prompt-time:
 
 - SUBJECT DEFINITIONS (first) ← the shot's @material list (Bible §2) resolved to
-  Define-as-label bindings: character headshot+full-body pairs in the earliest slots,
+  Define-as-label bindings: character references in the earliest slots,
   each definition stating what it governs; every later mention uses the label
 - OPENING/HOOK ← beat sheet (hook only if this is a marked peak shot)
 - CONTEXT ← the shot's visual + the fixed state from the schedule (Bible §4)
@@ -143,9 +152,9 @@ already-locked source. Nothing is improvised at prompt-time:
 [FILM] / SHOT 14 (IRONY REVEAL)
 
 [SUBJECT DEFINITIONS]
-Define the [2–3 anchor features of hero] in [Image1] (facial features, headshot)
-and [Image2] (styling and wardrobe, full body) as **hero**.
-Define the terrain and architecture in [Image3] as **the site**; it governs
+Define the [2–3 anchor features of hero] in [Image1] (facial features, styling,
+wardrobe, build) as **hero**.
+Define the terrain and architecture in [Image2] as **the site**; it governs
 environment, composition, and the [structure] at its FIXED [state] version.
 
 [CONTEXT]

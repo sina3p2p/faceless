@@ -11,7 +11,8 @@ interface FloatingPanelProps {
   icon?: React.ReactNode
   width?: number
   zIndex?: number
-  onClose: () => void
+  visible: boolean
+  setVisible: (visible: boolean) => void
   children: React.ReactNode
 }
 
@@ -35,7 +36,8 @@ export function FloatingPanel({
   icon,
   width = 300,
   zIndex = 30,
-  onClose,
+  visible,
+  setVisible,
   children,
 }: FloatingPanelProps) {
   const selfRef = useRef<HTMLDivElement>(null)
@@ -73,6 +75,8 @@ export function FloatingPanel({
     dragState.current = { startX: e.clientX, startY: e.clientY, originX: pos.x, originY: pos.y }
   }
 
+  if (!visible) return null;
+
   const header = (
     <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/8 select-none">
       <div className="flex items-center gap-2 text-white/70">
@@ -80,7 +84,7 @@ export function FloatingPanel({
         <span className="text-xs font-semibold">{title}</span>
       </div>
       <button
-        onClick={onClose}
+        onClick={() => setVisible(false)}
         className="w-6 h-6 flex items-center justify-center rounded-full text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-colors"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -92,7 +96,7 @@ export function FloatingPanel({
 
   if (isMobile) {
     return (
-      <Sheet open onOpenChange={(open) => !open && onClose()}>
+      <Sheet open={visible} onOpenChange={(open) => !open && setVisible(false)}>
         <SheetContent side="bottom" showCloseButton={false} className="glass-elevated border-white/14 rounded-t-2xl p-0">
           <SheetHeader className="p-0">
             <SheetTitle className="sr-only">{title}</SheetTitle>

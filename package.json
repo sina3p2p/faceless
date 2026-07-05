@@ -30,6 +30,7 @@
     "@remotion/lambda": "^4.0.481",
     "@remotion/media-utils": "^4.0.445",
     "@remotion/player": "^4.0.445",
+    "@remotion/preload": "^4.0.445",
     "@tailwindcss/typography": "^0.5.19",
     "@tanstack/react-query": "^5.100.9",
     "@xyflow/react": "^12.10.2",

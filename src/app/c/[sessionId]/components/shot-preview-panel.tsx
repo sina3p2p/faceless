@@ -31,7 +31,7 @@ export function ShotPreviewPanel({
     return (
       <div className="mt-1 space-y-2">
         <div className="rounded-xl overflow-hidden border border-white/10">
-          <video src={shotResult.videoUrl} controls className="w-full blur-sm transition-[filter] duration-700" onCanPlay={(e) => e.currentTarget.classList.remove('blur-sm')} />
+          <video src={shotResult.videoUrl} controls preload="metadata" className="w-full" />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {shotResult.approved ? (

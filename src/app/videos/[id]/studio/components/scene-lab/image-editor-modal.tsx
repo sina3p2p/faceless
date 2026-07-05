@@ -10,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useStudioContext } from "../../context/StudioContext";
+import { mediaUrl } from "@/lib/storage";
 
 // ── Types ──
 
@@ -366,9 +367,7 @@ export function ImageEditorModal({
 
     async function load() {
       try {
-        const res = await fetch(
-          `/api/proxy-image?url=${encodeURIComponent(currentImage)}`,
-        );
+        const res = await fetch(mediaUrl(currentImage));
         if (!res.ok || cancelled) return;
         const blob = await res.blob();
         if (cancelled) return;
@@ -851,11 +850,10 @@ export function ImageEditorModal({
           )}
           <button
             onClick={() => setShowHistory((h) => !h)}
-            className={`px-3 py-1.5 rounded-lg text-[12px] border transition-colors ${
-              showHistory
-                ? "text-white border-white/20 bg-white/5"
-                : "text-gray-500 border-white/10 hover:text-white"
-            }`}
+            className={`px-3 py-1.5 rounded-lg text-[12px] border transition-colors ${showHistory
+              ? "text-white border-white/20 bg-white/5"
+              : "text-gray-500 border-white/10 hover:text-white"
+              }`}
           >
             {showHistory ? "Hide history" : "Show history"}
           </button>
@@ -914,11 +912,10 @@ export function ImageEditorModal({
                       initCrop(opt.id);
                       setShowCropMenu(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-[13px] text-left transition-colors ${
-                      cropAspect === opt.id
-                        ? "bg-white/10 text-white"
-                        : "text-gray-300 hover:bg-white/5"
-                    }`}
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-[13px] text-left transition-colors ${cropAspect === opt.id
+                      ? "bg-white/10 text-white"
+                      : "text-gray-300 hover:bg-white/5"
+                      }`}
                   >
                     <span className="text-lg opacity-60">{opt.icon}</span>
                     {opt.label}
@@ -1253,15 +1250,14 @@ export function ImageEditorModal({
                 <button
                   key={entry.timestamp}
                   onClick={() => setCurrentImage(entry.url)}
-                  className={`w-full rounded-xl overflow-hidden border-2 transition-all ${
-                    isActive
-                      ? "border-violet-500 ring-1 ring-violet-500/30"
-                      : "border-white/10 opacity-60 hover:opacity-90 hover:border-white/20"
-                  }`}
+                  className={`w-full rounded-xl overflow-hidden border-2 transition-all ${isActive
+                    ? "border-violet-500 ring-1 ring-violet-500/30"
+                    : "border-white/10 opacity-60 hover:opacity-90 hover:border-white/20"
+                    }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/api/proxy-image?url=${encodeURIComponent(entry.url)}`}
+                    src={mediaUrl(entry.url)}
                     alt=""
                     className="w-full aspect-video object-cover"
                   />
@@ -1298,7 +1294,7 @@ export function ImageEditorModal({
                     <img
                       src={
                         ref.previewUrl ??
-                        `/api/proxy-image?url=${encodeURIComponent(ref.url)}`
+                        mediaUrl(ref.url)
                       }
                       alt={ref.label}
                       className="w-full h-full object-cover"
@@ -1342,7 +1338,7 @@ export function ImageEditorModal({
                           {frame.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={`/api/proxy-image?url=${encodeURIComponent(frame.imageUrl)}`}
+                              src={mediaUrl(frame.imageUrl)}
                               alt=""
                               className="w-10 h-10 rounded-lg object-cover shrink-0 border border-white/10"
                             />
@@ -1419,11 +1415,10 @@ export function ImageEditorModal({
                               setSelectedModel(m.id);
                               setShowModelMenu(false);
                             }}
-                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-left transition-colors ${
-                              selectedModel === m.id
-                                ? "bg-violet-500/20 text-violet-300"
-                                : "text-gray-300 hover:bg-white/5"
-                            }`}
+                            className={`w-full flex items-center gap-2 px-3 py-2.5 text-[12px] text-left transition-colors ${selectedModel === m.id
+                              ? "bg-violet-500/20 text-violet-300"
+                              : "text-gray-300 hover:bg-white/5"
+                              }`}
                           >
                             <span>🍌</span>
                             {m.label}
@@ -1454,11 +1449,10 @@ export function ImageEditorModal({
                       setShowFramePicker((v) => !v);
                       setFramePickerQuery("");
                     }}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors text-[12px] ${
-                      showFramePicker
-                        ? "bg-violet-500/20 text-violet-300"
-                        : "bg-white/5 hover:bg-white/10 text-gray-300"
-                    }`}
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors text-[12px] ${showFramePicker
+                      ? "bg-violet-500/20 text-violet-300"
+                      : "bg-white/5 hover:bg-white/10 text-gray-300"
+                      }`}
                     title="Reference a frame"
                   >
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -1538,11 +1532,10 @@ function ToolButton({
     <button
       onClick={onClick}
       title={title}
-      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
-        active
-          ? "bg-white/15 text-white"
-          : "text-gray-500 hover:text-white hover:bg-white/5"
-      }`}
+      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${active
+        ? "bg-white/15 text-white"
+        : "text-gray-500 hover:text-white hover:bg-white/5"
+        }`}
     >
       {children}
     </button>

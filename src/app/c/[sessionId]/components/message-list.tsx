@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AssistantText } from "./assistant-text";
 import { ForkSelector } from "./fork-selector";
 import { AssetRefPanel } from "./asset-ref-panel";
+import { SceneGridPanel } from "./scene-grid-panel";
 import { ShotCompilePanel } from "./shot-compile-panel";
 import { ShotPreviewPanel } from "./shot-preview-panel";
 import type { ClientMessage } from "@/types/v2/story";
@@ -14,6 +15,7 @@ export function MessageList({
   streamingMsgId,
   onForkChoice,
   onAssetApproval,
+  onGridApproval,
   onRetry,
   onRenderShot,
   onShotApproval,
@@ -23,6 +25,7 @@ export function MessageList({
   streamingMsgId: string | null;
   onForkChoice: (toolCallId: string, value: string, optionId?: string) => void;
   onAssetApproval: (toolCallId: string, assetHandle: string, url: string) => void;
+  onGridApproval: (toolCallId: string, sceneId: string | number, url: string) => void;
   onRetry: (toolCallId: string) => void;
   onRenderShot: (toolCallId: string, renderPrompt: string) => void;
   onShotApproval: (toolCallId: string, videoUrl: string) => void;
@@ -145,6 +148,19 @@ export function MessageList({
                         : (url: string) => onAssetApproval(msg.assetRef!.toolCallId, msg.assetRef!.assetHandle!, url)
                     }
                     onRetry={!msg.assetRef.approvedUrl && !msg.assetRef.loading ? () => onRetry(msg.assetRef!.toolCallId) : undefined}
+                  />
+                )}
+
+                {msg.sceneGrid && (
+                  <SceneGridPanel
+                    sceneGrid={msg.sceneGrid}
+                    disabled={isStreaming}
+                    onApprove={
+                      msg.sceneGrid.approvedUrl
+                        ? undefined
+                        : (url: string) => onGridApproval(msg.sceneGrid!.toolCallId, msg.sceneGrid!.sceneId!, url)
+                    }
+                    onRetry={!msg.sceneGrid.approvedUrl && !msg.sceneGrid.loading ? () => onRetry(msg.sceneGrid!.toolCallId) : undefined}
                   />
                 )}
 

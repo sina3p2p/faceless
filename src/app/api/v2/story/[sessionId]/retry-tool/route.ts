@@ -3,7 +3,7 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { renderAndUploadShot, generateAssetImages } from "@/server/services/showrunner";
+import { renderAndUploadShot, generateAssetImages, generateSceneGridImages } from "@/server/services/showrunner";
 
 type StoredTc = {
   id: string;
@@ -82,6 +82,18 @@ export async function POST(
     const generatedImages = await generateAssetImages(imagePrompt, assetKind);
     await patchRow({ generatedImages });
     return NextResponse.json({ assetHandle, assetKind, images: generatedImages });
+  }
+
+  if (toolName === "generateSceneGrid") {
+    const { sceneId, imagePrompt, referenceImageUrls, aspectRatio } = tcArgs as {
+      sceneId: string | number;
+      imagePrompt: string;
+      referenceImageUrls: string[];
+      aspectRatio?: "16:9" | "9:16" | "1:1";
+    };
+    const generatedImages = await generateSceneGridImages(imagePrompt, referenceImageUrls, aspectRatio ?? "16:9");
+    await patchRow({ generatedImages });
+    return NextResponse.json({ sceneId, images: generatedImages });
   }
 
   return badRequest(`Tool "${toolName}" is not retryable`);

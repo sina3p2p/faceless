@@ -5,7 +5,7 @@ import { VideoEditorPanel, type Clip } from "./video-editor-panel";
 import { Card } from "@/components/ui/card";
 import { ChatInput } from "./chat-input";
 import { MessageList } from "./message-list";
-import type { AssetRef, ClientMessage, ForkCall, ShotCompile, ShotResult } from "@/types/v2/story";
+import type { AssetRef, ClientMessage, ForkCall, SceneGrid, ShotCompile, ShotResult } from "@/types/v2/story";
 import { useMobileTab } from "../../../story-shell";
 import { cn } from "@/lib/utils";
 
@@ -40,10 +40,22 @@ export function StoryChat({
   const dragStartXRef = useRef(0);
   const dragStartWidthRef = useRef(0);
   const chatPanelRef = useRef<HTMLDivElement>(null);
+  const chatRowRef = useRef<HTMLDivElement>(null);
+  const [rowWidth, setRowWidth] = useState(0);
 
   const isStreaming = status === "streaming";
   const seed = useMemo(() => messages.find((m) => m.role === "user")?.text ?? "", [messages]);
   const mobileTab = useMobileTab();
+
+  useEffect(() => {
+    if (!chatRowRef.current) return;
+    const el = chatRowRef.current;
+    const update = () => setRowWidth(el.clientWidth);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     setClipOrder((prev) => {
@@ -239,6 +251,22 @@ export function StoryChat({
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, assetRef } : m))
       );
+    } else if (event.type === "scene_grid_loading") {
+      const sceneGrid: SceneGrid = { toolCallId: event.toolCallId as string, loading: true };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, sceneGrid } : m))
+      );
+    } else if (event.type === "scene_grid") {
+      const sceneGrid: SceneGrid = {
+        toolCallId: event.toolCallId as string,
+        loading: false,
+        sceneId: event.sceneId as string | number,
+        images: event.images as string[],
+        aspectRatio: event.aspectRatio as SceneGrid["aspectRatio"],
+      };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, sceneGrid } : m))
+      );
     } else if (event.type === "shot_compile_loading") {
       const shotCompile: ShotCompile = { toolCallId: event.toolCallId as string, loading: true };
       setMessages((prev) =>
@@ -349,6 +377,8 @@ export function StoryChat({
           return { ...m, shotResult: { toolCallId, loading: true } };
         if (m.assetRef?.toolCallId === toolCallId)
           return { ...m, assetRef: { ...m.assetRef!, loading: true, error: undefined, images: undefined } };
+        if (m.sceneGrid?.toolCallId === toolCallId)
+          return { ...m, sceneGrid: { ...m.sceneGrid!, loading: true, error: undefined, images: undefined } };
         return m;
       })
     );
@@ -368,6 +398,8 @@ export function StoryChat({
             return { ...m, shotResult: { toolCallId, loading: false, videoUrl: data.videoUrl as string } };
           if (m.assetRef?.toolCallId === toolCallId)
             return { ...m, assetRef: { ...m.assetRef!, loading: false, error: undefined, images: data.images as string[] } };
+          if (m.sceneGrid?.toolCallId === toolCallId)
+            return { ...m, sceneGrid: { ...m.sceneGrid!, loading: false, error: undefined, images: data.images as string[] } };
           return m;
         })
       );
@@ -378,6 +410,8 @@ export function StoryChat({
             return { ...m, shotResult: { toolCallId, loading: false, error: String(err) } };
           if (m.assetRef?.toolCallId === toolCallId)
             return { ...m, assetRef: { ...m.assetRef!, loading: false, error: String(err) } };
+          if (m.sceneGrid?.toolCallId === toolCallId)
+            return { ...m, sceneGrid: { ...m.sceneGrid!, loading: false, error: String(err) } };
           return m;
         })
       );
@@ -393,6 +427,17 @@ export function StoryChat({
       )
     );
     await streamResponse({ type: "asset_approval", toolCallId, assetHandle, approvedUrl });
+  }
+
+  async function handleGridApproval(toolCallId: string, sceneId: string | number, approvedUrl: string) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role === "assistant" && m.sceneGrid?.toolCallId === toolCallId
+          ? { ...m, sceneGrid: { ...m.sceneGrid!, approvedUrl } }
+          : m
+      )
+    );
+    await streamResponse({ type: "grid_approval", toolCallId, sceneId, approvedUrl });
   }
 
   // ── Drag-to-resize ────────────────────────────────────────────────────────────
@@ -422,13 +467,13 @@ export function StoryChat({
   }
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative min-h-0">
+    <div ref={chatRowRef} className="flex-1 flex flex-col md:flex-row overflow-hidden relative min-h-0">
       {/* ── Center: Video Editor ── */}
       <Card
         variant="panel"
         padding="none"
         className={cn(
-          chatExpanded ? "hidden" : "flex-1 rounded-none min-w-0 min-h-0",
+          "flex-1 rounded-none min-w-0 min-h-0",
           mobileTab && mobileTab.tab !== "editor" && "max-md:hidden"
         )}
       >
@@ -457,10 +502,9 @@ export function StoryChat({
       {/* ── Right: Chat Sidebar ── */}
       <div
         ref={chatPanelRef}
-        style={chatExpanded ? undefined : { width: chatVisible ? chatWidth : 0 }}
+        style={{ width: chatExpanded ? rowWidth : chatVisible ? chatWidth : 0 }}
         className={cn(
-          chatExpanded ? "flex-1 w-full" : "shrink-0",
-          "min-h-0 relative",
+          "shrink-0 min-h-0 relative",
           !isDragging && "transition-all duration-200",
           mobileTab && mobileTab.tab !== "chat" && "max-md:hidden",
           mobileTab?.tab === "chat" && "max-md:w-full! max-md:flex-1!"
@@ -523,6 +567,7 @@ export function StoryChat({
             streamingMsgId={streamingMsgId}
             onForkChoice={handleForkChoice}
             onAssetApproval={handleAssetApproval}
+            onGridApproval={handleGridApproval}
             onRetry={retryTool}
             onRenderShot={handleRenderShot}
             onShotApproval={handleShotApproval}

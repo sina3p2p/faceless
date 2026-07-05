@@ -3,6 +3,7 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { eq, desc, asc, and, inArray } from "drizzle-orm";
+import { generateSeed } from "@/lib/seed";
 
 export async function POST(req: NextRequest) {
   const user = await getAuthUser();
@@ -17,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   const [session] = await db
     .insert(filmSessions)
-    .values({ userId: user.id, status: "in_progress" })
+    .values({ userId: user.id, status: "in_progress", seed: generateSeed() })
     .returning();
 
   const msgId = crypto.randomUUID();

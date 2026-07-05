@@ -1,8 +1,8 @@
 # Shot Compilation Recipe — Turning the Locked Bible into Seedance 2.0 Prompts
 
-> **DO NOT LOAD THIS FILE DURING STAGE 1.** It is useless before reference images exist, and reading it while authoring the story or shot list will contaminate that work with premature render-prompt thinking. Load it ONLY after Stage 1 is fully complete — the Bible is locked AND every `@material` has an approved reference image — at the moment you begin writing Seedance prompts in Stage 2. If you are still developing premise, characters, screenplay, shot-list intent, or generating asset images, this file is not yet relevant.
+> **DO NOT LOAD THIS FILE DURING STAGE 1.** It is useless before reference images exist, and reading it while authoring the story or shot list will contaminate that work with premature render-prompt thinking. Load it ONLY after Stage 1 is fully complete — the Bible is locked, every `@material` has an approved reference image, AND every scene's grid is approved (or its skip recorded) with generation groups marked (Step 17) — at the moment you begin writing Seedance prompts in Stage 2. If you are still developing premise, characters, screenplay, shot-list intent, or generating asset images, this file is not yet relevant.
 
-This is the reference the showrunner loads when Stage 1 is complete (Bible locked, all assets approved) and it begins writing the final Seedance prompts. It is **not** a story tool — every creative decision was already made and frozen in the Bible. This document is purely about _compiling_ those locked decisions into precise, renderable Seedance 2.0 prompts.
+This is the reference the showrunner loads when Stage 1 is complete (Bible locked, all assets approved, all scene grids approved, groups marked) and it begins writing the final Seedance prompts. It is **not** a story tool — every creative decision was already made and frozen in the Bible. This document is purely about _compiling_ those locked decisions into precise, renderable Seedance 2.0 prompts.
 
 ---
 
@@ -40,24 +40,25 @@ Ambient environmental life (mist, foliage, water, light) is tier (b) seasoning a
 
 ---
 
-## One shot per generation by default (read this carefully — it's the most common quality mistake)
+## Scene grids and generation groups (how shots become generations)
 
-**Default: render ONE shot per generation.** Seedance can pack multiple shots with hard cuts into a single 15s generation — but doing so **divides the motion budget** across those shots. A 14s generation split into two shots is two thin ~7s fragments, each with little room to develop movement; the result reads as "a static image with a few small moves." A 10s generation spent on ONE shot gives that shot a full, developing, cinematic motion arc. Most of your shots are individually rich (a block sliding and reversing, a slow push-in on a reveal, an emotional beat) — each of those _deserves and needs a whole generation_. Give it one.
+**Compile precondition (machine-checkable):** compilation input MUST include the completed Scene Grid Registry from Step 17. If the registry is missing, incomplete, or has any scene whose status is not `approved_grid` or `skip_recorded` (with its required fields), emit `status: "gap"` and do not compile: `"Shot N: Scene Grid Registry missing/failing for scene M — run Step 17 before compiling."` Per shot: a scene with `status: approved_grid` must attach the scene grid and cite the relevant panel; a scene with `status: skip_recorded` must carry the registry's `skip_reason` in the render package. A missing `grid_handle` is not a skip. A missing registry is not a skip. Never skip the grid phase silently because assets are done.
 
-**The motion-budget rule:** the richer a shot's intended movement, the more it needs its own generation. A shot whose whole point is motion (something sliding, a developing camera move, an action beat) must NOT share a generation. Bundling starves it.
+The unit of DRAMA is the scene; the unit of GENERATION is the group. They are deliberately separate layers — the render window must never redefine what a scene is, and as clip windows grow, only the partition constant below changes.
 
-**Multi-shot bundling is the EXCEPTION, used only when ALL of these hold:**
+**The scene grid (the edit, approved at image price).** After assets are approved, each scene gets a **grid storyboard**: ONE photoreal image containing the scene's shots as panels in shot-list order (full reference: `grid-storyboards.md` — prompt formula, layout geometry, failure catalog, approval protocol). Because all panels come from a single image generation, they share one latent — geography stays coherent (the doorway on the same side, eyelines pointing at what the next panel shows, screen direction flowing one way) and character appearance holds across panels for free. The user approves the grid BEFORE any video is generated: reading it left-to-right is watching the scene's cuts, so a broken handoff or teleporting prop is caught at image price. Panels are the shots' **cut-in moments**, compiled from the rows' cut columns. INSERT shots and lone establishing shots may skip the grid (no geography to protect).
 
-- The shots share the same location, lighting state, and character(s) — a genuinely continuous moment, not a scene change. (A wide → a close-up of the _same_ moment can bundle; a location change cannot.)
-- Each bundled shot is _short and low-motion_ — a quick reaction, a held look — so dividing the budget doesn't starve them.
-- You specifically want the in-model cut's smoothness for closely-related beats.
-- Cap at 2–3 shots (not 5 — that's the absolute model ceiling, not a target), ≤15s total.
+**Generation groups (marked at Step 17, honored here).** The partition — which rows form a group, which are mandatory solos — was decided during Stage 1 and recorded in the Scene Grid Registry's `generation_groups` (partition rules live in `grid-storyboards.md`, the Step 17 reference). At compile time the marked partition is DATA, not a decision: compile each marked group or solo as-is. If a shot arrives unmarked, that is a gap (Step 17 incomplete), not an invitation to partition here.
 
-When in doubt, render separately and stitch the cut in post — the post-cut is trivial and you keep the full motion budget per shot. **Different location, different lighting, or a motion-heavy shot → always its own generation.**
+**Duration semantics (important):** the shot list's Dur column is an ESTIMATE — planning data for partition math and the runtime total. It NEVER enters any prompt. For a solo, the API duration parameter = the shot's duration. For a group, the API duration = the sum of the group's estimates (≤15s), and **Seedance distributes time across the cuts itself** — in-prompt timing is officially unstable, and the model, seeing the actual motion, places cuts better than pre-render guesses. Steer proportions only with RELATIVE pace words derived from the rows ("the first shot lingers; the last two cut quickly"). If a returned group paced a beat wrong, that is a targeted reroll with a stronger pace word — or a promotion to solo, where the API duration is exact.
 
-For the rare multi-shot generation, open with ONE shared SUBJECT DEFINITIONS block, then label each shot (`Shot 1:`, `Shot 2:`) with its own action and camera — in event order, no timestamps or per-segment durations (in-prompt timing is officially unstable; the model paces the cuts) — and put the **global render notes (Look, grade, lighting)** plus the constraint tail at the END. Seedance follows closing notes more reliably for camera and lighting.
+**Group prompt structure:** one shared SUBJECT DEFINITIONS block (verbatim Bible lines) which ALSO defines the scene grid **with the generation's panel range scoped explicitly** — `Define the panel sequence in [ImageN] as **the approved scene grid for Scene X**; THIS generation renders ONLY panels [a]–[b] (the group's panel_ids from the registry), in order — other panels in the scene grid are continuity context only and must NOT be rendered in this generation` — then labeled shot blocks each opening with the panel citation (`Shot 1 (panel a): composition matches panel a of the scene grid. [action, camera, pace word]`, `Shot 2 (panel a+1): composition matches panel a+1. ...`) in event order with NO timestamps, each block's action ending at its cut-out; then the global render notes and constraint tail at the END. The scope clause is mandatory whenever the grid has more panels than the group has shots (the normal case — grids are per SCENE, groups are per GENERATION): an unscoped 'follow the panels in strict order' invites the model to continue into out-of-scope panels inside the clip. The grid is a sequence reference (a documented Seedance pattern): the model renders the shots with hard cuts, following the approved compositions.
 
-**Grouping is ideally marked in the Bible's shot list during Stage 1.** If unmarked, default to one-per-generation; only bundle when the strict exception above clearly applies.
+**Solo prompt in a gridded scene:** attach the grid and cite the shot's panel by number — `composition follows panel 4 of the scene grid` — so even solos stay pinned to the approved geography. Image-guided, not text-guided.
+
+**App-side contract:** the returned group clip is pre-split at the cuts for per-shot review. Rejection of one sub-shot offers "reroll group" or "demote to solos" — the good sub-shots will not return identical on a group reroll; that is the known cost of grouping.
+
+**Validation caveat:** the grid's value rests on Seedream keeping cross-panel geometry coherent. Treat the first film through this flow as the validation run; if grids return spatially contradictory panels, fall back to solos with per-panel citation.
 
 ## Continuity across generations — native extension and track completion
 
@@ -73,18 +74,18 @@ Extension is a _continuity_ tool, not a substitute for the grouping rules above:
 
 ## Reference binding — the @material → [Image#] translation
 
-Stage 1 wrote `@material` handles (e.g. `@hero_charsheet`, `@giza_plate`). Seedance 2.0 reference mode takes uploaded images addressed as `[Image1]`, `[Image2]`, etc., **in the order they're attached** (first attached = `[Image1]`). Compilation resolves each handle to its approved image(s) and assigns slots. Note a character handle resolves to TWO slots (headshot + full-body).
+Stage 1 wrote `@material` handles (e.g. `@hero_charsheet`, `@giza_plate`). Seedance 2.0 reference mode takes uploaded images addressed as `[Image1]`, `[Image2]`, etc., **in the order they're attached** (first attached = `[Image1]`). Compilation resolves each handle to its approved image and assigns slots. A character handle is exactly ONE slot — one turnaround character-sheet image per character, always.
 
 Four hard rules:
 
-1. **Slot order = precision priority.** The more precisely an asset must be matched, the EARLIER it goes: character headshots first, then character full-bodies, then hero-prop/object refs, then location plates. Seedance weights earlier assets more heavily for precise reference.
+1. **Slot order = precision priority.** The more precisely an asset must be matched, the EARLIER it goes: character references first, then hero-prop/object refs, then location plates. Seedance weights earlier assets more heavily for precise reference.
 
-2. **Attach only the assets that appear in this shot (or group).** Reference mode accepts up to 9 images, but 3–5 focused references beat more (and each character costs two slots). Pull only the character(s) and location(s) actually on screen. If a shot/group names more distinct assets than the budget allows, that's a gap — flag it (the shot is probably too crowded), don't silently drop refs.
+2. **Attach only the assets that appear in this shot (or group).** Reference mode accepts up to 9 images, but 3–5 focused references beat more. Pull only the character(s) and location(s) actually on screen. If a shot/group names more distinct assets than the budget allows, that's a gap — flag it (the shot is probably too crowded), don't silently drop refs.
 
-3. **DEFINE each subject up front, then use the label everywhere.** The official binding grammar: open the prompt with definitions —
-   - `Define the [2–3 stable features, e.g. man with the measuring cord and kilt] in [Image1] (facial features) and [Image2] (styling and wardrobe) as **overseer**.`
-   - `Define the terrain in [Image3] as **the crater site**; it governs environment, architecture, and composition.`
-     Then **every subsequent mention of that subject uses the exact same label** ("overseer", never "the man" / "he" at first mention of a new sentence block where ambiguity could arise). An unbound mention is how identity drift starts. For a quick one-off binding without a definition, the inline form `overseer@Image1` also works — but for film work, prefer explicit definitions.
+3. **DEFINE each subject up front, then use the label everywhere — and the definition text is LOCKED.** Each asset's definition line (label, its 2–3 stable features, its anchor details) is written ONCE in the Bible §2 and pasted VERBATIM into every prompt that uses the asset. Never re-derive or re-word it per shot: a character defined by "dust smudge, amulet, chisel at belt" in one shot and "bare feet, linen kilt" in the next is two different definitions competing for one identity — definition drift is identity drift by the back door. (Per-shot additions are allowed only as appended clauses after the locked line, e.g. adding a hand-relevant anchor for an insert — never as substitutions.) The official binding grammar: open the prompt with definitions —
+   - `Define the [2–3 stable features, e.g. woman in the grey wool coat with the silver pendant] in [Image1] (facial features, styling, wardrobe, build) as **the detective**.`
+   - `Define the environment in [Image2] as **the alley**; it governs environment, architecture, and composition.`
+     Then **every subsequent mention of that subject uses the exact same label** ("the detective", never "the woman" / "she" at first mention of a new sentence block where ambiguity could arise). An unbound mention is how identity drift starts. For a quick one-off binding without a definition, the inline form `detective@Image1` also works — but for film work, prefer explicit definitions.
 
 4. **State what each reference governs.** Never attach an image silently — the definition must say what attribute it controls (facial features / styling / environment / object form), or the model merges attributes unpredictably.
 
@@ -101,7 +102,7 @@ When a shot is flagged static-lock (a rigid subject must not change/morph during
 
 Never write "the pyramid does not grow" or "no morphing" — write the fixed state as a present fact. And **never write the blanket clause "only the camera moves, subject unchanged"** — in a frame containing characters, that clause freezes the _characters_, producing mannequins in a diorama. The lock always names its target: "the pyramid unchanged," "the ship's hull unchanged," never "subject unchanged."
 
-**Characters are NEVER static-locked.** Character identity consistency comes from the reference-image binding (`[Image#] = identity and wardrobe of...`) plus the identity anchor line — not from freezing motion. Every character in frame gets explicit **performance direction**, always:
+**Characters are NEVER static-locked.** Character identity consistency comes from the reference-image binding (the character's verbatim Define-as-label line in SUBJECT DEFINITIONS) plus the identity anchor line — not from freezing motion. Every character in frame gets explicit **performance direction**, always:
 
 - If the character carries the shot's primary motion: the scripted action, phrased as start→end (`she pushes herself back into the roots, heels dragging through the soil, one arm wrapping her belly`).
 - If the character is secondary in a camera-driven shot: written **micro-performance** at minimum — breath, gaze, small gestures (`his chest rises with quickened breath; his eyes track the figure; his fingers tighten in the dirt`). The model does not invent blocking; a character with no written verb stands like a wax figure.
@@ -134,7 +135,7 @@ If a shot's State Schedule value is missing for something visibly stateful (a st
 
 ## Duration
 
-Pull the shot's duration from the shot row; it must be one of Seedance 2.0's allowed values (4–15s). For a multi-shot group, the sum of the shots' durations is the generation length and must be ≤15s. Keep individual narrative shots short (commonly 5–10s) — long single takes are where motion drift creeps in.
+Duration is an API PARAMETER on the render package, never prompt text, and the shot row's Dur is an ESTIMATE. For a solo: the API duration = the row's estimate (within Seedance 2.0's window, 4–15s). For a group: the API duration = the sum of the group's estimates (≤15s); Seedance places the internal cuts itself — steer proportions only with relative pace words ("the first shot lingers; the last two cut quickly"). Keep individual narrative shots short (estimates commonly 5–10s) — long single takes are where motion drift creeps in. A mistimed beat in a returned group = targeted reroll with a stronger pace word, or promotion to solo (where the API duration is exact).
 
 ---
 
@@ -143,9 +144,9 @@ Pull the shot's duration from the shot row; it must be one of Seedance 2.0's all
 Assemble in this order, global notes last:
 
 1. **SUBJECT DEFINITIONS (first):** the Define-as-label bindings for every attached reference (see binding grammar above). These go FIRST — precise references are weighted by early placement, and every later mention depends on the labels existing.
-2. **CONTEXT** — one line: what this shot is, where it sits in the scene — and if the previous shot's row specifies a cut-in for this shot, CONTEXT opens by ANSWERING it ("From the overseer's elevated point of view: the crater below..."; "The turn completes: she now faces the door..."). Honor the scene's Space line: geography and screen direction here must match every other shot in the scene. (Not a hook. A continuation.)
-3. **PRIMARY ACTION** — the shot's primary motion, phrased as a start→end arc with a real verb: what moves, how, and where it ends up. If Primary = SUBJECT, this is the character/object action; if Primary = CAMERA, this states what the developing frame reveals while characters hold micro-performance. This section may never describe a motionless tableau — if the row gives you no delta, that's a gap, not a compile. The action ENDS at the row's cut-out state, written explicitly as the final sentence ("his gaze locks off-frame, down and left, toward the unseen crater"; "she begins to turn"; "the goat exits frame right") — this is the half of the edit this generation owns; the next shot's CONTEXT answers it. **State scale relationships explicitly when scale matters** — the model defaults to wrong proportions if you don't. "Limestone blocks" alone renders person-height boulders and a toy-looking pyramid; instead write the relationship: "limestone blocks roughly waist-to-chest height, the pyramid a monumental structure rising hundreds of feet, human workers tiny against it." Whenever a shot depends on bigness, smallness, or proportion, name the relationship between the elements — don't assume the model infers it.
-4. **PERFORMANCE** — explicit direction for every character in frame (by label): the scripted action if a character is the primary motion, written micro-performance (breath, gaze, small gesture) otherwise. Never omitted when a character is on screen; never replaced by a lock.
+2. **CONTEXT** — one line: what this shot is, where it sits in the scene — and if the previous shot's row specifies a cut-in for this shot, CONTEXT opens by ANSWERING it ("From her point of view: the empty doorway..."; "The turn completes: he now faces the window..."). Honor the scene's Space line: geography and screen direction here must match every other shot in the scene. (Not a hook. A continuation.)
+3. **PRIMARY ACTION** — the shot's primary motion, phrased as a start→end arc with a real verb: what moves, how, and where it ends up. If Primary = SUBJECT, this is the character/object action; if Primary = CAMERA, this states what the developing frame reveals while characters hold micro-performance. This section may never describe a motionless tableau — if the row gives you no delta, that's a gap, not a compile. The action ENDS at the row's cut-out state, written explicitly as the final sentence ("her gaze locks off-frame, down and left, toward the unseen street"; "he begins to turn"; "the car exits frame right") — this is the half of the edit this generation owns; the next shot's CONTEXT answers it. **State scale relationships explicitly when scale matters** — the model defaults to wrong proportions if you don't. "Limestone blocks" alone renders person-height boulders and a toy-looking pyramid; instead write the relationship: "limestone blocks roughly waist-to-chest height, the pyramid a monumental structure rising hundreds of feet, human workers tiny against it." Whenever a shot depends on bigness, smallness, or proportion, name the relationship between the elements — don't assume the model infers it.
+4. **PERFORMANCE** — explicit direction for every character in frame (by label): the scripted action if a character is the primary motion, written micro-performance (breath, gaze, small gesture) otherwise. Never omitted when a character is on screen; never replaced by a lock. Two phrasing traps: **(a) partial figures need explicit ownership** — a hand, foot, or shadow entering frame must say whose it is, and if it belongs to an anonymous party, say so in a way that excludes the defined subjects ("another worker's sandaled foot, visible only from the shin down") — an unowned limb next to a defined character reads as _that character's_, which can invert a scene's meaning; and give the limb internally consistent attributes (never "bare sandaled foot" — contradictory features average into something wrong). **(b) Reactions to sound or off-screen events are reactions, not forces** — write "at the offscreen shout, her hand flinches back," never "her hand is yanked back by the shout"; physical-causation phrasing makes the model render physical contact.
 5. **CAMERA** — the move from the shot row, matched to the beat's mood (see encyclopedia). State stillness explicitly if locked — allowed only when the subject carries the primary motion.
 6. **STATE** — the State Schedule values as present facts.
 7. **STATIC-LOCK** — if flagged, the positive fixed-state clause naming its specific rigid target (never "subject unchanged").
@@ -154,7 +155,7 @@ Assemble in this order, global notes last:
 
 **No second-marks anywhere in the prompt.** Seedance's support for precise in-prompt timing ("0–3 seconds", "over 9s") is officially unstable and can produce abnormal generations. Total duration is an API parameter; pace _within_ the shot is controlled with words (slow, gradual, unhurried, brisk) and with the order of described events. Sequence beats by order ("begins as a slow dolly-in, then eases into a gentle pan right"), never by timestamps.
 
-For a multi-shot group: one shared SUBJECT DEFINITIONS block, then `Shot 1: [context/action/camera] … Shot 2: …` (event order, no timestamps), then ONE shared GLOBAL RENDER NOTES block + constraint tail at the end covering all shots.
+For a multi-shot group, follow the group prompt structure in the "Scene grids and generation groups" section (the authoritative spec): one shared SUBJECT DEFINITIONS block that also defines the scene grid, then `Shot 1 (panel N): …  Shot 2 (panel N+1): …` in event order with no timestamps, relative pace words only, then ONE shared GLOBAL RENDER NOTES block + constraint tail at the end covering all shots.
 
 ---
 
@@ -166,7 +167,9 @@ Every compile produces ONE structured object, not free text. This makes the resu
 {
   "status": "ok" | "gap",
   "shot_id": "14",
-  "render_prompt": "SUBJECT DEFINITIONS: Define ... in [Image1] (facial features) and [Image2] (styling) as **hero**. Define ... in [Image3] as **the site**. CONTEXT: ... PRIMARY ACTION: ... PERFORMANCE: ... CAMERA: ... STATE: ... [STATIC-LOCK: ...] GLOBAL RENDER NOTES: ... CONSTRAINT TAIL: Keep it subtitle-free; avoid generating any text or subtitles. Do not generate watermarks or logos.",
+  "group_shot_ids": ["14"],
+  "grid_reference": "@scene3_grid" | null,
+  "render_prompt": "SUBJECT DEFINITIONS: Define ... in [Image1] (facial features, styling, wardrobe) as **hero**. Define ... in [Image2] as **the site**. CONTEXT: ... PRIMARY ACTION: ... PERFORMANCE: ... CAMERA: ... STATE: ... [STATIC-LOCK: ...] GLOBAL RENDER NOTES: ... CONSTRAINT TAIL: Keep it subtitle-free; avoid generating any text or subtitles. Do not generate watermarks or logos.",
   "duration_seconds": 8,
   "resolution": "1080p",
   "references": [
@@ -178,6 +181,8 @@ Every compile produces ONE structured object, not free text. This makes the resu
     "reference_count_ok": true,
     "all_assets_onscreen": true,
     "every_reference_has_controls": true,
+    "reference_images_distinct": true,
+    "definitions_verbatim": true,
     "subjects_defined_first": true,
     "labels_consistent": true,
     "global_notes_last": true,
@@ -186,6 +191,7 @@ Every compile produces ONE structured object, not free text. This makes the resu
     "positive_lock_only": true,
     "primary_motion_present": true,
     "character_performance_present": true,
+    "panel_range_scoped": true,
     "cut_handoff_compiled": true,
     "single_lighting_state": true,
     "arc_entities_bound": true,
@@ -197,12 +203,15 @@ Every compile produces ONE structured object, not free text. This makes the resu
 ```
 
 - `render_prompt` is the assembled prompt in the section order below — this is the text shown to the user for approval/edit before any render.
+- `group_shot_ids` lists every shot in this generation (a solo is a one-element list). For groups: `duration_seconds` = the sum of the shots' ESTIMATED durations (≤15s); the app pre-splits the returned clip at the cuts for per-shot review. Shot-list Dur values never appear in the prompt.
+- `grid_reference` is the scene grid's handle if the scene has one; groups consume it as a sequence reference, solos cite their panel by number.
 - `resolution` is the render tier as a STRUCTURED FIELD ONLY — the app passes it (with quality and aspect ratio) as parameters on the generateShot API call. It must never appear as words inside `render_prompt`: the model ignores "1080p" in prompt text the same way it ignores f-stops and ISO. Tier policy: the cheap tier (e.g. 480p) is allowed for preview passes; the shot's APPROVED/final render is always the top tier (e.g. 1080p). Never mark a preview-tier render as final — a 480p clip in the edit is a quality bug.
 - `references` maps each `[Image#]` slot to its `@material` handle and the attribute it controls (the binding grammar, made explicit).
 - `checks` is the assertion result — each is a hard rule from this recipe, self-verified before emitting. If any check is false, fix the prompt before emitting (or emit a gap if it can't be fixed from the Bible).
 - On a missing/ambiguous/over-budget input, emit `status: "gap"` with `render_prompt: null` and the `gaps` array naming each problem, e.g.:
   - `"Shot 14: no State Schedule lighting value for this beat — needs a lighting state."`
   - `"Shot 9: references @ship but no approved image is bound to that handle."`
+  - `"Shot 3: two slots resolve to the same image URL — a duplicated attachment wastes a slot; bind distinct images."`
   - `"Shot 12: 6 distinct assets named, exceeds the focused-reference budget — scene likely too crowded; confirm which are essential."`
   - `"Shot 7: no primary motion — the row is a static tableau (subject has no action, camera locked); it needs a delta before it can render."`
   - `"Shot 14: lighting written as a transition (Golden Hour → dusk) — pick ONE state for this row; time passes between shots."`
@@ -216,7 +225,9 @@ A gap is a success — it caught an incompleteness cheaply, before a video gener
 - `reference_count_ok`: ≤9 images attached.
 - `all_assets_onscreen`: every attached asset actually appears in the shot.
 - `every_reference_has_controls`: each reference's definition states what it governs (facial features / styling / environment / object form).
-- `subjects_defined_first`: the prompt opens with Define-as-label bindings for every attached reference; character headshots occupy the earliest slots.
+- `reference_images_distinct`: every attached slot resolves to a DIFFERENT image — a duplicated URL is a resolution bug wasting a slot. Fails as a gap, not a render.
+- `definitions_verbatim`: every definition line matches the Bible §2 canonical text for that handle exactly (appended per-shot clauses allowed; substitutions fail).
+- `subjects_defined_first`: the prompt opens with Define-as-label bindings for every attached reference; character references occupy the earliest slots.
 - `labels_consistent`: every mention of a defined subject uses its exact label; no unbound "the man"/"she" where a label exists.
 - `global_notes_last`: the Look/grade/lighting block is at the end (definitions are at the top, not here).
 - `constraint_tail_present`: the prompt ends with the subtitle/watermark/logo suppression tail.
@@ -224,6 +235,7 @@ A gap is a success — it caught an incompleteness cheaply, before a video gener
 - `positive_lock_only`: any static-lock uses positive fixed-state phrasing (no "no/not/don't/never") AND names its specific rigid target — the words "subject unchanged" fail this check. SCOPE: this rule governs content/state/lock phrasing only; the constraint tail is the single sanctioned negative block (vendor's own artifact-suppression phrasing) and is exempt.
 - `primary_motion_present`: the prompt has exactly one primary motion source (subject action with a start→end verb, or a camera move). Ambient motion alone fails; locked camera + actionless subject fails and becomes a gap.
 - `character_performance_present`: every character on screen has explicit performance direction (scripted action or written micro-performance); a character with no verb fails.
+- `panel_range_scoped`: for a group in a gridded scene, the grid definition names the exact active panels (matching the registry group's `panel_ids`), declares unused panels continuity-context-only, and every shot block cites its panel; an unscoped "strict order" over a grid larger than the group fails, and prompt panels that disagree with the registry's `panel_map` fail.
 - `cut_handoff_compiled`: the prompt's action ends at the row's cut-out state, and (if the previous row specified a cut-in for this shot) CONTEXT opens by answering it. A "rest" cut-out passes but is noted; a missing cut-out fails.
 - `single_lighting_state`: the prompt carries exactly one canonical lighting state — any in-shot lighting transition fails and becomes a gap ("time passes between shots").
 - `arc_entities_bound`: every character, hero prop, and location named in the action has a reference bound in SUBJECT DEFINITIONS (or is explicitly background-tier per the Bible). An arc that moves the ship with no ship reference attached fails.
@@ -249,7 +261,7 @@ A camera instruction has four parts: **shot size, angle, lens character, and mov
 **The five phrasing rules (these prevent the most common failures):**
 
 1. **One primary camera move per shot.** Stacking moves ("push in, then pan, then orbit") produces jitter and drift. If you need a compound move, sequence it as beats in event order, never with timestamps: "Begins as a slow dolly-in, then eases into a gentle pan right for the closing moment." Sequence, don't jam.
-2. **Use rhythmic, plain words — NOT technical specs.** "slow, smooth, steady, gradual, gentle, drifting" all work. "24fps, f/2.8, ISO 800, 85mm" is **ignored** by the model — it's prompt decoration that does nothing. The same goes for output specs: "1080p," "4K," quality tiers, and aspect ratios in prompt text are dead words — those are **API parameters** the app passes on the generateShot call (from the render package's structured fields), never prompt content. Describe the camera the way you'd tell an operator the feel, not the way you'd set a camera body.
+2. **Use rhythmic, plain words — NOT technical specs.** "slow, smooth, steady, gradual, gentle, drifting" all work. "24fps, f/2.8, ISO 800, 85mm" is **ignored** by the model — it's prompt decoration that does nothing. The same goes for output specs: "1080p," "4K," quality tiers, and aspect ratios in prompt text are dead words — including dressed-up forms like "2.39:1 anamorphic widescreen framing intent," which contradicts the API's actual aspect parameter and risks baked-in letterbox bars. (Anamorphic LENS character — oval bokeh, horizontal flares — is legitimate Look language; the RATIO is not.) These — those are **API parameters** the app passes on the generateShot call (from the render package's structured fields), never prompt content. Describe the camera the way you'd tell an operator the feel, not the way you'd set a camera body.
 3. **Separate camera motion from subject motion — only one thing moves fast at a time.** "The dancer spins; the camera holds a fixed frame" works. "Camera spins around a spinning dancer" produces chaos. If the subject is the action, lock or slow the camera; if the camera is the action, calm the subject.
 4. **"Fast" is the single most quality-degrading word.** Fast camera + fast cuts + busy scene almost guarantees artifacts. Default to slow/medium; reserve speed for a deliberate, isolated moment.
 5. **A reference video beats text for an exact camera move.** Text is best for _spatial_ decisions (framing, subject, look); if you need a precise camera trajectory or pacing, a short stabilized reference clip (`@Video1 for camera movement`) carries it better than any words. (If the reference is shaky, the model copies the shake.)
@@ -320,13 +332,15 @@ In reference mode, synchronized ambient audio is on by default — acceptable fo
 - Did every value come from the Bible or the shot row? (If not → gap.)
 - **Is there exactly ONE primary motion source — subject action with a real verb, or a camera move?** (Ambient-only or locked-camera-plus-static-subject → gap.)
 - **Does every character on screen have performance direction** (scripted action or micro-performance)? Is no character static-locked?
-- Are only the on-screen assets attached, each opened with a Define-as-label binding stating what it governs — character headshots in the earliest slots — and is every later mention using the exact label?
+- Are only the on-screen assets attached, each opened with a Define-as-label binding stating what it governs — character references in the earliest slots — and is every later mention using the exact label?
 - Is the prompt free of timestamps/second-counts (pace in words and event order only)?
 - Does the prompt end with the subtitle/watermark/logo constraint tail?
+- Are all definition lines verbatim from the Bible §2, and does every slot resolve to a distinct image (no duplicated URLs)?
+- Any partial figures owned and internally consistent; any sound/off-screen reactions phrased as reactions, not physical forces?
 - Is the grade the Bible's single Look, not a per-shot choice?
 - Is the lighting the shot's State Schedule state?
 - If anything rigid is fixed-within-shot, does the static-lock clause name that specific thing in positive phrasing (never "subject unchanged")?
-- One shot per generation unless the strict bundling exception applies (shared location/lighting, short low-motion beats, ≤2–3 shots, ≤15s)?
+- Is this compile honoring the generation group marked at Step 17 (solo or 1–4-shot group, summed estimates ≤15s) — not a re-partition invented at compile time? Motion-rich / fulcrum / timing-critical shots solo?
 - Is a motion-rich shot given its own full generation (not starved by sharing)?
 - Are scale relationships stated where proportion matters?
 - Does the action end at the row's cut-out state, and does CONTEXT answer the previous row's cut-in? Does the framing honor the row's Scale and the scene's Space line?

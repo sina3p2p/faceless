@@ -4,7 +4,7 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
-import { storyTools, MODEL, openrouter, generateAssetImages } from "@/server/services/showrunner";
+import { storyTools, MODEL, openrouter, generateAssetImages, generateSceneGridImages } from "@/server/services/showrunner";
 import { rowsToModelMessages } from "@/server/services/showrunner/messages";
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
 
@@ -92,6 +92,20 @@ export async function POST(
       }],
       createdAt: new Date(),
     });
+  } else if (body.type === "grid_approval") {
+    await db.insert(filmSessionMessages).values({
+      id: crypto.randomUUID(),
+      messageId: crypto.randomUUID(),
+      sessionId,
+      role: "user",
+      type: "grid_approval",
+      parts: [{
+        toolCallId: body.toolCallId,
+        sceneId: body.sceneId,
+        approvedUrl: body.approvedUrl,
+      }],
+      createdAt: new Date(),
+    });
   } else if (body.type === "shot_approval") {
     await db.insert(filmSessionMessages).values({
       id: crypto.randomUUID(),
@@ -126,6 +140,7 @@ export async function POST(
       system: AI_FILM_STAGE1_SKILL,
       messages: modelMessages,
       tools: storyTools,
+      seed: session.seed ?? undefined,
       // Allow the model to call loadReference (auto-executed) and then continue
       // responding in the same turn. Cap at 10 to prevent runaway loops.
       stopWhen: stepCountIs(10),
@@ -147,6 +162,7 @@ export async function POST(
     let fullText = "";
     const toolCalls: RawToolCall[] = [];
     const pendingAssetIndices: number[] = [];
+    const pendingGridIndices: number[] = [];
     const pendingShotIndices: number[] = [];
     const loadReferenceResults = new Map<string, unknown>(); // toolCallId → execute() return value
 
@@ -159,6 +175,8 @@ export async function POST(
           emit({ type: "fork_loading", toolCallId: chunk.id });
         } else if (chunk.toolName === "generateAssetReferences") {
           emit({ type: "asset_ref_loading", toolCallId: chunk.id });
+        } else if (chunk.toolName === "generateSceneGrid") {
+          emit({ type: "scene_grid_loading", toolCallId: chunk.id });
         } else if (chunk.toolName === "compileShot") {
           emit({ type: "shot_compile_loading", toolCallId: chunk.id });
         }
@@ -175,6 +193,8 @@ export async function POST(
           emit({ type: "fork", toolCallId: chunk.toolCallId, ...args });
         } else if (chunk.toolName === "generateAssetReferences") {
           pendingAssetIndices.push(toolCalls.length - 1);
+        } else if (chunk.toolName === "generateSceneGrid") {
+          pendingGridIndices.push(toolCalls.length - 1);
         } else if (chunk.toolName === "compileShot") {
           pendingShotIndices.push(toolCalls.length - 1);
         }
@@ -196,6 +216,25 @@ export async function POST(
           const generatedImages = await generateAssetImages(args.imagePrompt, args.assetKind);
           tc.function.arguments = { ...args, generatedImages };
           emit({ type: "asset_ref", toolCallId: tc.id, assetHandle: args.assetHandle, assetKind: args.assetKind, images: generatedImages });
+        })
+      );
+    }
+
+    // Generate images for all scene grid tool calls in parallel
+    if (pendingGridIndices.length > 0) {
+      await Promise.all(
+        pendingGridIndices.map(async (idx) => {
+          const tc = toolCalls[idx]!;
+          const args = tc.function.arguments as {
+            sceneId: string | number;
+            imagePrompt: string;
+            referenceImageUrls: string[];
+            aspectRatio: "16:9" | "9:16" | "1:1";
+          };
+          const aspectRatio = args.aspectRatio ?? "16:9";
+          const generatedImages = await generateSceneGridImages(args.imagePrompt, args.referenceImageUrls, aspectRatio);
+          tc.function.arguments = { ...args, generatedImages };
+          emit({ type: "scene_grid", toolCallId: tc.id, sceneId: args.sceneId, images: generatedImages, aspectRatio });
         })
       );
     }

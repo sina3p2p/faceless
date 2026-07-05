@@ -2,5 +2,5 @@ import { openrouter } from "@/server/services/ai/llm/index";
 
 export const MODEL = "anthropic/claude-sonnet-5";
 
-export { storyTools, generateAssetImages, generateShotWithFallback, renderAndUploadShot } from "./tools";
+export { storyTools, generateAssetImages, generateSceneGridImages, generateShotWithFallback, renderAndUploadShot } from "./tools";
 export { openrouter };

@@ -26,6 +26,16 @@ export type AssetRef = {
   error?: string;
 };
 
+export type SceneGrid = {
+  toolCallId: string;
+  loading: boolean;
+  sceneId?: string | number;
+  images?: string[];
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  approvedUrl?: string;
+  error?: string;
+};
+
 export type ShotResult = {
   toolCallId: string;
   loading: boolean;
@@ -49,6 +59,7 @@ export type ClientMessage = {
   text: string;
   fork?: ForkCall;
   assetRef?: AssetRef;
+  sceneGrid?: SceneGrid;
   shotResult?: ShotResult;
   shotCompile?: ShotCompile;
 };
