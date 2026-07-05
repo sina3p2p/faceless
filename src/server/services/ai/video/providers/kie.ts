@@ -68,7 +68,7 @@ export class KieVideoProvider implements IProvider {
         input,
       }
     );
-    console.log("KIE: task created", JSON.stringify(task, null, 2));
+    console.log("KIE: task created", input, JSON.stringify(task, null, 2));
     return this.pollTask(task.data.taskId, req.duration);
   }
 
