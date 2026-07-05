@@ -61,15 +61,19 @@ export class KieVideoProvider implements IProvider {
     if (req.generateAudio != null) input.generate_audio = req.generateAudio;
     if (req.referenceImages && req.referenceImages.length > 0) input.reference_image_urls = req.referenceImages;
 
-    const { data: task } = await this.client.post<{ data: { taskId: string } }>(
-      "/jobs/createTask",
-      {
-        model: modelName,
-        input,
-      }
-    );
-
-    return this.pollTask(task.data.taskId, req.duration);
+    try {
+      const { data: task } = await this.client.post<{ data: { taskId: string } }>(
+        "/jobs/createTask",
+        {
+          model: modelName,
+          input,
+        }
+      );
+      return this.pollTask(task.data.taskId, req.duration);
+    } catch (error) {
+      console.error("KIE: error creating task", error);
+      throw error;
+    }
   }
 
   private pollTask(taskId: string, expectedDuration: number): Promise<VideoResult> {
