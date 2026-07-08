@@ -1,8 +1,9 @@
 import { NextRequest } from "next/server";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
 import { db } from "@/server/db";
-import { filmSessions, filmShotJobs } from "@/server/db/schema";
-import { eq } from "drizzle-orm";
+import { filmSessions, filmShotJobs, media } from "@/server/db/schema";
+import { eq, getTableColumns } from "drizzle-orm";
+import { mediaUrl } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -51,16 +52,18 @@ export async function GET(
         await sleep(POLL_MS);
 
         const jobs = await db
-          .select()
+          .select({ ...getTableColumns(filmShotJobs), mediaUrl: media.url, mediaMetadata: media.metadata })
           .from(filmShotJobs)
+          .leftJoin(media, eq(filmShotJobs.mediaId, media.id))
           .where(eq(filmShotJobs.sessionId, sessionId));
 
         for (const job of jobs) {
           if (notified.has(job.toolCallId)) continue;
 
-          if (job.status === "succeeded" && job.videoUrl) {
+          if (job.status === "succeeded" && job.mediaUrl) {
             notified.add(job.toolCallId);
-            enqueue({ type: "shot_complete", toolCallId: job.toolCallId, videoUrl: job.videoUrl });
+            const durationSeconds = (job.mediaMetadata as { duration?: number } | null)?.duration;
+            enqueue({ type: "shot_complete", toolCallId: job.toolCallId, videoUrl: mediaUrl(job.mediaUrl), durationSeconds });
           } else if (job.status === "failed") {
             notified.add(job.toolCallId);
             enqueue({ type: "shot_error", toolCallId: job.toolCallId, error: job.error ?? "Generation failed" });

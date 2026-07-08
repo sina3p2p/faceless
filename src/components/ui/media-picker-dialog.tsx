@@ -21,6 +21,7 @@ export interface MediaItem {
   url: string
   prompt: string | null
   model: string | null
+  duration: number | null
   createdAt: string
 }
 

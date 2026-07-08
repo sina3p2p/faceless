@@ -61,7 +61,7 @@ export async function POST(
 
   if (toolName === "compileShot") {
     const key = `v2/shots/${sessionId}/${toolCallId}-retry-${Date.now()}.mp4`;
-    const persistentUrl = await renderAndUploadShot(
+    const { url: persistentUrl, durationSeconds } = await renderAndUploadShot(
       tcArgs.referenceImageUrls as string[],
       tcArgs.prompt as string,
       (tcArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
@@ -69,14 +69,16 @@ export async function POST(
       sessionId,
       key
     );
-    await patchRow({ videoUrl: persistentUrl });
-    return NextResponse.json({ videoUrl: persistentUrl });
+    // Retry doesn't go through filmShotJobs (that's only for the async
+    // worker path) — just patch the message the client reads.
+    await patchRow({ videoUrl: persistentUrl, renderedDurationSeconds: durationSeconds });
+    return NextResponse.json({ videoUrl: persistentUrl, durationSeconds });
   }
 
   if (toolName === "generateAssetReferences") {
     const { assetHandle, assetKind, imagePrompt } = tcArgs as {
       assetHandle: string;
-      assetKind: "character" | "location";
+      assetKind: "character" | "location" | "object";
       imagePrompt: string;
     };
     const generatedImages = await generateAssetImages(imagePrompt, assetKind);

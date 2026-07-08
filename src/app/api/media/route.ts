@@ -4,6 +4,11 @@ import { media } from "@/server/db/schema";
 import { getAuthUser, unauthorized, badRequest } from "@/lib/api-utils";
 import { eq, desc, and, count } from "drizzle-orm";
 import { mediaUrl, uploadFile } from "@/lib/storage";
+import { probeVideoDuration } from "@/lib/media-probe";
+
+function durationOf(item: { metadata: unknown }): number | null {
+  return (item.metadata as { duration?: number } | null)?.duration ?? null;
+}
 
 const PAGE_SIZE = 20;
 
@@ -33,6 +38,7 @@ export async function GET(req: NextRequest) {
     url: mediaUrl(item.url),
     prompt: item.prompt,
     model: item.modelUsed,
+    duration: durationOf(item),
     createdAt: item.createdAt.toISOString(),
   }));
 
@@ -63,12 +69,15 @@ export async function POST(req: NextRequest) {
   const buffer = Buffer.from(await file.arrayBuffer());
   await uploadFile(key, buffer, file.type);
 
+  const duration = type === "video" ? await probeVideoDuration(buffer) : null;
+
   const [item] = await db.insert(media).values({
     userId: user.id,
     type,
     url: key,
     prompt: file.name,
     modelUsed: "upload",
+    metadata: duration != null ? { duration } : null,
   }).returning();
 
   return NextResponse.json(
@@ -78,6 +87,7 @@ export async function POST(req: NextRequest) {
       url: mediaUrl(item.url),
       prompt: item.prompt,
       model: item.modelUsed,
+      duration: durationOf(item),
       createdAt: item.createdAt.toISOString(),
     },
     { status: 201 }

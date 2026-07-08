@@ -61,8 +61,7 @@ export function SceneGridPanel({
         <img
           src={image}
           alt={`Scene ${sceneGrid.sceneId} grid storyboard`}
-          className="w-full h-full object-cover blur-sm transition-[filter] duration-500"
-          onLoad={(e) => e.currentTarget.classList.remove("blur-sm")}
+          className="w-full h-full object-cover"
         />
       </div>
 

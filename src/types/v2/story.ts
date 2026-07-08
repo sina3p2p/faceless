@@ -20,7 +20,7 @@ export type AssetRef = {
   toolCallId: string;
   loading: boolean;
   assetHandle?: string;
-  assetKind?: "character" | "location";
+  assetKind?: "character" | "location" | "object";
   images?: string[];
   approvedUrl?: string;
   error?: string;
@@ -40,6 +40,7 @@ export type ShotResult = {
   toolCallId: string;
   loading: boolean;
   videoUrl?: string;
+  duration?: number;
   error?: string;
   approved?: boolean;
 };

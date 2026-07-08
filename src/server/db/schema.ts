@@ -546,7 +546,7 @@ export const filmSessions = pgTable("film_sessions", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   status: filmSessionStatusEnum("status").notNull().default("in_progress"),
   title: text("title"),
-  seed: integer("seed"),
+  seed: integer("seed").default(0).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -576,6 +576,7 @@ export const filmShotJobs = pgTable("film_shot_jobs", {
   assistantMessageRowId: text("assistant_message_row_id").notNull(),
   status: text("status").notNull().default("pending"), // pending | in_progress | succeeded | failed
   videoUrl: text("video_url"),
+  mediaId: text("media_id").references(() => media.id),
   error: text("error"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

@@ -10,10 +10,12 @@ const PlayerView = memo(function PlayerView({
     playerRef,
     compositionProps,
     totalFrames,
+    playbackRate,
 }: {
     playerRef: React.RefObject<PlayerRef | null>;
     compositionProps: StoryCompositionProps;
     totalFrames: number;
+    playbackRate: number;
 }) {
     return (
         <Player
@@ -24,6 +26,7 @@ const PlayerView = memo(function PlayerView({
             compositionWidth={1920}
             compositionHeight={1080}
             fps={FPS}
+            playbackRate={playbackRate}
             style={{ width: "100%", height: "100%" }}
             controls={false}
             clickToPlay={false}

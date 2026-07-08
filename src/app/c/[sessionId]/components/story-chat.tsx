@@ -76,6 +76,7 @@ export function StoryChat({
         map.set(m.shotResult.toolCallId, {
           toolCallId: m.shotResult.toolCallId,
           videoUrl: m.shotResult.videoUrl,
+          duration: m.shotResult.duration,
           approved: m.shotResult.approved,
         });
       }
@@ -113,10 +114,11 @@ export function StoryChat({
         if (event.type === "shot_complete") {
           const toolCallId = event.toolCallId as string;
           const videoUrl = event.videoUrl as string;
+          const duration = event.durationSeconds as number | undefined;
           setMessages((prev) =>
             prev.map((m) =>
               m.shotResult?.toolCallId === toolCallId
-                ? { ...m, shotResult: { ...m.shotResult, toolCallId, loading: false, videoUrl } }
+                ? { ...m, shotResult: { ...m.shotResult, toolCallId, loading: false, videoUrl, duration } }
                 : m
             )
           );

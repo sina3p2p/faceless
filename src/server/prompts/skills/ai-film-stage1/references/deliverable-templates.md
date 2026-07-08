@@ -24,6 +24,7 @@ The two TEXT documents of Stage 1's five-artifact handoff (Bible + shot list; th
   - hero_charsheet: "Define the [2–3 stable features + anchor details] in [slot] (facial features, styling, wardrobe, build) as **[label]**."
   - [location]_plate: "Define the [environment] in [slot] as **[label]**; it governs environment, architecture, and composition[, with the [structure] at its [state] version].
 - Locations: [site_plate (versions: ...), ...]
+- Objects / vehicles / hero props: [ship_object_ref, amulet_object_ref, ...] — any recurring vehicle, tool, or prop that appears across shots gets its OWN object reference (one clean three-quarter view, neutral background), never a life sentence inside a location plate or a character sheet; an object named in a motion arc but absent from this list will be invented fresh at render time
 - Voices: [hero_vo, ...]  (if using an external voice tool fed back as reference)
 - Background-tier (no reference image): [crowds, one-off figures]
 
@@ -73,12 +74,15 @@ Rows are grouped into **SCENES** (the unit between beat and shot: one location +
 
 ```
 SCENE [n] — [location] — [lighting state]
+  Delta: [what changes irreversibly in this scene] — visually: [what must look
+          different from the previous scene: a State Schedule value, the light,
+          new action in the frame]
   Coverage: [the scale plan, e.g. "establish W → alternating M → CU for the turn"]
   Space: [where key subjects/objects are relative to each other; which way movement
           flows across frame; which side the eyeline crosses]
 ```
 
-The Space line is what keeps geography consistent across the scene's rows (a hero prop cannot sit in the kitchen in one shot and in the car in the next; a distant landmark stays on the same side of frame) and keeps screen direction coherent (a movement that exits right enters the next frame moving right). When a beat spans two locations cutting against each other, that is TWO scenes — the intercut is expressed by alternating rows, not by blurring one scene across both spaces.
+The Delta line is the distilled result of Step 11's scene-delta rule (the full purpose/start/end analysis lives in the outline — never duplicate it here); it feeds the grid prompt's what-is-new clause. The Space line is what keeps geography consistent across the scene's rows (a hero prop cannot sit in the kitchen in one shot and in the car in the next; a distant landmark stays on the same side of frame) and keeps screen direction coherent (a movement that exits right enters the next frame moving right). When a beat spans two locations cutting against each other, that is TWO scenes — the intercut is expressed by alternating rows, not by blurring one scene across both spaces.
 
 One row per shot. Columns:
 
@@ -119,6 +123,32 @@ One row per shot. Columns:
   but absent from materials will be invented fresh at render time.
 
 Keep a running total of shots and seconds against the target runtime.
+
+## B2. Camera language for authoring rows (choose here; Stage 2 phrases it)
+
+This is the CHOOSING vocabulary for the Camera move and Scale cells — available during Stage 1 by design. (How to WORD the chosen move for Seedance lives in the compilation recipe and is not needed while authoring.)
+
+**The governing principle — motivated movement:** the camera moves when MEANING moves. Every non-static move must answer "what is this move revealing, following, or making us feel?" A move with no answer is decoration; cut it to lock-off and let the subject carry the shot. Corollary: a film where every shot moves is drone-soup — stillness spends contrast that makes the moving shots land.
+
+**Mood → move idioms (expanded):**
+| The beat wants | Reach for |
+|---|---|
+| Rising tension, dawning realization | slow push-in (the closer we get, the worse it feels) |
+| Reveal, irony, context recontextualizing a figure | pull-back or crane-up (the frame learns something) |
+| Intimacy, private moment | slow push to CU, or static CU with shallow focus |
+| Observation, deadpan comedy, letting a gag play | lock-off (the frame refuses to react — that IS the joke) |
+| Unease, wrongness | Dutch tilt held, or slow drift with no motivation |
+| Vertigo, floor-dropping realization | dolly-zoom (push-in while zooming out, background stretches) — rare, once per film at most |
+| Energy, pursuit | tracking/side-follow at matched speed (earn it by contrast with stiller shots around it) |
+| Scale, awe | low angle looking up + slow crane/tilt, subject towering |
+| Vulnerability, smallness | high angle or overhead, subject diminished in negative space |
+| Transition inside a space | foreground wipe-by (a pillar/figure crosses close to lens, briefly occluding — a cut you don't cut) |
+| Walking dialogue-of-glances | reverse-track ahead of the subject walking toward camera |
+| Study, hypnosis, a held object of fascination | slow orbit at constant distance |
+
+**Camera height and angle belong in the Camera move cell** whenever they carry meaning: eye-level is the invisible default; name low/high/overhead/ground-level ONLY when the beat wants power, vulnerability, layout, or texture — an unmotivated fancy angle reads as showing off.
+
+**Depth staging (the strongest realism cue AI shot lists neglect):** compose in THREE planes, not one — something soft in the extreme foreground (a shoulder, a tool, a doorframe edge), the subject in the mid, life in the deep background — and prefer movement TOWARD or AWAY from camera over lateral crosses: depth movement generates parallax, and correct parallax is what subconsciously reads as "filmed" rather than "generated." Per scene, aim for at least one row staged in three planes and one whose movement travels through depth. Write the planes into the motion arc ("past the foreground scaffold, the overseer walks toward camera from the deep ramp") — the grid panels will then inherit the depth composition.
 
 ---
 

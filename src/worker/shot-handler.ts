@@ -29,9 +29,11 @@ export async function handleShotJob(job: Job<ShotJobData>) {
     .where(eq(schema.filmShotJobs.toolCallId, toolCallId));
 
   let videoUrl: string;
+  let durationSeconds: number;
+  let mediaId: string;
   try {
     const key = `v2/shots/${sessionId}/${toolCallId}.mp4`;
-    videoUrl = await renderAndUploadShot(referenceImageUrls, prompt, aspectRatio, duration, sessionId, key);
+    ({ url: videoUrl, durationSeconds, mediaId } = await renderAndUploadShot(referenceImageUrls, prompt, aspectRatio, duration, sessionId, key));
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     logger.error("Shot job generation failed", err as Error, { jobId: job.id, sessionId, toolCallId });
@@ -47,14 +49,15 @@ export async function handleShotJob(job: Job<ShotJobData>) {
     throw err; // let BullMQ handle retries / failure logging
   }
 
-  // Persist success. The /shot-events SSE route polls filmShotJobs and will
-  // push the result to the client within the next poll cycle (~3 s).
+  // Persist success. The /shot-events SSE route polls filmShotJobs (joined
+  // to `media` for the URL) and will push the result to the client within
+  // the next poll cycle (~3 s).
   await db
     .update(schema.filmShotJobs)
-    .set({ status: "succeeded", videoUrl, updatedAt: new Date() })
+    .set({ status: "succeeded", mediaId, updatedAt: new Date() })
     .where(eq(schema.filmShotJobs.toolCallId, toolCallId));
 
-  await patchMessageToolCall(assistantMessageRowId, toolCallId, { videoUrl, pending: false });
+  await patchMessageToolCall(assistantMessageRowId, toolCallId, { videoUrl, renderedDurationSeconds: durationSeconds, pending: false });
 
   logger.info("Shot job completed", { jobId: job.id, sessionId, toolCallId, videoUrl });
   return { videoUrl };

@@ -11,8 +11,10 @@ export const generateAssetReferences = tool({
     "approval, then call again for the next asset. Never batch multiple assets in a single " +
     "turn. Only call once the Look block is locked.",
   inputSchema: z.object({
-    assetHandle: z.string().describe('Named handle, e.g. "hero_charsheet" or "rooftop_plate"'),
-    assetKind: z.enum(["character", "location"]),
+    assetHandle: z
+      .string()
+      .describe('Named handle, e.g. "hero_charsheet", "rooftop_plate", or "ship_object_ref"'),
+    assetKind: z.enum(["character", "location", "object"]),
     imagePrompt: z
       .string()
       .describe(
@@ -24,7 +26,7 @@ export const generateAssetReferences = tool({
 /** Shared by the chat route (first generation) and the retry-tool route (regeneration). */
 export async function generateAssetImages(
   imagePrompt: string,
-  assetKind: "character" | "location"
+  assetKind: "character" | "location" | "object"
 ): Promise<string[]> {
   const aspectRatio = assetKind === "location" ? ("16:9" as const) : ("1:1" as const);
   const results = await Promise.all(

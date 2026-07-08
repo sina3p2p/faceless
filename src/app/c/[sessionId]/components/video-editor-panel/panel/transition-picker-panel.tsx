@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { FloatingPanel } from "../../floating-panel";
-import type { InternalClip, TransitionSetting } from "../types";
+import type { InternalClip, TransitionSetting } from "../timeline/types";
 
 export interface TransitionPickerPanelProps {
   containerRef: React.RefObject<HTMLDivElement | null>;

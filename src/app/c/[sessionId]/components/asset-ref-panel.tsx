@@ -69,7 +69,7 @@ export function AssetRefPanel({
                 }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="Reference candidate" className="w-full h-full object-cover blur-sm transition-[filter] duration-500" onLoad={(e) => e.currentTarget.classList.remove('blur-sm')} />
+              <img src={url} alt="Reference candidate" className="w-full h-full object-cover" />
               {isApproved && (
                 <div className="absolute inset-0 bg-emerald-500/20 flex items-center justify-center">
                   <svg className="w-6 h-6 text-emerald-400 drop-shadow" fill="currentColor" viewBox="0 0 20 20">

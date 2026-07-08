@@ -274,7 +274,7 @@ A camera instruction has four parts: **shot size, angle, lens character, and mov
 
 **Putting it together — a camera line reads:** [shot size] + [angle if non-neutral] + [one movement, phrased rhythmically] + [focus feel]. E.g. _"Medium close-up, slight low angle, slow dolly-in over the shot, shallow focus with a soft background."_ One size, one angle, one move, one focus note — clean and obeyed.
 
-## Camera Movement Encyclopedia (match to the beat's mood)
+## Camera Movement Encyclopedia (phrasing reference — the move was already CHOSEN at Step 14 from deliverable-templates §B2; here you phrase that choice for Seedance, you don't re-choose it)
 
 | Movement                      | When it fits a beat                              | Seedance phrasing                                                                                                       |
 | ----------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |

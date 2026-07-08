@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { type PlayerRef } from "@remotion/player";
 import { preloadVideo } from "@remotion/preload";
@@ -8,8 +8,8 @@ import { getVideoMetadata } from "@remotion/media-utils";
 import { type StoryCompositionProps, type AudioClipConfig, computeSequenceLayout, FPS } from "@/remotion/StoryComposition";
 import { FloatingPanel } from "../floating-panel";
 import { Timeline } from "./timeline";
-import { formatTime } from "./use-pointer-drag";
-import type { InternalClip, AudioClip, TransitionSetting } from "./types";
+import { trackIdOf, trackIndexOf, nextFreeTrackIndex } from "./timeline/hooks/use-timeline-tracks";
+import type { InternalClip, AudioClip, TransitionSetting, TimelineTrack, NewTimelineItemInput } from "./timeline/types";
 import { SpeedPanel, type SpeedMode, type CurvePoint } from "./panel/speed-panel";
 import { VolumePanel } from "./panel/volume-panel";
 import { AiEditPanel } from "./panel/ai-edit-panel";
@@ -23,6 +23,7 @@ import PlayerView from "./player-view";
 export type Clip = {
   toolCallId: string;
   videoUrl: string;
+  duration?: number;
   approved?: boolean;
 };
 
@@ -36,31 +37,96 @@ interface VideoEditorPanelProps {
   isHidden?: boolean;
 }
 
+interface HistorySnapshot {
+  clips: InternalClip[];
+  audioClips: AudioClip[];
+  transitions: Map<string, TransitionSetting>;
+}
+
+const HISTORY_COALESCE_MS = 300;
+const HISTORY_LIMIT = 50;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toInternalClip(c: Clip, startTime = 0, trackIndex = 0): InternalClip {
   return { id: c.toolCallId, sourceId: c.toolCallId, videoUrl: c.videoUrl, approved: c.approved, startTime, trackIndex, trimStart: 0, trimEnd: null, reversed: false };
 }
 
+// Classic array-move reindexing for dragging a track to a new position:
+// the moved track takes `toIndex`, everything strictly between the two
+// shifts by one to close the gap.
+function remapTrackIndex(fromIndex: number, toIndex: number, trackIndex: number): number {
+  if (trackIndex === fromIndex) return toIndex;
+  if (fromIndex < toIndex) {
+    if (trackIndex > fromIndex && trackIndex <= toIndex) return trackIndex - 1;
+  } else {
+    if (trackIndex >= toIndex && trackIndex < fromIndex) return trackIndex + 1;
+  }
+  return trackIndex;
+}
+
+function buildTracks(
+  clips: InternalClip[],
+  audioClips: AudioClip[],
+  getEffectiveDuration: (clip: InternalClip) => number,
+  getAudioEffDur: (ac: AudioClip) => number,
+): TimelineTrack[] {
+  const byTrack = new Map<number, TimelineTrack["items"]>();
+  for (const clip of clips) {
+    const items = byTrack.get(clip.trackIndex) ?? [];
+    items.push({
+      id: clip.id,
+      trackId: trackIdOf(clip.trackIndex),
+      start: clip.startTime,
+      end: clip.startTime + getEffectiveDuration(clip),
+      type: "video",
+      label: clip.sourceId,
+      color: "#7c3aed",
+      clip,
+    });
+    byTrack.set(clip.trackIndex, items);
+  }
+  for (const ac of audioClips) {
+    const items = byTrack.get(ac.trackIndex) ?? [];
+    items.push({
+      id: ac.id,
+      trackId: trackIdOf(ac.trackIndex),
+      start: ac.startTime,
+      end: ac.startTime + getAudioEffDur(ac),
+      type: "audio",
+      label: ac.name,
+      color: "#14b8a6",
+      clip: ac,
+    });
+    byTrack.set(ac.trackIndex, items);
+  }
+  return Array.from(byTrack.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([idx, items]) => ({ id: trackIdOf(idx), name: idx === 0 ? "Main" : `T${idx + 1}`, items }));
+}
 
 // ─── Main Panel ───────────────────────────────────────────────────────────────
 
 export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectClip, isHidden }: VideoEditorPanelProps) {
   const [internalClips, setInternalClips] = useState<InternalClip[]>(() => {
-    // Space clips sequentially on track 0 with a 5s placeholder gap.
-    // Real durations load asynchronously via onLoadedMetadata.
+    // Space clips sequentially on track 0 using each clip's known duration
+    // (reported by the generation provider) where available, falling back to
+    // a 5s placeholder for clips that predate that being stored. Real
+    // durations for placeholder clips load asynchronously via onLoadedMetadata.
     let cursor = 0;
     return clips.map((c) => {
       const clip = toInternalClip(c, cursor, 0);
-      cursor += 5;
+      cursor += c.duration ?? 5;
       return clip;
     });
   });
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [activeClipIndex, setActiveClipIndex] = useState(0);
-  const [clipMeta, setClipMeta] = useState<Map<string, number>>(new Map());
-  const [pxPerSec, setPxPerSec] = useState(80);
+  const [clipMeta, setClipMeta] = useState<Map<string, number>>(
+    () => new Map(clips.filter((c) => c.duration != null).map((c) => [c.toolCallId, c.duration!])),
+  );
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [trackLocks, setTrackLocks] = useState<Set<number>>(new Set());
   const [activeTab, setActiveTab] = useState<ToolTab | null>(null);
   const [clipSpeeds, setClipSpeeds] = useState<Map<string, number>>(new Map());
   const [clipVolumes, setClipVolumes] = useState<Map<string, number>>(new Map());
@@ -89,12 +155,73 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
   // Remotion Player ref
   const playerRef = useRef<PlayerRef>(null);
 
+  // ── undo/redo history ─────────────────────────────────────────────────────
+  // One generic mechanism: snapshot {clips, audioClips, transitions} before any
+  // history-tracked update, coalesced to at most once per 300ms so a whole drag
+  // gesture collapses into a single undo step.
+  const historyStateRef = useRef<HistorySnapshot>({ clips: internalClips, audioClips, transitions: clipTransitions });
+  useLayoutEffect(() => {
+    historyStateRef.current = { clips: internalClips, audioClips, transitions: clipTransitions };
+  });
+  const pastRef = useRef<HistorySnapshot[]>([]);
+  const futureRef = useRef<HistorySnapshot[]>([]);
+  const lastSnapshotAtRef = useRef(0);
+  const [historyTick, setHistoryTick] = useState(0);
+
+  function snapshotHistory() {
+    const now = Date.now();
+    if (now - lastSnapshotAtRef.current > HISTORY_COALESCE_MS) {
+      pastRef.current = [...pastRef.current, historyStateRef.current].slice(-HISTORY_LIMIT);
+      futureRef.current = [];
+      lastSnapshotAtRef.current = now;
+      setHistoryTick((t) => t + 1);
+    }
+  }
+
+  function setInternalClipsH(updater: React.SetStateAction<InternalClip[]>) {
+    snapshotHistory();
+    setInternalClips(updater);
+  }
+  function setAudioClipsH(updater: React.SetStateAction<AudioClip[]>) {
+    snapshotHistory();
+    setAudioClips(updater);
+  }
+  function setClipTransitionsH(updater: React.SetStateAction<Map<string, TransitionSetting>>) {
+    snapshotHistory();
+    setClipTransitions(updater);
+  }
+
+  function undo() {
+    const prev = pastRef.current[pastRef.current.length - 1];
+    if (!prev) return;
+    pastRef.current = pastRef.current.slice(0, -1);
+    futureRef.current = [...futureRef.current, historyStateRef.current];
+    setInternalClips(prev.clips);
+    setAudioClips(prev.audioClips);
+    setClipTransitions(prev.transitions);
+    setHistoryTick((t) => t + 1);
+  }
+  function redo() {
+    const next = futureRef.current[futureRef.current.length - 1];
+    if (!next) return;
+    futureRef.current = futureRef.current.slice(0, -1);
+    pastRef.current = [...pastRef.current, historyStateRef.current];
+    setInternalClips(next.clips);
+    setAudioClips(next.audioClips);
+    setClipTransitions(next.transitions);
+    setHistoryTick((t) => t + 1);
+  }
+  // historyTick is read here only to force a re-render after undo/redo/snapshot
+  void historyTick;
+  const canUndo = pastRef.current.length > 0;
+  const canRedo = futureRef.current.length > 0;
+
   // ── sync internalClips from props ─────────────────────────────────────────
   // Merges server-pushed clip updates into local editable state; local edits
   // (trim/position/etc.) are preserved for clips that still exist upstream.
+  // Not history-tracked — this is an automatic sync, not a user gesture.
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- merge logic must run once, not scattered across every internalClips-mutating call site
     setInternalClips((prev) => {
       const validSourceIds = new Set(clips.map((c) => c.toolCallId));
       const filtered = prev.filter((c) => validSourceIds.has(c.sourceId));
@@ -116,34 +243,73 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
       );
       const newClips = incoming.map((c) => {
         const clip = toInternalClip(c, cursor, 0);
-        cursor += clipMeta.get(c.toolCallId) ?? 5;
+        cursor += c.duration ?? clipMeta.get(c.toolCallId) ?? 5;
         return clip;
       });
+      const known = incoming.filter((c) => c.duration != null);
+      if (known.length > 0) {
+        setClipMeta((prevMeta) => {
+          const next = new Map(prevMeta);
+          for (const c of known) if (!next.has(c.toolCallId)) next.set(c.toolCallId, c.duration!);
+          return next;
+        });
+      }
       return [...updated, ...newClips];
     });
   }, [clips]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Closes the 5s placeholder gap once a clip's real duration is known: shifts
-  // subsequent track-0 clips so they follow immediately after the real end.
+  // Closes the 5s placeholder gap once a clip's real duration is known.
+  // Re-derives every "pristine" track-0 clip's position from scratch using
+  // the best durations known so far (real where resolved, 5s placeholder
+  // otherwise), rather than nudging only the immediate next clip — video
+  // metadata for several clips can resolve concurrently and in any order,
+  // and a single-hop shift only produces a correctly packed layout when
+  // clips happen to resolve strictly left to right. A clip stops being
+  // "pristine" (and layout stops auto-adjusting from that point on) as soon
+  // as its position no longer matches what the auto-layout would have put
+  // it at, which is how a user's manual drag is preserved.
+  // Not history-tracked — this is an automatic correction, not a user gesture.
+  //
+  // clipMetaRef (kept fresh via the layout effect below) is read here instead
+  // of `clipMeta` directly — this function is only ever invoked from async
+  // getVideoMetadata callbacks, so closing over `clipMeta` would pin it to
+  // whatever it was when the *effect* last ran, not when each resolution
+  // actually lands. That made every resolution after the first overwrite
+  // clipMeta from a stale snapshot instead of building on the latest one —
+  // durations from earlier-resolved clips were silently lost.
+  const clipMetaRef = useRef(clipMeta);
+  useLayoutEffect(() => {
+    clipMetaRef.current = clipMeta;
+  });
+
   const applyRealDuration = useCallback((id: string, realDur: number) => {
-    if (clipMeta.has(id)) return;
-    setClipMeta((prev) => new Map(prev).set(id, realDur));
+    if (clipMetaRef.current.has(id)) return;
+    setClipMeta((prev) => (prev.has(id) ? prev : new Map(prev).set(id, realDur)));
     setInternalClips((prev) => {
-      const idx = prev.findIndex((x) => x.id === id);
-      if (idx < 0) return prev;
-      const clip = prev[idx]!;
-      if (clip.trackIndex !== 0) return prev;
-      const placeholderEnd = clip.startTime + 5;
-      const realEnd = clip.startTime + realDur;
-      const shift = realEnd - placeholderEnd;
-      if (Math.abs(shift) < 0.01) return prev;
-      return prev.map((x, xi) =>
-        xi > idx && x.trackIndex === 0 && Math.abs(x.startTime - placeholderEnd) < 0.1
-          ? { ...x, startTime: Math.max(0, x.startTime + shift) }
-          : x
-      );
+      const priorMeta = clipMetaRef.current;
+      const durationOf = (clipId: string) => (clipId === id ? realDur : priorMeta.get(clipId) ?? 5);
+      let oldCursor = 0;
+      let newCursor = 0;
+      let pristine = true;
+      let changed = false;
+      const next = prev.map((c) => {
+        if (c.trackIndex !== 0) return c;
+        if (pristine) {
+          pristine = Math.abs(c.startTime - oldCursor) < 0.1;
+        }
+        oldCursor += priorMeta.get(c.id) ?? 5;
+        if (!pristine) {
+          newCursor = c.startTime + durationOf(c.id);
+          return c;
+        }
+        const placed = Math.abs(c.startTime - newCursor) < 0.01 ? c : { ...c, startTime: newCursor };
+        if (placed !== c) changed = true;
+        newCursor += durationOf(c.id);
+        return placed;
+      });
+      return changed ? next : prev;
     });
-  }, [clipMeta]);
+  }, []);
 
   // ── preload clip videos so OffthreadVideo has no seek delay ────────────────
   // preloadVideo() just hints the browser via <link rel=preload> — no fetch(),
@@ -170,7 +336,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
         .then(({ durationInSeconds }) => {
           for (const id of ids) applyRealDuration(id, durationInSeconds);
         })
-        .catch(() => { });
+        .catch((err) => { console.error("getVideoMetadata failed", url, err); });
     }
   }, [internalClips, applyRealDuration]);
 
@@ -189,6 +355,15 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
     return Math.max(0, end - clip.trimStart);
   }, [getRawDuration]);
 
+  // A locked track's items can't be moved/trimmed/deleted/duplicated/split —
+  // enforced once here rather than scattered across every call site.
+  function isItemLocked(id: string): boolean {
+    const clip = internalClips.find((c) => c.id === id);
+    if (clip) return trackLocks.has(clip.trackIndex);
+    const ac = audioClips.find((a) => a.id === id);
+    return ac ? trackLocks.has(ac.trackIndex) : false;
+  }
+
   const totalDuration = useMemo(
     () => Math.max(
       0,
@@ -201,7 +376,6 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
   // ── auto-remove transitions when clips are no longer adjacent ─────────────
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- single choke point for pruning stale transitions; internalClips is mutated from ~10 call sites in Timeline
     setClipTransitions((prev) => {
       if (prev.size === 0) return prev;
       const SNAP = 0;
@@ -270,19 +444,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
     const player = playerRef.current;
     if (!player) return;
     const onTimeUpdate = () => {
-      const t = player.getCurrentFrame() / FPS;
-      setCurrentTime(t);
-      let idx = 0;
-      let bestTrack = Infinity;
-      for (let i = 0; i < internalClips.length; i++) {
-        const c = internalClips[i]!;
-        const end = c.startTime + (clipMeta.get(c.id) ?? 0);
-        if (t >= c.startTime && t < end && c.trackIndex < bestTrack) {
-          idx = i;
-          bestTrack = c.trackIndex;
-        }
-      }
-      setActiveClipIndex(idx);
+      setCurrentTime(player.getCurrentFrame() / FPS);
     };
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
@@ -297,7 +459,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
       player.removeEventListener("pause", onPause);
       player.removeEventListener("ended", onEnded);
     };
-  }, [internalClips, clipMeta]);
+  }, [internalClips]);
 
   // ── playback ──────────────────────────────────────────────────────────────
 
@@ -311,52 +473,51 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
     }
   }
 
+  function playH() {
+    togglePlay();
+  }
+  function pauseH() {
+    playerRef.current?.pause();
+  }
+
   function seekTo(t: number) {
     const clamped = Math.max(0, Math.min(totalDuration, t));
     setCurrentTime(clamped);
     playerRef.current?.seekTo(Math.round(clamped * FPS));
   }
 
-  // ── transport ─────────────────────────────────────────────────────────────
-
-  function goToStart() { seekTo(0); }
-  function goToEnd() { seekTo(totalDuration); }
-
-  function prevClip() {
-    const starts = internalClips.map((c) => c.startTime).sort((a, b) => a - b);
-    const before = starts.filter((t) => t < currentTime - 0.05);
-    seekTo(before.length > 0 ? before[before.length - 1]! : 0);
-  }
-
-  function nextClip() {
-    const starts = internalClips.map((c) => c.startTime).sort((a, b) => a - b);
-    const after = starts.find((t) => t > currentTime + 0.05);
-    if (after !== undefined) seekTo(after);
-  }
-
   const videoPreviewRef = useRef<HTMLDivElement>(null);
 
-  // ── per-clip controls ─────────────────────────────────────────────────────
+  // ── selection ─────────────────────────────────────────────────────────────
+  // selectedItemIds is the Timeline's own multi-select (marquee); the external
+  // selectedClipId/onSelectClip prop pair (owned by story-chat.tsx) mirrors the
+  // single-video-clip case, kept in sync both ways.
 
-  const selectedClip = internalClips.find((c) => c.id === selectedClipId) ?? null;
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(() => (selectedClipId ? [selectedClipId] : []));
+
+  useEffect(() => {
+    const single = selectedItemIds.length === 1 ? selectedItemIds[0]! : null;
+    const derived = single !== null && internalClips.some((c) => c.id === single) ? single : null;
+    onSelectClip(derived);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-derive when selection or clip list changes
+  }, [selectedItemIds, internalClips]);
+
+  useEffect(() => {
+    setSelectedItemIds((prev) => {
+      if (selectedClipId === null) return prev;
+      if (prev.length === 1 && prev[0] === selectedClipId) return prev;
+      return [selectedClipId];
+    });
+  }, [selectedClipId]);
 
   // ── split ─────────────────────────────────────────────────────────────────
 
-  const canSplit = useMemo(() => {
-    if (!selectedClipId) return false;
-    const clip = internalClips.find((c) => c.id === selectedClipId);
-    if (!clip) return false;
-    const localEffTime = currentTime - clip.startTime;
-    const eff = getEffectiveDuration(clip);
-    return localEffTime > 0.1 && localEffTime < eff - 0.1;
-  }, [selectedClipId, internalClips, currentTime, getEffectiveDuration]);
-
-  function splitAtPlayhead() {
-    if (!selectedClipId || !canSplit) return;
-    const clipIdx = internalClips.findIndex((c) => c.id === selectedClipId);
+  function onSplitItemsH(itemId: string, splitTime: number) {
+    if (isItemLocked(itemId)) return;
+    const clipIdx = internalClips.findIndex((c) => c.id === itemId);
     if (clipIdx < 0) return;
     const clip = internalClips[clipIdx]!;
-    const localEffTime = currentTime - clip.startTime;
+    const localEffTime = splitTime - clip.startTime;
     const rawSplitPoint = clip.trimStart + localEffTime;
     const raw = getRawDuration(clip.id);
     const splitDur = getEffectiveDuration({ ...clip, trimEnd: rawSplitPoint });
@@ -370,52 +531,175 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
     };
 
     setClipMeta((prev) => new Map(prev).set(part2.id, raw));
-    setInternalClips((prev) => {
+    setInternalClipsH((prev) => {
       const next = [...prev];
       next.splice(clipIdx, 1, part1, part2);
       return next;
     });
-    onSelectClip(part2.id);
+    setSelectedItemIds([part2.id]);
   }
 
   // ── reverse ───────────────────────────────────────────────────────────────
 
-  function toggleReverse() {
-    if (!selectedClipId) return;
-    setInternalClips((prev) => prev.map((c) =>
-      c.id === selectedClipId ? { ...c, reversed: !c.reversed } : c
-    ));
+  function onReverseItemsH(ids: string[]) {
+    const idSet = new Set(ids.filter((id) => !isItemLocked(id)));
+    if (idSet.size === 0) return;
+    setInternalClipsH((prev) => prev.map((c) => (idSet.has(c.id) ? { ...c, reversed: !c.reversed } : c)));
   }
 
-  // ── delete ────────────────────────────────────────────────────────────────
+  // ── delete / duplicate (support multi-item selection) ─────────────────────
 
-  function deleteClip() {
-    if (!selectedClipId) return;
-    deleteClipById(selectedClipId);
+  function onDeleteItemsH(ids: string[]) {
+    const idSet = new Set(ids.filter((id) => !isItemLocked(id)));
+    if (idSet.size === 0) return;
+    setInternalClipsH((prev) => prev.filter((c) => !idSet.has(c.id)));
+    setAudioClipsH((prev) => prev.filter((ac) => !idSet.has(ac.id)));
+    setSelectedItemIds((prev) => prev.filter((id) => !idSet.has(id)));
   }
 
-  function deleteClipById(id: string) {
-    if (selectedClipId === id) onSelectClip(null);
-    setInternalClips((prev) => prev.filter((c) => c.id !== id));
+  function onDuplicateItemsH(ids: string[]) {
+    const newIds: string[] = [];
+    for (const id of ids) {
+      if (isItemLocked(id)) continue;
+      const src = internalClips.find((c) => c.id === id);
+      if (src) {
+        const dur = getEffectiveDuration(src);
+        const copy: InternalClip = { ...src, id: `${src.sourceId}-d${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, startTime: src.startTime + dur };
+        const raw = getRawDuration(src.id);
+        if (raw > 0) setClipMeta((prev) => new Map(prev).set(copy.id, raw));
+        setInternalClipsH((prev) => [...prev, copy]);
+        newIds.push(copy.id);
+        continue;
+      }
+      const srcAudio = audioClips.find((ac) => ac.id === id);
+      if (srcAudio) {
+        const dur = getAudioEffDur(srcAudio);
+        const copy: AudioClip = { ...srcAudio, id: `${srcAudio.id}-d${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, startTime: srcAudio.startTime + dur };
+        setAudioClipsH((prev) => [...prev, copy]);
+        newIds.push(copy.id);
+      }
+    }
+    if (newIds.length > 0) setSelectedItemIds(newIds);
   }
 
-  // ── duplicate ─────────────────────────────────────────────────────────────
+  // ── move / resize (drag + trim) ───────────────────────────────────────────
 
-  function duplicateClip() {
-    if (!selectedClipId) return;
-    const src = internalClips.find((c) => c.id === selectedClipId);
-    if (!src) return;
-    const dur = getEffectiveDuration(src);
-    const copy: InternalClip = {
-      ...src,
-      id: `${src.sourceId}-d${Date.now()}`,
-      startTime: src.startTime + dur,
-    };
-    const raw = getRawDuration(src.id);
-    if (raw > 0) setClipMeta((prev) => new Map(prev).set(copy.id, raw));
-    setInternalClips((prev) => [...prev, copy]);
-    onSelectClip(copy.id);
+  function onItemMoveH(itemId: string, newStart: number, newEnd: number, newTrackId: string) {
+    void newEnd; // move never changes duration
+    if (isItemLocked(itemId)) return;
+    const newTrackIndex = trackIndexOf(newTrackId);
+    if (internalClips.some((c) => c.id === itemId)) {
+      setInternalClipsH((prev) => prev.map((c) => (c.id === itemId ? { ...c, startTime: newStart, trackIndex: newTrackIndex } : c)));
+    } else {
+      setAudioClipsH((prev) => prev.map((ac) => (ac.id === itemId ? { ...ac, startTime: newStart, trackIndex: newTrackIndex } : ac)));
+    }
   }
+
+  function onItemResizeH(itemId: string, newStart: number, newEnd: number) {
+    if (isItemLocked(itemId)) return;
+    const videoItem = internalClips.find((c) => c.id === itemId);
+    if (videoItem) {
+      const raw = getRawDuration(itemId);
+      const deltaStart = newStart - videoItem.startTime;
+      const newTrimStart = Math.max(0, Math.min(videoItem.trimStart + deltaStart, raw));
+      const newTrimEndRaw = newTrimStart + (newEnd - newStart);
+      const newTrimEnd = raw > 0 && newTrimEndRaw >= raw ? null : newTrimEndRaw;
+      setInternalClipsH((prev) => prev.map((c) => (c.id === itemId ? { ...c, startTime: newStart, trimStart: newTrimStart, trimEnd: newTrimEnd } : c)));
+      return;
+    }
+    const audioItem = audioClips.find((ac) => ac.id === itemId);
+    if (audioItem) {
+      const raw = audioItem.rawDuration;
+      const deltaStart = newStart - audioItem.startTime;
+      const newTrimStart = Math.max(0, Math.min(audioItem.trimStart + deltaStart, raw));
+      const newTrimEndRaw = newTrimStart + (newEnd - newStart);
+      const newTrimEnd = raw > 0 && newTrimEndRaw >= raw ? null : newTrimEndRaw;
+      setAudioClipsH((prev) => prev.map((ac) => (ac.id === itemId ? { ...ac, startTime: newStart, trimStart: newTrimStart, trimEnd: newTrimEnd } : ac)));
+    }
+  }
+
+  // ── add new items ─────────────────────────────────────────────────────────
+
+  function onAddNewItemH(item: NewTimelineItemInput) {
+    if (item.type === "video") {
+      const clipId = item.id ?? `user-${Date.now()}`;
+      const lastEnd = Math.max(0, ...internalClips.filter((c) => c.trackIndex === 0).map((c) => c.startTime + (getRawDuration(c.id) || 5)));
+      setInternalClipsH((prev) => [...prev, { id: clipId, sourceId: clipId, videoUrl: item.videoUrl, startTime: lastEnd, trackIndex: 0, trimStart: 0, trimEnd: null, reversed: false }]);
+      if (item.duration != null) setClipMeta((prev) => new Map(prev).set(clipId, item.duration!));
+      setSelectedItemIds([clipId]);
+      return;
+    }
+    const usedTracks = new Set([...internalClips.map((c) => c.trackIndex), ...audioClips.map((ac) => ac.trackIndex)]);
+    const trackIndex = nextFreeTrackIndex(usedTracks);
+    const id = `audio-${Date.now()}`;
+    setAudioClipsH((prev) => [...prev, { id, url: item.url, name: item.name, startTime: 0, trackIndex, trimStart: 0, trimEnd: null, rawDuration: item.rawDuration, volume: 1 }]);
+    setSelectedItemIds([id]);
+  }
+
+  // ── full-replace fallback (no dedicated event covers this) ────────────────
+
+  function onTracksChangeH(newTracks: TimelineTrack[]) {
+    const nextClips: InternalClip[] = [];
+    const nextAudio: AudioClip[] = [];
+    for (const track of newTracks) {
+      for (const item of track.items) {
+        if (item.type === "video") nextClips.push(item.clip);
+        else nextAudio.push(item.clip);
+      }
+    }
+    setInternalClipsH(nextClips);
+    setAudioClipsH(nextAudio);
+  }
+
+  // ── track lock / delete / reorder ─────────────────────────────────────────
+
+  function onTrackLockToggleH(trackIndex: number) {
+    setTrackLocks((prev) => {
+      const next = new Set(prev);
+      if (next.has(trackIndex)) next.delete(trackIndex);
+      else next.add(trackIndex);
+      return next;
+    });
+  }
+
+  function onTrackDeleteH(trackIndex: number) {
+    setInternalClipsH((prev) =>
+      prev
+        .filter((c) => c.trackIndex !== trackIndex)
+        .map((c) => (c.trackIndex > trackIndex ? { ...c, trackIndex: c.trackIndex - 1 } : c))
+    );
+    setAudioClipsH((prev) =>
+      prev
+        .filter((ac) => ac.trackIndex !== trackIndex)
+        .map((ac) => (ac.trackIndex > trackIndex ? { ...ac, trackIndex: ac.trackIndex - 1 } : ac))
+    );
+    setTrackLocks((prev) => {
+      const next = new Set<number>();
+      for (const idx of prev) {
+        if (idx === trackIndex) continue;
+        next.add(idx > trackIndex ? idx - 1 : idx);
+      }
+      return next;
+    });
+  }
+
+  function onTrackReorderH(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex) return;
+    setInternalClipsH((prev) => prev.map((c) => ({ ...c, trackIndex: remapTrackIndex(fromIndex, toIndex, c.trackIndex) })));
+    setAudioClipsH((prev) => prev.map((ac) => ({ ...ac, trackIndex: remapTrackIndex(fromIndex, toIndex, ac.trackIndex) })));
+    setTrackLocks((prev) => {
+      const next = new Set<number>();
+      for (const idx of prev) next.add(remapTrackIndex(fromIndex, toIndex, idx));
+      return next;
+    });
+  }
+
+  // ── tracks adapter for the Timeline controlled component ──────────────────
+
+  const tracks = useMemo(
+    () => buildTracks(internalClips, audioClips, getEffectiveDuration, getAudioEffDur),
+    [internalClips, audioClips, getEffectiveDuration, getAudioEffDur],
+  );
 
   // ── tab config ────────────────────────────────────────────────────────────
 
@@ -501,7 +785,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
                 sessionId={sessionId}
                 selectedClipId={selectedClipId}
                 internalClips={internalClips}
-                setInternalClips={setInternalClips}
+                setInternalClips={setInternalClipsH}
                 setClipMeta={setClipMeta}
                 onSelectClip={onSelectClip}
                 getRawDuration={getRawDuration}
@@ -526,15 +810,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             </p>
           </div>
         ) : (
-          <PlayerView playerRef={playerRef} compositionProps={compositionProps} totalFrames={totalFrames} />
-        )}
-
-        {internalClips.length > 0 && (
-          <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm rounded-md px-2 py-1">
-            <span className="text-xs font-mono text-white/70">
-              {formatTime(currentTime)} / {formatTime(totalDuration)}
-            </span>
-          </div>
+          <PlayerView playerRef={playerRef} compositionProps={compositionProps} totalFrames={totalFrames} playbackRate={playbackRate} />
         )}
 
         <TransitionPickerPanel
@@ -542,141 +818,48 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
           transitionPickerFor={transitionPickerFor}
           internalClips={internalClips}
           clipTransitions={clipTransitions}
-          setClipTransitions={setClipTransitions}
+          setClipTransitions={setClipTransitionsH}
           visible={transitionPickerFor !== null}
           setVisible={(visible) => setTransitionPickerFor(visible ? transitionPickerFor : null)}
         />
       </div>
 
-      {/* ── Transport Controls ── */}
-      <div className="shrink-0 h-11 flex items-center justify-between px-4 border-t border-white/10 bg-black/20 backdrop-blur-md">
-        {/* Left: edit actions */}
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={deleteClip}
-            disabled={!selectedClipId}
-            title="Delete clip"
-            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
-          >
-            <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
-            </svg>
-          </button>
-          <button
-            onClick={splitAtPlayhead}
-            disabled={!canSplit}
-            title="Split at playhead"
-            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
-          >
-            <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="m7.848 8.25 1.536.887M7.848 8.25a3 3 0 1 1-5.196-3 3 3 0 0 1 5.196 3Zm1.536.887a2.165 2.165 0 0 1 1.083 1.839c.005.351.054.695.14 1.024M9.384 9.137l2.077 1.199M7.848 15.75l1.536-.887m-1.536.887a3 3 0 1 1-5.196 3 3 3 0 0 1 5.196-3Zm1.536-.887a2.165 2.165 0 0 0 1.083-1.839c.005-.351.054-.695.14-1.024m0 0 2.077-1.199m0-3.328a4.323 4.323 0 0 1 2.068-1.379l5.325-1.628a4.5 4.5 0 0 1 2.48-.044l.803.215-7.794 4.5m-2.882-1.664A4.33 4.33 0 0 0 10.607 12m3.736 0 7.794 4.5-.802.215a4.5 4.5 0 0 1-2.48-.043l-5.326-1.629a4.324 4.324 0 0 1-2.068-1.379M14.343 12l-2.882 1.664" />
-            </svg>
-          </button>
-          <button
-            onClick={duplicateClip}
-            disabled={!selectedClipId}
-            title="Duplicate clip"
-            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed"
-          >
-            <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-            </svg>
-          </button>
-          <button
-            onClick={toggleReverse}
-            disabled={!selectedClipId}
-            title="Reverse clip"
-            className={`w-8 h-8 flex items-center justify-center rounded transition-all disabled:opacity-25 disabled:cursor-not-allowed ${selectedClip?.reversed ? "text-amber-400 bg-amber-500/15 hover:bg-amber-500/25" : "text-muted-foreground/60 hover:text-foreground hover:bg-white/10"
-              }`}
-          >
-            <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Center: transport */}
-        <div className="flex items-center gap-1">
-          <button onClick={goToStart} disabled={internalClips.length === 0} title="Go to start"
-            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all disabled:opacity-25 disabled:cursor-not-allowed">
-            <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
-          </button>
-          <button onClick={prevClip} disabled={internalClips.length === 0} title="Previous clip"
-            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all disabled:opacity-25 disabled:cursor-not-allowed">
-            <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm12 12L8 12l10-6z" /></svg>
-          </button>
-          <button onClick={togglePlay} disabled={internalClips.length === 0} title={isPlaying ? "Pause" : "Play"}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/90 text-black hover:bg-white transition-all disabled:opacity-25 disabled:cursor-not-allowed">
-            {isPlaying
-              ? <svg className="w-[15px] h-[15px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
-              : <svg className="w-[15px] h-[15px] ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            }
-          </button>
-          <button onClick={nextClip} disabled={internalClips.length === 0} title="Next clip"
-            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all disabled:opacity-25 disabled:cursor-not-allowed">
-            <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l10-6L6 6v12zm12-12v12h2V6h-2z" /></svg>
-          </button>
-          <button onClick={goToEnd} disabled={internalClips.length === 0} title="Go to end"
-            className="w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all disabled:opacity-25 disabled:cursor-not-allowed">
-            <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm8.5 0h2V6h-2v12z" /></svg>
-          </button>
-        </div>
-
-        {/* Right: zoom + export */}
-        <div className="flex items-center gap-2">
-          <button onClick={() => setPxPerSec((p) => Math.max(20, Math.round(p * 0.8)))} title="Zoom out"
-            className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35M8 11h6" />
-            </svg>
-          </button>
-          <input type="range" min={20} max={300} value={pxPerSec} onChange={(e) => setPxPerSec(Number(e.target.value))}
-            className="w-20 h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white/70 hover:[&::-webkit-slider-thumb]:bg-white"
-          />
-          <button onClick={() => setPxPerSec((p) => Math.min(300, Math.round(p * 1.25)))} title="Zoom in"
-            className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
-            </svg>
-          </button>
-          <div className="w-px h-5 bg-white/10 mx-1" />
-          <button
-            onClick={() => setTimelineCollapsed((c) => !c)}
-            title={timelineCollapsed ? "Expand timeline" : "Collapse timeline"}
-            className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all"
-          >
-            <svg
-              className="w-4 h-4 transition-transform duration-200"
-              style={{ transform: timelineCollapsed ? "rotate(180deg)" : "rotate(0deg)" }}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
       <Timeline
-        internalClips={internalClips}
-        setInternalClips={setInternalClips}
-        audioClips={audioClips}
-        setAudioClips={setAudioClips}
-        selectedClipId={selectedClipId}
-        onSelectClip={onSelectClip}
-        activeClipIndex={activeClipIndex}
+        tracks={tracks}
+        totalDuration={totalDuration}
+        currentFrame={Math.round(currentTime * FPS)}
+        fps={FPS}
+        onFrameChange={(frame) => seekTo(frame / FPS)}
+        onTracksChange={onTracksChangeH}
+        onItemMove={onItemMoveH}
+        onItemResize={onItemResizeH}
+        onItemSelect={(id) => setSelectedItemIds([id])}
+        selectedItemIds={selectedItemIds}
+        onSelectedItemsChange={setSelectedItemIds}
+        onDeleteItems={onDeleteItemsH}
+        onDuplicateItems={onDuplicateItemsH}
+        onSplitItems={onSplitItemsH}
+        onReverseItems={onReverseItemsH}
+        onAddNewItem={onAddNewItemH}
+        playbackRate={playbackRate}
+        setPlaybackRate={setPlaybackRate}
+        trackLocks={trackLocks}
+        onTrackLockToggle={onTrackLockToggleH}
+        onTrackDelete={onTrackDeleteH}
+        onTrackReorder={onTrackReorderH}
+        onCollapsedChange={setTimelineCollapsed}
+        isPlaying={isPlaying}
+        onPlay={playH}
+        onPause={pauseH}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={undo}
+        onRedo={redo}
+        getRawDuration={getRawDuration}
         clipTransitions={clipTransitions}
         transitionPickerFor={transitionPickerFor}
-        setTransitionPickerFor={setTransitionPickerFor}
-        pxPerSec={pxPerSec}
-        setPxPerSec={setPxPerSec}
+        onTransitionPickerChange={setTransitionPickerFor}
         collapsed={timelineCollapsed}
-        currentTime={currentTime}
-        totalDuration={totalDuration}
-        getEffectiveDuration={getEffectiveDuration}
-        getRawDuration={getRawDuration}
-        getAudioEffDur={getAudioEffDur}
-        seekTo={seekTo}
-        deleteClipById={deleteClipById}
       />
     </div>
   );

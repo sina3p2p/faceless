@@ -1,5 +1,5 @@
 import { useState, type Dispatch, type SetStateAction } from "react";
-import type { InternalClip } from "../types";
+import type { InternalClip } from "../timeline/types";
 
 export interface AiEditPanelProps {
   sessionId: string;

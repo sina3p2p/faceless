@@ -1,4 +1,4 @@
-import type { InternalClip } from "../types";
+import type { InternalClip } from "../timeline/types";
 
 export interface ExportPanelProps {
   internalClips: InternalClip[];

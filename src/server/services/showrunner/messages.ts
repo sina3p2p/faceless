@@ -109,6 +109,7 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
               toolCallId: tc.id,
               loading: isPending,
               videoUrl: args.videoUrl as string | undefined,
+              duration: args.renderedDurationSeconds as number | undefined,
               error: args.shotError as string | undefined,
               approved: shotApprovals.has(tc.id),
             };
@@ -191,7 +192,7 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
           toolName: tc.function.name,
           // Strip server-side augmentation before sending to model
           input: Object.fromEntries(
-            Object.entries(tc.function.arguments).filter(([k]) => !["generatedImages", "videoUrl", "pending", "shotError"].includes(k))
+            Object.entries(tc.function.arguments).filter(([k]) => !["generatedImages", "videoUrl", "pending", "shotError", "renderedDurationSeconds"].includes(k))
           ),
         }));
         msgs.push({

@@ -1,8 +1,12 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { eq } from "drizzle-orm";
 import { generateVideoFromReferences, type VideoResult } from "@/server/services/ai/video";
 import { isE005, addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
 import { uploadFile, mediaUrl } from "@/lib/storage";
+import { probeVideoDuration } from "@/lib/media-probe";
+import { db } from "@/server/db";
+import { filmSessions, media } from "@/server/db/schema";
 
 export const compileShot = tool({
   description:
@@ -62,10 +66,22 @@ export async function generateShotWithFallback(
   }
 }
 
+export interface UploadedShot {
+  url: string;
+  durationSeconds: number;
+  mediaId: string;
+}
+
 /**
  * Render the shot then re-upload the video to R2 — used by both the async
  * shot-queue worker and the synchronous retry-tool route. Replicate's URLs
  * expire, so the result is never persisted as-is.
+ *
+ * Also inserts a `media` row with the ffprobe-measured duration (same as
+ * user-uploaded videos in /api/media — one place holds duration for both,
+ * so anything reading clip metadata doesn't need to special-case where the
+ * video came from). durationSeconds is a real measurement of the uploaded
+ * file, not the requested/expected duration from the generation request.
  */
 export async function renderAndUploadShot(
   referenceImageUrls: string[],
@@ -74,10 +90,23 @@ export async function renderAndUploadShot(
   duration: number,
   sessionId: string,
   storageKey: string
-): Promise<string> {
+): Promise<UploadedShot> {
   const result = await generateShotWithFallback(referenceImageUrls, prompt, aspectRatio, duration, sessionId);
   const videoResp = await fetch(result.videoUrl);
   const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
   await uploadFile(storageKey, videoBuffer, "video/mp4");
-  return mediaUrl(storageKey);
+
+  const durationSeconds = (await probeVideoDuration(videoBuffer)) ?? result.durationSeconds;
+
+  const [session] = await db.select({ userId: filmSessions.userId }).from(filmSessions).where(eq(filmSessions.id, sessionId));
+  const [mediaRow] = await db.insert(media).values({
+    userId: session.userId,
+    type: "video",
+    url: storageKey,
+    prompt,
+    modelUsed: "seedance-2-mini",
+    metadata: { duration: durationSeconds },
+  }).returning({ id: media.id });
+
+  return { url: mediaUrl(storageKey), durationSeconds, mediaId: mediaRow.id };
 }
