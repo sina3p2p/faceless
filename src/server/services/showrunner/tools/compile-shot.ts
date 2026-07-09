@@ -11,11 +11,11 @@ import { filmSessions, media } from "@/server/db/schema";
 export const compileShot = tool({
   description:
     "Compile a shot prompt package and present it to the user for review before any rendering happens. " +
-    "Assemble the full Seedance 2.0 prompt from the Bible per the shot-compilation-recipe, then call this tool. " +
+    "Only after Stage 1 is complete (registry passing): load stage2-skill.md and shot-compilation-recipe.md, " +
+    "assemble the Seedance 2.0 prompt from the Bible, then call this tool. " +
     "The user will review and optionally edit the prompt, then approve — rendering starts only after their approval. " +
-    "Wait for the user's shot approval before calling this again for the next shot. " +
-    "Never batch multiple independent shots in a single call — one call = one shot. " +
-    "Only available after the Bible is locked and all asset images are approved.",
+    "Wait for the user's shot approval before calling this again for the next generation. " +
+    "Never batch multiple independent generations in a single call — one call = one generation group or solo.",
   inputSchema: z.object({
     prompt: z
       .string()

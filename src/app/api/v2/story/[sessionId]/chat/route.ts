@@ -164,7 +164,8 @@ export async function POST(
     const pendingAssetIndices: number[] = [];
     const pendingGridIndices: number[] = [];
     const pendingShotIndices: number[] = [];
-    const loadReferenceResults = new Map<string, unknown>(); // toolCallId → execute() return value
+    // Auto-executed tools whose execute() output must be persisted for history replay
+    const autoToolResults = new Map<string, unknown>(); // toolCallId → execute() return value
 
     for await (const chunk of result.fullStream) {
       if (chunk.type === "text-delta") {
@@ -198,8 +199,11 @@ export async function POST(
         } else if (chunk.toolName === "compileShot") {
           pendingShotIndices.push(toolCalls.length - 1);
         }
-      } else if (chunk.type === "tool-result" && chunk.toolName === "loadReference") {
-        loadReferenceResults.set(chunk.toolCallId, chunk.output);
+      } else if (
+        chunk.type === "tool-result" &&
+        (chunk.toolName === "loadReference" || chunk.toolName === "recordSceneGridEntry")
+      ) {
+        autoToolResults.set(chunk.toolCallId, chunk.output);
       }
     }
 
@@ -251,7 +255,7 @@ export async function POST(
       parts: [{
         text: fullText,
         toolCalls,
-        toolResults: Object.fromEntries(loadReferenceResults),
+        toolResults: Object.fromEntries(autoToolResults),
       }],
       createdAt: new Date(),
     });

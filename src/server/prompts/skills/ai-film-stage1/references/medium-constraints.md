@@ -33,7 +33,7 @@ Across essentially all current models, characters subtly change face/hair/propor
 - Write the Stage 1 character spec with **fixed anchor features** (the 2–3 things the model must never change) and **unchanging wardrobe** + one instantly-readable detail.
 - **Anchor generation to approved images, never bare text**: character/location references on every shot, and — in this pipeline — the scene grid as the composition anchor (sequence reference for groups, panel citation for solos; see `grid-storyboards.md`). This pipeline deliberately does NOT use per-shot first-frame/keyframe animation; composition guidance comes from the approved grid, not from generating a still per shot.
 
-## Expanding a locked spec into a reference-image prompt (Step 16)
+## Expanding a locked spec into a reference-image prompt (Step 15)
 
 A character/location spec is written for a _human_ to understand the design ("frail, sympathetic grey alien with a teal chest disc"). That underdetermines the image — a hundred different aliens satisfy it. Before generating, expand it into a full image prompt so the candidate is born in the film's visual language instead of a generic render. Assemble the prompt from five parts, in this order:
 
@@ -58,7 +58,7 @@ The test for a good reference prompt: _if you generated this same prompt ten tim
 The old rule "avoid dialogue" is weaker for native-audio models. The durable safe pattern:
 
 - Generate the **voice once** in an external tool (e.g. an AI voice generator), then feed it to the video model as an **audio reference** so the voice is fixed and the visuals sync to it — instead of letting each clip invent (and drift) the voice.
-- This also fixes timing/word precision, which matters for comedy. Still keep dialogue lean; physical/visual comedy is more robust and universal.
+- This also fixes timing/word precision, which matters for dialogue-driven beats. Still keep dialogue lean; physical/visual storytelling is more robust and universal.
 
 ## The static-lock lesson (the morphing-pyramid bug)
 
@@ -87,7 +87,7 @@ The exact opposite failure, from a real clip: a night-forest shot with two chara
 
 ## Scene grid storyboards
 
-Moved to its own reference: see `references/grid-storyboards.md` for the grid prompt formula, layout geometry, failure catalog, approval protocol, and consumption grammar (Step 17).
+Moved to its own reference: see `references/grid-storyboards.md` for the grid prompt formula, layout geometry, failure catalog, approval protocol, and consumption grammar (Step 16).
 
 ## Render resolution (don't ship previews)
 

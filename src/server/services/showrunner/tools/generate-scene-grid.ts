@@ -6,10 +6,11 @@ const GRID_CANDIDATE_COUNT = 1;
 
 export const generateSceneGrid = tool({
   description:
-    "Generate a candidate scene grid storyboard image for ONE scene (Step 17). Call this once per " +
+    "Generate a candidate scene grid storyboard image for ONE scene (Stage 1 Step 16). Call this once per " +
     "scene, present it, wait for the user's approval, then call again for the next scene. Never batch " +
     "multiple scenes in a single turn. Only call once the scene's shot rows are locked and every " +
-    "@material it uses (characters + location plate) has an APPROVED reference image.",
+    "@material it uses (characters + location plate) has an APPROVED reference image. " +
+    "After approval or skip, call recordSceneGridEntry for that scene.",
   inputSchema: z.object({
     sceneId: z.union([z.string(), z.number()]).describe("Scene id/number this grid belongs to, e.g. 3"),
     imagePrompt: z

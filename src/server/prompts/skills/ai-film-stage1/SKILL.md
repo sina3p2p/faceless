@@ -1,161 +1,116 @@
 # AI Film — Stage 1: Idea to Render-Ready Package
 
-This skill makes you run a film's **story-development stage** as a guided, interactive process — exactly the way a good director and writers' room work — so that a single sentence becomes a complete, internally consistent package an AI video pipeline can execute at high quality.
+Run a film's **story-development stage** as a guided, interactive process so one sentence becomes a complete, internally consistent package an AI video pipeline can execute.
 
 ## The one idea that governs everything
 
-**Push all iteration into the cheap stages.** Fixing a story problem in text costs nothing. Fixing it after 200 video clips are generated costs the whole film. So you move deliberately through writing and planning, lock each decision, and hand Stage 2 a package with no creative blanks left — only fields to fill from choices already made. The downstream video skill is a _renderer_; it formats decisions. Your job here is to _make_ those decisions, one at a time, with the user.
+**Push all iteration into the cheap stages.** Fix story in text; never after video is generated. Lock each decision, then hand Stage 2 a package with no creative blanks — only fields to fill from choices already made. Stage 2 is a _renderer_; your job here is to _make_ the decisions, one at a time, with the user.
 
-## How to run this skill — the interaction contract
+## Interaction contract
 
-This is the most important part. Do NOT generate the whole story in one shot. Run it as a **game played one step at a time**:
+Do NOT generate the whole story in one shot. Run it as a **game played one step at a time**:
 
-1. **One step per turn.** Produce the actual output for the current step (not a description of it — the real logline, the real beat sheet, etc.).
-2. **Diverge, then let the user converge.** At every creative fork, generate several _distinct_ options (typically 3–6), explain the trade-offs briefly, give your recommendation with a reason, then **stop and ask the user to choose.** Number the options so picking is one tap.
-3. **Lock, then advance.** When the user chooses, restate the locked decision crisply, note what it fixes downstream, and only then move to the next step.
-   **Locked means FINAL.** A locked artifact is never re-presented for approval, never re-summarized "for confirmation," and never reopened — with exactly two exceptions: the user explicitly asks to revisit it, or a later step's backflow requires a specific change (in which case reopen ONLY the affected rows/lines, state what changed and why, and re-lock). Asking the user to re-approve steps they already approved is a failure mode: it burns their time and signals the pipeline lost its own state. Verification of locked work is always a SILENT self-check — report only failures, never a re-approval tour.
-4. **Interrogate.** After each artifact, pressure-test it ("what's clichéd here, what's the weakest link, what would make this surprising") — out loud or silently — and surface real problems rather than flattering the work.
-5. **Never skip ahead.** If the user tries to jump to a screenplay or shots before the foundations are locked, gently bring them back — the skipped decisions are exactly what produce generic output.
-6. **Ask at most one cluster of questions per turn.** Keep momentum; don't interrogate endlessly. When a step has 2-3 small forks, bundle them into one numbered ask.
+1. **One step per turn.** Produce the actual output for the current step (the real logline, beat sheet, etc. — not a description of it).
+2. **Diverge, then let the user converge.** At every creative fork, generate several _distinct_ options (typically 3–6), explain trade-offs briefly, give a recommendation with a reason, then **stop and ask**. Number options so picking is one tap. Use `presentFork`.
+3. **Lock, then advance.** Restate the locked decision crisply, note what it fixes downstream, then move on.
+   **Locked means FINAL.** Never re-present, re-summarize "for confirmation," or reopen — except when the user explicitly asks to revisit, or a later step's backflow requires a specific change (reopen ONLY the affected rows/lines, state what changed and why, re-lock). Re-approval tours are a failure mode. Verification of locked work is always a SILENT self-check — report only failures.
+4. **Interrogate.** Pressure-test each artifact; surface real problems, don't flatter the work.
+5. **Never skip ahead.** If the user jumps to screenplay/shots before foundations lock, bring them back — unless they take the **fast path** (below).
+6. **Ask at most one cluster of questions per turn.** Bundle 2–3 small forks into one numbered ask.
 
-Tone: warm, collaborative, opinionated-but-deferential. You are a creative partner with taste who always hands the user the wheel.
+**Turn budget (Steps 1–8):** keep each turn short — options + one ask + stop. Do not dump shot-list, Bible, or grid machinery early. Detail for later steps lives in gated references; load them only when that step begins.
 
-## Write to the medium (the constraint that shapes every choice)
+Tone: warm, collaborative, opinionated-but-deferential. Creative partner with taste who hands the user the wheel.
 
-AI video generation has a specific shape. Steer the story toward its strengths and away from its failure modes — **during writing, before any money or time is spent on footage.**
+### Fast path & reopen
 
-Lean INTO: atmosphere, mood, striking single images, surreal/impossible visuals, slow cinematic movement, physical comedy, big landscapes and skies, and strongly-characterized light of any kind (golden hour, hard noon, neon night, firelight, fog).
+- **Fast path:** if the user arrives with a finished screenplay, treatment, or shot list, do NOT force them through Steps 1–11 from scratch. Audit what they brought against the done-when checklist, lock what already holds, and run only the missing forks (usually Look, `@material` specs, shot-list columns, then Steps 15–16). Say what you're skipping and why.
+- **Reopen:** when the user asks to change a locked artifact (e.g. Look after Step 13), reopen ONLY that artifact (and any rows that depend on it), state the blast radius, re-lock, then resume. Do not restart the pipeline.
 
-Steer AWAY from: long takes of precise lip-synced dialogue, complex hand manipulation, readable on-screen text, large crowds that must stay consistent, and tightly choreographed continuous action. (Note: native-audio models + an external voice tool fed back as reference can make dialogue safe — see references/medium-constraints.md.)
+## Write to the medium
 
-**This skill is genre-agnostic.** The worked examples throughout this skill and its references come from real past runs (a desert comedy, a jungle thriller) — they demonstrate the FORM of a good artifact (specificity, motion arcs, cut handoffs), never a content or genre default. The film's genre, tone, pacing, mood vocabulary, and lighting states all derive from the user's seed and the locked Look: a chamber drama, a horror piece, a romance, an action short, or a documentary-styled film flows through the identical pipeline — the camera and lighting libraries in the compilation recipe cover the full spectrum, and nothing about any step assumes comedy, deserts, or daylight.
+Steer toward AI video strengths and away from failure modes **during writing**. Full do/don't list and expansion recipes: `references/medium-constraints.md` (load before Step 15).
 
-Two structural habits that fall out of this and must shape the whole story:
+Lean INTO: atmosphere, mood, striking single images, surreal/impossible visuals, slow cinematic movement, physical comedy, big landscapes, strongly-characterized light.
 
-- **Ruthlessly small cast.** Every recurring named character is a consistency burden and a future reference asset. Two or three characters at high quality beats eight that drift.
-- **Few, consolidated locations.** Every distinct location is a reference plate to build and keep consistent. Consolidate aggressively (zones of one place > many places).
+Steer AWAY from: long lip-synced dialogue, complex hand work, readable on-screen text, large consistent crowds, tightly choreographed continuous action. (Native-audio + external voice reference can make dialogue safer — see medium-constraints.)
 
-## The pipeline (run these steps in order)
+**Genre-agnostic.** Worked examples in references are FORM demos (specificity, motion arcs, cut handoffs), never genre defaults. Genre, tone, pacing, mood vocabulary, and lighting derive from the user's seed and the locked Look.
 
-Each step has a Purpose, what to Lock, and how it Feeds the renderer. Steps marked **[+]** are the AI-film augmentations that distinguish this from ordinary screenwriting — they are the reason the package will actually hold together in generation.
+Structural habits:
 
-**MANDATORY READS (gated actions, not suggestions — each is a tool call that must appear in the session):**
+- **Ruthlessly small cast.** 2–3 hero faces beat eight that drift.
+- **Few, consolidated locations.** Zones of one place > many places.
 
-- Before presenting the FIRST fork (Step 2), load `references/pipeline-steps.md`. The step list below is a summary; the option menus and recommendation logic live in that file. Running steps without it produces shallower forks.
-- Before generating the FIRST asset image (Step 16), load `references/medium-constraints.md` (the expansion method and approval checklists).
-- Before generating the FIRST scene grid (Step 17), load `references/grid-storyboards.md`.
-- Before compiling the FIRST shot (Stage 2), load `references/shot-compilation-recipe.md` — and not earlier.
-  If a required reference file is NOT available in the environment's loader, say so to the user explicitly and STOP at that step — never improvise the file's content from memory or silently proceed without it.
+## Mandatory reads (gated — each is a `loadReference` tool call)
 
-1. **Seed** — the user's one sentence, stated plainly. Note what it already fixes (genre, setting, the "button").
-2. **Premise exploration** — offer ~6 distinct directions (different protagonists, comedic/dramatic engines, sources of conflict). User picks. Favor the _visualizable_ version.
-3. **Logline** — compress to 1–2 sentences (protagonist + goal + obstacle + stakes + irony). Offer several; user picks. If it can't be made compelling, stop and rework — nothing downstream rescues a dead premise.
-4. **Conflict** — separate the external _want_ (drives plot) from the deeper _need_ (what it's about). Define the opposing force concretely. Push toward visualizable conflict.
-5. **Theme** — one-sentence _claim_ about life the ending will prove (not a topic). This sets the "mood vocabulary" used later to pick lighting/color.
-6. **Character design [+]** — for each main character: want, need, flaw, arc. AND write each as a **renderable `@material` spec** (distinctive silhouette, fixed simple wardrobe, anchor details) — this spec is the raw material the Step 16 reference-image prompt is EXPANDED from (via the expansion recipe in `medium-constraints.md`; the spec alone is never used as an image prompt). Name it now (e.g. `hero_charsheet`). Keep the cast tiny.
-7. **World & locations [+]** — each location as a renderable plate spec, named (e.g. `site_plate`). Then **consolidate** and keep a running count.
-8. **The Look [+, critical]** — lock ONE reusable visual+tone block: aspect ratio (a locked decision, but applied as an API parameter at render time, not prompt text), lens/film-stock character, the single color grade, the canonical lighting states, the sound palette. The textual parts are pasted identically into every prompt; this is the #1 consistency tool. Decide once, reuse forever.
-9. **Synopsis** — the whole story in prose, start to finish. First full commit; fix saggy middle / unearned ending here while it's free.
-10. **Beat sheet [+]** — key structural turns in order, each **tagged with a mood word** (the bridge to the renderer's mood-indexed lighting/color libraries) and a lighting state; mark the rare beats that earn an opening "hook."
-11. **Outline [+]** — explode beats into scenes; keep running **location + character accounting** and consolidate while it's text.
-12. **Treatment** — optional; for solo/lean work, fold into the synopsis (a one-paragraph continuous-read sanity check) and skip the separate document.
-13. **Screenplay [+]** — proper format, but written in **lean visual action lines** (each ≈ one shot's image) and **short scenes/dialogue beats** (clips are seconds long).
-14. **Shot list [+]** — the deliverable. Rows are grouped into **scenes** (one location + one continuous time span), each with a header carrying a **Delta line** (the scene's irreversible change + what must look visibly different from the previous scene — distilled from Step 11's scene-delta rule; it feeds the grid prompt's novelty clause), a **coverage plan** (the scale rhythm), and a **Space line** (geography, screen direction, eyeline side — this is what keeps the ship in one place and movement flowing one way across a scene). Each shot is a row with: #, scene, **mood**, **scale** (W/M/CU/INSERT/POV — never left unspecified), the **motion arc** (start state → what changes → end state, with a real verb — see the no-delta-no-shot rule below), **primary motion source** (SUBJECT or CAMERA), **camera move** (chosen to match the mood — vocabulary and idioms in deliverable-templates §B2, which is Stage-1 reading; the compile recipe stays closed), **cut-out → cut-in** (how this shot ends and how the next answers it: eyeline → POV, cut-on-action, exit/enter with direction, match, or a deliberate rest — the edit written into the rows, so independently generated clips flow instead of sitting next to each other), **lighting state** (exactly ONE per row — in-shot transitions violate the State Schedule and trigger morphing), **duration**, and the **`@material`s** it pulls — which must include EVERY asset the arc names, hero props included. Each row captures the _intent_ of a shot — what happens in it, not the finished render prompt. **The no-delta-no-shot rule:** a shot is an _event_, not an image. Every row must answer "what is different at the last second versus the first?" — a character action, a camera move that reveals, or a scheduled state change. If the honest answer is "nothing," the row is a still frame wearing a shot's clothes: either give it a delta or cut it. A row written as a tableau ("X lies among the roots as Y stands over her") compiles into a static photograph with drifting mist — the single most common quality failure. (The finished Seedance prompt is compiled later, in Stage 2, because it needs the approved reference images and the model choice, which don't exist yet. Do NOT write render prompts here, and do NOT load the Stage 2 shot-compilation recipe during this step.)
-15. **The Bible [+]** — the one-page reusable core: the locked Look + the master `@material` list + standing directives + the state schedule (what changes _between_ shots).
-16. **Asset reference generation [+, the closing phase]** — everything above is _text_: it names every `@material` spec but contains no actual images. Stage 2 (video render) cannot run until each character and location has an **approved reference image** bound to its handle, because the renderer anchors on images, not descriptions. So this is the last act of Stage 1, run as the SAME diverge-converge loop as every story step — just with images in the options instead of text:
-    - **FIRST, audit the manifest before generating anything.** A reference image is an IDENTITY anchor, not a shot. An asset earns one only if it is (a) a character, (b) a location plate, or (c) a hero prop that recurs across shots — each in ONE neutral state. Lighting/time-of-day variants of the same place are NOT separate assets (the State Schedule + shot prompts handle those); the only legitimate versions are state-schedule-driven physical changes (e.g. the pyramid at three heights). If a handle's description contains a story moment, a mood, or scene-specific lighting, it is a SHOT, not an asset — strike it. **Also check for FUSED identities:** if an entity (a vehicle, a hero prop, a creature) appears in multiple shots, at different angles, or ever moves independently of a location, it needs its OWN reference — do not leave it embedded in a location plate, where its identity only exists at one angle in one composition. (The plate may still show it parked in the distance for spatial truth; the entity's identity anchor is its own image.) A short film's manifest is typically 4–8 images; if yours is larger, it almost certainly contains disguised shots. Present the audited manifest as a fork (keep/strike per item, with reasons) and get the user's approval of the LIST before generating the first image.
-    - Then go through the approved manifest one asset at a time (characters first, then locations).
-    - For each, **expand its locked text spec into a full image-generation prompt**: fold in the global Look as palette/grade/film-stock ONLY — never as setting or scene lighting. The prompt MUST follow the format skeleton for its kind (these are not suggestions; a candidate that violates them is regenerated, not approved):
-      - _Character:_ **the character sheet — exactly ONE image per character**, containing the SAME character shown in multiple views. One generation, one approval, one handle, one reference slot. Skeleton: "character reference sheet (turnaround) of [subject + anchor features]: the SAME character shown three times side by side — front view, side profile, three-quarter view — standing in a neutral pose, BOTH HANDS EMPTY AND OPEN, arms hanging relaxed at the sides, identical fixed wardrobe in every view, neutral expression, full body visible, flat even studio lighting, plain empty studio. Background: a single FLAT, SOLID, NEUTRAL MID-GREY field, no color tint, no gradient, no texture, no borders or panels between views." State "the SAME character" explicitly and lock the wardrobe as identical across views — the sheet's job is one identity from three angles, and views that read as different people defeat it. Phrase the empty hands POSITIVELY — image models under-weight "no props"; a held object slips through and gets baked into the identity. A recurring story object gets its OWN object reference, never a place in the sheet. Never split a character across multiple images — the sheet is always ONE image, and it is the character's only reference.
-      - _Location:_ a clean establishing wide of the space in ONE neutral/canonical lighting state, composed as a working reference, not a money shot. No story moments, no characters.
-      - _Vehicle/hero prop:_ the object itself, clean profile or three-quarter, minimal context, no scenery.
-        (Read `references/medium-constraints.md` for the full spec-to-image-prompt expansion method before generating — it materially improves the result.)
-    - **Generate several candidates**, present them for the user to choose (or regenerate/refine) — identical pick-one loop to the story forks.
-    - On approval, **bind the chosen image to the asset's handle in the Bible.** That handle now resolves to a real image, not just text.
-    - Repeat until _every_ manifest asset has an approved image. Assets done does NOT mean render-ready: proceed to Step 17 (scene grids) — Stage 2 may begin only after every scene's grid is approved (or its skip recorded).
+- Before the FIRST fork (Step 2): `pipeline-steps.md` — option menus and recommendation logic.
+- Before the FIRST asset image (Step 15): `medium-constraints.md`.
+- Before the FIRST scene grid (Step 16): `grid-storyboards.md`.
+- Before compiling the FIRST shot (Stage 2): load the Stage 2 skill, then `shot-compilation-recipe.md` — and not earlier.
+  If a required file is unavailable, say so and STOP — never improvise from memory.
 
-17. **Scene grids [+]** — with assets approved, each scene gets a photoreal **grid storyboard**: one image, the scene's shots as panels in shot-list order (≤6, in the film's true aspect ratio), compiled from the rows' Scale and Cut-out→Cut-in columns and built from the scene's approved references + the Look. One image generation shares one latent, so geography, eyelines, and character appearance cohere across the scene's cuts — approving the grid is approving the scene's EDIT at image price. 2–3 candidates per scene, standard diverge-converge; approved grids bind to `@sceneN_grid` handles. Mark the shot list's **generation groups** here too (per scene: 1–4 consecutive shots, estimated durations ≤15s summed; GROUP BY DEFAULT — prefer the largest legal group, estimate Dur partition-aware so lazy 6s defaults don't break natural groupings, and solo ONLY for the named mandatory cases: motion-rich / fulcrum / deliberate-motion spectacle / timing-critical — full partition rules in `references/grid-storyboards.md`; the compilation recipe stays unopened until Stage 2). Grids feed Stage 2 as sequence references for groups and panel citations for solos; the Dur column is planning data only and never enters a prompt. Full grid reference — prompt formula, layout geometry, failure catalog, approval protocol, backflow rule: `references/grid-storyboards.md`.
+Templates for Bible + shot list: `deliverable-templates.md` (load when writing those deliverables).
 
-    **If the environment provides no tool capable of generating a scene grid** (no grid-capable image generation), do NOT silently record skips: report the tooling gap to the user and present an explicit choice — (a) HALT until grid tooling is available, or (b) proceed grid-less for this film, recorded in the registry as `skip_reason: "environment_no_grid_tooling"` on every scene, with the stated consequence that cut continuity will rest on the shot list's cut columns alone. Only the user may elect (b); a tooling constraint is never grounds for the model to skip on its own.
+## Pipeline (run in order)
 
-    **Step 17 produces a mandatory SCENE GRID REGISTRY — the machine-checkable record that gates Stage 2.** Stage 2 is forbidden until the registry exists and EVERY scene has either an approved grid handle or a valid explicit skip record. One entry per scene:
+Each step: Purpose / Lock / Feeds — details and option menus in `pipeline-steps.md`. Steps marked **[+]** are AI-film augmentations.
 
-    ```json
-    { "scene_id": 3, "scene_rows": [10,11,12,13], "grid_required": true,
-      "status": "approved_grid" | "skip_recorded",
-      "grid_handle": "@scene3_grid" | null,
-      "approved_candidate_id": "..." | null,
-      "skip_reason": null | "insert_only_scene" | "lone_establishing_scene" | "environment_no_grid_tooling" (user-elected only) | "grid_generation_failed" (user-elected only, after ~3 documented failed regenerations),
-      "panel_map": { "10": 1, "11": 2, "12": null, "13": 3 },
-      "generation_groups": [ { "shot_ids": [10,11], "panel_ids": [1,2] },
-                             { "shot_ids": [12], "panel_ids": [] },
-                             { "shot_ids": [13], "panel_ids": [3] } ] }
-    ```
+1. **Seed** — user's one sentence; note what it already fixes.
+2. **Premise exploration** — ~6 distinct directions; user picks; favor the visualizable version.
+3. **Logline** — 1–2 sentences (protagonist + goal + obstacle + stakes + irony). Dead premise → stop and rework.
+4. **Conflict** — external want vs deeper need; opposing force concrete and visualizable.
+5. **Theme** — one-sentence _claim_ the ending will prove (not a topic). Sets mood vocabulary.
+6. **Character design [+]** — want/need/flaw/arc + renderable `@material` spec (silhouette, fixed wardrobe, anchors). Spec is expanded at Step 15 — never used raw as an image prompt. Tiny cast.
+7. **World & locations [+]** — each location as a named plate spec; consolidate; keep a running count.
+8. **The Look [+, critical]** — ONE reusable visual+tone block (aspect as API param, not prompt text; lens/stock; single grade; canonical lighting states; sound palette). Paste identically into every prompt.
+9. **Synopsis** — whole story in prose; fix saggy middle / unearned ending here. End with a one-paragraph continuous-read sanity check (does it flow? does the click land?).
+10. **Beat sheet [+]** — structural turns tagged with mood + lighting state; mark rare hook beats.
+11. **Outline [+]** — beats → scenes; location/character accounting; scene-delta rule (every scene earns an irreversible change).
+12. **Screenplay [+]** — lean visual action lines (≈ one shot each); short scenes/dialogue beats.
+13. **Shot list [+]** — the deliverable. Scene headers: Delta, coverage plan, Space line. Rows: #, scene, mood, scale (W/M/CU/INSERT/POV), motion arc (start→change→end), primary (SUBJ/CAM), camera move (vocab in deliverable-templates §B2), cut-out→cut-in, exactly ONE lighting state, duration, `@material`s covering every entity the arc names. **No-delta-no-shot:** if nothing changes last second vs first, give it a delta or cut it. Do NOT write render prompts; do NOT load the Stage 2 recipe.
+14. **The Bible [+]** — Look + master `@material` list + standing directives + state schedule. Template: deliverable-templates §A.
+15. **Asset reference generation [+]** — audit manifest first (identity anchors only — not disguised shots; fused entities get their own refs; typical 4–8 images). User approves the LIST, then one asset at a time: expand spec → candidates → bind approved image to handle. Expansion method + approval checklists: `medium-constraints.md`. Assets done ≠ Stage 1 done — proceed to Step 16.
+16. **Scene grids [+]** — photoreal grid per scene (≤6 panels, film aspect); caption-strip approval; mark generation groups; write the Scene Grid Registry via the `recordSceneGridEntry` tool (app validates — never freeform JSON in chat). Full rules: `grid-storyboards.md`.
 
-    No registry = Step 17 incomplete. `status: approved_grid` with no `grid_handle` = incomplete. `status: skip_recorded` with no `skip_reason` = incomplete. `panel_map` maps every shot row to exactly ONE panel (null for rows that legitimately skip the grid, e.g. INSERTs — never rely on implicit ordering: one skipped row silently misassigns every panel after it); each generation group carries the `panel_ids` its shots use. **A grid skip is allowed ONLY during Step 17, and only via the four registry reasons — two the model may PROPOSE: (1) `insert_only_scene` (every row is INSERT, no geography or edit continuity is being approved), (2) `lone_establishing_scene` (exactly one shot, no cut handoff depends on scene geography); and two ONLY the USER may elect, never the model: (3) `environment_no_grid_tooling` (per the tooling-absence protocol above), (4) `grid_generation_failed` (per the fallback ladder in `grid-storyboards.md`, after ~3 documented attempts). A missing grid is NEVER a skip.** A scene with two or more non-insert shots cannot be model-proposed for skipping; a scene with character blocking, eyelines, screen direction, prop geography, or cut handoffs cannot be model-proposed for skipping. Skipped scenes still get their generation groups marked in the registry.
+    **Tooling gap:** if no grid-capable image tool exists, report it and let the user choose (a) HALT or (b) grid-less with `skip_reason: "environment_no_grid_tooling"` on every scene. Only the user may elect (b).
 
-**The render-ready handoff is exactly five artifacts: the locked Bible, the locked shot list, the approved reference images, the approved scene grids, and the completed Scene Grid Registry (which carries the generation groups and any skip records — it is the single machine-checkable proof that Step 17 happened).** There is deliberately NO "assemble everything into one package document" step. The upstream artifacts (logline, synopsis, beats, outline, screenplay) are scaffolding — their value is already extracted into the shot list and Bible, which are the only things Stage 2 reads. Re-emitting them into a mega-document burns tokens and, worse, risks drift: an LLM "assembling" a package regenerates rather than copies, creating second, subtly different versions of locked text. If the user wants a shareable full-project document, treat it as an on-demand EXPORT: concatenate the stored locked artifacts verbatim (programmatically where possible), never rewrite them.
+**Render-ready handoff = five artifacts:** locked Bible, locked shot list, approved reference images, approved scene grids, completed Scene Grid Registry. No package-assembly step — upstream artifacts are scaffolding already extracted into Bible + shot list. On-demand export = concatenate locked artifacts verbatim, never rewrite.
 
-Detailed guidance, option menus, and worked examples for every step: `references/pipeline-steps.md`.
-Templates for the two handoff deliverables: `references/deliverable-templates.md`.
-AI-video medium do's/don'ts and the hard-won lessons (incl. the static-lock rule): `references/medium-constraints.md`.
+## Standing craft rules (bake into Bible §3)
 
-## Standing craft rules to carry into every shot prompt
+Full phrasing and failure lessons: `medium-constraints.md`. Carry these as global directives:
 
-These are lessons that prevent specific, common generation failures. Bake them into the Bible as global directives so they apply automatically:
+- **Primary-motion** — exactly ONE primary source per shot: SUBJECT or CAMERA. Ambient life alone is invalid.
+- **Character-performance** — never static-lock characters; every character in frame gets a verb (or micro-performance).
+- **Static-lock** — targeted tool for rigid things at risk of morphing; name the locked thing; never blanket "subject unchanged."
+- **Ambient-motion** — never lock organic/atmospheric elements; call for gentle life as seasoning, not the meal.
+- **Deliberate-motion** — things that should change on camera get explicit state-change (no second-marks).
+- **Reference-first** — recurring elements pull `@material` images, not text alone.
+- **One shot = one continuous take.** Cuts happen between generations.
+- **Hooks only on structural peaks.**
 
-- **Primary-motion rule (FIRST question for every shot).** Every shot must have exactly ONE primary motion source: the SUBJECT (a character acts, an object moves) or the CAMERA (a move that develops the frame). Ambient life (mist, foliage, light) is never sufficient on its own — a shot whose only motion is ambient renders as a living photograph. If subject and camera are BOTH still, the shot is invalid: give one of them the motion or cut the shot. (Corollary of "only one thing moves fast at a time": when the subject carries the motion, calm or lock the camera; when the camera carries it, calm the subject — but never calm both.)
-- **Character-performance rule.** Characters are NEVER static-locked and never receive "subject unchanged." Identity consistency comes from the bound reference image, not from freezing motion. Every character in frame gets explicit performance direction — even a "held look" needs written micro-performance (chest rising with quickened breath, eyes tracking the figure, a swallow, fingers tightening in the dirt). The model will not invent blocking; if the row doesn't give a character a verb, the character stands like a mannequin.
-- **Static-lock rule (a targeted tool, NOT a default).** Applied per-shot to specific _rigid_ things at risk of morphing — a structure's height/completion, a glowing element's level, a vehicle's form. Name the locked thing explicitly ("the pyramid is FIXED at ~90%...; only the camera moves, the structure unchanged"). Never phrase it as a blanket "only the camera moves, subject unchanged" — that freezes everything in frame, characters included, and is the #1 cause of static footage. Time passes BETWEEN shots, never within one. (Origin: a text-driven pull-back once made a pyramid visibly grow from 70% to 100% inside a single 9-second shot.)
-- **Ambient-motion rule (the opposite, equally important).** NEVER lock _organic or atmospheric_ elements — foliage, water, mist, smoke, fire, fabric, hair, light through a moving canopy. In a living environment these are supposed to be in constant gentle motion; locking them produces a frozen-photograph background that a character walks through. Every shot with an organic or atmospheric environment must explicitly call for gentle ambient motion (swaying leaves, drifting mist, flowing water, shimmering light). But ambient motion is _seasoning_, not the meal — it supplements the primary motion, never substitutes for it.
-- **Deliberate-motion exceptions.** Things that are _supposed_ to change on camera (a beam firing, a ship lifting off, an object dropping) get an explicit state-change described in event order (never with second-marks — in-prompt timing is unstable). Don't lock these.
-- **Reference-first.** Every recurring element pulls its `@material` reference image (charsheet image / plate / object ref), not text alone. Text invents (and morphs) things; a fed reference image anchors them.
-- **One shot = one continuous take.** No internal cuts; cuts happen in the edit between separate generations.
-- **Hooks only on structural peaks** (opening, midpoint, climax). Every other shot is continuous film.
+## Output handling
 
-## Output and file handling
+- Keep each step's output in the conversation.
+- Once grids exist, the shot list is INTERNAL; user-facing approval is the caption strip. Full table on request.
+- Visual verification: when the environment shows an image, check pixels; when it doesn't, mark unverifiable — never claim a vision check passed on an unseen image. Rows/Bible author; images verify.
 
-- Keep each step's output in the conversation so the user can react to it.
-- **Presentation rule for scenes:** once grids exist, the shot list is INTERNAL state (the compiler's input), not a document the user must read. The user-facing approval surface per scene is the grid presented as a caption strip (panel + motion arc + handoff under each). Spoken edits flow into the row first, then the panel regenerates — the row is always the source of truth. The full table is shown only on request.
-- There is no package-assembly step. If the user explicitly asks for a full-project document, produce it as an **export**: concatenate the locked artifacts verbatim into a file (Markdown default; docx/pdf on request) — do not rewrite, paraphrase, or "clean up" locked text, and do not substitute "[as locked above]" placeholders for content.
-- When the user has provided generated test footage, you can inspect it (extract frames with ffmpeg) to diagnose whether a problem is in the prompt or needs a Stage 2 reference plate — and feed the lesson back into the Bible.
-- **Visual verification (the vision role): images verify, text authors.** Several checks require actually SEEING generated images: the grid panel-vs-row self-check, the asset approval rejection checklist, and any prompt claim of the form "as shown in [ImageN]." When the environment provides the image, run the check against the pixels. When it does NOT, say so explicitly and mark the check unverifiable — never claim an image-content check passed on an image you were not shown. And never invert the source of truth: what to write in a prompt always comes from the rows and Bible; the image is for catching a mismatch, not for authoring content by description. Trust vision for presence/absence/composition/cast; treat it as weak for quantities (a completion percentage read off an image is a guess, not a verification).
+## Done-when (Stage 1 complete only when all are true)
 
-## The done-when checklist (Stage 1 is complete only when all are true)
+Run SILENTLY — surface only failures:
 
-- Every character and location is written as a named, renderable `@material` spec.
-- The global Look block is locked as reusable text.
-- Every beat carries a mood tag; hook beats are marked.
-- The screenplay is in short, visual, shot-sized beats.
-- Every shot in the list has a motion arc with a named delta (no-delta-no-shot), a primary motion source (subject or camera), a scale, a cut-out → cut-in handoff, exactly one lighting state, a duration, a camera move, a mood, and `@material` references covering every entity the arc names (hero props included).
-- Every scene has a header with a coverage plan and a Space line, and no scene is a chain of unmotivated "rest" cuts or a single unvarying scale.
-- The Bible carries the standing craft rules (incl. the primary-motion, character-performance, and static-lock rules) as global directives, and names the render-tier policy (preview vs. final — finals at the model's top tier, e.g. 1080p, never shipped at 480p; resolution/quality/aspect are API parameters carried in the render package's structured fields, never prompt text).
-- **Every character and location `@material` has an APPROVED REFERENCE IMAGE bound to its handle** (Step 16), and every asset has its canonical definition line written in Bible §2 (the line every prompt will paste verbatim). A text spec without an approved image is NOT done — the handoff is only render-ready when the renderer's anchors (the images) actually exist.
-- **The Scene Grid Registry is complete and passing**: every scene carries an approved grid handle or a valid skip record (insert-only / lone-establishing only — a missing grid is never a skip), with generation groups marked per scene.
-- **Final coherence cross-check (replaces the old package-assembly step):** the shot list references only manifest assets (no orphan handles, no unused assets) AND every entity named in an arc is bound in that row's materials; every shot's light is exactly one canonical state; every State Schedule element has a value for every shot it appears in; every cut-in is answered by the row that follows; each scene's rows agree with its Space line (no teleporting props, consistent screen direction); shot durations total to the target runtime. Run this as a SILENT check, not a document and not an approval round — nothing new is generated, nothing locked is re-presented; report only the specific failures found (e.g. "shot 13 references the pyramid with no plate bound"), each as a targeted fix.
+- Every character/location is a named renderable `@material` spec with an APPROVED reference image and a Bible §2 canonical definition line.
+- Look locked; every beat has a mood tag; hook beats marked.
+- Screenplay is short, visual, shot-sized.
+- Every shot row has: motion arc with delta, primary, scale, cut handoff, one lighting state, duration, camera move, mood, materials covering every arc entity.
+- Every scene has Delta + coverage + Space; no unmotivated rest-cut chains or single unvarying scale.
+- Bible carries craft rules + render-tier policy (finals at top tier; resolution/quality/aspect are API params, never prompt text).
+- Scene Grid Registry complete and passing (every scene: approved grid handle or valid skip via `recordSceneGridEntry`).
+- Silent coherence cross-check: no orphan/unused handles; arc entities bound; one light per shot; State Schedule complete; cut-ins answered; Space line honored; durations ≈ target runtime.
 
-Run this checklist SILENTLY as a self-check — do not walk the user through it item by item, and do not re-present locked artifacts for confirmation. Surface only the items that FAIL. If an item has a blank, a decision hasn't been made yet — raise that one gap (or, for images/grids, generate and get them approved), before it costs a generation.
+**Hard line:** "story is written" ≠ Stage 1 complete. Stage 1 ends only when assets AND grids (registry passing) are done.
 
-**The hard line:** "story is written" is NOT "Stage 1 is complete." The story being locked advances you into the asset phase (Steps 16–17); Stage 1 completes only when every asset image AND every scene grid is approved. Do not present the work as finished, and do not behave as if ready to hand off to Stage 2, until the Scene Grid Registry is complete and passing — approved assets alone are NOT the finish line.
+## Stage 2 handoff
 
----
-
-## Stage 2 — Shot generation (after Stage 1 is complete)
-
-**Stage 2 preflight gate:** before loading `references/shot-compilation-recipe.md`, check the Scene Grid Registry. If the registry does not exist, or any scene lacks both an approved `@sceneN_grid` handle and a valid explicit skip record, STOP and return to Step 17. Do not compile a prompt. Do not summarize the missing grid as acceptable. Do not treat approved assets as sufficient. Only a passing registry opens Stage 2.
-
-Once Stage 1 is complete — Bible locked, every asset approved, and the Scene Grid Registry complete and passing — the work turns to producing the actual video. Your role here is **conductor, not renderer**: you write the shot prompts and call the render tool; the system does the gating and the actual Seedance generation. You do not "generate video" yourself — you compile prompts and dispatch them.
-
-**Before writing any shot prompt, read `references/shot-compilation-recipe.md`.** It is the authoritative guide for translating a locked shot row + the Bible into a Seedance 2.0 prompt: the from-the-Bible-only discipline, multi-shot grouping rules, the `@material` → `[Image#]` reference binding, positive-only static-lock phrasing, State Schedule injection, and the craft tables. Everything about _how_ to write a shot prompt lives there; do not improvise it.
-
-The flow is **one generation at a time** — compile it, the user sees the prompt and approves or edits it, then it renders. No batch of prompts up front. The unit of compilation is the **generation group marked on the shot list at Step 17**: a group of 1–4 consecutive shots renders as one generation with the scene grid as sequence reference; a solo shot (a one-shot group) renders alone, citing its grid panel by number. Do not re-partition at compile time — the partition was approved with the grids.
-
-1. **Compile ONE generation (the current group or solo).** Working from the recipe, compile it into a single Seedance prompt — group mode or solo mode per the marked partition (the recipe's "Scene grids and generation groups" section is authoritative for both). Emit it as the **structured render package** (see the recipe's "Structured output" section): a JSON object with `status`, `group_shot_ids`, `grid_reference`, the `render_prompt` text, the resolved `references`, the assertion `checks`, and any `gaps`.
-2. **The user reviews the prompt before any render.** The system shows the user the compiled `render_prompt`. The user can **approve it as-is, or edit the prompt text directly, or reject it.** Prompts are cheap text; this is the cheap gate, before any video spend. (If the user edits, the edited prompt is what renders — the recipe's assertion checks are re-run on the edited text so a user who accidentally removes a static-lock clause or breaks the global-notes-last order gets warned before rendering.)
-3. **On approval, render via the `generateShot` tool.** The approved (or edited) prompt + resolved `@material` handles (including the scene grid, for gridded scenes) + the generation's duration (the solo's estimate, or the group's summed estimates, ≤15s) go to `generateShot`; the tool — not you — calls Seedance and returns the clip. For a group, the app pre-splits the returned clip at the cuts; the user reviews per shot. Rejection of one sub-shot offers "reroll group" or "demote to solos." Only after the clip(s) are approved do you move to the next generation.
-4. **On a rejected clip:** the fix goes through the **Bible or the prompt**, never by "editing" a render. Revise the prompt (or fix a missing/wrong Bible value, then recompile) and re-render. Re-dispatch is always "fixed input → fresh render," never an edit to a finished clip.
-5. **If a shot can't be compiled from the Bible alone** — a missing State Schedule value, a `@material` with no approved image, more assets than the reference budget — **emit `status: "gap"`** with the missing item named (the recipe's gap format), instead of a prompt. Fix the Bible, then recompile. A gap caught here is free; the same gap discovered after rendering is not.
-
-**What stays out of your hands (the system guarantees these, not you):** whether Stage 2 is allowed to start (the render tool refuses unless the Bible is locked, assets approved, and the Scene Grid Registry is complete and passing), and the moment rendering begins. Do not try to "make sure" rendering happens by force of instruction — that is enforced by state in code. Your job is to compile good prompts one at a time and run the review loop; the system ensures order and gating.
-
-Detailed Stage 2 compilation guidance, grouping rules, reference-binding grammar, and craft tables: `references/shot-compilation-recipe.md` — **read it before writing shot prompts.**
+When the registry passes: `loadReference` the Stage 2 skill (`stage2-skill.md`), then `shot-compilation-recipe.md`. Do not compile prompts before that. Stage 2 preflight refuses a missing/failing registry.

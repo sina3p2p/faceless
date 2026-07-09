@@ -201,18 +201,22 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
         });
 
         // Add tool results immediately after the assistant turn.
-        // loadReference: use the result stored in the DB row (captured from execute()).
+        // Auto-executed tools (loadReference, recordSceneGridEntry): use DB-stored execute() output.
         // User-facing tools: use real results where available; synthetic "pending" for the rest.
         const resultParts = calls.map((tc) => {
-          if (tc.function.name === "loadReference") {
+          if (tc.function.name === "loadReference" || tc.function.name === "recordSceneGridEntry") {
             const stored = storedToolResults[tc.id];
+            const fallback =
+              tc.function.name === "loadReference"
+                ? "(reference file content unavailable)"
+                : JSON.stringify({ ok: false, errors: ["(registry entry result unavailable)"] });
             return {
               type: "tool-result" as const,
               toolCallId: tc.id,
               toolName: tc.function.name,
               output: stored
                 ? (stored as { type: "text"; value: string })
-                : { type: "text" as const, value: "(reference file content unavailable)" },
+                : { type: "text" as const, value: fallback },
             };
           }
           const collected = collectedResults.get(tc.id);

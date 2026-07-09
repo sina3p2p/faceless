@@ -495,16 +495,24 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
 
   const [selectedItemIds, setSelectedItemIds] = useState<string[]>(() => (selectedClipId ? [selectedClipId] : []));
 
+  // Mirror local multi-select → parent single-select. Guard with !== so we
+  // don't call setState on every internalClips identity change (that ping-pongs
+  // with the effect below and blows the update-depth limit).
   useEffect(() => {
     const single = selectedItemIds.length === 1 ? selectedItemIds[0]! : null;
     const derived = single !== null && internalClips.some((c) => c.id === single) ? single : null;
-    onSelectClip(derived);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-derive when selection or clip list changes
-  }, [selectedItemIds, internalClips]);
+    if (derived !== selectedClipId) onSelectClip(derived);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onSelectClip is stable setState from parent
+  }, [selectedItemIds, internalClips, selectedClipId]);
 
   useEffect(() => {
     setSelectedItemIds((prev) => {
-      if (selectedClipId === null) return prev;
+      if (selectedClipId === null) {
+        // Parent cleared (e.g. preview click) — drop a lone mirrored selection,
+        // but keep true multi-select (length > 1) which has no parent equivalent.
+        if (prev.length <= 1) return prev.length === 0 ? prev : [];
+        return prev;
+      }
       if (prev.length === 1 && prev[0] === selectedClipId) return prev;
       return [selectedClipId];
     });

@@ -24,8 +24,13 @@ export function StoryChat({
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const hasAutoSent = useRef(false);
 
-  // video editor state
-  const [clipOrder, setClipOrder] = useState<string[]>([]);
+  // video editor state — clipOrder preserves first-seen shot order across
+  // message stream updates (text deltas must not reshuffle the timeline).
+  const [clipOrder, setClipOrder] = useState<string[]>(() =>
+    initialMessages
+      .filter((m) => m.shotResult?.videoUrl)
+      .map((m) => m.shotResult!.toolCallId),
+  );
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
 
   // resizable chat sidebar
@@ -57,17 +62,28 @@ export function StoryChat({
     return () => observer.disconnect();
   }, []);
 
+  // Key only on shot identities / media fields — ignore text_delta noise so
+  // this effect (and the clips memo below) don't fire on every stream token.
+  const shotsKey = useMemo(() => {
+    const parts: string[] = [];
+    for (const m of messages) {
+      const s = m.shotResult;
+      if (!s?.videoUrl) continue;
+      parts.push(`${s.toolCallId}\0${s.videoUrl}\0${s.duration ?? ""}\0${s.approved ? 1 : 0}`);
+    }
+    return parts.join("\n");
+  }, [messages]);
+
   useEffect(() => {
+    if (!shotsKey) return;
+    const newIds = shotsKey.split("\n").map((row) => row.split("\0")[0]!).filter(Boolean);
     setClipOrder((prev) => {
       const existingIds = new Set(prev);
-      const newIds = messages
-        .filter((m) => m.shotResult?.videoUrl)
-        .map((m) => m.shotResult!.toolCallId)
-        .filter((id) => !existingIds.has(id));
-      if (newIds.length === 0) return prev;
-      return [...prev, ...newIds];
+      const toAdd = newIds.filter((id) => !existingIds.has(id));
+      if (toAdd.length === 0) return prev;
+      return [...prev, ...toAdd];
     });
-  }, [messages]);
+  }, [shotsKey]);
 
   const clipsByTcId = useMemo(() => {
     const map = new Map<string, Clip>();
@@ -82,7 +98,9 @@ export function StoryChat({
       }
     }
     return map;
-  }, [messages]);
+    // shotsKey is the content identity; messages alone would rebuild on every text_delta
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shotsKey]);
 
   const clips = useMemo(
     () => clipOrder.map((id) => clipsByTcId.get(id)).filter(Boolean) as Clip[],
