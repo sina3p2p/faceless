@@ -60,6 +60,7 @@ export class KieVideoProvider implements IProvider {
     if (req.endImageUrl) input.last_frame_url = req.endImageUrl;
     if (req.generateAudio != null) input.generate_audio = req.generateAudio;
     if (req.referenceImages && req.referenceImages.length > 0) input.reference_image_urls = req.referenceImages;
+    if (req.referenceVideos && req.referenceVideos.length > 0) input.reference_video_urls = req.referenceVideos;
 
     const { data: task } = await this.client.post<{ data: { taskId: string } }>(
       "/jobs/createTask",

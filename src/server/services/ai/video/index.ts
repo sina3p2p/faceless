@@ -37,9 +37,8 @@ export async function generateVideoFromImage(
 }
 
 /**
- * Reference-mode generation for Seedance 2: pass a character reference image and
- * the scene's TTS audio file so the model drives lipsync natively.
- * No start/last frame — mutually exclusive with generateVideoFromImage.
+ * Reference-mode generation for Seedance 2: pass character/location reference
+ * images (and optionally a start frame and/or reference videos for continuity).
  */
 export async function generateVideoFromReferences(
   referenceImages: string[],
@@ -48,12 +47,25 @@ export async function generateVideoFromReferences(
   videoModelId: TVideoModelId,
   aspectRatio: TAspectRatio = "9:16",
   resolution: TVideoResolution = "480p",
-  duration: number = -1
+  duration: number = -1,
+  opts?: {
+    startImageUrl?: string;
+    referenceVideos?: string[];
+  }
 ): Promise<VideoResult> {
   const kie = new KieVideoProvider();
-  return kie.generateVideo(
-    { model: videoModelId, referenceImages, referenceAudios, prompt, duration, aspectRatio, resolution, generateAudio: true },
-  );
+  return kie.generateVideo({
+    model: videoModelId,
+    referenceImages,
+    referenceAudios,
+    referenceVideos: opts?.referenceVideos,
+    startImageUrl: opts?.startImageUrl,
+    prompt,
+    duration,
+    aspectRatio,
+    resolution,
+    generateAudio: true,
+  });
 }
 
 /**

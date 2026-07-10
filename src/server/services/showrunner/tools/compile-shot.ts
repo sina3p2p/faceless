@@ -1,64 +1,150 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { generateVideoFromReferences, type VideoResult } from "@/server/services/ai/video";
+import { generateVideoFromReferences, editVideo, type VideoResult } from "@/server/services/ai/video";
 import { isE005, addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { probeVideoDuration } from "@/lib/media-probe";
 import { db } from "@/server/db";
 import { filmSessions, media } from "@/server/db/schema";
 
+export const CONTINUITY_MODES = ["fresh", "from_start_frame", "extend_video"] as const;
+export type ContinuityMode = (typeof CONTINUITY_MODES)[number];
+
 export const compileShot = tool({
   description:
     "Compile a shot prompt package and present it to the user for review before any rendering happens. " +
     "Only after Stage 1 is complete (registry passing): load stage2-skill.md and shot-compilation-recipe.md, " +
     "assemble the Seedance 2.0 prompt from the Bible, then call this tool. " +
-    "The user will review and optionally edit the prompt, then approve — rendering starts only after their approval. " +
-    "Wait for the user's shot approval before calling this again for the next generation. " +
-    "Never batch multiple independent generations in a single call — one call = one generation group or solo.",
+    "DEFAULT to solo generations (one shot per call). Prefer continuityMode: " +
+    "'from_start_frame' (pass startFrameUrl from extractClipFrame on the previous approved clip) for hard-cut joins, " +
+    "or 'extend_video' (pass sourceVideoUrl of the previous approved clip) for continuous walks/action. " +
+    "Use 'fresh' only for scene opens / clean breaks. " +
+    "Attach referenceImageUrls in character → object → location → grid order. " +
+    "The user reviews/edits the prompt, then approves — rendering starts only after approval. " +
+    "Wait for shot approval before compiling the next generation.",
   inputSchema: z.object({
     prompt: z
       .string()
-      .describe("Full compiled Seedance 2.0 prompt, assembled from the Bible per the shot-compilation-recipe. This is what the user will review and optionally edit before rendering."),
+      .describe(
+        "Full compiled Seedance 2.0 prompt from the Bible per the shot-compilation-recipe. " +
+          "For extend_video, open with Extend <Video_1>: … (never say 'reference <Video_1>'). " +
+          "For from_start_frame, CONTEXT must restate footing from the start frame."
+      ),
     referenceImageUrls: z
       .array(z.string())
-      .describe("Approved reference image URLs for the @material handles that appear in this shot, in binding order ([Image1], [Image2], …). Max 9."),
+      .max(9)
+      .describe(
+        "Approved reference image URLs in precision order: character → object → location → grid. " +
+          "May be empty for pure extend_video when identity is carried by the source clip + start frame."
+      ),
     duration: z
       .number()
       .int()
       .min(4)
       .max(15)
-      .describe("Target clip duration in seconds (4–15). Use the value from the shot row."),
+      .describe("Target clip duration in seconds (4–15). Solo = shot Dur; avoid padding with unused group sums."),
     aspectRatio: z
       .enum(["16:9", "9:16", "1:1"])
       .default("16:9")
       .describe("Aspect ratio — default 16:9 for cinematic film."),
+    continuityMode: z
+      .enum(CONTINUITY_MODES)
+      .default("fresh")
+      .describe(
+        "fresh = stills-only (scene open / clean break). " +
+          "from_start_frame = open from previous clip's last frame (hard-cut continuity). " +
+          "extend_video = continue from previous approved clip (walks / continuous action)."
+      ),
+    startFrameUrl: z
+      .string()
+      .optional()
+      .describe("Required for from_start_frame: JPEG/PNG URL from extractClipFrame on the previous approved clip."),
+    sourceVideoUrl: z
+      .string()
+      .optional()
+      .describe("Required for extend_video: the previous approved clip URL to continue from."),
   }),
 });
 
+export type CompileShotArgs = {
+  prompt: string;
+  referenceImageUrls: string[];
+  duration: number;
+  aspectRatio: "16:9" | "9:16" | "1:1";
+  continuityMode?: ContinuityMode;
+  startFrameUrl?: string;
+  sourceVideoUrl?: string;
+};
+
+export function validateCompileContinuity(args: CompileShotArgs): string[] {
+  const mode = args.continuityMode ?? "fresh";
+  const errors: string[] = [];
+  if (mode === "from_start_frame" && !args.startFrameUrl) {
+    errors.push("from_start_frame requires startFrameUrl (call extractClipFrame on the previous approved clip first).");
+  }
+  if (mode === "extend_video" && !args.sourceVideoUrl) {
+    errors.push("extend_video requires sourceVideoUrl (the previous approved clip URL).");
+  }
+  if (mode === "fresh" && (!args.referenceImageUrls || args.referenceImageUrls.length === 0)) {
+    errors.push("fresh mode requires at least one referenceImageUrl.");
+  }
+  return errors;
+}
+
 /**
- * Generate a shot via Seedance reference mode, with an automatic E005 fallback:
- * if Seedance rejects the images with E005, apply enhanced Gaussian perturbation
- * to all reference images and retry once.
+ * Generate a shot via Seedance, with continuity mode support and E005 fallback
+ * for reference-image rejection.
  */
 export async function generateShotWithFallback(
-  referenceImageUrls: string[],
-  prompt: string,
-  aspectRatio: "16:9" | "9:16" | "1:1" = "16:9",
-  duration: number,
+  args: CompileShotArgs,
   sessionId: string
 ): Promise<VideoResult> {
+  const mode = args.continuityMode ?? "fresh";
+  const aspectRatio = args.aspectRatio ?? "16:9";
+  const refs = args.referenceImageUrls ?? [];
+
+  if (mode === "extend_video") {
+    // Prefer reference-mode with the prior clip as a video input (KIE Seedance).
+    // Fall back to editVideo if reference videos are rejected by the provider.
+    try {
+      return await generateVideoFromReferences(
+        refs,
+        [],
+        args.prompt,
+        "seedance-2-mini",
+        aspectRatio,
+        "480p",
+        args.duration,
+        {
+          startImageUrl: args.startFrameUrl,
+          referenceVideos: args.sourceVideoUrl ? [args.sourceVideoUrl] : undefined,
+        }
+      );
+    } catch (err) {
+      console.warn("[compile-shot] extend via referenceVideos failed, falling back to editVideo", err);
+      return await editVideo(args.sourceVideoUrl!, args.prompt, args.duration, aspectRatio, "480p", "seedance-2-pro");
+    }
+  }
+
   const run = (urls: string[]) =>
-    generateVideoFromReferences(urls, [], prompt, 'seedance-2-mini', aspectRatio, "480p", duration);
+    generateVideoFromReferences(
+      urls,
+      [],
+      args.prompt,
+      "seedance-2-mini",
+      aspectRatio,
+      "480p",
+      args.duration,
+      mode === "from_start_frame" ? { startImageUrl: args.startFrameUrl } : undefined
+    );
 
   try {
-    return await run(referenceImageUrls);
+    return await run(refs);
   } catch (err) {
-    if (isE005(err)) {
+    if (isE005(err) && refs.length > 0) {
       const noisedUrls = await Promise.all(
-        referenceImageUrls.map((url, i) =>
-          addSeedanceNoiseEnhanced(url, `ref${i}`, `story_${sessionId}`)
-        )
+        refs.map((url, i) => addSeedanceNoiseEnhanced(url, `ref${i}`, `story_${sessionId}`))
       );
       return await run(noisedUrls);
     }
@@ -74,24 +160,17 @@ export interface UploadedShot {
 
 /**
  * Render the shot then re-upload the video to R2 — used by both the async
- * shot-queue worker and the synchronous retry-tool route. Replicate's URLs
- * expire, so the result is never persisted as-is.
- *
- * Also inserts a `media` row with the ffprobe-measured duration (same as
- * user-uploaded videos in /api/media — one place holds duration for both,
- * so anything reading clip metadata doesn't need to special-case where the
- * video came from). durationSeconds is a real measurement of the uploaded
- * file, not the requested/expected duration from the generation request.
+ * shot-queue worker and the synchronous retry-tool route.
  */
 export async function renderAndUploadShot(
-  referenceImageUrls: string[],
-  prompt: string,
-  aspectRatio: "16:9" | "9:16" | "1:1",
-  duration: number,
+  args: CompileShotArgs,
   sessionId: string,
   storageKey: string
 ): Promise<UploadedShot> {
-  const result = await generateShotWithFallback(referenceImageUrls, prompt, aspectRatio, duration, sessionId);
+  const errors = validateCompileContinuity(args);
+  if (errors.length > 0) throw new Error(errors.join(" "));
+
+  const result = await generateShotWithFallback(args, sessionId);
   const videoResp = await fetch(result.videoUrl);
   const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
   await uploadFile(storageKey, videoBuffer, "video/mp4");
@@ -103,7 +182,7 @@ export async function renderAndUploadShot(
     userId: session.userId,
     type: "video",
     url: storageKey,
-    prompt,
+    prompt: args.prompt,
     modelUsed: "seedance-2-mini",
     metadata: { duration: durationSeconds },
   }).returning({ id: media.id });
