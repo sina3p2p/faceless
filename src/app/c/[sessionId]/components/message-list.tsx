@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AssistantText } from "./assistant-text";
-import { ForkSelector } from "./fork-selector";
 import { AssetRefPanel } from "./asset-ref-panel";
 import { SceneGridPanel } from "./scene-grid-panel";
 import { ShotCompilePanel } from "./shot-compile-panel";
@@ -13,7 +12,6 @@ export function MessageList({
   messages,
   isStreaming,
   streamingMsgId,
-  onForkChoice,
   onAssetApproval,
   onGridApproval,
   onRetry,
@@ -23,7 +21,6 @@ export function MessageList({
   messages: ClientMessage[];
   isStreaming: boolean;
   streamingMsgId: string | null;
-  onForkChoice: (toolCallId: string, value: string, optionId?: string) => void;
   onAssetApproval: (toolCallId: string, assetHandle: string, url: string) => void;
   onGridApproval: (toolCallId: string, sceneId: string | number, url: string) => void;
   onRetry: (toolCallId: string) => void;
@@ -87,14 +84,14 @@ export function MessageList({
               );
             }
 
-            const fork = msg.fork;
+            const qs = msg.questions;
             return (
               <div key={msg.id} className="space-y-3 group">
-                {(msg.text || msg.reasoning || (isStreaming && !fork)) && (
+                {(msg.text || msg.reasoning || (isStreaming && !qs)) && (
                   <AssistantText
                     text={msg.text}
                     reasoning={msg.reasoning}
-                    isTyping={isStreaming && msg.id === streamingMsgId && !fork}
+                    isTyping={isStreaming && msg.id === streamingMsgId && !qs}
                   />
                 )}
 
@@ -112,31 +109,7 @@ export function MessageList({
                   </div>
                 )}
 
-                {fork && (
-                  <div>
-                    {fork.loading ? (
-                      <p className="text-xs text-muted-foreground/40 italic animate-pulse">Preparing options…</p>
-                    ) : fork.options ? (
-                      <ForkSelector
-                        options={fork.options}
-                        recommendedId={fork.recommendedId!}
-                        recommendationReason={fork.recommendationReason!}
-                        selectedId={fork.result?.optionId}
-                        onChoose={
-                          fork.result
-                            ? undefined
-                            : (optionId, customText) =>
-                              onForkChoice(
-                                fork.toolCallId,
-                                customText ?? fork.options!.find((o) => o.id === optionId)?.content ?? "",
-                                optionId
-                              )
-                        }
-                        disabled={isStreaming}
-                      />
-                    ) : null}
-                  </div>
-                )}
+
 
                 {msg.assetRef && (
                   <AssetRefPanel

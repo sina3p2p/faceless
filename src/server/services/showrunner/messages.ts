@@ -1,5 +1,13 @@
 import type { ModelMessage } from "ai";
-import type { AssetRef, ClientMessage, ForkCall, SceneGrid, ShotCompile, ShotResult } from "@/types/v2/story";
+import type {
+  AssetRef,
+  ClientMessage,
+  QuestionItem,
+  QuestionsCall,
+  SceneGrid,
+  ShotCompile,
+  ShotResult,
+} from "@/types/v2/story";
 
 type DbRow = {
   messageId: string;
@@ -57,25 +65,95 @@ function getToolCalls(d: Record<string, unknown>): RawToolCall[] {
   const calls: RawToolCall[] = [];
   if (d.forkCall) {
     const fc = d.forkCall as Record<string, unknown>;
-    calls.push({ id: fc.toolCallId as string, type: "function", function: { name: "presentFork", arguments: fc } });
+    calls.push({
+      id: fc.toolCallId as string,
+      type: "function",
+      function: { name: "presentFork", arguments: fc },
+    });
   }
   if (d.assetCall) {
     const ac = d.assetCall as Record<string, unknown>;
-    calls.push({ id: ac.toolCallId as string, type: "function", function: { name: "generateAssetReferences", arguments: { ...ac, generatedImages: ac.images } } });
+    calls.push({
+      id: ac.toolCallId as string,
+      type: "function",
+      function: {
+        name: "generateAssetReferences",
+        arguments: { ...ac, generatedImages: ac.images },
+      },
+    });
   }
   return calls;
 }
 
+/** Legacy presentFork args → QuestionItem[]. */
+function legacyForkToQuestions(args: Record<string, unknown>): QuestionItem[] {
+  const options = args.options as
+    | Array<{ id?: string; label?: string; content?: string }>
+    | undefined;
+  if (!options?.length) {
+    return [
+      {
+        question: (args.question as string) || "Pick a direction",
+        options: [],
+      },
+    ];
+  }
+  const recommendedId = args.recommendedId as string | undefined;
+  const recommendedIndex = recommendedId
+    ? options.findIndex((o) => o.id === recommendedId)
+    : undefined;
+  return [
+    {
+      question: (args.question as string) || "Pick a direction",
+      options: options.map((o) => {
+        const label = o.label?.trim() ?? "";
+        const content = o.content?.trim() ?? "";
+        if (label && content) return `${label} — ${content}`;
+        return label || content || o.id || "";
+      }),
+      recommendedIndex:
+        recommendedIndex !== undefined && recommendedIndex >= 0
+          ? recommendedIndex
+          : undefined,
+    },
+  ];
+}
+
+function formatQaText(questions: QuestionItem[], answers: string[]): string {
+  return questions
+    .map((q, i) => `Q: ${q.question}\nA: ${answers[i] ?? "(unanswered)"}`)
+    .join("\n\n");
+}
+
+function parseAnswers(d: Record<string, unknown>): string[] | undefined {
+  if (Array.isArray(d.answers)) return d.answers as string[];
+  // Legacy fork_result
+  if (typeof d.value === "string") return [d.value];
+  return undefined;
+}
+
+const USER_RESULT_TYPES = new Set([
+  "questions_result",
+  "fork_result",
+  "asset_approval",
+  "grid_approval",
+  "shot_approval",
+]);
+
 export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
-  const forkResults = new Map<string, { optionId?: string; value: string }>();
+  const questionAnswers = new Map<string, string[]>();
   const assetApprovals = new Map<string, string>();
   const gridApprovals = new Map<string, string>();
   const shotApprovals = new Set<string>();
 
   for (const row of rows) {
-    if (row.role === "user" && row.type === "fork_result") {
+    if (
+      row.role === "user" &&
+      (row.type === "questions_result" || row.type === "fork_result")
+    ) {
       const d = rowData(row);
-      forkResults.set(d.toolCallId as string, { optionId: d.optionId as string | undefined, value: d.value as string });
+      const answers = parseAnswers(d);
+      if (answers) questionAnswers.set(d.toolCallId as string, answers);
     } else if (row.role === "user" && row.type === "asset_approval") {
       const d = rowData(row);
       assetApprovals.set(d.toolCallId as string, d.approvedUrl as string);
@@ -90,14 +168,14 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
 
   const messages: ClientMessage[] = [];
   for (const row of rows) {
-    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval" || row.type === "grid_approval" || row.type === "shot_approval")) continue;
+    if (row.role === "user" && USER_RESULT_TYPES.has(row.type)) continue;
 
     const d = rowData(row);
     if (row.role === "user") {
       messages.push({ id: row.messageId, role: "user", text: d.text as string });
     } else if (row.role === "assistant") {
       const calls = getToolCalls(d);
-      let fork: ForkCall | undefined;
+      let questions: QuestionsCall | undefined;
       let assetRef: AssetRef | undefined;
       let sceneGrid: SceneGrid | undefined;
       let shotResult: ShotResult | undefined;
@@ -105,14 +183,19 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
 
       for (const tc of calls) {
         const args = tc.function.arguments;
-        if (tc.function.name === "presentFork") {
-          fork = {
+        if (
+          tc.function.name === "askQuestions" ||
+          tc.function.name === "presentFork"
+        ) {
+          const items =
+            tc.function.name === "askQuestions"
+              ? (args.questions as QuestionItem[])
+              : legacyForkToQuestions(args);
+          questions = {
             toolCallId: tc.id,
             loading: false,
-            options: args.options as ForkCall["options"],
-            recommendedId: args.recommendedId as string,
-            recommendationReason: args.recommendationReason as string,
-            result: forkResults.get(tc.id),
+            questions: items,
+            answers: questionAnswers.get(tc.id),
           };
         } else if (tc.function.name === "generateAssetReferences") {
           assetRef = {
@@ -139,7 +222,6 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
           const isPending = (args.pending as boolean | undefined) === true;
           const hasVideo = !!(args.videoUrl as string | undefined);
           if (isPending || hasVideo) {
-            // Render has started (or finished) — show the video panel
             shotResult = {
               toolCallId: tc.id,
               loading: isPending,
@@ -149,7 +231,6 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
               approved: shotApprovals.has(tc.id),
             };
           } else {
-            // Render not started yet — show the compile-review panel
             shotCompile = {
               toolCallId: tc.id,
               loading: false,
@@ -164,7 +245,24 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
         }
       }
 
-      messages.push({ id: row.messageId, role: "assistant", text: (d.text as string) ?? "", fork, assetRef, sceneGrid, shotResult, shotCompile });
+      messages.push({
+        id: row.messageId,
+        role: "assistant",
+        text: (d.text as string) ?? "",
+        questions,
+        assetRef,
+        sceneGrid,
+        shotResult,
+        shotCompile,
+      });
+
+      if (questions?.answers && questions.questions?.length) {
+        messages.push({
+          id: `${row.messageId}-answers`,
+          role: "user",
+          text: formatQaText(questions.questions, questions.answers),
+        });
+      }
     }
   }
   return messages;
@@ -175,16 +273,42 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
   // This prevents AI_MissingToolResultsError when the LLM made multiple tool calls in one
   // turn but the user hasn't responded to all of them yet.
   const collectedResults = new Map<string, { text: string; imageUrl?: string }>();
+  // Need question text for Q/A formatting — scan assistant turns for askQuestions/presentFork
+  const questionsByToolCall = new Map<string, QuestionItem[]>();
 
   for (const row of rows) {
-    if (row.role === "user" && row.type === "fork_result") {
+    if (row.role === "assistant" && row.type === "turn") {
       const d = rowData(row);
-      const optionId = d.optionId as string | null;
-      const value = d.value as string;
-      collectedResults.set(d.toolCallId as string, {
-        text: optionId
-          ? `User selected option ${optionId}. Locked content: ${value}`
-          : `User provided a custom direction: ${value}`,
+      for (const tc of getToolCalls(d)) {
+        if (tc.function.name === "askQuestions") {
+          questionsByToolCall.set(
+            tc.id,
+            tc.function.arguments.questions as QuestionItem[]
+          );
+        } else if (tc.function.name === "presentFork") {
+          questionsByToolCall.set(
+            tc.id,
+            legacyForkToQuestions(tc.function.arguments)
+          );
+        }
+      }
+    }
+  }
+
+  for (const row of rows) {
+    if (
+      row.role === "user" &&
+      (row.type === "questions_result" || row.type === "fork_result")
+    ) {
+      const d = rowData(row);
+      const answers = parseAnswers(d);
+      if (!answers) continue;
+      const toolCallId = d.toolCallId as string;
+      const qs = questionsByToolCall.get(toolCallId);
+      collectedResults.set(toolCallId, {
+        text: qs
+          ? formatQaText(qs, answers)
+          : answers.map((a) => `A: ${a}`).join("\n"),
       });
     } else if (row.role === "user" && row.type === "asset_approval") {
       const d = rowData(row);
@@ -220,7 +344,7 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
   const msgs: ModelMessage[] = [];
 
   for (const row of rows) {
-    if (row.role === "user" && (row.type === "fork_result" || row.type === "asset_approval" || row.type === "grid_approval" || row.type === "shot_approval")) continue;
+    if (row.role === "user" && USER_RESULT_TYPES.has(row.type)) continue;
 
     const d = rowData(row);
 
@@ -235,24 +359,35 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
         const toolCallParts = calls.map((tc) => ({
           type: "tool-call" as const,
           toolCallId: tc.id,
-          toolName: tc.function.name,
-          // Strip server-side augmentation before sending to model
-          input: Object.fromEntries(
-            Object.entries(tc.function.arguments).filter(
-              ([k]) =>
-                !["generatedImages", "videoUrl", "pending", "shotError", "renderedDurationSeconds"].includes(k)
-            )
-          ),
+          // Replay legacy presentFork under askQuestions name so the live tool set matches
+          toolName:
+            tc.function.name === "presentFork" ? "askQuestions" : tc.function.name,
+          input:
+            tc.function.name === "presentFork"
+              ? { questions: legacyForkToQuestions(tc.function.arguments) }
+              : Object.fromEntries(
+                  Object.entries(tc.function.arguments).filter(
+                    ([k]) =>
+                      ![
+                        "generatedImages",
+                        "videoUrl",
+                        "pending",
+                        "shotError",
+                        "renderedDurationSeconds",
+                      ].includes(k)
+                  )
+                ),
         }));
         msgs.push({
           role: "assistant",
-          content: text ? [{ type: "text" as const, text }, ...toolCallParts] : toolCallParts,
+          content: text
+            ? [{ type: "text" as const, text }, ...toolCallParts]
+            : toolCallParts,
         });
 
-        // Add tool results immediately after the assistant turn.
-        // Auto-executed tools: use DB-stored execute() output.
-        // User-facing tools: use real results where available; synthetic "pending" for the rest.
         const resultParts = calls.map((tc) => {
+          const toolName =
+            tc.function.name === "presentFork" ? "askQuestions" : tc.function.name;
           if (
             tc.function.name === "loadReference" ||
             tc.function.name === "webExtract" ||
@@ -262,35 +397,39 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
               tc.function.name === "loadReference"
                 ? "(reference file content unavailable)"
                 : tc.function.name === "webExtract"
-                ? "(web extract content unavailable)"
-                : JSON.stringify({ ok: false, errors: ["(registry entry result unavailable)"] });
+                  ? "(web extract content unavailable)"
+                  : JSON.stringify({
+                      ok: false,
+                      errors: ["(registry entry result unavailable)"],
+                    });
             return {
               type: "tool-result" as const,
               toolCallId: tc.id,
-              toolName: tc.function.name,
+              toolName,
               output: toToolResultOutput(storedToolResults[tc.id], fallback),
             };
           }
           const collected = collectedResults.get(tc.id);
-          const resultText = collected?.text ?? (
-            tc.function.name === "generateAssetReferences"
+          const resultText =
+            collected?.text ??
+            (tc.function.name === "generateAssetReferences"
               ? `Reference images have been generated for "${tc.function.arguments.assetHandle as string}". User has not yet approved one.`
               : tc.function.name === "generateSceneGrid"
-              ? (tc.function.arguments.gridError as string | undefined)
-                ? `Scene grid rejected: ${tc.function.arguments.gridError as string}`
-                : `A scene grid candidate has been generated for scene ${tc.function.arguments.sceneId as string | number}. User has not yet approved it.`
-              : tc.function.name === "compileShot"
-              ? tc.function.arguments.videoUrl
-                ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval to add to timeline.`
-                : (tc.function.arguments.pending as boolean | undefined) === true
-                ? "Shot render in progress — waiting for the video to finish."
-                : "Shot prompt compiled and shown to user for review. Awaiting their approval before rendering starts."
-              : "User has not yet responded to this decision."
-          );
+                ? (tc.function.arguments.gridError as string | undefined)
+                  ? `Scene grid rejected: ${tc.function.arguments.gridError as string}`
+                  : `A scene grid candidate has been generated for scene ${tc.function.arguments.sceneId as string | number}. User has not yet approved it.`
+                : tc.function.name === "compileShot"
+                  ? tc.function.arguments.videoUrl
+                    ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval to add to timeline.`
+                    : (tc.function.arguments.pending as boolean | undefined) ===
+                        true
+                      ? "Shot render in progress — waiting for the video to finish."
+                      : "Shot prompt compiled and shown to user for review. Awaiting their approval before rendering starts."
+                  : "User has not yet answered these questions.");
           return {
             type: "tool-result" as const,
             toolCallId: tc.id,
-            toolName: tc.function.name,
+            toolName,
             output: collected?.imageUrl
               ? {
                   type: "content" as const,

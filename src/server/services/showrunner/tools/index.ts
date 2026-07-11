@@ -3,7 +3,7 @@ import { loadReference } from "./load-reference";
 import { generateAssetReferences } from "./generate-asset-references";
 import { generateSceneGrid } from "./generate-scene-grid";
 import { compileShot } from "./compile-shot";
-import { presentFork } from "./present-fork";
+import { askQuestions } from "./ask-questions";
 import { recordSceneGridEntry } from "./record-scene-grid-entry";
 
 export const storyTools = {
@@ -13,7 +13,7 @@ export const storyTools = {
   generateAssetReferences,
   generateSceneGrid,
   compileShot,
-  presentFork,
+  askQuestions,
   recordSceneGridEntry,
 };
 

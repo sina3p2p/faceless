@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useMemo, startTransition } from "react";
 import { VideoEditorPanel, type Clip } from "./video-editor-panel";
 import { Card } from "@/components/ui/card";
 import { ChatInput } from "./chat-input";
+import { formatQuestionsAnswers, QuestionsPicker } from "./questions-picker";
 import { MessageList } from "./message-list";
-import type { AssetRef, ClientMessage, ForkCall, SceneGrid, ShotCompile, ShotResult } from "@/types/v2/story";
+import type { AssetRef, ClientMessage, QuestionsCall, SceneGrid, ShotCompile, ShotResult } from "@/types/v2/story";
 import { useMobileTab } from "../../../story-shell";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,16 @@ export function StoryChat({
   const isStreaming = status === "streaming";
   const seed = useMemo(() => messages.find((m) => m.role === "user")?.text ?? "", [messages]);
   const mobileTab = useMobileTab();
+
+  const pendingQuestions = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.questions && !msg.questions.answers) {
+        return msg.questions;
+      }
+    }
+    return null;
+  }, [messages]);
 
   useEffect(() => {
     if (!chatRowRef.current) return;
@@ -239,21 +250,19 @@ export function StoryChat({
           )
         )
       );
-    } else if (event.type === "fork_loading") {
-      const fork: ForkCall = { toolCallId: event.toolCallId as string, loading: true };
+    } else if (event.type === "questions_loading") {
+      const questions: QuestionsCall = { toolCallId: event.toolCallId as string, loading: true };
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, fork } : m))
+        prev.map((m) => (m.id === tempId ? { ...m, questions } : m))
       );
-    } else if (event.type === "fork") {
-      const fork: ForkCall = {
+    } else if (event.type === "questions") {
+      const questions: QuestionsCall = {
         toolCallId: event.toolCallId as string,
         loading: false,
-        options: event.options as ForkCall["options"],
-        recommendedId: event.recommendedId as string,
-        recommendationReason: event.recommendationReason as string,
+        questions: event.questions as QuestionsCall["questions"],
       };
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, fork } : m))
+        prev.map((m) => (m.id === tempId ? { ...m, questions } : m))
       );
     } else if (event.type === "asset_ref_loading") {
       const assetRef: AssetRef = { toolCallId: event.toolCallId as string, loading: true };
@@ -346,15 +355,24 @@ export function StoryChat({
     await streamResponse({ type: "user", text });
   }
 
-  async function handleForkChoice(toolCallId: string, value: string, optionId?: string) {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.role === "assistant" && m.fork?.toolCallId === toolCallId
-          ? { ...m, fork: { ...m.fork!, result: { optionId, value } } }
-          : m
-      )
+  async function handleQuestionsSubmit(toolCallId: string, answers: string[]) {
+    const host = messages.find(
+      (m) => m.role === "assistant" && m.questions?.toolCallId === toolCallId
     );
-    await streamResponse({ type: "fork_result", toolCallId, value, optionId });
+    const qaText =
+      host?.questions?.questions
+        ? formatQuestionsAnswers(host.questions.questions, answers)
+        : answers.join("\n");
+
+    setMessages((prev) => [
+      ...prev.map((m) =>
+        m.role === "assistant" && m.questions?.toolCallId === toolCallId
+          ? { ...m, questions: { ...m.questions!, answers } }
+          : m
+      ),
+      { id: crypto.randomUUID(), role: "user" as const, text: qaText },
+    ]);
+    await streamResponse({ type: "questions_result", toolCallId, answers });
   }
 
   async function handleShotApproval(toolCallId: string, videoUrl: string) {
@@ -590,13 +608,32 @@ export function StoryChat({
             messages={messages}
             isStreaming={isStreaming}
             streamingMsgId={streamingMsgId}
-            onForkChoice={handleForkChoice}
+            pendingQuestionsToolCallId={pendingQuestions?.toolCallId}
+            onQuestionsSubmit={handleQuestionsSubmit}
             onAssetApproval={handleAssetApproval}
             onGridApproval={handleGridApproval}
             onRetry={retryTool}
             onRenderShot={handleRenderShot}
             onShotApproval={handleShotApproval}
           />
+
+          <div className="shrink-0 max-w-3xl mx-auto w-full px-3 space-y-2">
+            {pendingQuestions?.loading && (
+              <p className="text-xs text-muted-foreground/40 italic animate-pulse px-1">
+                Preparing questions…
+              </p>
+            )}
+            {pendingQuestions?.questions && (
+              <QuestionsPicker
+                key={pendingQuestions.toolCallId}
+                questions={pendingQuestions.questions}
+                onSubmit={(answers) =>
+                  void handleQuestionsSubmit(pendingQuestions.toolCallId, answers)
+                }
+                disabled={isStreaming}
+              />
+            )}
+          </div>
 
           <ChatInput isStreaming={isStreaming} onSend={(text) => void sendUserMessage(text)} />
         </Card>

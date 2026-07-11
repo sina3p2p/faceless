@@ -64,18 +64,22 @@ export async function POST(
       parts: [{ text }],
       createdAt: new Date(),
     });
-  } else if (body.type === "fork_result") {
+  } else if (body.type === "questions_result" || body.type === "fork_result") {
+    const answers = Array.isArray(body.answers)
+      ? (body.answers as string[])
+      : typeof body.value === "string"
+        ? [body.value as string]
+        : null;
+    if (!answers?.length) return badRequest("answers required");
     await db.insert(filmSessionMessages).values({
       id: crypto.randomUUID(),
       messageId: crypto.randomUUID(),
       sessionId,
       role: "user",
-      type: "fork_result",
+      type: "questions_result",
       parts: [{
         toolCallId: body.toolCallId,
-        step: body.step,
-        value: body.value,
-        optionId: body.optionId ?? null,
+        answers,
       }],
       createdAt: new Date(),
     });
@@ -185,8 +189,8 @@ export async function POST(
         fullText += chunk.text;
         emit({ type: "text_delta", text: chunk.text });
       } else if (chunk.type === "tool-input-start") {
-        if (chunk.toolName === "presentFork") {
-          emit({ type: "fork_loading", toolCallId: chunk.id });
+        if (chunk.toolName === "askQuestions") {
+          emit({ type: "questions_loading", toolCallId: chunk.id });
         } else if (chunk.toolName === "generateAssetReferences") {
           emit({ type: "asset_ref_loading", toolCallId: chunk.id });
         } else if (chunk.toolName === "generateSceneGrid") {
@@ -203,8 +207,8 @@ export async function POST(
         };
         toolCalls.push(rawCall);
 
-        if (chunk.toolName === "presentFork") {
-          emit({ type: "fork", toolCallId: chunk.toolCallId, ...args });
+        if (chunk.toolName === "askQuestions") {
+          emit({ type: "questions", toolCallId: chunk.toolCallId, ...args });
         } else if (chunk.toolName === "generateAssetReferences") {
           pendingAssetIndices.push(toolCalls.length - 1);
         } else if (chunk.toolName === "generateSceneGrid") {

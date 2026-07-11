@@ -553,7 +553,7 @@ export const filmSessions = pgTable("film_sessions", {
 
 // Each row is one part of a UIMessage.
 // message_id groups parts belonging to the same assistant/user turn.
-// type identifies the part kind ("text", "tool-presentFork", …).
+// type identifies the part kind ("text", "tool-askQuestions", …).
 // parts stores the full part payload as JSON.
 export const filmSessionMessages = pgTable("film_session_messages", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),

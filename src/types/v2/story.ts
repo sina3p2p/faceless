@@ -1,19 +1,16 @@
 export type SessionStatus = "in_progress" | "completed" | "abandoned";
 
-export type ForkOption = {
-  id: string;
-  label: string;
-  content: string;
-  tradeoffs: string;
+export type QuestionItem = {
+  question: string;
+  options: string[];
+  recommendedIndex?: number;
 };
 
-export type ForkCall = {
+export type QuestionsCall = {
   toolCallId: string;
   loading: boolean;
-  options?: ForkOption[];
-  recommendedId?: string;
-  recommendationReason?: string;
-  result?: { optionId?: string; value: string };
+  questions?: QuestionItem[];
+  answers?: string[];
 };
 
 export type AssetRef = {
@@ -68,7 +65,7 @@ export type ClientMessage = {
   role: "user" | "assistant";
   text: string;
   reasoning?: string;
-  fork?: ForkCall;
+  questions?: QuestionsCall;
   assetRef?: AssetRef;
   sceneGrid?: SceneGrid;
   shotResult?: ShotResult;
