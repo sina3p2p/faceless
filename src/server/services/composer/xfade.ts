@@ -1,4 +1,5 @@
-import type { TransitionType } from "@/types/pipeline";
+export type TransitionType = "cut" | "dissolve" | "fade" | "match-cut" | "whip-pan";
+
 
 /**
  * xfade chain builder for frame-to-frame transitions within a single scene.

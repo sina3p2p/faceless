@@ -12,12 +12,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import type { ImageSpec } from "@/server/services/ai/llm/image-spec";
-import type { FrameMotionSpec } from "@/server/services/ai/llm/motion";
-import type { MotionSkillHints } from "@/types/motion-skill-hints";
-import type { ResultMeta } from "@/server/services/ai/llm/prompt-contract";
 import type { ModelSettings } from "@/types/llm-common";
-import { PipelineConfig } from "@/types/pipeline";
 
 // ── Enums ──
 
@@ -176,7 +171,7 @@ export const videoProjects = pgTable("video_projects", {
   videoType: text("video_type").default("standalone").notNull(),
   script: text("script"),
   duration: integer("duration"),
-  config: json("config").$type<PipelineConfig>(),
+  config: json("config"),
   outputUrl: text("output_url"),
   thumbnailUrl: text("thumbnail_url"),
   modelSettings: json("model_settings").$type<ModelSettings>().notNull(),
@@ -323,13 +318,13 @@ export const sceneFrames = pgTable("scene_frames", {
   clipDuration: real("clip_duration").notNull().default(0),
   imagePrompt: text("image_prompt"),
   /** Structured architect output; subject.primary merged with continuity before serialize. */
-  imageSpec: json("image_spec").$type<ImageSpec | null>(),
+  imageSpec: json("image_spec"),
   /** Last prompt-contract assessment (deriveFinalStatus, reason codes, flags). */
-  promptContractMeta: json("prompt_contract_meta").$type<ResultMeta | null>(),
+  promptContractMeta: json("prompt_contract_meta"),
   /** Structured motion director output; visualDescription is the compiled video prompt. */
-  motionSpec: json("motion_spec").$type<FrameMotionSpec | null>(),
+  motionSpec: json("motion_spec"),
   /** Optional per-frame skill pack (hook, camera, music, vertical) for motion LLM. */
-  motionSkillHints: json("motion_skill_hints").$type<MotionSkillHints | null>(),
+  motionSkillHints: json("motion_skill_hints"),
   /** Storyboard-chosen transition INTO this frame. One of TransitionType. Null = legacy hard cut. */
   transitionIn: text("transition_in"),
   /** Storyboard-suggested SFX cue at the start of this frame. Null = no cue. */

@@ -608,8 +608,6 @@ export function StoryChat({
             messages={messages}
             isStreaming={isStreaming}
             streamingMsgId={streamingMsgId}
-            pendingQuestionsToolCallId={pendingQuestions?.toolCallId}
-            onQuestionsSubmit={handleQuestionsSubmit}
             onAssetApproval={handleAssetApproval}
             onGridApproval={handleGridApproval}
             onRetry={retryTool}
