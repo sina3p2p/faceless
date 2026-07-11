@@ -1,7 +1,7 @@
 import type { Job } from "bullmq";
 import { db, schema, eq } from "./shared";
 import type { ShotJobData } from "@/lib/shot-queue";
-import { renderAndUploadShot } from "@/server/services/showrunner";
+import { renderAndUploadShot } from "@/server/services/showrunner/tools/compile-shot";
 import { logger } from "@/lib/logger";
 
 type StoredTc = {
