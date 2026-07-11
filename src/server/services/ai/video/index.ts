@@ -1,5 +1,3 @@
-import * as fs from "fs/promises";
-import axios from "axios";
 import { pickBestDuration } from "./pick-duration";
 import type { VideoResult } from "@/types/video-provider";
 import { VIDEO_MODELS } from "@/lib/constants";

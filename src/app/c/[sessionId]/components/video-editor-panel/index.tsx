@@ -728,7 +728,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
       {/* ── Tool Tab Bar ── */}
-      <div className="flex items-center gap-1 px-3 h-12 border-b border-white/10 bg-black/20 backdrop-blur-md shrink-0 overflow-x-auto">
+      <div className="flex items-center gap-1 px-3 h-12 border-b border-white/10 bg-black/20 backdrop-blur-md shrink-0 min-w-0 overflow-x-auto scrollbar-none">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           return (

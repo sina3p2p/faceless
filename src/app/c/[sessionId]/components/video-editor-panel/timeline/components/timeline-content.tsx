@@ -56,7 +56,9 @@ export function TimelineContent({ pxPerSec, totalDuration }: { pxPerSec: number;
   const { numTracks } = useTimelineTracks(tracks);
   const activeItemId = useActiveItemId();
   const timelineH = RULER_H + numTracks * CLIP_TRACK_H + HEADER_H;
-  const contentWidth = Math.max(totalDuration * pxPerSec + 96, 600);
+  // No fixed px floor — a 600px min forced a horizontal scrollbar whenever chat
+  // narrowed the editor below that width, even when the timeline fit.
+  const contentWidth = totalDuration * pxPerSec + 96;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const { handleWheel } = useTimelineZoom(scrollRef);

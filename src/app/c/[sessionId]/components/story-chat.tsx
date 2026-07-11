@@ -509,7 +509,7 @@ export function StoryChat({
   }
 
   return (
-    <div ref={chatRowRef} className="flex-1 flex flex-col md:flex-row overflow-hidden relative min-h-0">
+    <div ref={chatRowRef} className="flex-1 flex flex-col md:flex-row overflow-hidden relative min-h-0 min-w-0">
       {/* ── Center: Video Editor ── */}
       <Card
         variant="panel"

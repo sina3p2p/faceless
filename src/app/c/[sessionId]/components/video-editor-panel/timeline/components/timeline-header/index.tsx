@@ -10,7 +10,7 @@ import { HEADER_H, MAX_PX_PER_SEC, MIN_PX_PER_SEC } from "../../constants";
 const SPEEDS = [0.5, 1, 1.5, 2];
 
 const iconBtn =
-  "w-8 h-8 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed";
+  "w-8 h-8 shrink-0 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground hover:bg-white/10 transition-all disabled:opacity-25 disabled:cursor-not-allowed";
 
 export function TimelineHeader({ totalDuration, collapsed }: { totalDuration: number; collapsed: boolean }) {
   const tracks = useTimelineStore((s) => s.tracks);
@@ -97,7 +97,7 @@ export function TimelineHeader({ totalDuration, collapsed }: { totalDuration: nu
   return (
     <>
       <div
-        className="shrink-0 border-b border-white/8 flex items-center gap-1 px-2 overflow-x-auto bg-black/20"
+        className="shrink-0 border-b border-white/8 flex items-center gap-1 px-2 min-w-0 overflow-x-auto scrollbar-none bg-black/20"
         style={{ height: HEADER_H }}
       >
         {/* Undo / redo */}
@@ -112,7 +112,7 @@ export function TimelineHeader({ totalDuration, collapsed }: { totalDuration: nu
           </svg>
         </button>
 
-        <div className="w-px h-5 bg-white/10 mx-1" />
+        <div className="w-px h-5 bg-white/10 mx-1 shrink-0" />
 
         {/* Edit actions */}
         <button
@@ -139,7 +139,7 @@ export function TimelineHeader({ totalDuration, collapsed }: { totalDuration: nu
           onClick={() => onReverseItems(selectedItemIds)}
           disabled={!hasSelection}
           title="Reverse selection"
-          className={`w-8 h-8 flex items-center justify-center rounded transition-all disabled:opacity-25 disabled:cursor-not-allowed ${selectedVideoItem?.clip.reversed ? "text-amber-400 bg-amber-500/15 hover:bg-amber-500/25" : "text-muted-foreground/60 hover:text-foreground hover:bg-white/10"
+          className={`w-8 h-8 shrink-0 flex items-center justify-center rounded transition-all disabled:opacity-25 disabled:cursor-not-allowed ${selectedVideoItem?.clip.reversed ? "text-amber-400 bg-amber-500/15 hover:bg-amber-500/25" : "text-muted-foreground/60 hover:text-foreground hover:bg-white/10"
             }`}
         >
           <svg className="w-[15px] h-[15px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
@@ -147,18 +147,18 @@ export function TimelineHeader({ totalDuration, collapsed }: { totalDuration: nu
           </svg>
         </button>
 
-        <div className="w-px h-5 bg-white/10 mx-1" />
+        <div className="w-px h-5 bg-white/10 mx-1 shrink-0" />
 
         {/* Speed */}
         <button
           onClick={cycleSpeed}
           title="Playback speed"
-          className="h-7 px-2 rounded text-[11px] font-mono font-semibold text-muted-foreground/70 hover:text-foreground hover:bg-white/10 transition-all"
+          className="h-7 px-2 rounded text-[11px] font-mono font-semibold text-muted-foreground/70 hover:text-foreground hover:bg-white/10 transition-all shrink-0"
         >
           {playbackRate}x
         </button>
 
-        <div className="flex-1 flex items-center justify-center gap-1 min-w-fit">
+        <div className="flex-1 flex items-center justify-center gap-1 min-w-0">
           <button onClick={goToStart} disabled={allItems.length === 0} title="Go to start" className={iconBtn}>
             <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
           </button>
@@ -166,7 +166,7 @@ export function TimelineHeader({ totalDuration, collapsed }: { totalDuration: nu
             <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h2v12H6zm12 12L8 12l10-6z" /></svg>
           </button>
           <button onClick={isPlaying ? onPause : onPlay} disabled={allItems.length === 0} title={isPlaying ? "Pause" : "Play"}
-            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/90 text-black hover:bg-white transition-all disabled:opacity-25 disabled:cursor-not-allowed">
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/90 text-black hover:bg-white transition-all disabled:opacity-25 disabled:cursor-not-allowed shrink-0">
             {isPlaying
               ? <svg className="w-[15px] h-[15px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" /></svg>
               : <svg className="w-[15px] h-[15px] ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
@@ -178,14 +178,14 @@ export function TimelineHeader({ totalDuration, collapsed }: { totalDuration: nu
           <button onClick={goToEnd} disabled={allItems.length === 0} title="Go to end" className={iconBtn}>
             <svg className="w-[18px] h-[18px]" fill="currentColor" viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zm8.5 0h2V6h-2v12z" /></svg>
           </button>
-          <span className="text-[11px] font-mono text-muted-foreground/70 ml-1 whitespace-nowrap">
+          <span className="text-[11px] font-mono text-muted-foreground/70 ml-1 whitespace-nowrap truncate min-w-0">
             {formatTime(currentTime)} / {formatTime(totalDuration)}
           </span>
         </div>
 
         {/* Zoom */}
         <button onClick={() => setPxPerSec((p) => p * 0.8)} title="Zoom out"
-          className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all">
+          className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all shrink-0">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35M8 11h6" />
           </svg>
@@ -193,36 +193,34 @@ export function TimelineHeader({ totalDuration, collapsed }: { totalDuration: nu
         <input
           type="range" min={MIN_PX_PER_SEC} max={MAX_PX_PER_SEC} value={pxPerSec}
           onChange={(e) => setPxPerSec(Number(e.target.value))}
-          className="w-20 h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white/70 hover:[&::-webkit-slider-thumb]:bg-white"
+          className="w-20 max-w-[5rem] min-w-0 flex-shrink h-1 appearance-none bg-white/20 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white/70 hover:[&::-webkit-slider-thumb]:bg-white"
         />
         <button onClick={() => setPxPerSec((p) => p * 1.25)} title="Zoom in"
-          className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all">
+          className="w-7 h-7 flex items-center justify-center rounded text-muted-foreground/60 hover:text-foreground transition-all shrink-0">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <circle cx="11" cy="11" r="8" /><path strokeLinecap="round" d="M21 21l-4.35-4.35M11 8v6M8 11h6" />
           </svg>
         </button>
 
-        <div className="w-px h-5 bg-white/10 mx-1" />
+        <div className="w-px h-5 bg-white/10 mx-1 shrink-0" />
 
-        {/* Add media */}
+        {/* Add media — icon-only so the bar fits when chat narrows the editor */}
         <button
           onClick={() => setVideoPickerOpen(true)}
           title="Add video"
-          className="flex items-center gap-1 h-7 px-2 rounded text-[11px] text-primary hover:bg-primary/10 border border-primary/20 hover:border-primary/50 transition-all"
+          className="w-7 h-7 flex items-center justify-center rounded text-primary hover:bg-primary/10 border border-primary/20 hover:border-primary/50 transition-all shrink-0"
         >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-          Video
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
         </button>
         <button
           onClick={() => setAudioPickerOpen(true)}
           title="Add audio"
-          className="flex items-center gap-1 h-7 px-2 rounded text-[11px] text-teal-500 hover:text-teal-300 hover:bg-teal-500/10 border border-teal-800/50 hover:border-teal-600/50 transition-all"
+          className="w-7 h-7 flex items-center justify-center rounded text-teal-500 hover:text-teal-300 hover:bg-teal-500/10 border border-teal-800/50 hover:border-teal-600/50 transition-all shrink-0"
         >
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-          Audio
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>
         </button>
 
-        <div className="w-px h-5 bg-white/10 mx-1" />
+        <div className="w-px h-5 bg-white/10 mx-1 shrink-0" />
 
         {/* Collapse */}
         <button

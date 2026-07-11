@@ -54,7 +54,7 @@ export function StoryShell({
         {/* Layout */}
         <div className="flex-1 flex max-md:p-0 max-md:gap-0 overflow-hidden min-h-0">
           <div className="contents">{sidebar}</div>
-          <div className="flex-1 flex flex-col overflow-hidden min-h-0">{children}</div>
+          <div className="flex-1 flex flex-col overflow-hidden min-h-0 min-w-0">{children}</div>
         </div>
       </div>
     </MobileTabCtx.Provider>
