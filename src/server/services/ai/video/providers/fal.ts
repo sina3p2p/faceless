@@ -1,4 +1,3 @@
-import { fal } from "@fal-ai/client";
 import { AI_VIDEO } from "@/lib/constants";
 import type { I2vRequest, IProvider, VideoResult } from "@/types/video-provider";
 import axios, { AxiosInstance } from "axios";
