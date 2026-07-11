@@ -86,11 +86,3 @@ export async function editVideo(
     { videoUrl, prompt, duration: snapped, aspectRatio, resolution, model: videoModelId }
   );
 }
-
-export async function downloadAIVideo(videoUrl: string, destPath: string): Promise<void> {
-  const response = await axios.get<ArrayBuffer>(videoUrl, {
-    responseType: "arraybuffer",
-    timeout: 300_000,
-  });
-  await fs.writeFile(destPath, Buffer.from(response.data));
-}

@@ -9,7 +9,7 @@ import { db } from "@/server/db";
 import { filmSessions, media } from "@/server/db/schema";
 
 export const CONTINUITY_MODES = ["fresh", "extend_video"] as const;
-export type ContinuityMode = (typeof CONTINUITY_MODES)[number];
+type ContinuityMode = (typeof CONTINUITY_MODES)[number];
 
 export const compileShot = tool({
   description:
@@ -28,15 +28,15 @@ export const compileShot = tool({
       .string()
       .describe(
         "Full compiled Seedance 2.0 prompt from the Bible per the shot-compilation-recipe. " +
-          "For extend_video, open with Extend <Video_1>: … (never say 'reference <Video_1>'). " +
-          "When continuing across clips, CONTEXT must restate footing from the previous last frame."
+        "For extend_video, open with Extend <Video_1>: … (never say 'reference <Video_1>'). " +
+        "When continuing across clips, CONTEXT must restate footing from the previous last frame."
       ),
     referenceImageUrls: z
       .array(z.string())
       .max(9)
       .describe(
         "Approved reference image URLs in precision order: character → object → location → grid. " +
-          "Required for fresh; optional for extend_video when identity is carried by the source clip."
+        "Required for fresh; optional for extend_video when identity is carried by the source clip."
       ),
     duration: z
       .number()
@@ -53,7 +53,7 @@ export const compileShot = tool({
       .default("fresh")
       .describe(
         "fresh = stills-only (scene open / clean break / new take). " +
-          "extend_video = continue from previous approved clip (walks / continuous action)."
+        "extend_video = continue from previous approved clip (walks / continuous action)."
       ),
     sourceVideoUrl: z
       .string()

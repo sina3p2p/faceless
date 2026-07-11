@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
-import { eq, lt, and, desc, asc } from "drizzle-orm";
+import { eq, lt, and, desc } from "drizzle-orm";
 import { rowsToClientMessages } from "@/server/services/showrunner/messages";
 
 const PAGE_SIZE = 30;

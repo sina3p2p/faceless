@@ -27,5 +27,4 @@ export {
   renderAndUploadShot,
   validateCompileContinuity,
   type CompileShotArgs,
-  type ContinuityMode,
 } from "./compile-shot";

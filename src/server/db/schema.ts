@@ -12,7 +12,6 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import type { ModelSettings } from "@/types/llm-common";
 
 // ── Enums ──
 
@@ -174,7 +173,7 @@ export const videoProjects = pgTable("video_projects", {
   config: json("config"),
   outputUrl: text("output_url"),
   thumbnailUrl: text("thumbnail_url"),
-  modelSettings: json("model_settings").$type<ModelSettings>().notNull(),
+  modelSettings: json("model_settings").notNull(),
   videoSize: text("video_size").$type<TAspectRatio>().notNull(),
   videoResolution: text("video_resolution").$type<TVideoResolution>().notNull(),
   voiceId: text("voice_id"),

@@ -50,7 +50,6 @@ export function StoryChat({
   const [rowWidth, setRowWidth] = useState(0);
 
   const isStreaming = status === "streaming";
-  const seed = useMemo(() => messages.find((m) => m.role === "user")?.text ?? "", [messages]);
   const mobileTab = useMobileTab();
 
   const pendingQuestions = useMemo(() => {

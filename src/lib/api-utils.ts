@@ -22,6 +22,3 @@ export function notFound(message = "Not found") {
   return NextResponse.json({ error: message }, { status: 404 });
 }
 
-export function serverError(message = "Internal server error") {
-  return NextResponse.json({ error: message }, { status: 500 });
-}
