@@ -25,3 +25,27 @@ export async function probeVideoDuration(buffer: Buffer): Promise<number | null>
     await fs.unlink(tmpPath).catch(() => { });
   }
 }
+
+/**
+ * Extract the last decoded frame of a video as a JPEG buffer.
+ * Used for Stage 2 continuity: next solo can open from this still.
+ */
+export async function extractLastFrameJpeg(videoUrl: string): Promise<Buffer> {
+  const id = crypto.randomUUID();
+  const tmpVideo = path.join(os.tmpdir(), `frame-src-${id}.mp4`);
+  const tmpFrame = path.join(os.tmpdir(), `frame-out-${id}.jpg`);
+  try {
+    const resp = await fetch(videoUrl);
+    if (!resp.ok) throw new Error(`Failed to download video for frame extract: ${resp.status}`);
+    await fs.writeFile(tmpVideo, Buffer.from(await resp.arrayBuffer()));
+
+    // Seek near the end, then grab one frame. -sseof seeks from EOF.
+    await execAsync(
+      `ffmpeg -y -hide_banner -sseof -0.1 -i "${tmpVideo}" -frames:v 1 -q:v 2 "${tmpFrame}"`
+    );
+    return await fs.readFile(tmpFrame);
+  } finally {
+    await fs.unlink(tmpVideo).catch(() => {});
+    await fs.unlink(tmpFrame).catch(() => {});
+  }
+}

@@ -36,10 +36,9 @@ export function MessageList({
   const isAtBottomRef = useRef(true);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  // Content height can grow without `messages` changing — e.g. the typing
-  // animation in AssistantText reveals a table/hr over many frames after a
-  // single text_delta lands. A ResizeObserver catches that growth directly
-  // instead of relying on the messages array as a proxy for DOM size.
+  // Content height can grow without `messages` changing — e.g. an image
+  // finishing load. A ResizeObserver catches that growth directly instead
+  // of relying on the messages array as a proxy for DOM size.
   useEffect(() => {
     const el = scrollContainerRef.current;
     const content = contentRef.current;
@@ -91,9 +90,10 @@ export function MessageList({
             const fork = msg.fork;
             return (
               <div key={msg.id} className="space-y-3 group">
-                {(msg.text || (isStreaming && !fork)) && (
+                {(msg.text || msg.reasoning || (isStreaming && !fork)) && (
                   <AssistantText
                     text={msg.text}
+                    reasoning={msg.reasoning}
                     isTyping={isStreaming && msg.id === streamingMsgId && !fork}
                   />
                 )}

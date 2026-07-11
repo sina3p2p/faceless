@@ -8,7 +8,7 @@ import { probeVideoDuration } from "@/lib/media-probe";
 import { db } from "@/server/db";
 import { filmSessions, media } from "@/server/db/schema";
 
-export const CONTINUITY_MODES = ["fresh", "from_start_frame", "extend_video"] as const;
+export const CONTINUITY_MODES = ["fresh", "extend_video"] as const;
 export type ContinuityMode = (typeof CONTINUITY_MODES)[number];
 
 export const compileShot = tool({
@@ -16,10 +16,10 @@ export const compileShot = tool({
     "Compile a shot prompt package and present it to the user for review before any rendering happens. " +
     "Only after Stage 1 is complete (registry passing): load stage2-skill.md and shot-compilation-recipe.md, " +
     "assemble the Seedance 2.0 prompt from the Bible, then call this tool. " +
-    "DEFAULT to solo generations (one shot per call). Prefer continuityMode: " +
-    "'from_start_frame' (pass startFrameUrl from extractClipFrame on the previous approved clip) for hard-cut joins, " +
-    "or 'extend_video' (pass sourceVideoUrl of the previous approved clip) for continuous walks/action. " +
-    "Use 'fresh' only for scene opens / clean breaks. " +
+    "DEFAULT to solo generations (one shot per call). " +
+    "Use continuityMode 'extend_video' + sourceVideoUrl (previous approved clip) when the next beat " +
+    "continues the same character through the same space (walks / approaches / same-surface carries). " +
+    "Use 'fresh' for scene opens, clean breaks, and hard cuts that start a new take. " +
     "Attach referenceImageUrls in character → object → location → grid order. " +
     "The user reviews/edits the prompt, then approves — rendering starts only after approval. " +
     "Wait for shot approval before compiling the next generation.",
@@ -29,14 +29,14 @@ export const compileShot = tool({
       .describe(
         "Full compiled Seedance 2.0 prompt from the Bible per the shot-compilation-recipe. " +
           "For extend_video, open with Extend <Video_1>: … (never say 'reference <Video_1>'). " +
-          "For from_start_frame, CONTEXT must restate footing from the start frame."
+          "When continuing across clips, CONTEXT must restate footing from the previous last frame."
       ),
     referenceImageUrls: z
       .array(z.string())
       .max(9)
       .describe(
         "Approved reference image URLs in precision order: character → object → location → grid. " +
-          "May be empty for pure extend_video when identity is carried by the source clip + start frame."
+          "Required for fresh; optional for extend_video when identity is carried by the source clip."
       ),
     duration: z
       .number()
@@ -52,14 +52,9 @@ export const compileShot = tool({
       .enum(CONTINUITY_MODES)
       .default("fresh")
       .describe(
-        "fresh = stills-only (scene open / clean break). " +
-          "from_start_frame = open from previous clip's last frame (hard-cut continuity). " +
+        "fresh = stills-only (scene open / clean break / new take). " +
           "extend_video = continue from previous approved clip (walks / continuous action)."
       ),
-    startFrameUrl: z
-      .string()
-      .optional()
-      .describe("Required for from_start_frame: JPEG/PNG URL from extractClipFrame on the previous approved clip."),
     sourceVideoUrl: z
       .string()
       .optional()
@@ -73,16 +68,12 @@ export type CompileShotArgs = {
   duration: number;
   aspectRatio: "16:9" | "9:16" | "1:1";
   continuityMode?: ContinuityMode;
-  startFrameUrl?: string;
   sourceVideoUrl?: string;
 };
 
 export function validateCompileContinuity(args: CompileShotArgs): string[] {
   const mode = args.continuityMode ?? "fresh";
   const errors: string[] = [];
-  if (mode === "from_start_frame" && !args.startFrameUrl) {
-    errors.push("from_start_frame requires startFrameUrl (call extractClipFrame on the previous approved clip first).");
-  }
   if (mode === "extend_video" && !args.sourceVideoUrl) {
     errors.push("extend_video requires sourceVideoUrl (the previous approved clip URL).");
   }
@@ -95,6 +86,10 @@ export function validateCompileContinuity(args: CompileShotArgs): string[] {
 /**
  * Generate a shot via Seedance, with continuity mode support and E005 fallback
  * for reference-image rejection.
+ *
+ * Modes:
+ * - fresh → multimodal reference stills only
+ * - extend_video → reference video (+ optional stills)
  */
 export async function generateShotWithFallback(
   args: CompileShotArgs,
@@ -105,8 +100,6 @@ export async function generateShotWithFallback(
   const refs = args.referenceImageUrls ?? [];
 
   if (mode === "extend_video") {
-    // Prefer reference-mode with the prior clip as a video input (KIE Seedance).
-    // Fall back to editVideo if reference videos are rejected by the provider.
     try {
       return await generateVideoFromReferences(
         refs,
@@ -117,7 +110,6 @@ export async function generateShotWithFallback(
         "480p",
         args.duration,
         {
-          startImageUrl: args.startFrameUrl,
           referenceVideos: args.sourceVideoUrl ? [args.sourceVideoUrl] : undefined,
         }
       );
@@ -135,8 +127,7 @@ export async function generateShotWithFallback(
       "seedance-2-mini",
       aspectRatio,
       "480p",
-      args.duration,
-      mode === "from_start_frame" ? { startImageUrl: args.startFrameUrl } : undefined
+      args.duration
     );
 
   try {

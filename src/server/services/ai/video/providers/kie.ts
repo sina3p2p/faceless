@@ -56,11 +56,27 @@ export class KieVideoProvider implements IProvider {
       aspect_ratio: req.aspectRatio,
       resolution: req.resolution,
     };
+    if (req.generateAudio != null) input.generate_audio = req.generateAudio;
+
+    // Seedance: Image-to-Video (first/last frame) and Multimodal Reference-to-Video
+    // are mutually exclusive — never send both in one request.
+    const hasFrameAnchor = !!(req.startImageUrl || req.endImageUrl);
+    const hasRefs =
+      (req.referenceImages?.length ?? 0) > 0 ||
+      (req.referenceVideos?.length ?? 0) > 0 ||
+      (req.referenceAudios?.length ?? 0) > 0;
+
+    if (hasFrameAnchor && hasRefs) {
+      throw new Error(
+        "KIE Seedance: first/last frames and reference images/videos are mutually exclusive — pick one mode"
+      );
+    }
+
     if (req.startImageUrl) input.first_frame_url = req.startImageUrl;
     if (req.endImageUrl) input.last_frame_url = req.endImageUrl;
-    if (req.generateAudio != null) input.generate_audio = req.generateAudio;
     if (req.referenceImages && req.referenceImages.length > 0) input.reference_image_urls = req.referenceImages;
     if (req.referenceVideos && req.referenceVideos.length > 0) input.reference_video_urls = req.referenceVideos;
+    if (req.referenceAudios && req.referenceAudios.length > 0) input.reference_audio_urls = req.referenceAudios;
 
     const { data: task } = await this.client.post<{ data: { taskId: string } }>(
       "/jobs/createTask",

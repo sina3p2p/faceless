@@ -9,22 +9,23 @@ The two TEXT documents of Stage 1's five-artifact handoff (Bible + shot list; th
 ```
 [FILM TITLE] — Visual & Tone Bible
 
-### 1. The Look (inherited identically by every prompt)
-- Aspect ratio: [a value the render API actually supports (check before locking, e.g. 16:9 / 21:9 / 9:16); applied as an API PARAMETER at render time — the ratio NEVER appears as prompt text (§3H); anamorphic LENS character, if wanted, is a Lens/stock entry, not a ratio]
+### 1. The Look (SHOW LOOK — applied by every prompt)
+- Aspect ratio: [a value the render API actually supports (check before locking, e.g. 16:9 / 9:16); applied as an API PARAMETER at render time — the ratio NEVER appears as prompt text (§3H); anamorphic LENS character, if wanted, is a Lens/stock entry, not a ratio]
 - Lens/stock: [grain, halation, flares, DoF behavior; warm/clinical]
-- Color grade (ONE, whole film): [name + temp + highlight/shadow bias + saturation;
-  name the ONE accent color allowed to pop]
+- Color grade (SHOW LOOK default): [name + temp + highlight/shadow bias + saturation;
+  name the accent color allowed to pop]
+- Optional locked trims: [named scene/sequence Look variants only — e.g. "night-interior cooler trim"; never freestyle per shot]
 - Lighting — canonical states ONLY: [STATE: Kelvin, shadow behavior, intended use] × 3–4
 - Sound: [one recurring score idea + arrangements; ambient bed; foley; dialogue approach]
 - Tone north-star: [one sentence]
 
 ### 2. Master @material list (assets Stage 2 builds)
-- Characters: [hero_charsheet (= the turnaround character sheet: exactly ONE image containing front/profile/three-quarter views of the SAME character, one slot), ...] — never multiple images per character
+- Characters: [hero_charsheet (= default: one turnaround sheet — ONE image with front/profile/three-quarter of the SAME character, one slot), ...] — default tested profile; extra identity refs only with a user-approved / documented model profile
 - **Canonical definition lines** (one per asset, written here ONCE, pasted VERBATIM into every prompt's SUBJECT DEFINITIONS — never re-worded per shot):
   - hero_charsheet: "Define the [2–3 stable features + anchor details] in [slot] (facial features, styling, wardrobe, build) as **[label]**."
   - [location]_plate: "Define the [environment] in [slot] as **[label]**; it governs environment, architecture, and composition[, with the [structure] at its [state] version].
 - Locations: [site_plate (versions: ...), ...]
-- Objects / vehicles / hero props: [ship_object_ref, amulet_object_ref, ...] — any recurring vehicle, tool, or prop that appears across shots gets its OWN object reference (one clean three-quarter view, neutral background), never a life sentence inside a location plate or a character sheet; an object named in a motion arc but absent from this list will be invented fresh at render time
+- Objects / vehicles / hero props: [ship_object_ref, amulet_object_ref, ...] — any recurring vehicle, tool, or prop that appears across shots gets its OWN object reference (one clean three-quarter view, neutral background), never a life sentence inside a location plate or a character sheet; an object named in a motion arc but absent from this list will be invented fresh at render time. **If the object has a ref, location plates stay environment-only.**
 - Voices: [hero_vo, ...]  (if using an external voice tool fed back as reference)
 - Background-tier (no reference image): [crowds, one-off figures]
 
@@ -34,14 +35,15 @@ it is not an @material, never occupies a slot, and never appears in this list. A
 "style_board" entry here is a category error: the compiler would try to bind an image
 that doesn't exist.
 
-### 3. Standing directives (apply to ALL prompts automatically)
-- A — Primary motion: every shot has exactly ONE primary motion source — SUBJECT
-  (character/object acts) or CAMERA (a developing move). Never both fast; NEVER neither.
+### 3. Standing directives (craft defaults — not universal cinema laws; exceptions must be locked + reviewable)
+- A — Dominant motion: every shot has one DOMINANT motion source — SUBJECT
+  (character/object acts) or CAMERA (a developing move). Secondary motion is allowed
+  when slower, smaller, and subordinate. Both-fast fails; neither fails.
   A shot with only ambient motion is invalid — fix the row, don't render it.
 - B — Character performance: characters are never static-locked and never receive
-  "subject unchanged"; identity comes from the bound reference image. Every character
-  in frame gets explicit performance direction (at minimum a written micro-performance:
-  breath, gaze, a small gesture).
+  "subject unchanged"; identity comes from the bound reference image. Never leave a
+  character unperformed. Intentional stillness is allowed when written as breath,
+  gaze, tension, posture, or deadpan hold.
 - C — Static-lock (targeted): name the specific rigid thing that must not morph
   ("the [structure] is FIXED at [state]; only the camera moves, the [structure]
   unchanged"). Never a blanket "subject unchanged." Time passes BETWEEN shots,
@@ -100,22 +102,25 @@ One row per shot. Columns:
   state. "Nadia lies among the roots as the figure stands over her" is a still frame;
   "The figure takes one slow step closer, head tilting; Nadia pushes herself back
   into the roots, heels dragging through soil" is a shot. **No delta → no row.**
+  **Reaction / discovery rows must name the gaze target in the arc** ("detective freezes,
+  eyes lock down-right onto the child at waist height") — "shocked" alone is not a
+  shot; Seedance will render the emotion and invent a wrong eyeline.
 - **Primary (SUBJ/CAM)** which single source carries the shot's motion — the subject
   or the camera. Exactly one. If neither, the row is invalid.
 - **Camera move** from the renderer's encyclopedia, chosen to match the mood. If
   Primary = SUBJ, the camera calms or locks; if Primary = CAM, the subject calms.
 - **Cut-out → Cut-in** how this shot hands off to the next — the edit written into
   the rows so it survives independent generation. Cut-out: the state the shot ends
-  in ("her eyes lift to the doorway, off-frame left"; "he starts to turn"; "the car
-  exits frame right"). Cut-in: how the NEXT shot answers it ("open on the doorway:
-  it is empty"; "the turn completes — he now faces her"; "—" if a clean scene
-  break). Named handoffs:
+  in — must lock **footing/surface/position**, not just intent ("she stands ON the
+  stone staircase, mid-flight, facing up" — not "she walks toward the stairs"). Cut-in:
+  how the NEXT shot answers it by restating that same footing before new action
+  ("still ON the stone staircase, mid-flight — continues climbing"). Named handoffs:
   eyeline, cut-on-action, exit/enter (with direction), match, POV-answer, or "rest"
   (a deliberate held cut — allowed, but consecutive "rest" cuts are the slideshow
   failure, so a scene of them is a flag). The final shot's cut-out is "end".
-- **Light** exactly ONE canonical state per row — never a transition ("Golden Hour →
-  dusk" inside a shot is a State Schedule violation and a morph trigger; if time must
-  visibly pass, it passes BETWEEN two rows at two states).
+  **Continuous walks across generations should prefer video extension** (Stage 2)
+  over hoping text cut-ins preserve geography.
+- **Light** exactly ONE canonical state per row — never a transition ("Golden Hour → dusk", "transitioning toward…"). Time passes BETWEEN shots; pick one state or split the row. In-shot light morphs are a State Schedule violation.
 - **Dur** seconds — an ESTIMATE used for group-partition math and the runtime total; it never appears in a prompt (solos get exact duration via the API parameter; groups get the summed estimate and Seedance paces the internal cuts).
 - **Materials** every asset that APPEARS IN THE MOTION ARC must be listed — characters,
   plates (at which version), AND hero props/objects. If the arc says the ship streaks,
@@ -148,7 +153,7 @@ This is the CHOOSING vocabulary for the Camera move and Scale cells — availabl
 
 **Camera height and angle belong in the Camera move cell** whenever they carry meaning: eye-level is the invisible default; name low/high/overhead/ground-level ONLY when the beat wants power, vulnerability, layout, or texture — an unmotivated fancy angle reads as showing off.
 
-**Depth staging (the strongest realism cue AI shot lists neglect):** compose in THREE planes, not one — something soft in the extreme foreground (a shoulder, a tool, a doorframe edge), the subject in the mid, life in the deep background — and prefer movement TOWARD or AWAY from camera over lateral crosses: depth movement generates parallax, and correct parallax is what subconsciously reads as "filmed" rather than "generated." Per scene, aim for at least one row staged in three planes and one whose movement travels through depth. Write the planes into the motion arc ("past the foreground scaffold, the overseer walks toward camera from the deep ramp") — the grid panels will then inherit the depth composition.
+**Depth staging (the strongest realism cue AI shot lists neglect):** compose in THREE planes, not one — something soft in the extreme foreground (a shoulder, a tool, a doorframe edge), the subject in the mid, life in the deep background — and prefer movement TOWARD or AWAY from camera over lateral crosses: depth movement generates parallax, and correct parallax is what subconsciously reads as "filmed" rather than "generated." Per scene, aim for at least one row staged in three planes and one whose movement travels through depth. Write the planes into the motion arc ("past the foreground doorway, the hero walks toward camera from the deep corridor") — the grid panels will then inherit the depth composition.
 
 ---
 

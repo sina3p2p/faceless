@@ -44,6 +44,7 @@ export function SceneGridPanel({
   }
 
   const isLocked = !!sceneGrid.approvedUrl;
+  const captions = sceneGrid.panelCaptions ?? [];
 
   return (
     <div className="mt-1 space-y-2">
@@ -64,6 +65,30 @@ export function SceneGridPanel({
           className="w-full h-full object-cover"
         />
       </div>
+
+      {captions.length > 0 && (
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: `repeat(${captions.length}, minmax(0, 1fr))` }}
+        >
+          {captions.map((cap, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 space-y-0.5 min-w-0"
+            >
+              <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-wider">
+                Panel {i + 1}
+              </p>
+              <p className="text-[10px] text-foreground/80 leading-snug line-clamp-3">{cap.motionArc}</p>
+              {cap.handoff && (
+                <p className="text-[10px] text-muted-foreground/55 leading-snug line-clamp-2">
+                  → {cap.handoff}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {!isLocked && (
         <div className="flex items-center gap-2 flex-wrap">

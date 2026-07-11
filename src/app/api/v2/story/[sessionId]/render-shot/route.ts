@@ -100,10 +100,12 @@ export async function POST(
     sessionId,
     toolCallId,
     assistantMessageRowId: assistantRowId,
-    referenceImageUrls: storedArgs.referenceImageUrls as string[],
+    referenceImageUrls: (storedArgs.referenceImageUrls as string[]) ?? [],
     prompt: renderPrompt,
     aspectRatio: (storedArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
     duration: storedArgs.duration as number,
+    continuityMode: (storedArgs.continuityMode as "fresh" | "extend_video") ?? "fresh",
+    sourceVideoUrl: storedArgs.sourceVideoUrl as string | undefined,
   });
 
   return NextResponse.json({ ok: true });

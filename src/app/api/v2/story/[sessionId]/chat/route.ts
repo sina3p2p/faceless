@@ -7,6 +7,7 @@ import { eq, asc } from "drizzle-orm";
 import { storyTools, MODEL, openrouter, generateAssetImages, generateSceneGridImages } from "@/server/services/showrunner";
 import { rowsToModelMessages } from "@/server/services/showrunner/messages";
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
+import { validatePanelCaptionCount } from "@/server/services/showrunner/tools";
 
 function sseResponse(
   handler: (emit: (event: object) => void) => Promise<void>
@@ -107,6 +108,18 @@ export async function POST(
       createdAt: new Date(),
     });
   } else if (body.type === "shot_approval") {
+    const videoUrl = body.videoUrl as string;
+    let lastFrameUrl: string | undefined;
+    try {
+      const { extractLastFrameJpeg } = await import("@/lib/media-probe");
+      const { uploadFile, mediaUrl } = await import("@/lib/storage");
+      const jpeg = await extractLastFrameJpeg(videoUrl);
+      const key = `v2/frames/${sessionId}/${crypto.randomUUID()}.jpg`;
+      await uploadFile(key, jpeg, "image/jpeg");
+      lastFrameUrl = mediaUrl(key);
+    } catch (err) {
+      console.warn("[chat] last-frame extract on shot_approval failed", err);
+    }
     await db.insert(filmSessionMessages).values({
       id: crypto.randomUUID(),
       messageId: crypto.randomUUID(),
@@ -115,7 +128,8 @@ export async function POST(
       type: "shot_approval",
       parts: [{
         toolCallId: body.toolCallId,
-        videoUrl: body.videoUrl,
+        videoUrl,
+        ...(lastFrameUrl ? { lastFrameUrl } : {}),
       }],
       createdAt: new Date(),
     });
@@ -141,10 +155,9 @@ export async function POST(
       messages: modelMessages,
       tools: storyTools,
       seed: session.seed ?? undefined,
-      // Allow the model to call loadReference (auto-executed) and then continue
+      // Allow the model to call loadReference / webExtract (auto-executed) and then continue
       // responding in the same turn. Cap at 10 to prevent runaway loops.
       stopWhen: stepCountIs(10),
-      // reasoning: "medium",
       providerOptions: {
         openrouter: {
           cacheControl: { type: "ephemeral" },
@@ -201,7 +214,9 @@ export async function POST(
         }
       } else if (
         chunk.type === "tool-result" &&
-        (chunk.toolName === "loadReference" || chunk.toolName === "recordSceneGridEntry")
+        (chunk.toolName === "loadReference" ||
+          chunk.toolName === "webExtract" ||
+          chunk.toolName === "recordSceneGridEntry")
       ) {
         autoToolResults.set(chunk.toolCallId, chunk.output);
       }
@@ -233,12 +248,36 @@ export async function POST(
             sceneId: string | number;
             imagePrompt: string;
             referenceImageUrls: string[];
+            panelCount?: number;
+            panelCaptions?: { motionArc: string; handoff: string }[];
             aspectRatio: "16:9" | "9:16" | "1:1";
           };
+          const captionError = validatePanelCaptionCount(args.panelCount, args.panelCaptions);
+          if (captionError) {
+            tc.function.arguments = { ...args, gridError: captionError };
+            emit({
+              type: "scene_grid",
+              toolCallId: tc.id,
+              sceneId: args.sceneId,
+              error: captionError,
+              panelCount: args.panelCount,
+              panelCaptions: args.panelCaptions,
+              aspectRatio: args.aspectRatio ?? "16:9",
+            });
+            return;
+          }
           const aspectRatio = args.aspectRatio ?? "16:9";
           const generatedImages = await generateSceneGridImages(args.imagePrompt, args.referenceImageUrls, aspectRatio);
           tc.function.arguments = { ...args, generatedImages };
-          emit({ type: "scene_grid", toolCallId: tc.id, sceneId: args.sceneId, images: generatedImages, aspectRatio });
+          emit({
+            type: "scene_grid",
+            toolCallId: tc.id,
+            sceneId: args.sceneId,
+            images: generatedImages,
+            panelCount: args.panelCount,
+            panelCaptions: args.panelCaptions,
+            aspectRatio,
+          });
         })
       );
     }
@@ -270,14 +309,18 @@ export async function POST(
         referenceImageUrls: string[];
         duration: number;
         aspectRatio: "16:9" | "9:16" | "1:1";
+        continuityMode?: "fresh" | "extend_video";
+        sourceVideoUrl?: string;
       };
       emit({
         type: "shot_compiled",
         toolCallId: tc.id,
         renderPrompt: args.prompt,
-        referenceImageUrls: args.referenceImageUrls,
+        referenceImageUrls: args.referenceImageUrls ?? [],
         duration: args.duration,
         aspectRatio: args.aspectRatio ?? "16:9",
+        continuityMode: args.continuityMode ?? "fresh",
+        sourceVideoUrl: args.sourceVideoUrl,
       });
     }
 

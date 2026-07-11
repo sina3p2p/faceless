@@ -14,6 +14,38 @@ type RawToolCall = {
   function: { name: string; arguments: Record<string, unknown> };
 };
 
+/** AI SDK tool-result `output` discriminator values. */
+const TOOL_RESULT_OUTPUT_TYPES = new Set([
+  "text",
+  "json",
+  "error-text",
+  "error-json",
+  "content",
+  "execution-denied",
+]);
+
+/**
+ * fullStream's tool-result `output` is the raw execute() return value.
+ * ModelMessage tool parts need ToolResultOutput `{ type, value }`.
+ * loadReference already returns that shape; tavilyExtract returns a plain object.
+ */
+function toToolResultOutput(stored: unknown, fallback: string) {
+  if (
+    stored &&
+    typeof stored === "object" &&
+    "type" in stored &&
+    typeof (stored as { type: unknown }).type === "string" &&
+    TOOL_RESULT_OUTPUT_TYPES.has((stored as { type: string }).type)
+  ) {
+    return stored as { type: "text"; value: string };
+  }
+  if (stored !== undefined && stored !== null) {
+    // JSONValue-compatible wrap for raw tool payloads (e.g. Tavily extract)
+    return { type: "json" as const, value: stored as Record<string, unknown> };
+  }
+  return { type: "text" as const, value: fallback };
+}
+
 function rowData(row: DbRow): Record<string, unknown> {
   return ((row.parts as unknown[])[0] ?? {}) as Record<string, unknown>;
 }
@@ -97,8 +129,11 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
             loading: false,
             sceneId: args.sceneId as string | number,
             images: (args.generatedImages ?? args.images) as string[] | undefined,
+            panelCount: args.panelCount as number | undefined,
+            panelCaptions: args.panelCaptions as SceneGrid["panelCaptions"],
             aspectRatio: args.aspectRatio as SceneGrid["aspectRatio"],
             approvedUrl: gridApprovals.get(tc.id),
+            error: args.gridError as string | undefined,
           };
         } else if (tc.function.name === "compileShot") {
           const isPending = (args.pending as boolean | undefined) === true;
@@ -122,6 +157,8 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
               referenceImageUrls: args.referenceImageUrls as string[],
               duration: args.duration as number,
               aspectRatio: args.aspectRatio as ShotCompile["aspectRatio"],
+              continuityMode: args.continuityMode as ShotCompile["continuityMode"],
+              sourceVideoUrl: args.sourceVideoUrl as string | undefined,
             };
           }
         }
@@ -165,8 +202,17 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
       });
     } else if (row.role === "user" && row.type === "shot_approval") {
       const d = rowData(row);
+      const lastFrameUrl = d.lastFrameUrl as string | undefined;
       collectedResults.set(d.toolCallId as string, {
-        text: `Shot rendered and approved by user: ${d.videoUrl as string}. Proceed to the next shot.`,
+        text: lastFrameUrl
+          ? `Shot rendered and approved by user: ${d.videoUrl as string}. Last frame (for CONTEXT footing only): ${lastFrameUrl}. ` +
+            `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${d.videoUrl as string}. ` +
+            `For a clean break / new take use continuityMode "fresh" with stills. ` +
+            `CONTEXT must restate footing from the last frame before new action.`
+          : `Shot rendered and approved by user: ${d.videoUrl as string}. ` +
+            `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${d.videoUrl as string}. ` +
+            `For a clean break / new take use continuityMode "fresh" with stills.`,
+        imageUrl: lastFrameUrl,
       });
     }
   }
@@ -183,7 +229,7 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
     } else if (row.role === "assistant" && row.type === "turn") {
       const text = (d.text as string) ?? "";
       const calls = getToolCalls(d);
-      const storedToolResults = (d.toolResults ?? {}) as Record<string, { type: string; value: string }>;
+      const storedToolResults = (d.toolResults ?? {}) as Record<string, unknown>;
 
       if (calls.length > 0) {
         const toolCallParts = calls.map((tc) => ({
@@ -192,7 +238,10 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
           toolName: tc.function.name,
           // Strip server-side augmentation before sending to model
           input: Object.fromEntries(
-            Object.entries(tc.function.arguments).filter(([k]) => !["generatedImages", "videoUrl", "pending", "shotError", "renderedDurationSeconds"].includes(k))
+            Object.entries(tc.function.arguments).filter(
+              ([k]) =>
+                !["generatedImages", "videoUrl", "pending", "shotError", "renderedDurationSeconds"].includes(k)
+            )
           ),
         }));
         msgs.push({
@@ -201,22 +250,25 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
         });
 
         // Add tool results immediately after the assistant turn.
-        // Auto-executed tools (loadReference, recordSceneGridEntry): use DB-stored execute() output.
+        // Auto-executed tools: use DB-stored execute() output.
         // User-facing tools: use real results where available; synthetic "pending" for the rest.
         const resultParts = calls.map((tc) => {
-          if (tc.function.name === "loadReference" || tc.function.name === "recordSceneGridEntry") {
-            const stored = storedToolResults[tc.id];
+          if (
+            tc.function.name === "loadReference" ||
+            tc.function.name === "webExtract" ||
+            tc.function.name === "recordSceneGridEntry"
+          ) {
             const fallback =
               tc.function.name === "loadReference"
                 ? "(reference file content unavailable)"
+                : tc.function.name === "webExtract"
+                ? "(web extract content unavailable)"
                 : JSON.stringify({ ok: false, errors: ["(registry entry result unavailable)"] });
             return {
               type: "tool-result" as const,
               toolCallId: tc.id,
               toolName: tc.function.name,
-              output: stored
-                ? (stored as { type: "text"; value: string })
-                : { type: "text" as const, value: fallback },
+              output: toToolResultOutput(storedToolResults[tc.id], fallback),
             };
           }
           const collected = collectedResults.get(tc.id);
@@ -224,7 +276,9 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
             tc.function.name === "generateAssetReferences"
               ? `Reference images have been generated for "${tc.function.arguments.assetHandle as string}". User has not yet approved one.`
               : tc.function.name === "generateSceneGrid"
-              ? `A scene grid candidate has been generated for scene ${tc.function.arguments.sceneId as string | number}. User has not yet approved it.`
+              ? (tc.function.arguments.gridError as string | undefined)
+                ? `Scene grid rejected: ${tc.function.arguments.gridError as string}`
+                : `A scene grid candidate has been generated for scene ${tc.function.arguments.sceneId as string | number}. User has not yet approved it.`
               : tc.function.name === "compileShot"
               ? tc.function.arguments.videoUrl
                 ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval to add to timeline.`
@@ -248,7 +302,7 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
               : { type: "text" as const, value: resultText },
           };
         });
-        msgs.push({ role: "tool", content: resultParts });
+        msgs.push({ role: "tool", content: resultParts } as ModelMessage);
       } else {
         msgs.push({ role: "assistant", content: text });
       }

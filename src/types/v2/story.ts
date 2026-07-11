@@ -26,11 +26,18 @@ export type AssetRef = {
   error?: string;
 };
 
+export type PanelCaption = {
+  motionArc: string;
+  handoff: string;
+};
+
 export type SceneGrid = {
   toolCallId: string;
   loading: boolean;
   sceneId?: string | number;
   images?: string[];
+  panelCount?: number;
+  panelCaptions?: PanelCaption[];
   aspectRatio?: "16:9" | "9:16" | "1:1";
   approvedUrl?: string;
   error?: string;
@@ -52,12 +59,15 @@ export type ShotCompile = {
   referenceImageUrls?: string[];
   duration?: number;
   aspectRatio?: "16:9" | "9:16" | "1:1";
+  continuityMode?: "fresh" | "extend_video";
+  sourceVideoUrl?: string;
 };
 
 export type ClientMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  reasoning?: string;
   fork?: ForkCall;
   assetRef?: AssetRef;
   sceneGrid?: SceneGrid;

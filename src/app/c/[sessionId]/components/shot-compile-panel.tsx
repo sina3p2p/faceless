@@ -3,6 +3,11 @@
 import { useState } from "react";
 import type { ShotCompile } from "@/types/v2/story";
 
+const MODE_LABEL: Record<NonNullable<ShotCompile["continuityMode"]>, string> = {
+  fresh: "Fresh (stills)",
+  extend_video: "Extend prior clip",
+};
+
 export function ShotCompilePanel({
   compile,
   disabled,
@@ -13,6 +18,8 @@ export function ShotCompilePanel({
   onApprove: (renderPrompt: string) => void;
 }) {
   const [editedPrompt, setEditedPrompt] = useState(compile.renderPrompt ?? "");
+  const refs = compile.referenceImageUrls ?? [];
+  const mode = compile.continuityMode ?? "fresh";
 
   if (compile.loading) {
     return <p className="text-xs text-muted-foreground/40 italic animate-pulse">Compiling shot prompt…</p>;
@@ -29,15 +36,61 @@ export function ShotCompilePanel({
         </svg>
       </div>
 
-      <div className="p-3 space-y-2 bg-background/30 backdrop-blur-sm">
-        <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">Prompt — edit before rendering</p>
-        <textarea
-          value={editedPrompt}
-          onChange={(e) => setEditedPrompt(e.target.value)}
-          disabled={disabled}
-          rows={5}
-          className="w-full bg-transparent text-[11px] text-foreground/80 leading-relaxed resize-none outline-none disabled:opacity-50 font-mono"
-        />
+      <div className="p-3 space-y-3 bg-background/30 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground/55">
+          <span className="rounded-md border border-white/10 px-1.5 py-0.5 uppercase tracking-wider">
+            {MODE_LABEL[mode]}
+          </span>
+          {(compile.duration != null || compile.aspectRatio) && (
+            <span>
+              {[compile.duration != null ? `${compile.duration}s` : null, compile.aspectRatio]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          )}
+        </div>
+
+        {refs.length > 0 && (
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+              References sent to video model
+            </p>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+              {refs.map((url, i) => (
+                <div
+                  key={`${url}-${i}`}
+                  className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-white/10 bg-white/5"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`Image${i + 1}`} className="w-full h-full object-cover" />
+                  <span className="absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-center text-white/80 py-0.5">
+                    Image{i + 1}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {compile.sourceVideoUrl && (
+          <p className="text-[10px] text-muted-foreground/45 truncate">
+            Source clip: {compile.sourceVideoUrl}
+          </p>
+        )}
+
+        <div className="space-y-2">
+          <p className="text-[10px] font-medium text-muted-foreground/60 uppercase tracking-wider">
+            Prompt — edit before rendering
+          </p>
+          <textarea
+            value={editedPrompt}
+            onChange={(e) => setEditedPrompt(e.target.value)}
+            disabled={disabled}
+            rows={5}
+            className="w-full bg-transparent text-[11px] text-foreground/80 leading-relaxed resize-none outline-none disabled:opacity-50 font-mono"
+          />
+        </div>
+
         <button
           onClick={() => onApprove(editedPrompt)}
           disabled={disabled || !editedPrompt.trim()}

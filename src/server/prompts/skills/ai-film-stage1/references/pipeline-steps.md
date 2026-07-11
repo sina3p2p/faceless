@@ -10,7 +10,7 @@ Worked fragments below come from past runs (including a desert comedy). Use them
 
 ## Step 1 — Seed
 
-**Purpose:** the raw spark. **Lock:** the sentence, stated plainly. **Do:** name what it already fixes — genre, setting, and any built-in "button" (a recurring payoff). Don't fall in love with it; it's a coordinate, not a destination. **Feeds:** everything.
+**Purpose:** the raw spark. **Lock:** the sentence, stated plainly. **Do:** name what it already fixes — genre, setting, and any built-in "button" (a recurring payoff). Don't fall in love with it; it's a coordinate, not a destination. **If the seed includes a URL:** call `webExtract` first, then lock the seed with what the source actually says (do not invent article contents). **Feeds:** everything.
 
 ## Step 2 — Premise exploration
 
@@ -82,7 +82,7 @@ Worked fragments below come from past runs (including a desert comedy). Use them
 **Purpose:** the deliverable; the unit of generation. **First group into SCENES** (one location + one continuous time span; an intercut beat = two scenes with alternating rows), each with a one-line header: Delta, coverage plan, Space line. **Then produce the table**, one row per shot:
 `# | scene | mood | scale (W/M/CU/INSERT/POV) | motion arc (start → change → end) | primary (SUBJ/CAM) | camera move | cut-out → cut-in | light (ONE state) | duration | materials`
 
-Column rules and camera-authoring vocabulary: `deliverable-templates.md` §B / §B2. **No-delta-no-shot:** if "what changes?" is "nothing," give a delta or cut the row. Do NOT expand rows into render prompts and do NOT load the Stage 2 compilation recipe. **Feeds:** grids (Step 16) and prompts (Stage 2).
+Column rules and camera-authoring vocabulary: `deliverable-templates.md` §B / §B2. **No-delta-no-shot:** if "what changes?" is "nothing," give a delta or cut the row. **One lighting state per row** — never "Golden Hour transitioning toward dusk"; pick ONE canonical state or split into two rows. Do NOT expand rows into render prompts and do NOT load the Stage 2 compilation recipe. **Feeds:** grids (Step 16) and prompts (Stage 2).
 
 ## Step 14 — The Bible [+]
 
@@ -90,11 +90,11 @@ See `deliverable-templates.md` §A. Four parts: locked Look; master `@material` 
 
 ## Step 15 — Asset reference generation
 
-Locked artifacts are text; the renderer needs images. **First audit the manifest** (identity anchors only — characters, plates, recurring hero props in ONE neutral state; strike disguised shots; fused entities get their own object refs; typical 4–8 images). Present the audited list as a fork before generating. Then one asset at a time (characters first): **expand** via `medium-constraints.md`, **generate candidates**, **bind** on approval. Assets approved ≠ Stage 1 done. **Feeds:** Step 16.
+Locked artifacts are text; the renderer needs images. **First audit the manifest** (identity anchors only — characters, plates, recurring hero props in ONE neutral state; strike disguised shots; fused entities get their own object refs; typical 4–8 images). **Plates must not embed a hero prop that has its own object ref.** **Charsheets: empty hands + object ref, OR tool-as-wardrobe — never both.** Present the audited list as a fork before generating. Then one asset at a time (characters first): **expand** via `medium-constraints.md`, **generate candidates**, **bind** on approval. Assets approved ≠ Stage 1 done. **Feeds:** Step 16.
 
 ## Step 16 — Scene grids
 
-With assets approved, generate each scene's grid (full reference: `grid-storyboards.md`). Present as caption strips; approval = approving the scene's EDIT. Mark generation groups. **Record each scene via `recordSceneGridEntry`** — the app validates the entry; do not author freeform registry JSON in chat. Stage 1 completes when every scene has a validated entry (approved grid or valid skip). **Feeds:** Stage 2.
+With assets approved, generate each scene's grid (full reference: `grid-storyboards.md`). Present as caption strips (`panelCount` + matching `panelCaptions` required); approval = Approve-grid button only — never free-text "continue". Mark generation groups (**solo by default**; group only low-motion consecutive beats). **Record each scene via `recordSceneGridEntry`** with `approved_candidate_id` = the generateSceneGrid toolCallId. Stage 1 completes when every scene has a validated entry. **Feeds:** Stage 2.
 
 _(No package step. Handoff = Bible + shot list + approved images + approved grids + passing registry. Export on request = concatenate locked artifacts verbatim.)_
 

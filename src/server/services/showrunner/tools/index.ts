@@ -1,3 +1,4 @@
+import { tavilyExtract } from "@tavily/ai-sdk";
 import { loadReference } from "./load-reference";
 import { generateAssetReferences } from "./generate-asset-references";
 import { generateSceneGrid } from "./generate-scene-grid";
@@ -7,6 +8,8 @@ import { recordSceneGridEntry } from "./record-scene-grid-entry";
 
 export const storyTools = {
   loadReference,
+  // Official Tavily AI SDK tool — https://ai-sdk.dev/cookbook/node/web-search-agent#tavily
+  webExtract: tavilyExtract(),
   generateAssetReferences,
   generateSceneGrid,
   compileShot,
@@ -15,5 +18,14 @@ export const storyTools = {
 };
 
 export { generateAssetImages } from "./generate-asset-references";
-export { generateSceneGridImages } from "./generate-scene-grid";
-export { generateShotWithFallback, renderAndUploadShot } from "./compile-shot";
+export {
+  generateSceneGridImages,
+  validatePanelCaptionCount,
+} from "./generate-scene-grid";
+export {
+  generateShotWithFallback,
+  renderAndUploadShot,
+  validateCompileContinuity,
+  type CompileShotArgs,
+  type ContinuityMode,
+} from "./compile-shot";

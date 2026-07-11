@@ -51,13 +51,13 @@ Never repair by editing pixels or approving "close enough" geometry. If the same
 
 ## Approval protocol
 
-Present 2–3 candidates per scene differing in STAGING (blocking, angles, scale rhythm), not just rendering luck. Present as a **caption strip**: image + under each panel the motion arc and handoff. User approves the EDIT, not final pixels.
+Present candidates per scene differing in STAGING (blocking, angles, scale rhythm), not just rendering luck. **Always pass `panelCount` and `panelCaptions`** on `generateSceneGrid` — `panelCaptions.length` must equal `panelCount`, one entry per panel with `motionArc` + `handoff` from the shot row. The app rejects mismatches before image generation. The UI shows a **caption strip** under the image; the user approves the EDIT, not final pixels. Free-text "continue" is NOT approval — wait for the Approve-grid button / `grid_approval` tool result.
 
-**Before presenting:** answer which panel carries the scene's Delta and what proves this isn't the previous scene again. Self-check every panel against its row; REJECT (don't present) cast/state/ratio mismatches.
+**Before presenting:** answer which panel carries the scene's Delta and what proves this isn't the previous scene again. Self-check every panel against its row; REJECT (don't present) cast/state/ratio mismatches. Grid prompts use **ONE lighting state** — no "transitioning toward dusk" language.
 
 **Backflow:** spoken edits flow INTO THE ROW first, then the panel regenerates. Never patch a panel while leaving its row stale.
 
-Approved grids bind to `@sceneN_grid` handles.
+Approved grids bind to `@sceneN_grid` handles. When recording via `recordSceneGridEntry`, set `approved_candidate_id` to the **exact `generateSceneGrid` toolCallId** from the approval result — never placeholders like `candidate_1`.
 
 ## Scene Grid Registry (app-validated)
 
@@ -72,7 +72,7 @@ Fields the tool accepts (one entry per call):
 | `grid_required` | yes | Usually true |
 | `status` | yes | `approved_grid` \| `skip_recorded` |
 | `grid_handle` | if approved | e.g. `@scene3_grid` |
-| `approved_candidate_id` | if approved | Tool-call / candidate id |
+| `approved_candidate_id` | if approved | Exact `generateSceneGrid` toolCallId from `grid_approval` — never `candidate_1` |
 | `skip_reason` | if skipped | One of the four reasons above |
 | `panel_map` | yes | Every shot row → exactly one panel number, or `null` for legitimate grid skips (e.g. INSERT). Explicit — never infer order. |
 | `generation_groups` | yes | `{ shot_ids, panel_ids }[]` for this scene |
@@ -84,9 +84,10 @@ Validation (enforced by the tool): `approved_grid` requires handle + candidate i
 Unit of DRAMA = scene; unit of GENERATION = group. Partition when the grid is approved:
 
 - Group = 1–4 consecutive shots whose **estimated** Dur sum ≤15s.
-- **GROUP BY DEFAULT** — largest legal group. Solo ONLY for: (1) motion-rich, (2) fulcrum, (3) deliberate-motion spectacle, (4) timing-critical. "Didn't fit after lazy 6s estimates" is NOT sanctioned — revisit estimates first.
+- **Solo or short groups by default** — quality/control first. Grouping is a cost/continuity tradeoff, not a cinema law. Prefer one shot per generation; group only when consecutive beats are low-motion, same location + lighting state, and the summed Dur ≤15s — and only when a shared grid sequence clearly helps. Strong default against sharing a window: (1) motion-rich, (2) fulcrum, (3) deliberate-motion spectacle (crash, impact, liftoff, beam fire), (4) timing-critical, (5) any beat that must preserve footing into the next generation via start-frame or video extension — override only when explicitly locked and reviewable. "Didn't fit after lazy 6s estimates" is NOT sanctioned — revisit estimates first. **Crash/liftoff/spectacle must not share a generation with quiet character beats** unless the user explicitly accepts that tradeoff.
 - **Partition-aware durations:** draft connected low-motion beats at 3–5s when they can share a window; don't inflate/deflate real dramatic length.
 - Different location or lighting state always breaks the group (scene boundary).
+- **Cross-generation continuity is Stage 2's job** (`extend_video`). Do not invent multi-shot groups just to "keep geography" — solos + extend are safer.
 
 Record groups in the same `recordSceneGridEntry` call. Stage 2 compiles them as-is.
 
@@ -94,6 +95,7 @@ Record groups in the same `recordSceneGridEntry` call. Stage 2 compiles them as-
 
 ## Consumption (pointer — full rules in Stage 2 `shot-compilation-recipe.md`)
 
-- **Groups:** grid as sequence reference; each shot block cites its panel.
-- **Solos in a gridded scene:** attach grid, cite panel by number.
+- **Groups:** grid as sequence reference; each shot block opens with a mandatory **COMPOSITION LOCK** (not a soft "composition matches panel" citation).
+- **Solos in a gridded scene:** attach grid, same COMPOSITION LOCK form for the shot's panel.
+- Soft panel citations alone are insufficient — Stage 2 gaps if the lock is missing or unextractable.
 - Grid never replaces character/plate references — they attach alongside it.

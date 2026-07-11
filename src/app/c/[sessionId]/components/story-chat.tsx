@@ -281,8 +281,11 @@ export function StoryChat({
         toolCallId: event.toolCallId as string,
         loading: false,
         sceneId: event.sceneId as string | number,
-        images: event.images as string[],
+        images: event.images as string[] | undefined,
+        panelCount: event.panelCount as number | undefined,
+        panelCaptions: event.panelCaptions as SceneGrid["panelCaptions"],
         aspectRatio: event.aspectRatio as SceneGrid["aspectRatio"],
+        error: event.error as string | undefined,
       };
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, sceneGrid } : m))
@@ -300,6 +303,8 @@ export function StoryChat({
         referenceImageUrls: event.referenceImageUrls as string[],
         duration: event.duration as number,
         aspectRatio: event.aspectRatio as ShotCompile["aspectRatio"],
+        continuityMode: event.continuityMode as ShotCompile["continuityMode"],
+        sourceVideoUrl: event.sourceVideoUrl as string | undefined,
       };
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, shotCompile } : m))

@@ -11,6 +11,8 @@ export interface ShotJobData {
   prompt: string;
   aspectRatio: "16:9" | "9:16" | "1:1";
   duration: number;
+  continuityMode?: "fresh" | "extend_video";
+  sourceVideoUrl?: string;
 }
 
 export const shotQueue = new Queue(SHOT_QUEUE_NAME, {

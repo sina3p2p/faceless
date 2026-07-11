@@ -15,6 +15,7 @@ export interface I2vRequest {
   endImageUrl?: string;
   videoUrl?: string;
   referenceImages?: string[];
+  referenceVideos?: string[];
   referenceAudios?: string[];
   /** Generate audio in the video clip (ambient or speech, model-dependent). */
   generateAudio?: boolean;

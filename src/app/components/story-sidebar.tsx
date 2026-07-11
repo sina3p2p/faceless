@@ -309,9 +309,7 @@ export function StorySidebar() {
       const res = await axios.get("/v2/story");
       return res.data.sessions;
     },
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {

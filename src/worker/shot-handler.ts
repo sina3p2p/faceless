@@ -19,9 +19,11 @@ export async function handleShotJob(job: Job<ShotJobData>) {
     prompt,
     aspectRatio,
     duration,
+    continuityMode,
+    sourceVideoUrl,
   } = job.data;
 
-  logger.info("Shot job started", { jobId: job.id, sessionId, toolCallId });
+  logger.info("Shot job started", { jobId: job.id, sessionId, toolCallId, continuityMode });
 
   await db
     .update(schema.filmShotJobs)
@@ -33,7 +35,18 @@ export async function handleShotJob(job: Job<ShotJobData>) {
   let mediaId: string;
   try {
     const key = `v2/shots/${sessionId}/${toolCallId}.mp4`;
-    ({ url: videoUrl, durationSeconds, mediaId } = await renderAndUploadShot(referenceImageUrls, prompt, aspectRatio, duration, sessionId, key));
+    ({ url: videoUrl, durationSeconds, mediaId } = await renderAndUploadShot(
+      {
+        prompt,
+        referenceImageUrls: referenceImageUrls ?? [],
+        aspectRatio,
+        duration,
+        continuityMode,
+        sourceVideoUrl,
+      },
+      sessionId,
+      key
+    ));
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
     logger.error("Shot job generation failed", err as Error, { jobId: job.id, sessionId, toolCallId });

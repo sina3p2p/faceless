@@ -3,7 +3,12 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
-import { renderAndUploadShot, generateAssetImages, generateSceneGridImages } from "@/server/services/showrunner";
+import {
+  renderAndUploadShot,
+  generateAssetImages,
+  generateSceneGridImages,
+  validatePanelCaptionCount,
+} from "@/server/services/showrunner";
 
 type StoredTc = {
   id: string;
@@ -62,10 +67,14 @@ export async function POST(
   if (toolName === "compileShot") {
     const key = `v2/shots/${sessionId}/${toolCallId}-retry-${Date.now()}.mp4`;
     const { url: persistentUrl, durationSeconds } = await renderAndUploadShot(
-      tcArgs.referenceImageUrls as string[],
-      tcArgs.prompt as string,
-      (tcArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
-      tcArgs.duration as number,
+      {
+        prompt: tcArgs.prompt as string,
+        referenceImageUrls: (tcArgs.referenceImageUrls as string[]) ?? [],
+        aspectRatio: (tcArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
+        duration: tcArgs.duration as number,
+        continuityMode: (tcArgs.continuityMode as "fresh" | "extend_video") ?? "fresh",
+        sourceVideoUrl: tcArgs.sourceVideoUrl as string | undefined,
+      },
       sessionId,
       key
     );
@@ -87,15 +96,26 @@ export async function POST(
   }
 
   if (toolName === "generateSceneGrid") {
-    const { sceneId, imagePrompt, referenceImageUrls, aspectRatio } = tcArgs as {
+    const { sceneId, imagePrompt, referenceImageUrls, panelCount, panelCaptions, aspectRatio } = tcArgs as {
       sceneId: string | number;
       imagePrompt: string;
       referenceImageUrls: string[];
+      panelCount?: number;
+      panelCaptions?: { motionArc: string; handoff: string }[];
       aspectRatio?: "16:9" | "9:16" | "1:1";
     };
+    const captionError = validatePanelCaptionCount(panelCount, panelCaptions);
+    if (captionError) {
+      return badRequest(captionError);
+    }
     const generatedImages = await generateSceneGridImages(imagePrompt, referenceImageUrls, aspectRatio ?? "16:9");
     await patchRow({ generatedImages });
-    return NextResponse.json({ sceneId, images: generatedImages });
+    return NextResponse.json({
+      sceneId,
+      images: generatedImages,
+      panelCount,
+      panelCaptions,
+    });
   }
 
   return badRequest(`Tool "${toolName}" is not retryable`);
