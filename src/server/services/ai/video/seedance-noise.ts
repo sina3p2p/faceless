@@ -1,10 +1,6 @@
 import sharp from "sharp";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 
-export function isE005(err: unknown): boolean {
-  return err instanceof Error && err.message.includes("E005");
-}
-
 async function fetchImage(url: string): Promise<Buffer> {
   const resp = await fetch(url);
   if (!resp.ok) throw new Error(`noise fetch failed: ${resp.status}`);

@@ -3,10 +3,20 @@ import {
   Html5Audio,
   OffthreadVideo,
   Sequence,
+  getRemotionEnvironment,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
+
+/** Same-origin proxy so Player/prefetch can fetch bytes (R2 has no CORS). */
+export function previewMediaUrl(url: string): string {
+  return url.replace(/\/api\/media\//, "/api/media-proxy/");
+}
+
+function playerSrc(url: string): string {
+  return getRemotionEnvironment().isPlayer ? previewMediaUrl(url) : url;
+}
 
 export type TransitionType =
   | "dissolve"
@@ -228,11 +238,12 @@ function ClipLayer({
   return (
     <AbsoluteFill style={{ opacity, transform: transform || undefined, clipPath: clipPath || undefined, overflow: "hidden" }}>
       <OffthreadVideo
-        src={clip.videoUrl}
+        src={playerSrc(clip.videoUrl)}
         trimBefore={trimBefore}
         {...(trimAfter !== undefined ? { trimAfter } : {})}
         playbackRate={Math.max(0.1, clip.speed)}
         volume={volumeAtFrame}
+        pauseWhenBuffering
         style={{ width: "100%", height: "100%", objectFit: "contain" }}
       />
       {blackOpacity > 0 && (
@@ -253,7 +264,9 @@ export function StoryComposition({ clips, audioClips = [] }: StoryCompositionPro
   return (
     <AbsoluteFill style={{ backgroundColor: "black" }}>
       {sorted.map(({ clip, from, frames, transInFrames, transOutFrames, transInType, transOutType }) => (
-        <Sequence key={clip.id} from={from} durationInFrames={frames} layout="none">
+        // premountFor needs absolute-fill (layout="none" skips premount entirely).
+        // 3s gives remote clips time to seek+buffer before the cut.
+        <Sequence key={clip.id} from={from} durationInFrames={frames} premountFor={FPS * 3}>
           <ClipLayer
             clip={clip}
             totalFrames={frames}
@@ -273,8 +286,8 @@ export function StoryComposition({ clips, audioClips = [] }: StoryCompositionPro
         const trimBefore = Math.round(ac.trimStart * FPS);
         const trimAfter = Math.round(end * FPS);
         return (
-          <Sequence key={ac.id} from={from} durationInFrames={durationFrames} layout="none">
-            <Html5Audio src={ac.url} trimBefore={trimBefore} trimAfter={trimAfter} volume={ac.volume} />
+          <Sequence key={ac.id} from={from} durationInFrames={durationFrames} premountFor={FPS * 3}>
+            <Html5Audio src={playerSrc(ac.url)} trimBefore={trimBefore} trimAfter={trimAfter} volume={ac.volume} pauseWhenBuffering />
           </Sequence>
         );
       })}

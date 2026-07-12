@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
 import { AuthModal } from "@/components/auth-modal";
-import { useMobileTab } from "../story-shell";
+import { useMobileTab } from "@/components/story-shell";
 
 function useIsMobile() {
   const [mobile, setMobile] = useState(

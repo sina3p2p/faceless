@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { type PlayerRef } from "@remotion/player";
-import { preloadVideo } from "@remotion/preload";
+import { prefetch } from "remotion";
 import { getVideoMetadata } from "@remotion/media-utils";
-import { type StoryCompositionProps, type AudioClipConfig, computeSequenceLayout, FPS } from "@/remotion/StoryComposition";
+import { type StoryCompositionProps, type AudioClipConfig, computeSequenceLayout, FPS, previewMediaUrl } from "@/remotion/StoryComposition";
 import { FloatingPanel } from "../floating-panel";
 import { Timeline } from "./timeline";
 import { trackIdOf, trackIndexOf, nextFreeTrackIndex } from "./timeline/hooks/use-timeline-tracks";
@@ -311,27 +311,28 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
     });
   }, []);
 
-  // ── preload clip videos so OffthreadVideo has no seek delay ────────────────
-  // preloadVideo() just hints the browser via <link rel=preload> — no fetch(),
-  // so no CORS requirement (unlike remotion's prefetch()). Duration is read
-  // separately via getVideoMetadata, which uses a <video> element and is also
-  // CORS-free (only pixel reads need CORS, not metadata/duration).
-  const preloadsRef = useRef(new Map<string, () => void>());
+  // ── prefetch clip videos into Remotion's blob cache ───────────────────────
+  // remotion's prefetch() is what OffthreadVideo's usePreload() actually reads.
+  // @remotion/preload's preloadVideo() only hints the browser and does not
+  // feed that cache. Prefetch via media-proxy (same-origin) because R2 has no CORS.
+  // Duration still comes from getVideoMetadata on the redirect URL (CORS-free).
+  const prefetchesRef = useRef(new Map<string, () => void>());
   useEffect(() => {
-    const active = preloadsRef.current;
+    const active = prefetchesRef.current;
     const byUrl = new Map<string, string[]>();
     for (const c of internalClips) {
       byUrl.set(c.videoUrl, [...(byUrl.get(c.videoUrl) ?? []), c.id]);
     }
-    for (const [url, unpreload] of active) {
+    for (const [url, free] of active) {
       if (!byUrl.has(url)) {
-        unpreload();
+        free();
         active.delete(url);
       }
     }
     for (const [url, ids] of byUrl) {
       if (active.has(url)) continue;
-      active.set(url, preloadVideo(url));
+      const { free } = prefetch(previewMediaUrl(url));
+      active.set(url, free);
       getVideoMetadata(url)
         .then(({ durationInSeconds }) => {
           for (const id of ids) applyRealDuration(id, durationInSeconds);
@@ -341,7 +342,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
   }, [internalClips, applyRealDuration]);
 
   useEffect(() => () => {
-    for (const unpreload of preloadsRef.current.values()) unpreload();
+    for (const free of prefetchesRef.current.values()) free();
   }, []);
 
   // ── derived ───────────────────────────────────────────────────────────────

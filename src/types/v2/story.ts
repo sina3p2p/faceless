@@ -23,15 +23,48 @@ export type AssetRef = {
   error?: string;
 };
 
+export type ContinuityPackNotes = {
+  roomGeography: string;
+  characterBlocking: string;
+  cameraAxis: string;
+  lightingProgression: string;
+  screenDirection: string;
+  fixedProps: string;
+};
+
+export type ContinuityPackKeyframe = {
+  role: "establishing" | "blocking" | "eyeline_props" | "other";
+  caption: string;
+};
+
+export type ContinuityPack = {
+  toolCallId: string;
+  loading: boolean;
+  sceneId?: string | number;
+  packHandle?: string;
+  notes?: ContinuityPackNotes;
+  keyframes?: ContinuityPackKeyframe[];
+  images?: string[];
+  aspectRatio?: "16:9" | "9:16" | "1:1";
+  approvedUrls?: string[];
+  error?: string;
+};
+
 export type PanelCaption = {
   motionArc: string;
   handoff: string;
 };
 
-export type SceneGrid = {
+export type GenerationGrid = {
   toolCallId: string;
   loading: boolean;
   sceneId?: string | number;
+  generationId?: string;
+  shotIds?: number[];
+  estimatedDurationSeconds?: number;
+  previousGenerationId?: string | null;
+  incomingAnchorHandle?: string | null;
+  continuityBreakReason?: string | null;
   images?: string[];
   panelCount?: number;
   panelCaptions?: PanelCaption[];
@@ -67,7 +100,8 @@ export type ClientMessage = {
   reasoning?: string;
   questions?: QuestionsCall;
   assetRef?: AssetRef;
-  sceneGrid?: SceneGrid;
+  continuityPack?: ContinuityPack;
+  generationGrid?: GenerationGrid;
   shotResult?: ShotResult;
   shotCompile?: ShotCompile;
 };

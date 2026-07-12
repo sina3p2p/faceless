@@ -48,29 +48,16 @@ async function generateOpenAiGptImageModel(
 ): Promise<MediaAsset | null> {
   try {
     const dims = gptImage15Dimensions(aspectRatio);
-    const finalPrompt = `${prompt}. ${compositionSuffix(aspectRatio)}, cinematic lighting, photorealistic, no text or watermarks.`;
+    const finalPrompt = `${prompt}. ${compositionSuffix(aspectRatio)}, no text or watermarks.`;
     const size = gptImage15Size(aspectRatio);
-    const response = await recordAiCall(
-      {
-        provider: "openai",
-        model,
-        operation: "image.generate",
-        request: { model, prompt: finalPrompt, n: 1, size, quality: "medium", moderation: "low", aspectRatio },
-        summarize: (r) => {
-          const item = (r as { data?: Array<{ url?: string; b64_json?: string }> }).data?.[0];
-          return { hasUrl: !!item?.url, hasB64: !!item?.b64_json, dims };
-        },
-      },
-      () => openai.images.generate({
-        model,
-        prompt: finalPrompt,
-        n: 1,
-        size,
-        quality: "medium",
-        moderation: "low"
-      }),
-    );
-
+    const response = await openai.images.generate({
+      model,
+      prompt: finalPrompt,
+      n: 1,
+      size,
+      quality: "medium",
+      moderation: "low"
+    });
     const item = response.data?.[0];
     const b64 = item?.b64_json;
     const remoteUrl = item?.url;
@@ -159,36 +146,14 @@ async function generateOpenAiGptImageWithRefs(
 
     const dims = gptImage15Dimensions(aspectRatio);
     const editSize = gptImage15Size(aspectRatio);
-    const response = await recordAiCall(
-      {
-        provider: "openai",
-        model: "gpt-image-1.5",
-        operation: "image.editWithRefs",
-        request: {
-          model: "gpt-image-1.5",
-          requestedModel,
-          prompt: composedPrompt,
-          n: 1,
-          size: editSize,
-          quality: "medium",
-          aspectRatio,
-          refCount: imageParts.length,
-          refs: usable.map(({ ref }) => ({ url: ref.url, name: ref.name, type: ref.type, description: ref.description })),
-        },
-        summarize: (r) => {
-          const item = (r as { data?: Array<{ url?: string; b64_json?: string }> }).data?.[0];
-          return { hasUrl: !!item?.url, hasB64: !!item?.b64_json, dims };
-        },
-      },
-      () => openai.images.edit({
-        model: "gpt-image-1.5",
-        image: imageParts,
-        prompt: composedPrompt,
-        n: 1,
-        size: editSize,
-        quality: "medium",
-      }),
-    );
+    const response = await openai.images.edit({
+      model: "gpt-image-1.5",
+      image: imageParts,
+      prompt: composedPrompt,
+      n: 1,
+      size: editSize,
+      quality: "medium",
+    });
 
     const item = response.data?.[0];
     const b64 = item?.b64_json;

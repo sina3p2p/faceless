@@ -1,6 +1,6 @@
 # Deliverable Templates
 
-The two TEXT documents of Stage 1's five-artifact handoff (Bible + shot list; the other three parts — approved reference images, scene grids, and the Scene Grid Registry — are produced at Steps 15–16). Fill these from locked decisions only. Prompt assembly for Seedance lives in the Stage 2 skill / `shot-compilation-recipe.md` — not here.
+The two TEXT documents of Stage 1's five-artifact handoff (Bible + shot list; the other three parts — approved reference images, generation grids, and the Generation Grid Registry — are produced at Steps 15–16). Fill these from locked decisions only. Prompt assembly for Seedance lives in the Stage 2 skill / `shot-compilation-recipe.md` — not here.
 
 ---
 
@@ -121,7 +121,7 @@ One row per shot. Columns:
   **Continuous walks across generations should prefer video extension** (Stage 2)
   over hoping text cut-ins preserve geography.
 - **Light** exactly ONE canonical state per row — never a transition ("Golden Hour → dusk", "transitioning toward…"). Time passes BETWEEN shots; pick one state or split the row. In-shot light morphs are a State Schedule violation.
-- **Dur** seconds — an ESTIMATE used for group-partition math and the runtime total; it never appears in a prompt (solos get exact duration via the API parameter; groups get the summed estimate and Seedance paces the internal cuts).
+- **Dur** seconds — an ESTIMATE used for generation-partition math and the runtime total; it never appears in a prompt (API duration = the generation's summed estimate ≤15s; Seedance paces internal cuts).
 - **Materials** every asset that APPEARS IN THE MOTION ARC must be listed — characters,
   plates (at which version), AND hero props/objects. If the arc says the ship streaks,
   lifts, or is exited, `ship_object_ref` is in this cell; an entity named in the arc
@@ -159,4 +159,4 @@ This is the CHOOSING vocabulary for the Camera move and Scale cells — availabl
 
 ## C. Prompt assembly (Stage 2 only)
 
-Do not assemble Seedance prompts during Stage 1. When the Scene Grid Registry passes, load the Stage 2 skill and `shot-compilation-recipe.md` — that file owns section order, binding grammar, assertion checks, and worked examples.
+Do not assemble Seedance prompts during Stage 1. When the Generation Grid Registry passes, load the Stage 2 skill and `shot-compilation-recipe.md` — that file owns section order, binding grammar, assertion checks, and worked examples.

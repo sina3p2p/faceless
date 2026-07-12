@@ -1,8 +1,8 @@
 # AI Film — Stage 2: Shot Compilation & Render
 
-**Load this via `loadReference("stage2-skill.md")` only after Stage 1 is complete** — Bible locked, every `@material` has an approved reference image, and the Scene Grid Registry is complete and passing. The chat system prompt stays Stage 1 for the whole session; this file (and the recipe) are injected into the thread as references. Follow them for compile/render work.
+**Load this via `loadReference("stage2-skill.md")` only after Stage 1 is complete** — Bible locked, every `@material` has an approved reference image, and the Generation Grid Registry is complete and passing. The chat system prompt stays Stage 1 for the whole session; this file (and the recipe) are injected into the thread as references. Follow them for compile/render work.
 
-If the registry is missing or any scene lacks both an approved `@sceneN_grid` handle and a valid skip record, STOP and return to Stage 1 Step 16. Do not compile. Do not treat approved assets as sufficient.
+If the registry is missing or any shot lacks both an approved `@sceneN_genX_grid` handle and a valid skip record, STOP and return to Stage 1 Step 16. Do not compile. Do not treat approved assets as sufficient.
 
 Your role is **conductor, not renderer**: compile shot prompts and dispatch them; the system gates and generates. You do not "generate video" yourself.
 
@@ -13,23 +13,24 @@ Your role is **conductor, not renderer**: compile shot prompts and dispatch them
 ## Hard gates (discipline)
 
 1. **Sequential load → compile.** Prefer not to call `compileShot` in the same turn as the first Stage 2 loads — load, stop; compile next turn.
-2. **Character-first slot order.** Attach references character → object → location → grid (`referenceImageUrls` in that order). Seedance weights earlier slots more for precise identity.
+2. **Character-first slot order.** Attach references in precision order: character → object → location → continuity-pack keyframes → incoming anchor → generation grid (`referenceImageUrls`). Seedance weights earlier slots more for precise identity; the generation grid is last because it is the sequence to render.
 3. **Bible-verbatim binds.** SUBJECT DEFINITIONS paste Bible §2 lines exactly (bind + govern + label). Do not re-essay the reference image.
-4. **Solo by default.** Prefer one shot per `compileShot`. Groups only when Stage 1 marked a low-motion consecutive group — grouping is a cost/continuity tradeoff. Motion-rich / crash / liftoff / fulcrum / deliberate-motion spectacle shots marked solo at Step 16 stay solo unless the user explicitly accepts sharing a window.
+4. **One compile = one generation grid.** Compile the registry entry as-is (1–4 shots, ≤15s). Do not re-partition. Spectacle 1-panel generations stay solo unless the user explicitly accepts sharing a window.
 5. **Approvals are buttons.** Free-text "continue" is never shot or grid approval.
-6. **COMPOSITION LOCK on every gridded shot.** Soft panel citations (`composition matches panel…`, `composition follows panel…`) are forbidden. Every group/solo shot block opens with `COMPOSITION LOCK: match panel [p] of the approved scene grid — [framing, subject position, geography, screen direction, footing/state]`. Extract from approved panel + row + captions; if unextractable → `status: "gap"`.
-7. **Footing continuity via modes.** When the next shot continues a walk/approach on the same surface:
-   - Prefer `compileShot` with `continuityMode: "extend_video"` + `sourceVideoUrl` (approved prior clip). Prompt opens with `Extend <Video_1>: …`. Optional stills OK.
-   - Use `continuityMode: "fresh"` for scene opens, clean breaks, and hard cuts that start a new take (stills only). Restate footing in CONTEXT from the previous last frame when geography must match.
+6. **COMPOSITION LOCK on every gridded shot.** Soft panel citations (`composition matches panel…`, `composition follows panel…`) are forbidden. Every shot block opens with `COMPOSITION LOCK: match panel [p] of the approved generation grid — [framing, subject position, geography, screen direction, footing/state]`. Extract from approved panel + row + captions; if unextractable → `status: "gap"`.
+7. **Render ALL panels.** The attached generation grid's panels are the generation — never "ignore other panels / continuity context only."
+8. **Footing continuity via modes.** When the next generation continues a walk/approach on the same surface:
+   - Prefer `compileShot` with `continuityMode: "extend_video"` + `sourceVideoUrl` (approved prior clip). Prompt opens with `Extend <Video_1>: …`. Optional stills OK. Upgrade the Stage 1 incoming anchor to `prior_render_last_frame` when available.
+   - Use `continuityMode: "fresh"` for scene opens, intentional `continuity_break_reason` breaks, and hard cuts that start a new take (stills only). Restate footing in CONTEXT from the previous last frame when geography must match.
    - CONTEXT must restate exact footing/surface from the previous last frame (pixels win over the planned row).
 
 **Craft defaults (not cinema laws):** one SHOW LOOK (+ locked trims only); one DOMINANT motion source per shot (secondary only if slower/smaller/subordinate); characters never static-locked or unperformed (intentional stillness must be written); one turnaround sheet is the default tested profile.
 
 ## Flow
 
-One generation at a time — compile, user reviews/edits the prompt, then render. No batch of prompts up front. The unit is usually a **solo**; honor Stage 1 Step 16 groups only when marked (1–4 consecutive low-motion shots). Do not re-partition at compile time.
+One generation at a time — compile, user reviews/edits the prompt, then render. No batch of prompts up front. Honor Stage 1 Step 16 generation grids as-is. Do not re-partition at compile time.
 
-1. **Compile ONE generation** per the recipe into a structured render package. Present via `compileShot` with `referenceImageUrls` in character → object → location → grid order, the correct `continuityMode` (+ `sourceVideoUrl` when extending), and a mandatory COMPOSITION LOCK on every gridded shot block.
+1. **Compile ONE generation** per the recipe into a structured render package. Present via `compileShot` with `referenceImageUrls` in character → object → location → continuity-pack keyframes → incoming anchor → generation grid order, the correct `continuityMode` (+ `sourceVideoUrl` when extending), and a mandatory COMPOSITION LOCK on every shot block. Multi-panel grids: render all panels in order.
 2. **User reviews** the prompt (approve / edit / reject). Edits re-run assertion checks before render.
 3. **On approval, render** — the approved prompt + resolved handles + duration + continuity fields go to the render path; wait for clip approval before the next generation. Shot approval returns the clip URL (and a last-frame still for CONTEXT footing) — use `extend_video` + that clip URL for the next continuous beat.
 4. **On rejected clip:** fix via Bible or prompt, then re-render. Never "edit" a finished clip.

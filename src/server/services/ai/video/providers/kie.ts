@@ -55,8 +55,8 @@ export class KieVideoProvider implements IProvider {
       duration: req.duration,
       aspect_ratio: req.aspectRatio,
       resolution: req.resolution,
+      generate_audio: req.generateAudio ?? false,
     };
-    if (req.generateAudio != null) input.generate_audio = req.generateAudio;
 
     // Seedance: Image-to-Video (first/last frame) and Multimodal Reference-to-Video
     // are mutually exclusive — never send both in one request.
@@ -85,7 +85,6 @@ export class KieVideoProvider implements IProvider {
         input,
       }
     );
-    console.log("KIE: task created", input, JSON.stringify(task, null, 2));
     return this.pollTask(task.data.taskId, req.duration);
   }
 

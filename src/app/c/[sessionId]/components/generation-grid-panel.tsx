@@ -1,35 +1,35 @@
-import type { SceneGrid } from "@/types/v2/story";
+import type { GenerationGrid } from "@/types/v2/story";
 
-const ASPECT: Record<NonNullable<SceneGrid["aspectRatio"]>, string> = {
+const ASPECT: Record<NonNullable<GenerationGrid["aspectRatio"]>, string> = {
   "16:9": "16/9",
   "9:16": "9/16",
   "1:1": "1/1",
 };
 
-export function SceneGridPanel({
-  sceneGrid,
+export function GenerationGridPanel({
+  generationGrid,
   disabled,
   onApprove,
   onRetry,
 }: {
-  sceneGrid: SceneGrid;
+  generationGrid: GenerationGrid;
   disabled?: boolean;
   onApprove?: (url: string) => void;
   onRetry?: () => void;
 }) {
-  const aspect = ASPECT[sceneGrid.aspectRatio ?? "16:9"];
+  const aspect = ASPECT[generationGrid.aspectRatio ?? "16:9"];
 
-  if (sceneGrid.loading) {
+  if (generationGrid.loading) {
     return (
       <div className="mt-1 rounded-xl bg-white/5 animate-pulse" style={{ aspectRatio: aspect }} />
     );
   }
 
-  const image = sceneGrid.images?.[0];
-  if (sceneGrid.error || !image) {
+  const image = generationGrid.images?.[0];
+  if (generationGrid.error || !image) {
     return (
       <div className="mt-1 flex items-center gap-3">
-        <p className="text-xs text-red-400">{sceneGrid.error ?? "Grid generation failed."}</p>
+        <p className="text-xs text-red-400">{generationGrid.error ?? "Grid generation failed."}</p>
         {onRetry && (
           <button
             onClick={onRetry}
@@ -43,13 +43,30 @@ export function SceneGridPanel({
     );
   }
 
-  const isLocked = !!sceneGrid.approvedUrl;
-  const captions = sceneGrid.panelCaptions ?? [];
+  const isLocked = !!generationGrid.approvedUrl;
+  const captions = generationGrid.panelCaptions ?? [];
+  const label =
+    generationGrid.generationId != null
+      ? `Gen ${generationGrid.generationId}`
+      : `Scene ${generationGrid.sceneId} grid`;
+  const durationLabel =
+    generationGrid.estimatedDurationSeconds != null
+      ? ` · ~${generationGrid.estimatedDurationSeconds}s`
+      : "";
+  const chainLabel = generationGrid.continuityBreakReason
+    ? ` · break: ${generationGrid.continuityBreakReason}`
+    : generationGrid.previousGenerationId
+      ? ` · from ${generationGrid.previousGenerationId}`
+      : "";
 
   return (
     <div className="mt-1 space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-xs font-medium text-primary">Scene {sceneGrid.sceneId} grid</span>
+        <span className="text-xs font-medium text-primary">
+          {label}
+          {durationLabel}
+          {chainLabel}
+        </span>
         {isLocked && (
           <span className="ml-1 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-2 py-0.5">
             Approved
@@ -61,7 +78,7 @@ export function SceneGridPanel({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image}
-          alt={`Scene ${sceneGrid.sceneId} grid storyboard`}
+          alt={`${label} storyboard`}
           className="w-full h-full object-cover"
         />
       </div>

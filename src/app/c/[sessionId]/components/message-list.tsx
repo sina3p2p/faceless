@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AssistantText } from "./assistant-text";
 import { AssetRefPanel } from "./asset-ref-panel";
-import { SceneGridPanel } from "./scene-grid-panel";
+import { ContinuityPackPanel } from "./continuity-pack-panel";
+import { GenerationGridPanel } from "./generation-grid-panel";
 import { ShotCompilePanel } from "./shot-compile-panel";
 import { ShotPreviewPanel } from "./shot-preview-panel";
 import type { ClientMessage } from "@/types/v2/story";
@@ -13,6 +14,7 @@ export function MessageList({
   isStreaming,
   streamingMsgId,
   onAssetApproval,
+  onContinuityPackApproval,
   onGridApproval,
   onRetry,
   onRenderShot,
@@ -22,6 +24,12 @@ export function MessageList({
   isStreaming: boolean;
   streamingMsgId: string | null;
   onAssetApproval: (toolCallId: string, assetHandle: string, url: string) => void;
+  onContinuityPackApproval: (
+    toolCallId: string,
+    sceneId: string | number,
+    packHandle: string,
+    approvedUrls: string[]
+  ) => void;
   onGridApproval: (toolCallId: string, sceneId: string | number, url: string) => void;
   onRetry: (toolCallId: string) => void;
   onRenderShot: (toolCallId: string, renderPrompt: string) => void;
@@ -124,16 +132,48 @@ export function MessageList({
                   />
                 )}
 
-                {msg.sceneGrid && (
-                  <SceneGridPanel
-                    sceneGrid={msg.sceneGrid}
+                {msg.continuityPack && (
+                  <ContinuityPackPanel
+                    continuityPack={msg.continuityPack}
                     disabled={isStreaming}
                     onApprove={
-                      msg.sceneGrid.approvedUrl
+                      msg.continuityPack.approvedUrls?.length
                         ? undefined
-                        : (url: string) => onGridApproval(msg.sceneGrid!.toolCallId, msg.sceneGrid!.sceneId!, url)
+                        : (urls: string[]) =>
+                            onContinuityPackApproval(
+                              msg.continuityPack!.toolCallId,
+                              msg.continuityPack!.sceneId!,
+                              msg.continuityPack!.packHandle!,
+                              urls
+                            )
                     }
-                    onRetry={!msg.sceneGrid.approvedUrl && !msg.sceneGrid.loading ? () => onRetry(msg.sceneGrid!.toolCallId) : undefined}
+                    onRetry={
+                      !msg.continuityPack.approvedUrls?.length && !msg.continuityPack.loading
+                        ? () => onRetry(msg.continuityPack!.toolCallId)
+                        : undefined
+                    }
+                  />
+                )}
+
+                {msg.generationGrid && (
+                  <GenerationGridPanel
+                    generationGrid={msg.generationGrid}
+                    disabled={isStreaming}
+                    onApprove={
+                      msg.generationGrid.approvedUrl
+                        ? undefined
+                        : (url: string) =>
+                            onGridApproval(
+                              msg.generationGrid!.toolCallId,
+                              msg.generationGrid!.sceneId!,
+                              url
+                            )
+                    }
+                    onRetry={
+                      !msg.generationGrid.approvedUrl && !msg.generationGrid.loading
+                        ? () => onRetry(msg.generationGrid!.toolCallId)
+                        : undefined
+                    }
                   />
                 )}
 

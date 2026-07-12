@@ -6,9 +6,11 @@ import { eq } from "drizzle-orm";
 import {
   renderAndUploadShot,
   generateAssetImages,
-  generateSceneGridImages,
+  generateContinuityPackImages,
+  generateGenerationGridImages,
   validatePanelCaptionCount,
 } from "@/server/services/showrunner";
+import { validateContinuityPackKeyframes, validateGenerationGridContinuity } from "@/server/services/showrunner/tools";
 
 type StoredTc = {
   id: string;
@@ -95,23 +97,102 @@ export async function POST(
     return NextResponse.json({ assetHandle, assetKind, images: generatedImages });
   }
 
-  if (toolName === "generateSceneGrid") {
-    const { sceneId, imagePrompt, referenceImageUrls, panelCount, panelCaptions, aspectRatio } = tcArgs as {
+  if (toolName === "generateContinuityPack") {
+    const {
+      sceneId,
+      packHandle,
+      notes,
+      keyframes,
+      referenceImageUrls,
+      aspectRatio,
+    } = tcArgs as {
       sceneId: string | number;
+      packHandle: string;
+      notes: Record<string, string>;
+      keyframes?: { role: string; caption: string; imagePrompt: string }[];
+      referenceImageUrls: string[];
+      aspectRatio?: "16:9" | "9:16" | "1:1";
+    };
+    const keyframeError = validateContinuityPackKeyframes(keyframes);
+    if (keyframeError) {
+      return badRequest(keyframeError);
+    }
+    const generatedImages = await generateContinuityPackImages(
+      keyframes!,
+      referenceImageUrls,
+      aspectRatio ?? "16:9"
+    );
+    await patchRow({ generatedImages });
+    return NextResponse.json({
+      sceneId,
+      packHandle,
+      notes,
+      keyframes,
+      images: generatedImages,
+    });
+  }
+
+  if (toolName === "generateGenerationGrid" || toolName === "generateSceneGrid") {
+    const {
+      sceneId,
+      generationId,
+      shotIds,
+      estimatedDurationSeconds,
+      previousGenerationId,
+      incomingAnchorHandle,
+      incomingAnchorKind,
+      incomingAnchorPanel,
+      continuityBreakReason,
+      isFirstInScene,
+      imagePrompt,
+      referenceImageUrls,
+      panelCount,
+      panelCaptions,
+      aspectRatio,
+    } = tcArgs as {
+      sceneId: string | number;
+      generationId?: string;
+      shotIds?: number[];
+      estimatedDurationSeconds?: number;
+      previousGenerationId?: string | null;
+      incomingAnchorHandle?: string | null;
+      incomingAnchorKind?: string | null;
+      incomingAnchorPanel?: number | null;
+      continuityBreakReason?: string | null;
+      isFirstInScene?: boolean;
       imagePrompt: string;
       referenceImageUrls: string[];
       panelCount?: number;
       panelCaptions?: { motionArc: string; handoff: string }[];
       aspectRatio?: "16:9" | "9:16" | "1:1";
     };
-    const captionError = validatePanelCaptionCount(panelCount, panelCaptions);
+    const captionError = validatePanelCaptionCount(panelCount, panelCaptions, shotIds);
     if (captionError) {
       return badRequest(captionError);
     }
-    const generatedImages = await generateSceneGridImages(imagePrompt, referenceImageUrls, aspectRatio ?? "16:9");
+    const continuityError = validateGenerationGridContinuity({
+      isFirstInScene,
+      previousGenerationId,
+      incomingAnchorHandle,
+      incomingAnchorKind,
+      incomingAnchorPanel,
+      continuityBreakReason,
+      referenceImageUrls,
+    });
+    if (continuityError) {
+      return badRequest(continuityError);
+    }
+    const generatedImages = await generateGenerationGridImages(
+      imagePrompt,
+      referenceImageUrls,
+      aspectRatio ?? "16:9"
+    );
     await patchRow({ generatedImages });
     return NextResponse.json({
       sceneId,
+      generationId,
+      shotIds,
+      estimatedDurationSeconds,
       images: generatedImages,
       panelCount,
       panelCaptions,

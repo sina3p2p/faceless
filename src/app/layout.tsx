@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import { StorySidebar } from "./components/story-sidebar";
+import { StorySidebar } from "@/components/story-sidebar";
 import { WarpShaderBackground } from "@/components/ui/warp-shader";
-import { StoryShell } from "./story-shell";
+import { StoryShell } from "@/components/story-shell";
 import { Providers } from "@/components/providers";
 import { DM_Sans, Geist_Mono } from "next/font/google";
 import { cn } from "@/lib/utils";

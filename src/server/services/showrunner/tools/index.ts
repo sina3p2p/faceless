@@ -1,27 +1,37 @@
 import { tavilyExtract } from "@tavily/ai-sdk";
 import { loadReference } from "./load-reference";
 import { generateAssetReferences } from "./generate-asset-references";
-import { generateSceneGrid } from "./generate-scene-grid";
+import { generateContinuityPack } from "./generate-continuity-pack";
+import { generateGenerationGrid } from "./generate-generation-grid";
 import { compileShot } from "./compile-shot";
 import { askQuestions } from "./ask-questions";
-import { recordSceneGridEntry } from "./record-scene-grid-entry";
+import { recordContinuityPackEntry } from "./record-continuity-pack-entry";
+import { recordGenerationGridEntry } from "./record-generation-grid-entry";
 
 export const storyTools = {
   loadReference,
   // Official Tavily AI SDK tool — https://ai-sdk.dev/cookbook/node/web-search-agent#tavily
   webExtract: tavilyExtract(),
   generateAssetReferences,
-  generateSceneGrid,
+  generateContinuityPack,
+  generateGenerationGrid,
   compileShot,
   askQuestions,
-  recordSceneGridEntry,
+  recordContinuityPackEntry,
+  recordGenerationGridEntry,
 };
 
 export { generateAssetImages } from "./generate-asset-references";
 export {
-  generateSceneGridImages,
+  generateContinuityPackImages,
+  validateContinuityPackKeyframes,
+} from "./generate-continuity-pack";
+export {
+  generateGenerationGridImages,
   validatePanelCaptionCount,
-} from "./generate-scene-grid";
+  validateGenerationGridContinuity,
+} from "./generate-generation-grid";
+export { validateContinuityChain } from "./record-generation-grid-entry";
 export {
   generateShotWithFallback,
   renderAndUploadShot,

@@ -1,8 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
-import { generateVideoFromReferences, editVideo, type VideoResult } from "@/server/services/ai/video";
-import { isE005, addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
+import { generateVideo, type VideoResult } from "@/server/services/ai/video";
+import { addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
 import { uploadFile, mediaUrl } from "@/lib/storage";
 import { probeVideoDuration } from "@/lib/media-probe";
 import { db } from "@/server/db";
@@ -20,7 +20,8 @@ export const compileShot = tool({
     "Use continuityMode 'extend_video' + sourceVideoUrl (previous approved clip) when the next beat " +
     "continues the same character through the same space (walks / approaches / same-surface carries). " +
     "Use 'fresh' for scene opens, clean breaks, and hard cuts that start a new take. " +
-    "Attach referenceImageUrls in character → object → location → grid order. " +
+    "Attach referenceImageUrls in precision order: character → object → location → " +
+    "continuity-pack keyframes → incoming anchor → generation grid. " +
     "The user reviews/edits the prompt, then approves — rendering starts only after approval. " +
     "Wait for shot approval before compiling the next generation.",
   inputSchema: z.object({
@@ -35,8 +36,10 @@ export const compileShot = tool({
       .array(z.string())
       .max(9)
       .describe(
-        "Approved reference image URLs in precision order: character → object → location → grid. " +
-        "Required for fresh; optional for extend_video when identity is carried by the source clip."
+        "Approved reference image URLs in precision order: character → object → location → " +
+        "continuity-pack keyframes (1–3) → incoming anchor (prior terminal panel / last frame, when continuous) → " +
+        "generation grid. Required for fresh; optional for extend_video when identity is carried by the source clip " +
+        "(still attach grid + continuity refs when available)."
       ),
     duration: z
       .number()
@@ -99,41 +102,23 @@ export async function generateShotWithFallback(
   const aspectRatio = args.aspectRatio ?? "16:9";
   const refs = args.referenceImageUrls ?? [];
 
-  if (mode === "extend_video") {
-    try {
-      return await generateVideoFromReferences(
-        refs,
-        [],
-        args.prompt,
-        "seedance-2-mini",
-        aspectRatio,
-        "480p",
-        args.duration,
-        {
-          referenceVideos: args.sourceVideoUrl ? [args.sourceVideoUrl] : undefined,
-        }
-      );
-    } catch (err) {
-      console.warn("[compile-shot] extend via referenceVideos failed, falling back to editVideo", err);
-      return await editVideo(args.sourceVideoUrl!, args.prompt, args.duration, aspectRatio, "480p", "seedance-2-pro");
-    }
-  }
-
   const run = (urls: string[]) =>
-    generateVideoFromReferences(
-      urls,
-      [],
-      args.prompt,
-      "seedance-2-mini",
+    generateVideo({
+      model: "seedance-2-mini",
+      referenceImages: urls,
+      referenceVideos: mode === "extend_video" && args.sourceVideoUrl ? [args.sourceVideoUrl] : undefined,
+      prompt: args.prompt,
+      duration: args.duration,
       aspectRatio,
-      "480p",
-      args.duration
-    );
+      resolution: "480p",
+      generateAudio: true,
+    });
 
   try {
     return await run(refs);
   } catch (err) {
-    if (isE005(err) && refs.length > 0) {
+    console.warn("Rejecting reference images, adding noise and retrying", { sessionId, refs });
+    if (refs.length > 0) {
       const noisedUrls = await Promise.all(
         refs.map((url, i) => addSeedanceNoiseEnhanced(url, `ref${i}`, `story_${sessionId}`))
       );

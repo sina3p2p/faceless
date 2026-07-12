@@ -2,9 +2,10 @@ import type { ModelMessage } from "ai";
 import type {
   AssetRef,
   ClientMessage,
+  ContinuityPack,
   QuestionItem,
   QuestionsCall,
-  SceneGrid,
+  GenerationGrid,
   ShotCompile,
   ShotResult,
 } from "@/types/v2/story";
@@ -136,6 +137,7 @@ const USER_RESULT_TYPES = new Set([
   "questions_result",
   "fork_result",
   "asset_approval",
+  "continuity_pack_approval",
   "grid_approval",
   "shot_approval",
 ]);
@@ -143,6 +145,7 @@ const USER_RESULT_TYPES = new Set([
 export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
   const questionAnswers = new Map<string, string[]>();
   const assetApprovals = new Map<string, string>();
+  const continuityPackApprovals = new Map<string, string[]>();
   const gridApprovals = new Map<string, string>();
   const shotApprovals = new Set<string>();
 
@@ -157,6 +160,12 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
     } else if (row.role === "user" && row.type === "asset_approval") {
       const d = rowData(row);
       assetApprovals.set(d.toolCallId as string, d.approvedUrl as string);
+    } else if (row.role === "user" && row.type === "continuity_pack_approval") {
+      const d = rowData(row);
+      continuityPackApprovals.set(
+        d.toolCallId as string,
+        (d.approvedUrls as string[]) ?? []
+      );
     } else if (row.role === "user" && row.type === "grid_approval") {
       const d = rowData(row);
       gridApprovals.set(d.toolCallId as string, d.approvedUrl as string);
@@ -177,7 +186,8 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
       const calls = getToolCalls(d);
       let questions: QuestionsCall | undefined;
       let assetRef: AssetRef | undefined;
-      let sceneGrid: SceneGrid | undefined;
+      let continuityPack: ContinuityPack | undefined;
+      let generationGrid: GenerationGrid | undefined;
       let shotResult: ShotResult | undefined;
       let shotCompile: ShotCompile | undefined;
 
@@ -206,15 +216,38 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
             images: (args.generatedImages ?? args.images) as string[] | undefined,
             approvedUrl: assetApprovals.get(tc.id),
           };
-        } else if (tc.function.name === "generateSceneGrid") {
-          sceneGrid = {
+        } else if (tc.function.name === "generateContinuityPack") {
+          const keyframes = args.keyframes as ContinuityPack["keyframes"];
+          continuityPack = {
             toolCallId: tc.id,
             loading: false,
             sceneId: args.sceneId as string | number,
+            packHandle: args.packHandle as string,
+            notes: args.notes as ContinuityPack["notes"],
+            keyframes,
+            images: (args.generatedImages ?? args.images) as string[] | undefined,
+            aspectRatio: args.aspectRatio as ContinuityPack["aspectRatio"],
+            approvedUrls: continuityPackApprovals.get(tc.id),
+            error: args.packError as string | undefined,
+          };
+        } else if (
+          tc.function.name === "generateGenerationGrid" ||
+          tc.function.name === "generateSceneGrid"
+        ) {
+          generationGrid = {
+            toolCallId: tc.id,
+            loading: false,
+            sceneId: args.sceneId as string | number,
+            generationId: args.generationId as string | undefined,
+            shotIds: args.shotIds as number[] | undefined,
+            estimatedDurationSeconds: args.estimatedDurationSeconds as number | undefined,
+            previousGenerationId: args.previousGenerationId as string | null | undefined,
+            incomingAnchorHandle: args.incomingAnchorHandle as string | null | undefined,
+            continuityBreakReason: args.continuityBreakReason as string | null | undefined,
             images: (args.generatedImages ?? args.images) as string[] | undefined,
             panelCount: args.panelCount as number | undefined,
-            panelCaptions: args.panelCaptions as SceneGrid["panelCaptions"],
-            aspectRatio: args.aspectRatio as SceneGrid["aspectRatio"],
+            panelCaptions: args.panelCaptions as GenerationGrid["panelCaptions"],
+            aspectRatio: args.aspectRatio as GenerationGrid["aspectRatio"],
             approvedUrl: gridApprovals.get(tc.id),
             error: args.gridError as string | undefined,
           };
@@ -251,7 +284,8 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
         text: (d.text as string) ?? "",
         questions,
         assetRef,
-        sceneGrid,
+        continuityPack,
+        generationGrid,
         shotResult,
         shotCompile,
       });
@@ -317,11 +351,22 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
         text: `User approved this reference image for "${d.assetHandle as string}": ${approvedUrl}`,
         imageUrl: approvedUrl,
       });
+    } else if (row.role === "user" && row.type === "continuity_pack_approval") {
+      const d = rowData(row);
+      const approvedUrls = (d.approvedUrls as string[]) ?? [];
+      collectedResults.set(d.toolCallId as string, {
+        text:
+          `User approved continuity pack "${d.packHandle as string}" for scene ${d.sceneId as string | number} ` +
+          `with ${approvedUrls.length} keyframe(s): ${approvedUrls.join(", ")}. ` +
+          `Record via recordContinuityPackEntry, then generate generation grids. ` +
+          `Keyframes are continuity references only — not a Seedance shot sequence.`,
+        imageUrl: approvedUrls[0],
+      });
     } else if (row.role === "user" && row.type === "grid_approval") {
       const d = rowData(row);
       const approvedUrl = d.approvedUrl as string;
       collectedResults.set(d.toolCallId as string, {
-        text: `User approved this scene grid for scene ${d.sceneId as string | number}: ${approvedUrl}`,
+        text: `User approved this generation grid for scene ${d.sceneId as string | number}: ${approvedUrl}`,
         imageUrl: approvedUrl,
       });
     } else if (row.role === "user" && row.type === "shot_approval") {
@@ -391,6 +436,8 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
           if (
             tc.function.name === "loadReference" ||
             tc.function.name === "webExtract" ||
+            tc.function.name === "recordContinuityPackEntry" ||
+            tc.function.name === "recordGenerationGridEntry" ||
             tc.function.name === "recordSceneGridEntry"
           ) {
             const fallback =
@@ -414,10 +461,21 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
             collected?.text ??
             (tc.function.name === "generateAssetReferences"
               ? `Reference images have been generated for "${tc.function.arguments.assetHandle as string}". User has not yet approved one.`
-              : tc.function.name === "generateSceneGrid"
+              : tc.function.name === "generateContinuityPack"
+                ? (tc.function.arguments.packError as string | undefined)
+                  ? `Continuity pack rejected: ${tc.function.arguments.packError as string}`
+                  : `A continuity pack candidate (notes + keyframes) has been generated for ${
+                      (tc.function.arguments.packHandle as string | undefined) ??
+                      `scene ${tc.function.arguments.sceneId as string | number}`
+                    }. User has not yet approved it.`
+              : tc.function.name === "generateGenerationGrid" ||
+                  tc.function.name === "generateSceneGrid"
                 ? (tc.function.arguments.gridError as string | undefined)
-                  ? `Scene grid rejected: ${tc.function.arguments.gridError as string}`
-                  : `A scene grid candidate has been generated for scene ${tc.function.arguments.sceneId as string | number}. User has not yet approved it.`
+                  ? `Generation grid rejected: ${tc.function.arguments.gridError as string}`
+                  : `A generation grid candidate has been generated for ${
+                      (tc.function.arguments.generationId as string | undefined) ??
+                      `scene ${tc.function.arguments.sceneId as string | number}`
+                    }. User has not yet approved it.`
                 : tc.function.name === "compileShot"
                   ? tc.function.arguments.videoUrl
                     ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval to add to timeline.`

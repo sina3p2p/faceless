@@ -3,12 +3,9 @@ import {
   text,
   timestamp,
   integer,
-  boolean,
   pgEnum,
   json,
-  real,
   uniqueIndex,
-  primaryKey,
   index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -16,74 +13,6 @@ import { relations } from "drizzle-orm";
 // ── Enums ──
 
 export const planTierEnum = pgEnum("plan_tier", ["FREE", "STARTER", "PRO"]);
-
-export const videoStatusEnum = pgEnum("video_status", [
-  "PENDING",
-  // Phase 1: Story
-  "PRODUCING",
-  "RESEARCH",
-  "STORY",
-  "SCENE_SPLIT",
-  "SCRIPT_SUPERVISION",
-  "REVIEW_STORY",
-  // Phase 2: Pre-production
-  "TTS_GENERATION",
-  "CINEMATOGRAPHY",
-  "HERO_ASSET_EXTRACTION",
-  "REVIEW_HERO_ASSETS",
-  "STORYBOARD",
-  "REVIEW_PRE_PRODUCTION",
-  // Phase 3: Production
-  "PROMPT_GENERATION",
-  "IMAGE_GENERATION",
-  "REVIEW_IMAGES",
-  "MOTION_GENERATION",
-  "VIDEO_GENERATION",
-  "REVIEW_PRODUCTION",
-  // Final
-  "RENDERING",
-  "COMPLETED",
-  "FAILED",
-  "CANCELLED",
-  // Legacy statuses (kept for existing data)
-  "REVIEW_SCENES",
-  "TTS_REVIEW",
-  "REVIEW_PROMPTS",
-  "REVIEW_MOTION",
-  "IMAGE_REVIEW",
-  "REVIEW_VIDEO",
-  "SCRIPT",
-  "REVIEW_SCRIPT",
-  "MUSIC_SCRIPT",
-  "REVIEW_MUSIC_SCRIPT",
-  "MUSIC_GENERATION",
-  "MUSIC_REVIEW",
-  "VIDEO_SCRIPT",
-  "REVIEW_VISUAL",
-  "REVIEW_STORY_LEGACY",
-]);
-
-export const renderStepEnum = pgEnum("render_step", [
-  "SCRIPT",
-  "TTS",
-  "MEDIA",
-  "COMPOSE",
-  "DONE",
-]);
-
-export const jobStatusEnum = pgEnum("job_status", [
-  "QUEUED",
-  "ACTIVE",
-  "COMPLETED",
-  "FAILED",
-  "RETRYING",
-]);
-
-export const heroAssetApprovalEnum = pgEnum("hero_asset_approval", [
-  "pending",
-  "approved",
-  "rejected",
-]);
 
 // ── Auth Tables (NextAuth) ──
 
@@ -97,27 +26,6 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
-
-export const accounts = pgTable(
-  "accounts",
-  {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    provider: text("provider").notNull(),
-    providerAccountId: text("provider_account_id").notNull(),
-    refresh_token: text("refresh_token"),
-    access_token: text("access_token"),
-    expires_at: integer("expires_at"),
-    token_type: text("token_type"),
-    scope: text("scope"),
-    id_token: text("id_token"),
-    session_state: text("session_state"),
-  },
-  (table) => [
-    uniqueIndex("provider_account_idx").on(table.provider, table.providerAccountId),
-  ]
-);
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -140,57 +48,9 @@ export const verificationTokens = pgTable(
 
 // ── Domain Tables ──
 
-export const series = pgTable("series", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  niche: text("niche").notNull(),
-  style: text("style").default("cinematic").notNull(),
-  defaultVoiceId: text("default_voice_id"),
-  llmModel: text("llm_model").default("anthropic/claude-opus-4.6"),
-  imageModel: text("image_model").default("gpt-image-1.5"),
-  videoModel: text("video_model").default("kling-3-standard"),
-  language: text("language").default("en").notNull(),
-  captionStyle: text("caption_style").default("none").notNull(),
-  videoSize: text("video_size").default("9:16").notNull(),
-  videoType: text("video_type").default("standalone").notNull(),
-  isInternal: boolean("is_internal").default(false).notNull(),
-  topicIdeas: json("topic_ideas").$type<string[]>().default([]).notNull(),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
-
-export const videoProjects = pgTable("video_projects", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  seriesId: text("series_id").references(() => series.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  status: videoStatusEnum("status").default("PENDING").notNull(),
-  title: text("title"),
-  language: text("language").default("en").notNull(),
-  videoType: text("video_type").default("standalone").notNull(),
-  script: text("script"),
-  duration: integer("duration"),
-  config: json("config"),
-  outputUrl: text("output_url"),
-  thumbnailUrl: text("thumbnail_url"),
-  modelSettings: json("model_settings").notNull(),
-  videoSize: text("video_size").$type<TAspectRatio>().notNull(),
-  videoResolution: text("video_resolution").$type<TVideoResolution>().notNull(),
-  voiceId: text("voice_id"),
-  idea: text("prompt"),
-  style: text("style").default("cinematic").notNull(),
-  seed: integer("seed").default(0).notNull(),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
-
 /** Web research pack for a video (1:1). Claims live in `research_claims`. */
 export const researchPacks = pgTable("research_packs", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  videoProjectId: text("video_project_id")
-    .notNull()
-    .references(() => videoProjects.id, { onDelete: "cascade" })
-    .unique(),
   generatedAt: timestamp("generated_at", { mode: "date" }).notNull(),
   queries: json("queries").$type<string[]>().notNull(),
   searchProvider: text("search_provider").notNull().default("tavily"),
@@ -205,9 +65,6 @@ export const researchClaims = pgTable(
     researchPackId: text("research_pack_id")
       .notNull()
       .references(() => researchPacks.id, { onDelete: "cascade" }),
-    videoProjectId: text("video_project_id")
-      .notNull()
-      .references(() => videoProjects.id, { onDelete: "cascade" }),
     claimOrder: integer("claim_order").notNull(),
     claimText: text("claim_text").notNull(),
     sourceUrl: text("source_url").notNull(),
@@ -222,151 +79,19 @@ export const researchClaims = pgTable(
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (t) => [
-    index("research_claims_video_project_id_idx").on(t.videoProjectId),
     index("research_claims_research_pack_id_idx").on(t.researchPackId),
   ]
 );
 
-/** User-owned story asset (image + metadata). Reused across series/videos via junction tables. */
-export const storyAssets = pgTable("story_assets", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  type: text("type").notNull().$type<"character" | "location" | "prop">(),
-  name: text("name").notNull(),
-  description: text("description").notNull().default(""),
-  url: text("url").notNull(),
-  sheetUrl: text("sheet_url"),
-  voiceId: text("voice_id"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
-
-export const seriesStoryAssets = pgTable(
-  "series_story_assets",
-  {
-    seriesId: text("series_id")
-      .notNull()
-      .references(() => series.id, { onDelete: "cascade" }),
-    storyAssetId: text("story_asset_id")
-      .notNull()
-      .references(() => storyAssets.id, { onDelete: "cascade" }),
-    sortOrder: integer("sort_order").notNull().default(0),
-  },
-  (t) => [primaryKey({ columns: [t.seriesId, t.storyAssetId] })]
-);
-
-export const videoStoryAssets = pgTable(
-  "video_story_assets",
-  {
-    videoProjectId: text("video_project_id")
-      .notNull()
-      .references(() => videoProjects.id, { onDelete: "cascade" }),
-    storyAssetId: text("story_asset_id")
-      .notNull()
-      .references(() => storyAssets.id, { onDelete: "cascade" }),
-    sortOrder: integer("sort_order").notNull().default(0),
-    /** Approval state for hero-asset workflow. User-uploaded/library-linked assets default to "approved"; agent-generated assets start "pending". */
-    approvalStatus: heroAssetApprovalEnum("approval_status").notNull().default("approved"),
-    approvedAt: timestamp("approved_at", { mode: "date" }),
-    /** Marks rows generated by the extract-hero-assets agent so re-runs can dedupe. */
-    generatedByJobId: text("generated_by_job_id"),
-  },
-  (t) => [primaryKey({ columns: [t.videoProjectId, t.storyAssetId] })]
-);
-
-export const videoScenes = pgTable("video_scenes", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  videoProjectId: text("video_project_id").notNull().references(() => videoProjects.id, { onDelete: "cascade" }),
-  sceneOrder: integer("scene_order").notNull(),
-  sceneTitle: text("scene_title"),
-  directorNote: text("director_note"),
-  text: text("text").notNull(),
-  imagePrompt: text("image_prompt"),
-  visualDescription: text("visual_description"),
-  searchQuery: text("search_query"),
-  captionData: json("caption_data"),
-  audioUrl: text("audio_url"),
-  imageUrl: text("image_url"),
-  videoUrl: text("video_url"),
-  speaker: text("speaker"),
-  // Emotional performance for TTS delivery (movie/dialogue). `emotion` is one
-  // of the screenwriter/supervisor enum values; `emotionIntensity` is
-  // subtle|moderate|strong. Null = neutral default.
-  emotion: text("emotion"),
-  emotionIntensity: text("emotion_intensity"),
-  assetRefs: json("asset_refs").$type<string[]>(),
-  duration: real("duration").notNull().default(0),
-  // Director's WPM-based estimate of narration length before TTS runs. Lets
-  // the cinematographer request matching-length clips and lets the supervisor
-  // catch over/under-budget scenes earlier.
-  estimatedDurationSec: real("estimated_duration_sec"),
-  // 1-5 score from the imageability pass. <=2 means the supervisor rewrote
-  // the directorNote into a concrete metaphor.
-  imageabilityScore: integer("imageability_score"),
-  // Forward-compatible seam for BGM beat-sync. Cut offset (ms) relative to
-  // scene start where a downstream beat-sync agent prefers to land the cut.
-  beatAlignmentHintMs: integer("beat_alignment_hint_ms"),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
-
-export const sceneFrames = pgTable("scene_frames", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  videoProjectId: text("video_project_id"),
-  sceneId: text("scene_id").notNull().references(() => videoScenes.id, { onDelete: "cascade" }),
-  frameOrder: integer("frame_order").notNull(),
-  clipDuration: real("clip_duration").notNull().default(0),
-  imagePrompt: text("image_prompt"),
-  /** Structured architect output; subject.primary merged with continuity before serialize. */
-  imageSpec: json("image_spec"),
-  /** Last prompt-contract assessment (deriveFinalStatus, reason codes, flags). */
-  promptContractMeta: json("prompt_contract_meta"),
-  /** Structured motion director output; visualDescription is the compiled video prompt. */
-  motionSpec: json("motion_spec"),
-  /** Optional per-frame skill pack (hook, camera, music, vertical) for motion LLM. */
-  motionSkillHints: json("motion_skill_hints"),
-  /** Storyboard-chosen transition INTO this frame. One of TransitionType. Null = legacy hard cut. */
-  transitionIn: text("transition_in"),
-  /** Storyboard-suggested SFX cue at the start of this frame. Null = no cue. */
-  sfxHint: text("sfx_hint"),
-  /**
-   * Movie type: true when this frame is a close-up on the character speaking
-   * the scene's line (face visible, lip-syncable). The compose stage lip-syncs
-   * only these frames to the scene audio.
-   */
-  isSpeakingCloseup: boolean("is_speaking_closeup").notNull().default(false),
-  visualDescription: text("visual_description"),
-  imageMediaId: text("image_media_id"),
-  videoMediaId: text("video_media_id"),
-  assetRefs: json("asset_refs").$type<string[]>(),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
-
 export const media = pgTable("media", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  sceneId: text("scene_id").references(() => videoScenes.id, { onDelete: "cascade" }),
-  frameId: text("frame_id").references(() => sceneFrames.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   url: text("url").notNull(),
   prompt: text("prompt"),
   modelUsed: text("model_used").notNull(),
   metadata: json("metadata"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
-
-export const renderJobs = pgTable("render_jobs", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  videoProjectId: text("video_project_id").notNull().references(() => videoProjects.id, { onDelete: "cascade" }),
-  step: renderStepEnum("step").default("SCRIPT").notNull(),
-  status: jobStatusEnum("status").default("QUEUED").notNull(),
-  progress: integer("progress").default(0).notNull(),
-  attempts: integer("attempts").default(0).notNull(),
-  maxAttempts: integer("max_attempts").default(3).notNull(),
-  error: text("error"),
-  startedAt: timestamp("started_at", { mode: "date" }),
-  completedAt: timestamp("completed_at", { mode: "date" }),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const assets = pgTable("assets", {
@@ -437,74 +162,19 @@ export const aiAuditLogs = pgTable(
 // ── Relations ──
 
 export const usersRelations = relations(users, ({ many }) => ({
-  accounts: many(accounts),
   sessions: many(sessions),
-  series: many(series),
   subscriptions: many(subscriptions),
   usageEntries: many(usageEntries),
-  storyAssets: many(storyAssets),
+  filmSessions: many(filmSessions),
 }));
 
-export const seriesRelations = relations(series, ({ one, many }) => ({
-  user: one(users, { fields: [series.userId], references: [users.id] }),
-  videoProjects: many(videoProjects),
-  seriesStoryAssets: many(seriesStoryAssets),
-}));
-
-export const storyAssetsRelations = relations(storyAssets, ({ one, many }) => ({
-  user: one(users, { fields: [storyAssets.userId], references: [users.id] }),
-  seriesMemberships: many(seriesStoryAssets),
-  videoMemberships: many(videoStoryAssets),
-}));
-
-export const seriesStoryAssetsRelations = relations(seriesStoryAssets, ({ one }) => ({
-  series: one(series, { fields: [seriesStoryAssets.seriesId], references: [series.id] }),
-  storyAsset: one(storyAssets, { fields: [seriesStoryAssets.storyAssetId], references: [storyAssets.id] }),
-}));
-
-export const videoStoryAssetsRelations = relations(videoStoryAssets, ({ one }) => ({
-  videoProject: one(videoProjects, { fields: [videoStoryAssets.videoProjectId], references: [videoProjects.id] }),
-  storyAsset: one(storyAssets, { fields: [videoStoryAssets.storyAssetId], references: [storyAssets.id] }),
-}));
 
 export const researchPacksRelations = relations(researchPacks, ({ one, many }) => ({
-  videoProject: one(videoProjects, { fields: [researchPacks.videoProjectId], references: [videoProjects.id] }),
   claims: many(researchClaims),
 }));
 
 export const researchClaimsRelations = relations(researchClaims, ({ one }) => ({
   researchPack: one(researchPacks, { fields: [researchClaims.researchPackId], references: [researchPacks.id] }),
-  videoProject: one(videoProjects, { fields: [researchClaims.videoProjectId], references: [videoProjects.id] }),
-}));
-
-export const videoProjectsRelations = relations(videoProjects, ({ one, many }) => ({
-  series: one(series, { fields: [videoProjects.seriesId], references: [series.id] }),
-  scenes: many(videoScenes),
-  renderJobs: many(renderJobs),
-  videoStoryAssets: many(videoStoryAssets),
-  researchPack: one(researchPacks, { fields: [videoProjects.id], references: [researchPacks.videoProjectId] }),
-}));
-
-export const videoScenesRelations = relations(videoScenes, ({ one, many }) => ({
-  videoProject: one(videoProjects, { fields: [videoScenes.videoProjectId], references: [videoProjects.id] }),
-  media: many(media, { relationName: "sceneMedia" }),
-  frames: many(sceneFrames),
-}));
-
-export const mediaRelations = relations(media, ({ one }) => ({
-  scene: one(videoScenes, { fields: [media.sceneId], references: [videoScenes.id], relationName: "sceneMedia" }),
-  frame: one(sceneFrames, { fields: [media.frameId], references: [sceneFrames.id], relationName: "frameMedia" }),
-}));
-
-export const sceneFramesRelations = relations(sceneFrames, ({ one, many }) => ({
-  scene: one(videoScenes, { fields: [sceneFrames.sceneId], references: [videoScenes.id] }),
-  imageMedia: one(media, { fields: [sceneFrames.imageMediaId], references: [media.id], relationName: "frameImageMedia" }),
-  videoMedia: one(media, { fields: [sceneFrames.videoMediaId], references: [media.id], relationName: "frameVideoMedia" }),
-  media: many(media, { relationName: "frameMedia" }),
-}));
-
-export const renderJobsRelations = relations(renderJobs, ({ one }) => ({
-  videoProject: one(videoProjects, { fields: [renderJobs.videoProjectId], references: [videoProjects.id] }),
 }));
 
 export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
@@ -529,12 +199,6 @@ export const filmSessionPhaseEnum = pgEnum("film_session_phase", [
   "complete",
 ]);
 
-export const filmStepEnum = pgEnum("film_step", [
-  "premise", "logline", "conflict", "theme", "characters",
-  "world", "look", "synopsis", "beat_sheet", "outline",
-  "screenplay", "shot_list", "complete",
-]);
-
 export const filmSessions = pgTable("film_sessions", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -557,7 +221,9 @@ export const filmSessionMessages = pgTable("film_session_messages", {
   type: text("type").notNull(),
   parts: json("parts").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (t) => [
+  index("film_session_messages_session_id_created_at_idx").on(t.sessionId, t.createdAt),
+]);
 
 // Tracks background BullMQ shot-generation jobs so results survive browser disconnects.
 // The chat route inserts a row (status=pending) before enqueueing the BullMQ job.

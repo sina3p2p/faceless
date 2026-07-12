@@ -92,9 +92,9 @@ See `deliverable-templates.md` §A. Four parts: locked Look; master `@material` 
 
 Locked artifacts are text; the renderer needs images. **First audit the manifest** (identity anchors only — characters, plates, recurring hero props in ONE neutral state; strike disguised shots; fused entities get their own object refs; typical 4–8 images). **Plates must not embed a hero prop that has its own object ref.** **Charsheets: empty hands + object ref, OR tool-as-wardrobe — never both.** Present the audited list as a fork before generating. Then one asset at a time (characters first): **expand** via `medium-constraints.md`, **generate candidates**, **bind** on approval. Assets approved ≠ Stage 1 done. **Feeds:** Step 16.
 
-## Step 16 — Scene grids
+## Step 16 — Generation grids
 
-With assets approved, generate each scene's grid (full reference: `grid-storyboards.md`). Present as caption strips (`panelCount` + matching `panelCaptions` required); approval = Approve-grid button only — never free-text "continue". Mark generation groups (**solo by default**; group only low-motion consecutive beats). **Record each scene via `recordSceneGridEntry`** with `approved_candidate_id` = the generateSceneGrid toolCallId. Stage 1 completes when every scene has a validated entry. **Feeds:** Stage 2.
+With assets approved, load `generation-grids.md`. Per scene: (1) generate and approve a **scene continuity pack** via `generateContinuityPack` (structured notes + **required** 1–3 visual keyframes — reference only, not a Seedance sequence) → `recordContinuityPackEntry`; (2) partition shots into **generation grids** (1–4 consecutive shots, estimated Dur ≤15s, prefer 8–12; solo for spectacle); (3) generate each grid via `generateGenerationGrid` with caption strips — later grids **must** bind prior terminal panel (`previousGenerationId` + `incomingAnchor*`) unless `continuityBreakReason`; (4) **record each generation via `recordGenerationGridEntry`** with continuity-chain fields + `continuity_pack_handle` + `approved_candidate_id` = the toolCallId. One grid = one Seedance render of all panels. Stage 1 completes when every shot has a validated registry entry. **Feeds:** Stage 2.
 
 _(No package step. Handoff = Bible + shot list + approved images + approved grids + passing registry. Export on request = concatenate locked artifacts verbatim.)_
 

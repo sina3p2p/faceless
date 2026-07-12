@@ -33,7 +33,7 @@ Across essentially all current models, characters subtly change face/hair/propor
 
 - Bind **ONE approved turnaround character sheet** per hero by default (the charsheet spec below) — one image containing the character's views, and only that image. Separately-bound angles or slightly-varying images of the same person are often read as different people and _reduce_ consistency (the twin bug). Extra identity refs require a **user-approved / documented model profile** — do not invent a second sheet on your own.
 - Write the Stage 1 character spec with **fixed anchor features** (the 2–3 things the model must never change) and **unchanging wardrobe** + one instantly-readable detail.
-- **Anchor generation to approved images, never bare text**: character/location references on every shot, and — in this pipeline — the scene grid as the composition anchor (sequence reference for groups; every gridded shot opens with a mandatory COMPOSITION LOCK extracted from the approved panel — soft "composition matches/follows panel" citations are forbidden; see Stage 2 `shot-compilation-recipe.md`). This pipeline deliberately does NOT use per-shot first-frame/keyframe animation; composition guidance comes from the approved grid + lock, not from generating a still per shot.
+- **Anchor generation to approved images, never bare text**: character/location references on every shot, and — in this pipeline — the **generation grid** as the composition anchor (Seedance renders all panels in order; every shot block opens with a mandatory COMPOSITION LOCK extracted from the approved panel — soft "composition matches/follows panel" citations are forbidden; see Stage 2 `shot-compilation-recipe.md`). **Scene continuity packs** (notes + 1–3 keyframes) are required geography references, never Seedance shot sequences. This pipeline deliberately does NOT use per-shot first-frame/keyframe animation; composition guidance for the edit comes from the approved generation grid + lock, not from treating continuity keyframes as panels-to-render.
 
 ## Expanding a locked spec into a reference-image prompt (Step 15)
 
@@ -95,9 +95,9 @@ The exact opposite failure, from a real clip: a night-forest shot with two chara
 - **Characters are never static-locked or unperformed:** identity comes from the reference-image binding; every character on screen gets written performance direction. Intentional stillness is allowed when written as breath, gaze, tension, posture, or deadpan hold — not as absent performance. The model does not invent blocking.
   Static-lock and this rule are two sides of one principle: **lock rigid form, direct living motion.** The morphing pyramid came from too little lock; the frozen tableau came from too much.
 
-## Scene grid storyboards
+## Generation grids
 
-Moved to its own reference: see `references/grid-storyboards.md` for the grid prompt formula, layout geometry, failure catalog, approval protocol, and consumption grammar (Step 16).
+Moved to its own reference: see `references/generation-grids.md` for continuity packs, generation-grid prompt formula, layout geometry, failure catalog, approval protocol, and consumption grammar (Step 16).
 
 ## Render resolution (don't ship previews)
 

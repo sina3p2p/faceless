@@ -4,10 +4,14 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
-import { storyTools, MODEL, openrouter, generateAssetImages, generateSceneGridImages } from "@/server/services/showrunner";
+import { storyTools, MODEL, openrouter, generateAssetImages, generateContinuityPackImages, generateGenerationGridImages } from "@/server/services/showrunner";
 import { rowsToModelMessages } from "@/server/services/showrunner/messages";
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
-import { validatePanelCaptionCount } from "@/server/services/showrunner/tools";
+import {
+  validatePanelCaptionCount,
+  validateContinuityPackKeyframes,
+  validateGenerationGridContinuity,
+} from "@/server/services/showrunner/tools";
 
 function sseResponse(
   handler: (emit: (event: object) => void) => Promise<void>
@@ -97,6 +101,21 @@ export async function POST(
       }],
       createdAt: new Date(),
     });
+  } else if (body.type === "continuity_pack_approval") {
+    await db.insert(filmSessionMessages).values({
+      id: crypto.randomUUID(),
+      messageId: crypto.randomUUID(),
+      sessionId,
+      role: "user",
+      type: "continuity_pack_approval",
+      parts: [{
+        toolCallId: body.toolCallId,
+        sceneId: body.sceneId,
+        packHandle: body.packHandle,
+        approvedUrls: body.approvedUrls,
+      }],
+      createdAt: new Date(),
+    });
   } else if (body.type === "grid_approval") {
     await db.insert(filmSessionMessages).values({
       id: crypto.randomUUID(),
@@ -179,6 +198,7 @@ export async function POST(
     let fullText = "";
     const toolCalls: RawToolCall[] = [];
     const pendingAssetIndices: number[] = [];
+    const pendingContinuityIndices: number[] = [];
     const pendingGridIndices: number[] = [];
     const pendingShotIndices: number[] = [];
     // Auto-executed tools whose execute() output must be persisted for history replay
@@ -193,8 +213,10 @@ export async function POST(
           emit({ type: "questions_loading", toolCallId: chunk.id });
         } else if (chunk.toolName === "generateAssetReferences") {
           emit({ type: "asset_ref_loading", toolCallId: chunk.id });
-        } else if (chunk.toolName === "generateSceneGrid") {
-          emit({ type: "scene_grid_loading", toolCallId: chunk.id });
+        } else if (chunk.toolName === "generateContinuityPack") {
+          emit({ type: "continuity_pack_loading", toolCallId: chunk.id });
+        } else if (chunk.toolName === "generateGenerationGrid") {
+          emit({ type: "generation_grid_loading", toolCallId: chunk.id });
         } else if (chunk.toolName === "compileShot") {
           emit({ type: "shot_compile_loading", toolCallId: chunk.id });
         }
@@ -211,7 +233,9 @@ export async function POST(
           emit({ type: "questions", toolCallId: chunk.toolCallId, ...args });
         } else if (chunk.toolName === "generateAssetReferences") {
           pendingAssetIndices.push(toolCalls.length - 1);
-        } else if (chunk.toolName === "generateSceneGrid") {
+        } else if (chunk.toolName === "generateContinuityPack") {
+          pendingContinuityIndices.push(toolCalls.length - 1);
+        } else if (chunk.toolName === "generateGenerationGrid") {
           pendingGridIndices.push(toolCalls.length - 1);
         } else if (chunk.toolName === "compileShot") {
           pendingShotIndices.push(toolCalls.length - 1);
@@ -220,7 +244,8 @@ export async function POST(
         chunk.type === "tool-result" &&
         (chunk.toolName === "loadReference" ||
           chunk.toolName === "webExtract" ||
-          chunk.toolName === "recordSceneGridEntry")
+          chunk.toolName === "recordContinuityPackEntry" ||
+          chunk.toolName === "recordGenerationGridEntry")
       ) {
         autoToolResults.set(chunk.toolCallId, chunk.output);
       }
@@ -243,27 +268,107 @@ export async function POST(
       );
     }
 
-    // Generate images for all scene grid tool calls in parallel
+    // Generate images for continuity packs
+    if (pendingContinuityIndices.length > 0) {
+      await Promise.all(
+        pendingContinuityIndices.map(async (idx) => {
+          const tc = toolCalls[idx]!;
+          const args = tc.function.arguments as {
+            sceneId: string | number;
+            packHandle: string;
+            notes: Record<string, string>;
+            keyframes?: { role: string; caption: string; imagePrompt: string }[];
+            referenceImageUrls: string[];
+            aspectRatio: "16:9" | "9:16" | "1:1";
+          };
+          const keyframeError = validateContinuityPackKeyframes(args.keyframes);
+          if (keyframeError) {
+            tc.function.arguments = { ...args, packError: keyframeError };
+            emit({
+              type: "continuity_pack",
+              toolCallId: tc.id,
+              sceneId: args.sceneId,
+              packHandle: args.packHandle,
+              notes: args.notes,
+              keyframes: args.keyframes,
+              error: keyframeError,
+              aspectRatio: args.aspectRatio ?? "16:9",
+            });
+            return;
+          }
+          const aspectRatio = args.aspectRatio ?? "16:9";
+          const generatedImages = await generateContinuityPackImages(
+            args.keyframes!,
+            args.referenceImageUrls,
+            aspectRatio
+          );
+          tc.function.arguments = { ...args, generatedImages };
+          emit({
+            type: "continuity_pack",
+            toolCallId: tc.id,
+            sceneId: args.sceneId,
+            packHandle: args.packHandle,
+            notes: args.notes,
+            keyframes: args.keyframes,
+            images: generatedImages,
+            aspectRatio,
+          });
+        })
+      );
+    }
+
+    // Generate images for all generation grid tool calls in parallel
     if (pendingGridIndices.length > 0) {
       await Promise.all(
         pendingGridIndices.map(async (idx) => {
           const tc = toolCalls[idx]!;
           const args = tc.function.arguments as {
             sceneId: string | number;
+            generationId?: string;
+            shotIds?: number[];
+            estimatedDurationSeconds?: number;
+            previousGenerationId?: string | null;
+            isFirstInScene?: boolean;
+            incomingAnchorHandle?: string | null;
+            incomingAnchorKind?: string | null;
+            incomingAnchorPanel?: number | null;
+            continuityBreakReason?: string | null;
             imagePrompt: string;
             referenceImageUrls: string[];
             panelCount?: number;
             panelCaptions?: { motionArc: string; handoff: string }[];
             aspectRatio: "16:9" | "9:16" | "1:1";
           };
-          const captionError = validatePanelCaptionCount(args.panelCount, args.panelCaptions);
-          if (captionError) {
-            tc.function.arguments = { ...args, gridError: captionError };
+          const captionError = validatePanelCaptionCount(
+            args.panelCount,
+            args.panelCaptions,
+            args.shotIds
+          );
+          const continuityError = captionError
+            ? null
+            : validateGenerationGridContinuity({
+                isFirstInScene: args.isFirstInScene,
+                previousGenerationId: args.previousGenerationId,
+                incomingAnchorHandle: args.incomingAnchorHandle,
+                incomingAnchorKind: args.incomingAnchorKind,
+                incomingAnchorPanel: args.incomingAnchorPanel,
+                continuityBreakReason: args.continuityBreakReason,
+                referenceImageUrls: args.referenceImageUrls,
+              });
+          const gridError = captionError ?? continuityError;
+          if (gridError) {
+            tc.function.arguments = { ...args, gridError };
             emit({
-              type: "scene_grid",
+              type: "generation_grid",
               toolCallId: tc.id,
               sceneId: args.sceneId,
-              error: captionError,
+              generationId: args.generationId,
+              shotIds: args.shotIds,
+              estimatedDurationSeconds: args.estimatedDurationSeconds,
+              previousGenerationId: args.previousGenerationId,
+              incomingAnchorHandle: args.incomingAnchorHandle,
+              continuityBreakReason: args.continuityBreakReason,
+              error: gridError,
               panelCount: args.panelCount,
               panelCaptions: args.panelCaptions,
               aspectRatio: args.aspectRatio ?? "16:9",
@@ -271,12 +376,22 @@ export async function POST(
             return;
           }
           const aspectRatio = args.aspectRatio ?? "16:9";
-          const generatedImages = await generateSceneGridImages(args.imagePrompt, args.referenceImageUrls, aspectRatio);
+          const generatedImages = await generateGenerationGridImages(
+            args.imagePrompt,
+            args.referenceImageUrls,
+            aspectRatio
+          );
           tc.function.arguments = { ...args, generatedImages };
           emit({
-            type: "scene_grid",
+            type: "generation_grid",
             toolCallId: tc.id,
             sceneId: args.sceneId,
+            generationId: args.generationId,
+            shotIds: args.shotIds,
+            estimatedDurationSeconds: args.estimatedDurationSeconds,
+            previousGenerationId: args.previousGenerationId,
+            incomingAnchorHandle: args.incomingAnchorHandle,
+            continuityBreakReason: args.continuityBreakReason,
             images: generatedImages,
             panelCount: args.panelCount,
             panelCaptions: args.panelCaptions,

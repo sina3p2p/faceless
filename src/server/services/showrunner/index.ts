@@ -4,7 +4,8 @@ export const MODEL = "anthropic/claude-sonnet-5";
 export {
   storyTools,
   generateAssetImages,
-  generateSceneGridImages,
+  generateContinuityPackImages,
+  generateGenerationGridImages,
   validatePanelCaptionCount,
   generateShotWithFallback,
   renderAndUploadShot,

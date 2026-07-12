@@ -9,7 +9,7 @@ const STAGE1_REFS = new Set([
   "pipeline-steps.md",
   "deliverable-templates.md",
   "medium-constraints.md",
-  "grid-storyboards.md",
+  "generation-grids.md",
 ]);
 
 const STAGE2_REFS = new Set(["shot-compilation-recipe.md"]);
@@ -33,14 +33,14 @@ export const loadReference = tool({
     "Read a detailed reference file from the skill. Call this when the " +
     "instructions tell you to consult a references/ file (e.g. " +
     "'see references/deliverable-templates.md'). Returns that file's full text. " +
-    "Use stage2-skill.md only after Stage 1's Scene Grid Registry is complete and passing.",
+    "Use stage2-skill.md only after Stage 1's Generation Grid Registry is complete and passing.",
   inputSchema: z.object({
     file: z
       .enum([
         "pipeline-steps.md",
         "deliverable-templates.md",
         "medium-constraints.md",
-        "grid-storyboards.md",
+        "generation-grids.md",
         "stage2-skill.md",
         "shot-compilation-recipe.md",
       ])
