@@ -14,7 +14,6 @@ export async function POST(req: NextRequest) {
 
   const message = body.message.trim();
   if (message.length < 5) return badRequest("message must be at least 5 characters");
-  if (message.length > 500) return badRequest("message must be under 500 characters");
 
   const [session] = await db
     .insert(filmSessions)
