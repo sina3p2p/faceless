@@ -723,7 +723,7 @@ export function StoryChat({
             onShotApproval={handleShotApproval}
           />
 
-          <div className="shrink-0 max-w-3xl mx-auto w-full px-3 space-y-2">
+          <div className="shrink-0 min-h-0 max-h-[45%] max-w-3xl mx-auto w-full px-3 flex flex-col">
             {pendingQuestions?.loading && (
               <p className="text-xs text-muted-foreground/40 italic animate-pulse px-1">
                 Preparing questions…

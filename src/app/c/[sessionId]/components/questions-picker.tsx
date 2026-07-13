@@ -50,8 +50,8 @@ export function QuestionsPicker({
   }
 
   return (
-    <div className="rounded-t-2xl border border-white/10 bg-[#141414] p-3.5 space-y-3">
-      <div className="flex items-start justify-between gap-3 px-0.5">
+    <div className="rounded-t-2xl border border-white/10 bg-[#141414] p-3.5 flex flex-col min-h-0 max-h-full overflow-hidden">
+      <div className="flex items-start justify-between gap-3 px-0.5 shrink-0 pb-3">
         <p className="text-[15px] font-medium text-white leading-snug min-w-0">
           {current.question}
         </p>
@@ -86,7 +86,7 @@ export function QuestionsPicker({
         )}
       </div>
 
-      <div className="space-y-2">
+      <div className="space-y-2 min-h-0 overflow-y-auto [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30">
         {current.options.map((option, i) => {
           const isRecommended = current.recommendedIndex === i
           const isSelected = answers[index] === option
