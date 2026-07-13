@@ -13,6 +13,30 @@ import {
   validateGenerationGridContinuity,
 } from "@/server/services/showrunner/tools";
 
+/** Parse `{ ok, errors? }` from tool execute() output (raw or AI SDK wrapped). */
+function parseToolOk(output: unknown): { ok: boolean; errors?: string[] } | null {
+  const raw =
+    typeof output === "object" &&
+    output !== null &&
+    "value" in output &&
+    typeof (output as { value: unknown }).value === "string"
+      ? (output as { value: string }).value
+      : typeof output === "string"
+        ? output
+        : null;
+  if (!raw) {
+    if (typeof output === "object" && output !== null && "ok" in output) {
+      return output as { ok: boolean; errors?: string[] };
+    }
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as { ok: boolean; errors?: string[] };
+  } catch {
+    return null;
+  }
+}
+
 function sseResponse(
   handler: (emit: (event: object) => void) => Promise<void>
 ): Response {
@@ -235,19 +259,64 @@ export async function POST(
           pendingAssetIndices.push(toolCalls.length - 1);
         } else if (chunk.toolName === "generateContinuityPack") {
           pendingContinuityIndices.push(toolCalls.length - 1);
-        } else if (chunk.toolName === "generateGenerationGrid") {
-          pendingGridIndices.push(toolCalls.length - 1);
         } else if (chunk.toolName === "compileShot") {
           pendingShotIndices.push(toolCalls.length - 1);
         }
-      } else if (
-        chunk.type === "tool-result" &&
-        (chunk.toolName === "loadReference" ||
+        // generateGenerationGrid is queued after its execute() validates (see tool-result)
+      } else if (chunk.type === "tool-result") {
+        if (
+          chunk.toolName === "loadReference" ||
           chunk.toolName === "webExtract" ||
           chunk.toolName === "recordContinuityPackEntry" ||
-          chunk.toolName === "recordGenerationGridEntry")
-      ) {
-        autoToolResults.set(chunk.toolCallId, chunk.output);
+          chunk.toolName === "recordGenerationGridEntry" ||
+          chunk.toolName === "generateGenerationGrid"
+        ) {
+          autoToolResults.set(chunk.toolCallId, chunk.output);
+        }
+        if (chunk.toolName === "generateGenerationGrid") {
+          const idx = toolCalls.findIndex((tc) => tc.id === chunk.toolCallId);
+          if (idx < 0) continue;
+          const args = toolCalls[idx]!.function.arguments as {
+            sceneId: string | number;
+            generationId?: string;
+            shotIds?: number[];
+            estimatedDurationSeconds?: number;
+            previousGenerationId?: string | null;
+            isFirstInScene?: boolean;
+            incomingAnchorHandle?: string | null;
+            incomingAnchorKind?: string | null;
+            incomingAnchorPanel?: number | null;
+            continuityBreakReason?: string | null;
+            panelCount?: number;
+            panelCaptions?: { motionArc: string; handoff: string }[];
+            aspectRatio?: "16:9" | "9:16" | "1:1";
+          };
+          const parsed = parseToolOk(chunk.output);
+          if (parsed?.ok === false) {
+            const gridError =
+              Array.isArray(parsed.errors) && parsed.errors.length > 0
+                ? parsed.errors.join("; ")
+                : "Generation grid validation failed";
+            toolCalls[idx]!.function.arguments = { ...args, gridError };
+            emit({
+              type: "generation_grid",
+              toolCallId: chunk.toolCallId,
+              sceneId: args.sceneId,
+              generationId: args.generationId,
+              shotIds: args.shotIds,
+              estimatedDurationSeconds: args.estimatedDurationSeconds,
+              previousGenerationId: args.previousGenerationId,
+              incomingAnchorHandle: args.incomingAnchorHandle,
+              continuityBreakReason: args.continuityBreakReason,
+              error: gridError,
+              panelCount: args.panelCount,
+              panelCaptions: args.panelCaptions,
+              aspectRatio: args.aspectRatio ?? "16:9",
+            });
+          } else {
+            pendingGridIndices.push(idx);
+          }
+        }
       }
     }
 
@@ -261,7 +330,7 @@ export async function POST(
             assetKind: "character" | "location";
             imagePrompt: string;
           };
-          const generatedImages = await generateAssetImages(args.imagePrompt, args.assetKind);
+          const generatedImages = await generateAssetImages(args.imagePrompt, args.assetKind, session.userId);
           tc.function.arguments = { ...args, generatedImages };
           emit({ type: "asset_ref", toolCallId: tc.id, assetHandle: args.assetHandle, assetKind: args.assetKind, images: generatedImages });
         })
@@ -317,7 +386,7 @@ export async function POST(
       );
     }
 
-    // Generate images for all generation grid tool calls in parallel
+    // Generate images for validated generation grid tool calls in parallel
     if (pendingGridIndices.length > 0) {
       await Promise.all(
         pendingGridIndices.map(async (idx) => {
@@ -339,6 +408,7 @@ export async function POST(
             panelCaptions?: { motionArc: string; handoff: string }[];
             aspectRatio: "16:9" | "9:16" | "1:1";
           };
+          // Defense-in-depth: execute() already validated; skip image gen if somehow invalid.
           const captionError = validatePanelCaptionCount(
             args.panelCount,
             args.panelCaptions,
@@ -347,14 +417,14 @@ export async function POST(
           const continuityError = captionError
             ? null
             : validateGenerationGridContinuity({
-                isFirstInScene: args.isFirstInScene,
-                previousGenerationId: args.previousGenerationId,
-                incomingAnchorHandle: args.incomingAnchorHandle,
-                incomingAnchorKind: args.incomingAnchorKind,
-                incomingAnchorPanel: args.incomingAnchorPanel,
-                continuityBreakReason: args.continuityBreakReason,
-                referenceImageUrls: args.referenceImageUrls,
-              });
+              isFirstInScene: args.isFirstInScene,
+              previousGenerationId: args.previousGenerationId,
+              incomingAnchorHandle: args.incomingAnchorHandle,
+              incomingAnchorKind: args.incomingAnchorKind,
+              incomingAnchorPanel: args.incomingAnchorPanel,
+              continuityBreakReason: args.continuityBreakReason,
+              referenceImageUrls: args.referenceImageUrls,
+            });
           const gridError = captionError ?? continuityError;
           if (gridError) {
             tc.function.arguments = { ...args, gridError };

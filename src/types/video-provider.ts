@@ -1,4 +1,5 @@
 import { AxiosInstance } from "axios";
+import OpenAI from "openai";
 
 export interface VideoResult {
   videoUrl: string;
@@ -21,8 +22,18 @@ export interface I2vRequest {
   generateAudio?: boolean;
 }
 
+export interface IImageRequest {
+  model: TImageModelId;
+  prompt: string;
+  aspectRatio: TAspectRatio;
+  n?: number;
+  quality?: "low" | "medium" | "high" | null;
+  referenceImages?: string[];
+}
+
 export interface IProvider {
-  readonly client: AxiosInstance;
+  readonly client: AxiosInstance | OpenAI;
   findModel(model: TVideoModelId): string | undefined;
   generateVideo(req: I2vRequest): Promise<VideoResult>;
+  generateImage(req: IImageRequest): Promise<string[]>;
 }

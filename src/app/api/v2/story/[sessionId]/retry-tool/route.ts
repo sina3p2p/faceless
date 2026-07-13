@@ -92,7 +92,7 @@ export async function POST(
       assetKind: "character" | "location" | "object";
       imagePrompt: string;
     };
-    const generatedImages = await generateAssetImages(imagePrompt, assetKind);
+    const generatedImages = await generateAssetImages(imagePrompt, assetKind, session.userId);
     await patchRow({ generatedImages });
     return NextResponse.json({ assetHandle, assetKind, images: generatedImages });
   }

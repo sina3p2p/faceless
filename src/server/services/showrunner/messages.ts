@@ -419,6 +419,8 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
                         "pending",
                         "shotError",
                         "renderedDurationSeconds",
+                        "gridError",
+                        "packError",
                       ].includes(k)
                   )
                 ),
@@ -456,6 +458,24 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
               output: toToolResultOutput(storedToolResults[tc.id], fallback),
             };
           }
+          // Continuity-chain / panel validation failures — prefer stored execute() JSON
+          // so the agent can fix isFirstInScene / previousGenerationId / incomingAnchor_*.
+          if (
+            (tc.function.name === "generateGenerationGrid" ||
+              tc.function.name === "generateSceneGrid") &&
+            typeof tc.function.arguments.gridError === "string"
+          ) {
+            const gridError = tc.function.arguments.gridError as string;
+            return {
+              type: "tool-result" as const,
+              toolCallId: tc.id,
+              toolName,
+              output: toToolResultOutput(
+                storedToolResults[tc.id],
+                JSON.stringify({ ok: false, errors: [gridError] })
+              ),
+            };
+          }
           const collected = collectedResults.get(tc.id);
           const resultText =
             collected?.text ??
@@ -470,12 +490,10 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
                     }. User has not yet approved it.`
               : tc.function.name === "generateGenerationGrid" ||
                   tc.function.name === "generateSceneGrid"
-                ? (tc.function.arguments.gridError as string | undefined)
-                  ? `Generation grid rejected: ${tc.function.arguments.gridError as string}`
-                  : `A generation grid candidate has been generated for ${
-                      (tc.function.arguments.generationId as string | undefined) ??
-                      `scene ${tc.function.arguments.sceneId as string | number}`
-                    }. User has not yet approved it.`
+                ? `A generation grid candidate has been generated for ${
+                    (tc.function.arguments.generationId as string | undefined) ??
+                    `scene ${tc.function.arguments.sceneId as string | number}`
+                  }. User has not yet approved it.`
                 : tc.function.name === "compileShot"
                   ? tc.function.arguments.videoUrl
                     ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval to add to timeline.`

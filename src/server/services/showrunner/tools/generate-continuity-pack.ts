@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { generateImage, type CharacterRef } from "@/server/services/media";
+import { generateImage } from "@/server/services/media";
+import { mediaUrl } from "@/lib/storage";
 
 const notesSchema = z.object({
   roomGeography: z
@@ -92,12 +93,13 @@ export async function generateContinuityPackImages(
   referenceImageUrls: string[],
   aspectRatio: "16:9" | "9:16" | "1:1"
 ): Promise<string[]> {
-  const characterRefs: CharacterRef[] = referenceImageUrls.map((url) => ({
-    url,
-    description: "preserve exact appearance and geography",
-  }));
-  const results = await Promise.all(
-    keyframes.map((kf) => generateImage(kf.imagePrompt, "gpt-image-2", characterRefs, aspectRatio))
+  const imgs = await Promise.all(
+    keyframes.map((kf) => generateImage({
+      model: "gpt-image-2",
+      prompt: kf.imagePrompt,
+      referenceImages: referenceImageUrls,
+      aspectRatio
+    }))
   );
-  return results.map((r) => r.url);
+  return imgs.flat().map(img => mediaUrl(img));
 }

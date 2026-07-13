@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { QuestionItem } from "@/types/v2/story"
 
@@ -22,8 +21,6 @@ export function QuestionsPicker({
 }) {
   const [index, setIndex] = useState(0)
   const [answers, setAnswers] = useState<string[]>(() => questions.map(() => ""))
-  const [customMode, setCustomMode] = useState(false)
-  const [customText, setCustomText] = useState("")
 
   const current = questions[index]
   const total = questions.length
@@ -34,8 +31,6 @@ export function QuestionsPicker({
     const next = [...answers]
     next[index] = value.trim()
     setAnswers(next)
-    setCustomMode(false)
-    setCustomText("")
 
     if (index >= total - 1) {
       onSubmit(next)
@@ -46,20 +41,16 @@ export function QuestionsPicker({
 
   function goBack() {
     if (index <= 0 || disabled) return
-    setCustomMode(false)
-    setCustomText("")
     setIndex(index - 1)
   }
 
   function goForward() {
     if (index >= total - 1 || disabled || !answers[index]) return
-    setCustomMode(false)
-    setCustomText("")
     setIndex(index + 1)
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#141414] p-3.5 space-y-3">
+    <div className="rounded-t-2xl border border-white/10 bg-[#141414] p-3.5 space-y-3">
       <div className="flex items-start justify-between gap-3 px-0.5">
         <p className="text-[15px] font-medium text-white leading-snug min-w-0">
           {current.question}
@@ -135,49 +126,6 @@ export function QuestionsPicker({
             </button>
           )
         })}
-      </div>
-
-      <div className="pt-0.5">
-        {!customMode ? (
-          <button
-            type="button"
-            onClick={() => setCustomMode(true)}
-            disabled={disabled}
-            className="text-xs text-muted-foreground/55 hover:text-muted-foreground transition-colors px-1"
-          >
-            + Write my own
-          </button>
-        ) : (
-          <div className="space-y-2 rounded-xl bg-white/5 border border-white/8 p-3">
-            <textarea
-              value={customText}
-              onChange={(e) => setCustomText(e.target.value)}
-              placeholder="Your answer…"
-              rows={2}
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/40 resize-none outline-none"
-              autoFocus
-            />
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={() => commitAnswer(customText)}
-                disabled={!customText.trim() || disabled}
-              >
-                Use this
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setCustomMode(false)
-                  setCustomText("")
-                }}
-              >
-                Cancel
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

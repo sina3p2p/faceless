@@ -16,6 +16,7 @@ import { AiEditPanel } from "./panel/ai-edit-panel";
 import { ExportPanel } from "./panel/export-panel";
 import { ComingSoonPanel } from "./panel/coming-soon-panel";
 import { TransitionPickerPanel } from "./panel/transition-picker-panel";
+import { EmptyEditorState } from "./empty-editor-state";
 import PlayerView from "./player-view";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -726,6 +727,14 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
 
   if (isHidden) return null;
 
+  if (internalClips.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative bg-black">
+        <EmptyEditorState />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
       {/* ── Tool Tab Bar ── */}
@@ -806,21 +815,8 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
             {activeTab === "export" && <ExportPanel internalClips={internalClips} />}
           </div>
         </FloatingPanel>
-        {internalClips.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 text-center px-6">
-            <div className="w-16 h-16 rounded-2xl border border-white/10 bg-white/5 flex items-center justify-center">
-              <svg className="w-8 h-8 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125m0 3.75h-1.5A1.125 1.125 0 0118 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0118 7.125v-1.5m1.5 2.625c.621 0 1.125.504 1.125 1.125v1.5m-7.5-6v5.625m0 0c0 .621.504 1.125 1.125 1.125h.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125h-.75A1.125 1.125 0 0010.5 9.375v.75" />
-              </svg>
-            </div>
-            <p className="text-sm text-muted-foreground font-medium">No clips yet</p>
-            <p className="text-xs text-muted-foreground/40 max-w-xs">
-              Chat with the AI showrunner to generate shots — they&apos;ll appear here in the timeline
-            </p>
-          </div>
-        ) : (
-          <PlayerView playerRef={playerRef} compositionProps={compositionProps} totalFrames={totalFrames} playbackRate={playbackRate} />
-        )}
+
+        <PlayerView playerRef={playerRef} compositionProps={compositionProps} totalFrames={totalFrames} playbackRate={playbackRate} />
 
         <TransitionPickerPanel
           containerRef={videoPreviewRef}

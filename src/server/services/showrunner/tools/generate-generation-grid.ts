@@ -1,7 +1,8 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { generateImage, type CharacterRef } from "@/server/services/media";
+import { generateImage } from "@/server/services/media";
 import { validateContinuityChain } from "./record-generation-grid-entry";
+import { mediaUrl } from "@/lib/storage";
 
 const GRID_CANDIDATE_COUNT = 1;
 
@@ -160,8 +161,50 @@ export const generateGenerationGrid = tool({
     "Requires an approved scene continuity pack. Later generations in the same scene MUST pass " +
     "previousGenerationId + incomingAnchorHandle/Kind (prior terminal panel; later prior last frame) " +
     "and attach that image in referenceImageUrls — unless continuityBreakReason documents an intentional break. " +
-    "Always pass panelCount, panelCaptions, and shotIds with matching lengths.",
+    "Always pass panelCount, panelCaptions, and shotIds with matching lengths. " +
+    "If this tool returns ok:false, fix the listed continuity/panel errors and call again in the same turn.",
   inputSchema: generateGenerationGridInputSchema,
+  execute: async (args) => {
+    const captionError = validatePanelCaptionCount(
+      args.panelCount,
+      args.panelCaptions,
+      args.shotIds
+    );
+    if (captionError) {
+      return {
+        type: "text" as const,
+        value: JSON.stringify({ ok: false, errors: [captionError] }),
+      };
+    }
+    const continuityError = validateGenerationGridContinuity({
+      isFirstInScene: args.isFirstInScene,
+      previousGenerationId: args.previousGenerationId,
+      incomingAnchorHandle: args.incomingAnchorHandle,
+      incomingAnchorKind: args.incomingAnchorKind,
+      incomingAnchorPanel: args.incomingAnchorPanel,
+      continuityBreakReason: args.continuityBreakReason,
+      referenceImageUrls: args.referenceImageUrls,
+    });
+    if (continuityError) {
+      return {
+        type: "text" as const,
+        value: JSON.stringify({
+          ok: false,
+          errors: continuityError.split("; ").filter(Boolean),
+        }),
+      };
+    }
+    return {
+      type: "text" as const,
+      value: JSON.stringify({
+        ok: true,
+        status: "pending_generation",
+        message:
+          "Args accepted. Images will be generated and shown for user approval. " +
+          "Do not call recordGenerationGridEntry until the user approves a candidate.",
+      }),
+    };
+  },
 });
 
 /** Shared by the chat route (first generation) and the retry-tool route (regeneration). */
@@ -170,14 +213,15 @@ export async function generateGenerationGridImages(
   referenceImageUrls: string[],
   aspectRatio: "16:9" | "9:16" | "1:1"
 ): Promise<string[]> {
-  const characterRefs: CharacterRef[] = referenceImageUrls.map((url) => ({
-    url,
-    description: "preserve exact appearance",
-  }));
   const results = await Promise.all(
     Array.from({ length: GRID_CANDIDATE_COUNT }, () =>
-      generateImage(imagePrompt, "gpt-image-2", characterRefs, aspectRatio)
+      generateImage({
+        model: "gpt-image-2",
+        prompt: imagePrompt,
+        referenceImages: referenceImageUrls,
+        aspectRatio
+      })
     )
   );
-  return results.map((r) => r.url);
+  return results.flat().map(img => mediaUrl(img));
 }

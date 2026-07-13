@@ -1,7 +1,8 @@
 import { AI_VIDEO } from "@/lib/constants";
-import type { I2vRequest, IProvider, VideoResult } from "@/types/video-provider";
+import type { I2vRequest, IImageRequest, VideoResult } from "@/types/video-provider";
 import { pollUntil } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
+import { BaseVideoProvider } from "./base";
 
 type KieTaskResult = {
   code: 200 | 401 | 403 | 404 | 500 | 505,
@@ -22,7 +23,7 @@ type KieTaskResult = {
     creditsConsumed: number
   }
 };
-export class KieVideoProvider implements IProvider {
+export class KieVideoProvider extends BaseVideoProvider {
   readonly client: AxiosInstance;
 
   constructor() {
@@ -30,6 +31,7 @@ export class KieVideoProvider implements IProvider {
     if (!token) {
       throw new Error("KIE_API_KEY is not set (required for KIE video generation)");
     }
+    super();
     this.client = axios.create({
       baseURL: "https://api.kie.ai/api/v1",
       headers: { Authorization: `Bearer ${token}` },
@@ -102,5 +104,9 @@ export class KieVideoProvider implements IProvider {
       }
       return null;
     });
+  }
+
+  async generateImage(_: IImageRequest): Promise<string[]> {
+    throw new Error("KIE: image generation is not supported");
   }
 }

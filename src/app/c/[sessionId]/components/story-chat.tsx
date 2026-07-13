@@ -387,6 +387,13 @@ export function StoryChat({
 
   // ── Action handlers ───────────────────────────────────────────────────────────
   async function sendUserMessage(text: string) {
+    // Free-text while a question fork is open = answer it (dismisses the picker)
+    // and send questions_result so tool history stays valid.
+    if (pendingQuestions?.toolCallId && pendingQuestions.questions?.length) {
+      const answers = pendingQuestions.questions.map((_, i) => (i === 0 ? text : ""));
+      await handleQuestionsSubmit(pendingQuestions.toolCallId, answers);
+      return;
+    }
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: "user", text }]);
     await streamResponse({ type: "user", text });
   }
@@ -395,10 +402,10 @@ export function StoryChat({
     const host = messages.find(
       (m) => m.role === "assistant" && m.questions?.toolCallId === toolCallId
     );
-    const qaText =
-      host?.questions?.questions
-        ? formatQuestionsAnswers(host.questions.questions, answers)
-        : answers.join("\n");
+    const qs = host?.questions?.questions;
+    const qaText = qs
+      ? formatQuestionsAnswers(qs, answers)
+      : answers.join("\n");
 
     setMessages((prev) => [
       ...prev.map((m) =>
@@ -450,6 +457,23 @@ export function StoryChat({
   }
 
   async function retryTool(toolCallId: string) {
+    const host = messages.find(
+      (m) =>
+        m.generationGrid?.toolCallId === toolCallId ||
+        m.continuityPack?.toolCallId === toolCallId ||
+        m.assetRef?.toolCallId === toolCallId ||
+        m.shotResult?.toolCallId === toolCallId
+    );
+    // Continuity/panel validation failures can't be fixed by replaying the same args —
+    // send the rejection back to the agent so it can correct the chain fields.
+    const gridError = host?.generationGrid?.toolCallId === toolCallId
+      ? host.generationGrid.error
+      : undefined;
+    if (gridError) {
+      await streamResponse({ type: "trigger" });
+      return;
+    }
+
     setMessages((prev) =>
       prev.map((m) => {
         if (m.shotResult?.toolCallId === toolCallId)

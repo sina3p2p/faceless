@@ -1,7 +1,8 @@
 import { AI_VIDEO } from "@/lib/constants";
-import type { I2vRequest, IProvider, VideoResult } from "@/types/video-provider";
+import type { I2vRequest, IImageRequest, IProvider, VideoResult } from "@/types/video-provider";
 import { pollUntil } from "@/lib/utils";
 import axios, { AxiosInstance } from "axios";
+import { BaseVideoProvider } from "./base";
 
 function extractOutputUrl(out: unknown): string {
   if (typeof out === "string" && (out.startsWith("http://") || out.startsWith("https://"))) {
@@ -15,13 +16,14 @@ function extractOutputUrl(out: unknown): string {
   }
   throw new Error("Replicate returned no video URL in output");
 }
-export class ReplicateVideoProvider implements IProvider {
+export class ReplicateVideoProvider extends BaseVideoProvider {
   readonly client: AxiosInstance;
   constructor() {
     const token = AI_VIDEO.replicateToken;
     if (!token) {
       throw new Error("REPLICATE_API_TOKEN is not set (required for Replicate video generation)");
     }
+    super();
     this.client = axios.create({
       baseURL: "https://api.replicate.com/v1",
       headers: { Authorization: `Bearer ${token}` },
@@ -72,5 +74,9 @@ export class ReplicateVideoProvider implements IProvider {
     }
     const prediction = await this.client.post('predictions', { input, version: model });
     return this.pollPrediction(prediction.data.id, req.duration);
+  }
+
+  async generateImage(_: IImageRequest): Promise<string[]> {
+    throw new Error("KIE: image generation is not supported");
   }
 }

@@ -1,6 +1,9 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { generateImage } from "@/server/services/media";
+import { mediaUrl } from "@/lib/storage";
+import { media } from "@/server/db/schema";
+import { db } from "@/server/db";
 
 const ASSET_CANDIDATE_COUNT = 1;
 
@@ -26,13 +29,29 @@ export const generateAssetReferences = tool({
 /** Shared by the chat route (first generation) and the retry-tool route (regeneration). */
 export async function generateAssetImages(
   imagePrompt: string,
-  assetKind: "character" | "location" | "object"
+  assetKind: "character" | "location" | "object",
+  userId: string,
 ): Promise<string[]> {
   const aspectRatio = assetKind === "location" ? ("16:9" as const) : ("1:1" as const);
   const results = await Promise.all(
     Array.from({ length: ASSET_CANDIDATE_COUNT }, () =>
-      generateImage(imagePrompt, "gpt-image-2", undefined, aspectRatio)
+      generateImage({
+        model: "gpt-image-2",
+        prompt: imagePrompt,
+        aspectRatio,
+      })
     )
   );
-  return results.map((r) => r.url);
+  const images = results.flat();
+
+  await db.insert(media).values(images.map(img => ({
+    userId,
+    type: "image",
+    url: img,
+    prompt: imagePrompt,
+    modelUsed: "gpt-image-2",
+    metadata: { aspectRatio },
+  })));
+
+  return images.map(img => mediaUrl(img));
 }
