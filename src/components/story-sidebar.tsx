@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession, signOut } from "next-auth/react";
 import axios from "@/lib/axios";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
@@ -35,6 +35,12 @@ interface StorySession {
 }
 
 const STORAGE_KEY = "story-sidebar-pinned";
+const TITLE_GENERATE_WINDOW_MS = 5 * 60_000;
+
+function shouldGenerateTitle(session: StorySession) {
+  if (session.title) return false;
+  return Date.now() - new Date(session.createdAt).getTime() < TITLE_GENERATE_WINDOW_MS;
+}
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -123,6 +129,61 @@ function UserMenuPopup({
   );
 }
 
+function SessionListItem({
+  session,
+  isActive,
+}: {
+  session: StorySession;
+  isActive: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const needsTitle = shouldGenerateTitle(session);
+
+  const { data: generatedTitle, isPending } = useQuery({
+    queryKey: ["story-session-title", session.id],
+    queryFn: async () => {
+      const res = await axios.post(`/v2/story/${session.id}/title`);
+      const title = (res.data.title as string | null) ?? null;
+      if (title) {
+        queryClient.setQueryData<StorySession[]>(["story-sessions"], (old) =>
+          old?.map((s) => (s.id === session.id ? { ...s, title } : s))
+        );
+      }
+      return title;
+    },
+    enabled: needsTitle,
+    staleTime: Infinity,
+    retry: false,
+  });
+
+  const title = session.title ?? generatedTitle;
+  const showShimmer = needsTitle && isPending;
+  const label = title ?? session.seed ?? "Untitled story";
+
+  return (
+    <Link
+      href={`/c/${session.id}`}
+      className={cn(
+        "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors mb-1",
+        isActive
+          ? "bg-primary/15 text-foreground"
+          : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+      )}
+    >
+      {showShimmer ? (
+        <span
+          className="relative block h-3.5 w-[70%] max-w-[9.5rem] overflow-hidden rounded-md bg-white/5"
+          aria-label="Generating title"
+        >
+          <span className="absolute inset-0 animate-shimmer-sweep bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+        </span>
+      ) : (
+        <span className="truncate leading-tight">{label}</span>
+      )}
+    </Link>
+  );
+}
+
 function SessionList({
   sessions,
   activeSessionId,
@@ -135,25 +196,9 @@ function SessionList({
   }
   return (
     <>
-      {sessions.map((s) => {
-        const isActive = s.id === activeSessionId;
-        const label = s.title ?? s.seed ?? "Untitled story";
-        return (
-          <Link
-            key={s.id}
-            href={`/c/${s.id}`}
-            className={cn(
-              "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors mb-1",
-              isActive
-                ? "bg-primary/15 text-foreground"
-                : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
-            )}
-          >
-            <span className={cn("shrink-0 transition-colors", isActive ? "text-primary/70" : "opacity-40")}><IconFilm /></span>
-            <span className="truncate leading-tight">{label}</span>
-          </Link>
-        );
-      })}
+      {sessions.map((s) => (
+        <SessionListItem key={s.id} session={s} isActive={s.id === activeSessionId} />
+      ))}
     </>
   );
 }

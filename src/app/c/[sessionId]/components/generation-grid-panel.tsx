@@ -1,3 +1,4 @@
+import { PhotoProvider, PhotoView } from "react-photo-view";
 import type { GenerationGrid } from "@/types/v2/story";
 
 const ASPECT: Record<NonNullable<GenerationGrid["aspectRatio"]>, string> = {
@@ -74,14 +75,21 @@ export function GenerationGridPanel({
         )}
       </div>
 
-      <div className="rounded-xl overflow-hidden border border-white/10" style={{ aspectRatio: aspect }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={image}
-          alt={`${label} storyboard`}
-          className="w-full h-full object-cover"
-        />
-      </div>
+      <PhotoProvider>
+        <PhotoView src={image}>
+          <div
+            className="rounded-xl overflow-hidden border border-white/10 cursor-zoom-in"
+            style={{ aspectRatio: aspect }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image}
+              alt={`${label} storyboard`}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </PhotoView>
+      </PhotoProvider>
 
       {captions.length > 0 && (
         <div

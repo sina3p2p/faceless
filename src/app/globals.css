@@ -313,6 +313,15 @@ body {
   background-clip: text;
 }
 
+@keyframes shimmer-sweep {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-shimmer-sweep {
+  animation: shimmer-sweep 1.2s ease-in-out infinite;
+}
+
 @theme inline {
   /* Fonts — next/font sets the CSS vars; these bridge them into Tailwind utilities */
   --font-sans: var(--font-sans);

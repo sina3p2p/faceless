@@ -1,3 +1,4 @@
+import { PhotoProvider, PhotoView } from "react-photo-view";
 import type { ContinuityPack } from "@/types/v2/story";
 
 const ASPECT: Record<NonNullable<ContinuityPack["aspectRatio"]>, string> = {
@@ -93,34 +94,38 @@ export function ContinuityPackPanel({
         </div>
       )}
 
-      <div
-        className="grid gap-1.5"
-        style={{ gridTemplateColumns: `repeat(${Math.min(images.length, 3)}, minmax(0, 1fr))` }}
-      >
-        {images.map((url, i) => (
-          <div key={url} className="space-y-1 min-w-0">
-            <div
-              className="rounded-lg overflow-hidden border border-white/10"
-              style={{ aspectRatio: aspect }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={url}
-                alt={keyframes[i]?.caption ?? `Continuity keyframe ${i + 1}`}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-              {keyframes[i]?.role ?? `Keyframe ${i + 1}`}
-            </p>
-            {keyframes[i]?.caption && (
-              <p className="text-[10px] text-foreground/80 leading-snug line-clamp-2">
-                {keyframes[i].caption}
+      <PhotoProvider>
+        <div
+          className="grid gap-1.5"
+          style={{ gridTemplateColumns: `repeat(${Math.min(images.length, 3)}, minmax(0, 1fr))` }}
+        >
+          {images.map((url, i) => (
+            <div key={url} className="space-y-1 min-w-0">
+              <PhotoView src={url}>
+                <div
+                  className="rounded-lg overflow-hidden border border-white/10 cursor-zoom-in"
+                  style={{ aspectRatio: aspect }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt={keyframes[i]?.caption ?? `Continuity keyframe ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </PhotoView>
+              <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-wider">
+                {keyframes[i]?.role ?? `Keyframe ${i + 1}`}
               </p>
-            )}
-          </div>
-        ))}
-      </div>
+              {keyframes[i]?.caption && (
+                <p className="text-[10px] text-foreground/80 leading-snug line-clamp-2">
+                  {keyframes[i].caption}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </PhotoProvider>
 
       {!isLocked && (
         <div className="flex items-center gap-2 flex-wrap">

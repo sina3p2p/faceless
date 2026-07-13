@@ -1,12 +1,13 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "@/lib/axios";
 import { AIChatInput } from "@/components/ui/ai-chat-input";
 
 export default function StoryLandingPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const { mutateAsync, isPending, isError, error } = useMutation({
     mutationFn: async ({ message }: { message: string }) => {
@@ -14,6 +15,7 @@ export default function StoryLandingPage() {
       return res.data;
     },
     onSuccess: (data) => {
+      void queryClient.invalidateQueries({ queryKey: ["story-sessions"] });
       router.push(`/c/${data.sessionId}`);
     },
   });

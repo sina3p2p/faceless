@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import "react-photo-view/dist/react-photo-view.css";
 import "./globals.css";
 import { StorySidebar } from "@/components/story-sidebar";
 import { WarpShaderBackground } from "@/components/ui/warp-shader";
