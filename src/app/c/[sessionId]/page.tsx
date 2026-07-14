@@ -31,7 +31,7 @@ export default async function StorySessionPage({
     .where(eq(filmSessionMessages.sessionId, sessionId))
     .orderBy(asc(filmSessionMessages.createdAt));
 
-  const initialMessages = rowsToClientMessages(rows);
+  const initialMessages = await rowsToClientMessages(rows);
 
   return <StoryChat sessionId={session.id} initialMessages={initialMessages} />;
 }

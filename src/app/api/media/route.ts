@@ -32,15 +32,17 @@ export async function GET(req: NextRequest) {
     offset: page * limit,
   });
 
-  const items = mediaItems.map((item) => ({
-    id: item.id,
-    type: item.type,
-    url: mediaUrl(item.url),
-    prompt: item.prompt,
-    model: item.modelUsed,
-    duration: durationOf(item),
-    createdAt: item.createdAt.toISOString(),
-  }));
+  const items = await Promise.all(
+    mediaItems.map(async (item) => ({
+      id: item.id,
+      type: item.type,
+      url: await mediaUrl(item.url),
+      prompt: item.prompt,
+      model: item.modelUsed,
+      duration: durationOf(item),
+      createdAt: item.createdAt.toISOString(),
+    }))
+  );
 
   return NextResponse.json({ items, total, totalPages: Math.ceil(total / limit), page, limit });
 }
@@ -84,7 +86,7 @@ export async function POST(req: NextRequest) {
     {
       id: item.id,
       type: item.type,
-      url: mediaUrl(item.url),
+      url: await mediaUrl(item.url),
       prompt: item.prompt,
       model: item.modelUsed,
       duration: durationOf(item),

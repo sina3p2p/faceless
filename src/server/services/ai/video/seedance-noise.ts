@@ -20,7 +20,7 @@ async function gaussianNoise(input: Buffer, sigma: number): Promise<Buffer> {
 
 async function store(buf: Buffer, key: string): Promise<string> {
   await uploadFile(key, buf, "image/jpeg");
-  return mediaUrl(key);
+  return await mediaUrl(key);
 }
 
 /** Stacked perturbation for E005 retry: hue shift + JPEG precompress + sigma=15 noise. */

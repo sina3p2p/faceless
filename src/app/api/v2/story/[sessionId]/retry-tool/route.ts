@@ -3,14 +3,12 @@ import { db } from "@/server/db";
 import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq } from "drizzle-orm";
+import { enqueueWorkerJob, JOB_NAMES } from "@/lib/worker-queue";
 import {
-  renderAndUploadShot,
-  generateAssetImages,
-  generateContinuityPackImages,
-  generateGenerationGridImages,
   validatePanelCaptionCount,
-} from "@/server/services/showrunner";
-import { validateContinuityPackKeyframes, validateGenerationGridContinuity } from "@/server/services/showrunner/tools";
+  validateContinuityPackKeyframes,
+  validateGenerationGridContinuity,
+} from "@/server/services/showrunner/tools";
 
 type StoredTc = {
   id: string;
@@ -67,23 +65,18 @@ export async function POST(
   }
 
   if (toolName === "compileShot") {
-    const key = `v2/shots/${sessionId}/${toolCallId}-retry-${Date.now()}.mp4`;
-    const { url: persistentUrl, durationSeconds } = await renderAndUploadShot(
-      {
-        prompt: tcArgs.prompt as string,
-        referenceImageUrls: (tcArgs.referenceImageUrls as string[]) ?? [],
-        aspectRatio: (tcArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
-        duration: tcArgs.duration as number,
-        continuityMode: (tcArgs.continuityMode as "fresh" | "extend_video") ?? "fresh",
-        sourceVideoUrl: tcArgs.sourceVideoUrl as string | undefined,
-      },
-      sessionId,
-      key
-    );
-    // Retry doesn't go through filmShotJobs (that's only for the async
-    // worker path) — just patch the message the client reads.
-    await patchRow({ videoUrl: persistentUrl, renderedDurationSeconds: durationSeconds });
-    return NextResponse.json({ videoUrl: persistentUrl, durationSeconds });
+    await patchRow({ pending: true, shotError: undefined, videoUrl: undefined });
+    await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_SHOT, {
+      toolCallId,
+      assistantMessageRowId: targetRowId,
+      referenceImageUrls: (tcArgs.referenceImageUrls as string[]) ?? [],
+      prompt: tcArgs.prompt as string,
+      aspectRatio: (tcArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
+      duration: tcArgs.duration as number,
+      continuityMode: (tcArgs.continuityMode as "fresh" | "extend_video") ?? "fresh",
+      sourceVideoUrl: tcArgs.sourceVideoUrl as string | undefined,
+    });
+    return NextResponse.json({ queued: true });
   }
 
   if (toolName === "generateAssetReferences") {
@@ -92,23 +85,24 @@ export async function POST(
       assetKind: "character" | "location" | "object";
       imagePrompt: string;
     };
-    const generatedImages = await generateAssetImages(imagePrompt, assetKind, session.userId);
-    await patchRow({ generatedImages });
-    return NextResponse.json({ assetHandle, assetKind, images: generatedImages });
+    await patchRow({ pending: true, generatedImages: undefined, error: undefined });
+    await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_ASSET_IMAGES, {
+      toolCallId,
+      assistantMessageRowId: targetRowId,
+      assetHandle,
+      assetKind,
+      imagePrompt,
+      userId: session.userId,
+    });
+    return NextResponse.json({ queued: true });
   }
 
   if (toolName === "generateContinuityPack") {
     const {
-      sceneId,
-      packHandle,
-      notes,
       keyframes,
       referenceImageUrls,
       aspectRatio,
     } = tcArgs as {
-      sceneId: string | number;
-      packHandle: string;
-      notes: Record<string, string>;
       keyframes?: { role: string; caption: string; imagePrompt: string }[];
       referenceImageUrls: string[];
       aspectRatio?: "16:9" | "9:16" | "1:1";
@@ -117,19 +111,18 @@ export async function POST(
     if (keyframeError) {
       return badRequest(keyframeError);
     }
-    const generatedImages = await generateContinuityPackImages(
-      keyframes!,
-      referenceImageUrls,
-      aspectRatio ?? "16:9"
-    );
-    await patchRow({ generatedImages });
-    return NextResponse.json({
-      sceneId,
-      packHandle,
-      notes,
-      keyframes,
-      images: generatedImages,
+    await patchRow({ pending: true, generatedImages: undefined, packError: undefined });
+    await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_CONTINUITY_PACK, {
+      toolCallId,
+      assistantMessageRowId: targetRowId,
+      sceneId: tcArgs.sceneId,
+      packHandle: tcArgs.packHandle,
+      notes: tcArgs.notes,
+      keyframes: keyframes!,
+      referenceImageUrls: referenceImageUrls ?? [],
+      aspectRatio: aspectRatio ?? "16:9",
     });
+    return NextResponse.json({ queued: true });
   }
 
   if (toolName === "generateGenerationGrid" || toolName === "generateSceneGrid") {
@@ -150,7 +143,7 @@ export async function POST(
       panelCaptions,
       aspectRatio,
     } = tcArgs as {
-      sceneId: string | number;
+      sceneId?: string | number;
       generationId?: string;
       shotIds?: number[];
       estimatedDurationSeconds?: number;
@@ -182,21 +175,24 @@ export async function POST(
     if (continuityError) {
       return badRequest(continuityError);
     }
-    const generatedImages = await generateGenerationGridImages(
-      imagePrompt,
-      referenceImageUrls,
-      aspectRatio ?? "16:9"
-    );
-    await patchRow({ generatedImages });
-    return NextResponse.json({
+    await patchRow({ pending: true, generatedImages: undefined, gridError: undefined });
+    await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_GENERATION_GRID, {
+      toolCallId,
+      assistantMessageRowId: targetRowId,
       sceneId,
       generationId,
       shotIds,
       estimatedDurationSeconds,
-      images: generatedImages,
+      previousGenerationId,
+      incomingAnchorHandle,
+      continuityBreakReason,
       panelCount,
       panelCaptions,
+      imagePrompt,
+      referenceImageUrls: referenceImageUrls ?? [],
+      aspectRatio: aspectRatio ?? "16:9",
     });
+    return NextResponse.json({ queued: true });
   }
 
   return badRequest(`Tool "${toolName}" is not retryable`);

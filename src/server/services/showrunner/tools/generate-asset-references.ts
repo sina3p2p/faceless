@@ -53,5 +53,5 @@ export async function generateAssetImages(
     metadata: { aspectRatio },
   })));
 
-  return images.map(img => mediaUrl(img));
+  return Promise.all(images.map((img) => mediaUrl(img)));
 }

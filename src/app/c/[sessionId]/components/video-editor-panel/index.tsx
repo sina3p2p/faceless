@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { type PlayerRef } from "@remotion/player";
 import { prefetch } from "remotion";
 import { getVideoMetadata } from "@remotion/media-utils";
-import { type StoryCompositionProps, type AudioClipConfig, computeSequenceLayout, FPS, previewMediaUrl } from "@/remotion/StoryComposition";
+import { type StoryCompositionProps, type AudioClipConfig, computeSequenceLayout, FPS } from "@/remotion/StoryComposition";
 import { FloatingPanel } from "../floating-panel";
 import { Timeline } from "./timeline";
 import { trackIdOf, trackIndexOf, nextFreeTrackIndex } from "./timeline/hooks/use-timeline-tracks";
@@ -315,8 +315,8 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
   // ── prefetch clip videos into Remotion's blob cache ───────────────────────
   // remotion's prefetch() is what OffthreadVideo's usePreload() actually reads.
   // @remotion/preload's preloadVideo() only hints the browser and does not
-  // feed that cache. Prefetch via media-proxy (same-origin) because R2 has no CORS.
-  // Duration still comes from getVideoMetadata on the redirect URL (CORS-free).
+  // feed that cache. Prefetch hits signed R2 URLs directly (requires CORS).
+  // Duration still comes from getVideoMetadata.
   const prefetchesRef = useRef(new Map<string, () => void>());
   useEffect(() => {
     const active = prefetchesRef.current;
@@ -332,7 +332,7 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
     }
     for (const [url, ids] of byUrl) {
       if (active.has(url)) continue;
-      const { free } = prefetch(previewMediaUrl(url));
+      const { free } = prefetch(url);
       active.set(url, free);
       getVideoMetadata(url)
         .then(({ durationInSeconds }) => {

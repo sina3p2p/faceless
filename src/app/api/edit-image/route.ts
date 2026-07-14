@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
   } = parsed.data;
 
   try {
-    const sourceImg = await fetchImageAsBase64(mediaUrl(sourceImageUrl));
+    const sourceImg = await fetchImageAsBase64(await mediaUrl(sourceImageUrl));
 
     if (!sourceImg) {
       return NextResponse.json(
@@ -74,14 +74,16 @@ export async function POST(req: NextRequest) {
     const hasAnnotations = !!annotatedImageUrl;
     let annotatedImg: { base64: string; mimeType: string } | null = null;
     if (hasAnnotations) {
-      annotatedImg = await fetchImageAsBase64(mediaUrl(annotatedImageUrl));
+      annotatedImg = await fetchImageAsBase64(await mediaUrl(annotatedImageUrl));
     }
 
     // Fetch reference images (from @mentions)
     const refImages: Array<{ base64: string; mimeType: string }> = [];
     if (referenceImageUrls?.length) {
       const results = await Promise.all(
-        referenceImageUrls.slice(0, 4).map((url) => fetchImageAsBase64(mediaUrl(url))),
+        referenceImageUrls.slice(0, 4).map(async (url) =>
+          fetchImageAsBase64(await mediaUrl(url))
+        ),
       );
       for (const r of results) {
         if (r) refImages.push(r);
@@ -233,7 +235,7 @@ export async function POST(req: NextRequest) {
       const buffer = Buffer.from(base64Match[2], "base64");
       const key = `generated/edit_${Date.now()}.jpg`;
       await uploadFile(key, buffer, base64Match[1]);
-      imageDataUrl = mediaUrl(key);
+      imageDataUrl = await mediaUrl(key);
     }
 
     return NextResponse.json({ url: imageDataUrl });

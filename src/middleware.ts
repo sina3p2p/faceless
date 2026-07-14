@@ -7,9 +7,9 @@ const RATE_LIMIT_MAX = 60;
 const requestCounts = new Map<string, { count: number; resetAt: number }>();
 
 export function middleware(request: NextRequest) {
-  // Media proxy + JSON list are high-volume; rate-limiting them taxes the app
-  // and hits 429s on gallery loads. Next.js ignores unknown `config` keys
-  // (there is no built-in excludedPaths).
+  // Media list/upload is high-volume; rate-limiting it taxes the app and hits
+  // 429s on gallery loads. Next.js ignores unknown `config` keys (there is no
+  // built-in excludedPaths).
   if (request.nextUrl.pathname.startsWith("/api/media")) {
     return NextResponse.next();
   }

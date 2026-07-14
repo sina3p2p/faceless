@@ -6,16 +6,10 @@ import { ALL_FORMATS, CanvasSink, Input, UrlSource } from "mediabunny";
 const FILMSTRIP_TILES = 6;
 const THUMB_WIDTH = 160;
 
-// mediabunny's UrlSource does a real byte-level fetch() to decode frames —
-// /api/media/[key] is a redirect to R2 (which has no CORS headers of its
-// own), so that fetch needs the buffering, same-origin-CORS proxy instead.
-function toProxyUrl(videoUrl: string): string {
-  return videoUrl.replace("/api/media/", "/api/media-proxy/");
-}
-
 // One demuxer+decoder pipeline per source video, reused across every clip
 // instance and every trim change — canvasesAtTimestamps() decodes each
 // packet at most once even for repeated/sparse timestamp requests.
+// Uses signed R2 URLs directly (bucket CORS must allow the app origin).
 const sinkCache = new Map<string, Promise<CanvasSink | null>>();
 
 function getSink(url: string): Promise<CanvasSink | null> {
@@ -93,7 +87,7 @@ export function Filmstrip({
 
   useEffect(() => {
     let cancelled = false;
-    getFilmstripThumbnails(toProxyUrl(videoUrl), timestamps).then((urls) => {
+    getFilmstripThumbnails(videoUrl, timestamps).then((urls) => {
       if (!cancelled) setThumbs(urls);
     });
     return () => { cancelled = true; };

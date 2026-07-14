@@ -27,7 +27,7 @@ export async function GET(
     .where(eq(filmSessionMessages.sessionId, sessionId))
     .orderBy(asc(filmSessionMessages.createdAt));
 
-  const messages = rowsToClientMessages(rows);
+  const messages = await rowsToClientMessages(rows);
 
   return NextResponse.json({
     id: session.id,

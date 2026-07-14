@@ -39,7 +39,7 @@ export class OpenAIVideoProvider extends BaseVideoProvider {
         if (req.referenceImages) {
             const files = await Promise.all(
                 req.referenceImages.map(async (img) => {
-                    const res = await fetch(mediaUrl(img));
+                    const res = await fetch(await mediaUrl(img));
                     if (!res.ok) return null;
                     const buffer = Buffer.from(await res.arrayBuffer());
                     const ct = res.headers.get("content-type") || "image/jpeg";

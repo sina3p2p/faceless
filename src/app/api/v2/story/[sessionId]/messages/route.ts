@@ -37,7 +37,7 @@ export async function GET(
     .limit(PAGE_SIZE * 3);
 
   const chronological = [...rows].reverse();
-  const messages = rowsToClientMessages(chronological);
+  const messages = await rowsToClientMessages(chronological);
   const pageMessages = messages.slice(-PAGE_SIZE);
   const hasMore = messages.length > PAGE_SIZE || rows.length >= PAGE_SIZE * 3;
   const oldestCreatedAt = chronological[0]?.createdAt.toISOString() ?? null;

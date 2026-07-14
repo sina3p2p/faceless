@@ -3,19 +3,14 @@ import {
   Html5Audio,
   OffthreadVideo,
   Sequence,
-  getRemotionEnvironment,
   interpolate,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
 
-/** Same-origin proxy so Player/prefetch can fetch bytes (R2 has no CORS). */
-export function previewMediaUrl(url: string): string {
-  return url.replace(/\/api\/media\//, "/api/media-proxy/");
-}
-
 function playerSrc(url: string): string {
-  return getRemotionEnvironment().isPlayer ? previewMediaUrl(url) : url;
+  // Player loads signed R2 URLs directly (bucket CORS must allow the app origin).
+  return url;
 }
 
 export type TransitionType =

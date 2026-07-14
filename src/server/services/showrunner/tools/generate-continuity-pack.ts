@@ -101,5 +101,5 @@ export async function generateContinuityPackImages(
       aspectRatio
     }))
   );
-  return imgs.flat().map(img => mediaUrl(img));
+  return Promise.all(imgs.flat().map((img) => mediaUrl(img)));
 }

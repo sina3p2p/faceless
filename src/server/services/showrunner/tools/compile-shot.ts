@@ -136,7 +136,7 @@ export interface UploadedShot {
 
 /**
  * Render the shot then re-upload the video to R2 — used by both the async
- * shot-queue worker and the synchronous retry-tool route.
+ * worker-jobs queue and the retry-tool route.
  */
 export async function renderAndUploadShot(
   args: CompileShotArgs,
@@ -163,5 +163,5 @@ export async function renderAndUploadShot(
     metadata: { duration: durationSeconds },
   }).returning({ id: media.id });
 
-  return { url: mediaUrl(storageKey), durationSeconds, mediaId: mediaRow.id };
+  return { url: await mediaUrl(storageKey), durationSeconds, mediaId: mediaRow.id };
 }

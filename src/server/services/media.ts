@@ -116,7 +116,7 @@ export async function editImageViaGptImage2(
       const buffer = Buffer.from(b64, "base64");
       const key = `generated/gpt-image-2-edit_${Date.now()}.png`;
       await uploadFile(key, buffer, "image/png");
-      return mediaUrl(key);
+      return await mediaUrl(key);
     }
 
     const remoteUrl = item?.url;
@@ -257,7 +257,7 @@ export async function generateViaOpenRouter(
       const buffer = Buffer.from(base64Match[2], "base64");
       const key = `generated/gemini_${Date.now()}.jpg`;
       await uploadFile(key, buffer, base64Match[1]);
-      imageDataUrl = mediaUrl(key);
+      imageDataUrl = await mediaUrl(key);
     }
 
     return imageDataUrl;

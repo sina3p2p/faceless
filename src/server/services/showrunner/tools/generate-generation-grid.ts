@@ -223,5 +223,5 @@ export async function generateGenerationGridImages(
       })
     )
   );
-  return results.flat().map(img => mediaUrl(img));
+  return Promise.all(results.flat().map((img) => mediaUrl(img)));
 }

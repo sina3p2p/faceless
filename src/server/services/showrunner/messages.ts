@@ -9,6 +9,7 @@ import type {
   ShotCompile,
   ShotResult,
 } from "@/types/v2/story";
+import { mediaUrl, mediaUrls } from "@/lib/storage";
 
 type DbRow = {
   messageId: string;
@@ -142,7 +143,7 @@ const USER_RESULT_TYPES = new Set([
   "shot_approval",
 ]);
 
-export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
+export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage[]> {
   const questionAnswers = new Map<string, string[]>();
   const assetApprovals = new Map<string, string>();
   const continuityPackApprovals = new Map<string, string[]>();
@@ -208,35 +209,45 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
             answers: questionAnswers.get(tc.id),
           };
         } else if (tc.function.name === "generateAssetReferences") {
+          const isPending = (args.pending as boolean | undefined) === true;
+          const rawImages = (args.generatedImages ?? args.images) as string[] | undefined;
+          const approved = assetApprovals.get(tc.id);
           assetRef = {
             toolCallId: tc.id,
-            loading: false,
+            loading: isPending,
             assetHandle: args.assetHandle as string,
             assetKind: args.assetKind as AssetRef["assetKind"],
-            images: (args.generatedImages ?? args.images) as string[] | undefined,
-            approvedUrl: assetApprovals.get(tc.id),
+            images: rawImages ? await mediaUrls(rawImages) : undefined,
+            approvedUrl: approved ? await mediaUrl(approved) : undefined,
+            error: args.error as string | undefined,
           };
         } else if (tc.function.name === "generateContinuityPack") {
+          const isPending = (args.pending as boolean | undefined) === true;
           const keyframes = args.keyframes as ContinuityPack["keyframes"];
+          const rawImages = (args.generatedImages ?? args.images) as string[] | undefined;
+          const approved = continuityPackApprovals.get(tc.id);
           continuityPack = {
             toolCallId: tc.id,
-            loading: false,
+            loading: isPending,
             sceneId: args.sceneId as string | number,
             packHandle: args.packHandle as string,
             notes: args.notes as ContinuityPack["notes"],
             keyframes,
-            images: (args.generatedImages ?? args.images) as string[] | undefined,
+            images: rawImages ? await mediaUrls(rawImages) : undefined,
             aspectRatio: args.aspectRatio as ContinuityPack["aspectRatio"],
-            approvedUrls: continuityPackApprovals.get(tc.id),
+            approvedUrls: approved ? await mediaUrls(approved) : undefined,
             error: args.packError as string | undefined,
           };
         } else if (
           tc.function.name === "generateGenerationGrid" ||
           tc.function.name === "generateSceneGrid"
         ) {
+          const isPending = (args.pending as boolean | undefined) === true;
+          const rawImages = (args.generatedImages ?? args.images) as string[] | undefined;
+          const approved = gridApprovals.get(tc.id);
           generationGrid = {
             toolCallId: tc.id,
-            loading: false,
+            loading: isPending,
             sceneId: args.sceneId as string | number,
             generationId: args.generationId as string | undefined,
             shotIds: args.shotIds as number[] | undefined,
@@ -244,35 +255,40 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
             previousGenerationId: args.previousGenerationId as string | null | undefined,
             incomingAnchorHandle: args.incomingAnchorHandle as string | null | undefined,
             continuityBreakReason: args.continuityBreakReason as string | null | undefined,
-            images: (args.generatedImages ?? args.images) as string[] | undefined,
+            images: rawImages ? await mediaUrls(rawImages) : undefined,
             panelCount: args.panelCount as number | undefined,
             panelCaptions: args.panelCaptions as GenerationGrid["panelCaptions"],
             aspectRatio: args.aspectRatio as GenerationGrid["aspectRatio"],
-            approvedUrl: gridApprovals.get(tc.id),
+            approvedUrl: approved ? await mediaUrl(approved) : undefined,
             error: args.gridError as string | undefined,
           };
         } else if (tc.function.name === "compileShot") {
           const isPending = (args.pending as boolean | undefined) === true;
           const hasVideo = !!(args.videoUrl as string | undefined);
           if (isPending || hasVideo) {
+            const videoUrl = args.videoUrl as string | undefined;
             shotResult = {
               toolCallId: tc.id,
               loading: isPending,
-              videoUrl: args.videoUrl as string | undefined,
+              videoUrl: videoUrl ? await mediaUrl(videoUrl) : undefined,
               duration: args.renderedDurationSeconds as number | undefined,
               error: args.shotError as string | undefined,
               approved: shotApprovals.has(tc.id),
             };
           } else {
+            const refs = args.referenceImageUrls as string[] | undefined;
+            const sourceVideoUrl = args.sourceVideoUrl as string | undefined;
             shotCompile = {
               toolCallId: tc.id,
               loading: false,
               renderPrompt: args.prompt as string,
-              referenceImageUrls: args.referenceImageUrls as string[],
+              referenceImageUrls: refs ? await mediaUrls(refs) : [],
               duration: args.duration as number,
               aspectRatio: args.aspectRatio as ShotCompile["aspectRatio"],
               continuityMode: args.continuityMode as ShotCompile["continuityMode"],
-              sourceVideoUrl: args.sourceVideoUrl as string | undefined,
+              sourceVideoUrl: sourceVideoUrl
+                ? await mediaUrl(sourceVideoUrl)
+                : undefined,
             };
           }
         }
@@ -302,7 +318,7 @@ export function rowsToClientMessages(rows: DbRow[]): ClientMessage[] {
   return messages;
 }
 
-export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
+export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]> {
   // Pre-collect all tool results so we can provide synthetic ones for unapproved calls.
   // This prevents AI_MissingToolResultsError when the LLM made multiple tool calls in one
   // turn but the user hasn't responded to all of them yet.
@@ -346,14 +362,14 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
       });
     } else if (row.role === "user" && row.type === "asset_approval") {
       const d = rowData(row);
-      const approvedUrl = d.approvedUrl as string;
+      const approvedUrl = await mediaUrl(d.approvedUrl as string);
       collectedResults.set(d.toolCallId as string, {
         text: `User approved this reference image for "${d.assetHandle as string}": ${approvedUrl}`,
         imageUrl: approvedUrl,
       });
     } else if (row.role === "user" && row.type === "continuity_pack_approval") {
       const d = rowData(row);
-      const approvedUrls = (d.approvedUrls as string[]) ?? [];
+      const approvedUrls = await mediaUrls((d.approvedUrls as string[]) ?? []);
       collectedResults.set(d.toolCallId as string, {
         text:
           `User approved continuity pack "${d.packHandle as string}" for scene ${d.sceneId as string | number} ` +
@@ -364,22 +380,25 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
       });
     } else if (row.role === "user" && row.type === "grid_approval") {
       const d = rowData(row);
-      const approvedUrl = d.approvedUrl as string;
+      const approvedUrl = await mediaUrl(d.approvedUrl as string);
       collectedResults.set(d.toolCallId as string, {
         text: `User approved this generation grid for scene ${d.sceneId as string | number}: ${approvedUrl}`,
         imageUrl: approvedUrl,
       });
     } else if (row.role === "user" && row.type === "shot_approval") {
       const d = rowData(row);
-      const lastFrameUrl = d.lastFrameUrl as string | undefined;
+      const videoUrl = await mediaUrl(d.videoUrl as string);
+      const lastFrameUrl = d.lastFrameUrl
+        ? await mediaUrl(d.lastFrameUrl as string)
+        : undefined;
       collectedResults.set(d.toolCallId as string, {
         text: lastFrameUrl
-          ? `Shot rendered and approved by user: ${d.videoUrl as string}. Last frame (for CONTEXT footing only): ${lastFrameUrl}. ` +
-            `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${d.videoUrl as string}. ` +
+          ? `Shot rendered and approved by user: ${videoUrl}. Last frame (for CONTEXT footing only): ${lastFrameUrl}. ` +
+            `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${videoUrl}. ` +
             `For a clean break / new take use continuityMode "fresh" with stills. ` +
             `CONTEXT must restate footing from the last frame before new action.`
-          : `Shot rendered and approved by user: ${d.videoUrl as string}. ` +
-            `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${d.videoUrl as string}. ` +
+          : `Shot rendered and approved by user: ${videoUrl}. ` +
+            `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${videoUrl}. ` +
             `For a clean break / new take use continuityMode "fresh" with stills.`,
         imageUrl: lastFrameUrl,
       });
@@ -432,91 +451,96 @@ export function rowsToModelMessages(rows: DbRow[]): ModelMessage[] {
             : toolCallParts,
         });
 
-        const resultParts = calls.map((tc) => {
-          const toolName =
-            tc.function.name === "presentFork" ? "askQuestions" : tc.function.name;
-          if (
-            tc.function.name === "loadReference" ||
-            tc.function.name === "webExtract" ||
-            tc.function.name === "recordContinuityPackEntry" ||
-            tc.function.name === "recordGenerationGridEntry" ||
-            tc.function.name === "recordSceneGridEntry"
-          ) {
-            const fallback =
-              tc.function.name === "loadReference"
-                ? "(reference file content unavailable)"
-                : tc.function.name === "webExtract"
-                  ? "(web extract content unavailable)"
-                  : JSON.stringify({
-                      ok: false,
-                      errors: ["(registry entry result unavailable)"],
-                    });
-            return {
-              type: "tool-result" as const,
-              toolCallId: tc.id,
-              toolName,
-              output: toToolResultOutput(storedToolResults[tc.id], fallback),
-            };
-          }
-          // Continuity-chain / panel validation failures — prefer stored execute() JSON
-          // so the agent can fix isFirstInScene / previousGenerationId / incomingAnchor_*.
-          if (
-            (tc.function.name === "generateGenerationGrid" ||
-              tc.function.name === "generateSceneGrid") &&
-            typeof tc.function.arguments.gridError === "string"
-          ) {
-            const gridError = tc.function.arguments.gridError as string;
-            return {
-              type: "tool-result" as const,
-              toolCallId: tc.id,
-              toolName,
-              output: toToolResultOutput(
-                storedToolResults[tc.id],
-                JSON.stringify({ ok: false, errors: [gridError] })
-              ),
-            };
-          }
-          const collected = collectedResults.get(tc.id);
-          const resultText =
-            collected?.text ??
-            (tc.function.name === "generateAssetReferences"
-              ? `Reference images have been generated for "${tc.function.arguments.assetHandle as string}". User has not yet approved one.`
-              : tc.function.name === "generateContinuityPack"
-                ? (tc.function.arguments.packError as string | undefined)
-                  ? `Continuity pack rejected: ${tc.function.arguments.packError as string}`
-                  : `A continuity pack candidate (notes + keyframes) has been generated for ${
-                      (tc.function.arguments.packHandle as string | undefined) ??
+        const resultParts = await Promise.all(
+          calls.map(async (tc) => {
+            const toolName =
+              tc.function.name === "presentFork" ? "askQuestions" : tc.function.name;
+            if (
+              tc.function.name === "loadReference" ||
+              tc.function.name === "webExtract" ||
+              tc.function.name === "recordContinuityPackEntry" ||
+              tc.function.name === "recordGenerationGridEntry" ||
+              tc.function.name === "recordSceneGridEntry"
+            ) {
+              const fallback =
+                tc.function.name === "loadReference"
+                  ? "(reference file content unavailable)"
+                  : tc.function.name === "webExtract"
+                    ? "(web extract content unavailable)"
+                    : JSON.stringify({
+                        ok: false,
+                        errors: ["(registry entry result unavailable)"],
+                      });
+              return {
+                type: "tool-result" as const,
+                toolCallId: tc.id,
+                toolName,
+                output: toToolResultOutput(storedToolResults[tc.id], fallback),
+              };
+            }
+            // Continuity-chain / panel validation failures — prefer stored execute() JSON
+            // so the agent can fix isFirstInScene / previousGenerationId / incomingAnchor_*.
+            if (
+              (tc.function.name === "generateGenerationGrid" ||
+                tc.function.name === "generateSceneGrid") &&
+              typeof tc.function.arguments.gridError === "string"
+            ) {
+              const gridError = tc.function.arguments.gridError as string;
+              return {
+                type: "tool-result" as const,
+                toolCallId: tc.id,
+                toolName,
+                output: toToolResultOutput(
+                  storedToolResults[tc.id],
+                  JSON.stringify({ ok: false, errors: [gridError] })
+                ),
+              };
+            }
+            const collected = collectedResults.get(tc.id);
+            const shotVideoUrl = tc.function.arguments.videoUrl
+              ? await mediaUrl(tc.function.arguments.videoUrl as string)
+              : undefined;
+            const resultText =
+              collected?.text ??
+              (tc.function.name === "generateAssetReferences"
+                ? `Reference images have been generated for "${tc.function.arguments.assetHandle as string}". User has not yet approved one.`
+                : tc.function.name === "generateContinuityPack"
+                  ? (tc.function.arguments.packError as string | undefined)
+                    ? `Continuity pack rejected: ${tc.function.arguments.packError as string}`
+                    : `A continuity pack candidate (notes + keyframes) has been generated for ${
+                        (tc.function.arguments.packHandle as string | undefined) ??
+                        `scene ${tc.function.arguments.sceneId as string | number}`
+                      }. User has not yet approved it.`
+                : tc.function.name === "generateGenerationGrid" ||
+                    tc.function.name === "generateSceneGrid"
+                  ? `A generation grid candidate has been generated for ${
+                      (tc.function.arguments.generationId as string | undefined) ??
                       `scene ${tc.function.arguments.sceneId as string | number}`
                     }. User has not yet approved it.`
-              : tc.function.name === "generateGenerationGrid" ||
-                  tc.function.name === "generateSceneGrid"
-                ? `A generation grid candidate has been generated for ${
-                    (tc.function.arguments.generationId as string | undefined) ??
-                    `scene ${tc.function.arguments.sceneId as string | number}`
-                  }. User has not yet approved it.`
-                : tc.function.name === "compileShot"
-                  ? tc.function.arguments.videoUrl
-                    ? `Shot rendered: ${tc.function.arguments.videoUrl as string}. Awaiting user approval to add to timeline.`
-                    : (tc.function.arguments.pending as boolean | undefined) ===
-                        true
-                      ? "Shot render in progress — waiting for the video to finish."
-                      : "Shot prompt compiled and shown to user for review. Awaiting their approval before rendering starts."
-                  : "User has not yet answered these questions.");
-          return {
-            type: "tool-result" as const,
-            toolCallId: tc.id,
-            toolName,
-            output: collected?.imageUrl
-              ? {
-                  type: "content" as const,
-                  value: [
-                    { type: "text" as const, text: resultText },
-                    { type: "image-url" as const, url: collected.imageUrl },
-                  ],
-                }
-              : { type: "text" as const, value: resultText },
-          };
-        });
+                  : tc.function.name === "compileShot"
+                    ? shotVideoUrl
+                      ? `Shot rendered: ${shotVideoUrl}. Awaiting user approval to add to timeline.`
+                      : (tc.function.arguments.pending as boolean | undefined) ===
+                          true
+                        ? "Shot render in progress — waiting for the video to finish."
+                        : "Shot prompt compiled and shown to user for review. Awaiting their approval before rendering starts."
+                    : "User has not yet answered these questions.");
+            return {
+              type: "tool-result" as const,
+              toolCallId: tc.id,
+              toolName,
+              output: collected?.imageUrl
+                ? {
+                    type: "content" as const,
+                    value: [
+                      { type: "text" as const, text: resultText },
+                      { type: "image-url" as const, url: collected.imageUrl },
+                    ],
+                  }
+                : { type: "text" as const, value: resultText },
+            };
+          })
+        );
         msgs.push({ role: "tool", content: resultParts } as ModelMessage);
       } else {
         msgs.push({ role: "assistant", content: text });

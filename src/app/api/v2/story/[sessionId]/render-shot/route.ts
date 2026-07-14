@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { filmSessions, filmSessionMessages, filmShotJobs } from "@/server/db/schema";
+import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
-import { shotQueue } from "@/lib/shot-queue";
+import { enqueueWorkerJob, JOB_NAMES } from "@/lib/worker-queue";
 
 type StoredTc = {
   id: string;
@@ -85,19 +85,7 @@ export async function POST(
       .where(eq(filmSessionMessages.id, assistantRowId));
   }
 
-  // Create the job tracker row and enqueue the render.
-  await db.insert(filmShotJobs).values({
-    id: crypto.randomUUID(),
-    sessionId,
-    toolCallId,
-    assistantMessageRowId: assistantRowId,
-    status: "pending",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  });
-
-  await shotQueue.add("generate-shot", {
-    sessionId,
+  await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_SHOT, {
     toolCallId,
     assistantMessageRowId: assistantRowId,
     referenceImageUrls: (storedArgs.referenceImageUrls as string[]) ?? [],
@@ -108,5 +96,5 @@ export async function POST(
     sourceVideoUrl: storedArgs.sourceVideoUrl as string | undefined,
   });
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, queued: true });
 }

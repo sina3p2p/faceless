@@ -39,7 +39,7 @@ export async function POST(
     const videoBuffer = Buffer.from(await videoResp.arrayBuffer());
     const key = `v2/edits/${sessionId}/${crypto.randomUUID()}.mp4`;
     await uploadFile(key, videoBuffer, "video/mp4");
-    const persistentUrl = mediaUrl(key);
+    const persistentUrl = await mediaUrl(key);
 
     return NextResponse.json({ videoUrl: persistentUrl });
   } catch (err) {
