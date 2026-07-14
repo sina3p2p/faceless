@@ -8,11 +8,6 @@ import {
   useVideoConfig,
 } from "remotion";
 
-function playerSrc(url: string): string {
-  // Player loads signed R2 URLs directly (bucket CORS must allow the app origin).
-  return url;
-}
-
 export type TransitionType =
   | "dissolve"
   | "fade-black"
@@ -233,7 +228,7 @@ function ClipLayer({
   return (
     <AbsoluteFill style={{ opacity, transform: transform || undefined, clipPath: clipPath || undefined, overflow: "hidden" }}>
       <OffthreadVideo
-        src={playerSrc(clip.videoUrl)}
+        src={clip.videoUrl}
         trimBefore={trimBefore}
         {...(trimAfter !== undefined ? { trimAfter } : {})}
         playbackRate={Math.max(0.1, clip.speed)}
@@ -282,7 +277,7 @@ export function StoryComposition({ clips, audioClips = [] }: StoryCompositionPro
         const trimAfter = Math.round(end * FPS);
         return (
           <Sequence key={ac.id} from={from} durationInFrames={durationFrames} premountFor={FPS * 3}>
-            <Html5Audio src={playerSrc(ac.url)} trimBefore={trimBefore} trimAfter={trimAfter} volume={ac.volume} pauseWhenBuffering />
+            <Html5Audio src={ac.url} trimBefore={trimBefore} trimAfter={trimAfter} volume={ac.volume} pauseWhenBuffering />
           </Sequence>
         );
       })}

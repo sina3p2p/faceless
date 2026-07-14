@@ -177,7 +177,6 @@ export const STORAGE = {
   get accessKeyId() { return env("S3_ACCESS_KEY_ID"); },
   get secretAccessKey() { return env("S3_SECRET_ACCESS_KEY"); },
   get bucket() { return env("S3_BUCKET", "faceless-media"); },
-  get r2PublicUrl() { return env("R2_PUBLIC_URL"); },
 } as const;
 
 // ── Stripe ──
