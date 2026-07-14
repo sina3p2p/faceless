@@ -1,9 +1,7 @@
 import { renderAndUploadShot } from "@/server/services/showrunner/tools/compile-shot";
-import {
-  generateAssetImages,
-  generateContinuityPackImages,
-  generateGenerationGridImages,
-} from "@/server/services/showrunner";
+import { generateAssetImages } from "@/server/services/showrunner/tools/generate-asset-references";
+import { generateContinuityPackImages } from "@/server/services/showrunner/tools/generate-continuity-pack";
+import { generateGenerationGridImages } from "@/server/services/showrunner/tools/generate-generation-grid";
 import { JOB_NAMES, type WorkerJobName } from "@/lib/worker-queue";
 import { logger } from "@/lib/logger";
 import { patchMessageToolCall, setJobStatus } from "./job-helpers";
