@@ -32,7 +32,7 @@ export class OpenAIVideoProvider extends BaseVideoProvider {
             prompt: req.prompt,
             n: req.n ?? 1,
             size: this.getSize(req.aspectRatio),
-            quality: req.quality ?? "medium",
+            quality: req.quality ?? "low",
         };
 
         let response;
