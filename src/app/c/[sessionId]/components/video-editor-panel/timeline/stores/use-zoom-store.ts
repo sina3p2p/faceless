@@ -18,6 +18,16 @@ export const useZoomStore = create<ZoomState>()(
       setPxPerSec: (px) =>
         set((state) => ({ pxPerSec: clamp(typeof px === "function" ? px(state.pxPerSec) : px) })),
     }),
-    { name: "timeline-zoom" },
+    {
+      name: "timeline-zoom-v2",
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<ZoomState>;
+        return {
+          ...current,
+          ...p,
+          pxPerSec: clamp(p.pxPerSec ?? current.pxPerSec),
+        };
+      },
+    },
   ),
 );

@@ -24,14 +24,22 @@ const CHAT_MAX = 640;
 export function StoryChat({
   sessionId,
   initialMessages,
+  initialHasMore = false,
+  initialOldestCreatedAt = null,
 }: {
   sessionId: string;
   initialMessages: ClientMessage[];
+  initialHasMore?: boolean;
+  initialOldestCreatedAt?: string | null;
 }) {
   const [messages, setMessages] = useState<ClientMessage[]>(initialMessages);
+  const [hasMore, setHasMore] = useState(initialHasMore);
+  const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(initialOldestCreatedAt);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [status, setStatus] = useState<"idle" | "streaming">("idle");
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const hasAutoSent = useRef(false);
+  const loadingOlderRef = useRef(false);
 
   // video editor state — clipOrder preserves first-seen shot order across
   // message stream updates (text deltas must not reshuffle the timeline).
@@ -87,7 +95,9 @@ export function StoryChat({
     for (const m of messages) {
       const s = m.shotResult;
       if (!s?.videoUrl) continue;
-      parts.push(`${s.toolCallId}\0${s.videoUrl}\0${s.duration ?? ""}\0${s.approved ? 1 : 0}`);
+      parts.push(
+        `${s.toolCallId}\0${s.videoUrl}\0${s.duration ?? ""}\0${s.approved ? 1 : 0}\0${s.filmstripUrl ?? ""}\0${s.filmstripTiles ?? ""}`
+      );
     }
     return parts.join("\n");
   }, [messages]);
@@ -110,6 +120,8 @@ export function StoryChat({
         map.set(m.shotResult.toolCallId, {
           toolCallId: m.shotResult.toolCallId,
           videoUrl: m.shotResult.videoUrl,
+          filmstripUrl: m.shotResult.filmstripUrl,
+          filmstripTiles: m.shotResult.filmstripTiles,
           duration: m.shotResult.duration,
           approved: m.shotResult.approved,
         });
@@ -161,10 +173,12 @@ export function StoryChat({
           const toolCallId = event.toolCallId as string;
           const videoUrl = event.videoUrl as string;
           const duration = event.durationSeconds as number | undefined;
+          const filmstripUrl = event.filmstripUrl as string | undefined;
+          const filmstripTiles = event.filmstripTiles as number | undefined;
           setMessages((prev) => {
             const next = prev.map((m) =>
               m.shotResult?.toolCallId === toolCallId
-                ? { ...m, shotResult: { ...m.shotResult, toolCallId, loading: false, videoUrl, duration } }
+                ? { ...m, shotResult: { ...m.shotResult, toolCallId, loading: false, videoUrl, duration, filmstripUrl, filmstripTiles } }
                 : m
             );
             if (!hasPendingJobs(next)) closeJobEventsStream();
@@ -460,6 +474,7 @@ export function StoryChat({
         toolCallId: event.toolCallId as string,
         loading: false,
         videoUrl: event.videoUrl as string,
+        filmstripUrl: event.filmstripUrl as string | undefined,
       };
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
@@ -479,6 +494,36 @@ export function StoryChat({
         if (event.jobsQueued === true || hasPendingJobs(next)) openJobEventsStream();
         return next;
       });
+    }
+  }
+
+  // ── Load older messages ───────────────────────────────────────────────────────
+  async function loadOlderMessages() {
+    if (!hasMore || !oldestCreatedAt || loadingOlderRef.current) return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    try {
+      const res = await fetch(
+        `/api/v2/story/${sessionId}/messages?before=${encodeURIComponent(oldestCreatedAt)}`
+      );
+      if (!res.ok) throw new Error(`Load older failed: ${res.status}`);
+      const page = (await res.json()) as {
+        messages: ClientMessage[];
+        hasMore: boolean;
+        oldestCreatedAt: string | null;
+      };
+      setMessages((prev) => {
+        const existing = new Set(prev.map((m) => m.id));
+        const older = page.messages.filter((m) => !existing.has(m.id));
+        return older.length ? [...older, ...prev] : prev;
+      });
+      setHasMore(page.hasMore);
+      setOldestCreatedAt(page.oldestCreatedAt);
+    } catch (err) {
+      console.error("Load older messages:", err);
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
     }
   }
 
@@ -790,6 +835,9 @@ export function StoryChat({
             messages={messages}
             isStreaming={isStreaming}
             streamingMsgId={streamingMsgId}
+            hasMore={hasMore}
+            loadingOlder={loadingOlder}
+            onLoadOlder={() => void loadOlderMessages()}
             onAssetApproval={handleAssetApproval}
             onContinuityPackApproval={handleContinuityPackApproval}
             onGridApproval={handleGridApproval}

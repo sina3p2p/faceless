@@ -9,14 +9,21 @@ import type {
   ShotCompile,
   ShotResult,
 } from "@/types/v2/story";
-import { mediaUrl, mediaUrls } from "@/lib/storage";
+import { mediaUrl, mediaUrls, storageKeyFrom } from "@/lib/storage";
+import { filmstripTileCount } from "@/lib/filmstrip";
+import { db } from "@/server/db";
+import { filmSessionMessages } from "@/server/db/schema";
+import { and, desc, eq, lt } from "drizzle-orm";
 
 type DbRow = {
   messageId: string;
   role: string;
   type: string;
   parts: unknown;
+  createdAt?: Date | null;
 };
+
+export const MESSAGES_PAGE_SIZE = 30;
 
 type RawToolCall = {
   id: string;
@@ -181,8 +188,9 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
     if (row.role === "user" && USER_RESULT_TYPES.has(row.type)) continue;
 
     const d = rowData(row);
+    const createdAt = row.createdAt?.toISOString();
     if (row.role === "user") {
-      messages.push({ id: row.messageId, role: "user", text: d.text as string });
+      messages.push({ id: row.messageId, role: "user", text: d.text as string, createdAt });
     } else if (row.role === "assistant") {
       const calls = getToolCalls(d);
       let questions: QuestionsCall | undefined;
@@ -267,11 +275,23 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
           const hasVideo = !!(args.videoUrl as string | undefined);
           if (isPending || hasVideo) {
             const videoUrl = args.videoUrl as string | undefined;
+            const videoKey = videoUrl ? storageKeyFrom(videoUrl) : null;
+            // Prefer explicit key; otherwise conventional sibling of the MP4
+            // (…/toolCallId-filmstrip.jpg) so backfilled strips show without a message rewrite.
+            const filmstripKey =
+              (args.filmstripUrl as string | undefined) ??
+              (videoKey ? videoKey.replace(/\.mp4$/i, "") + "-filmstrip.jpg" : undefined);
+            const duration = args.renderedDurationSeconds as number | undefined;
+            const filmstripTiles =
+              (args.filmstripTiles as number | undefined) ??
+              (duration != null ? filmstripTileCount(duration) : undefined);
             shotResult = {
               toolCallId: tc.id,
               loading: isPending,
               videoUrl: videoUrl ? await mediaUrl(videoUrl) : undefined,
-              duration: args.renderedDurationSeconds as number | undefined,
+              filmstripUrl: filmstripKey ? await mediaUrl(filmstripKey) : undefined,
+              filmstripTiles,
+              duration,
               error: args.shotError as string | undefined,
               approved: shotApprovals.has(tc.id),
             };
@@ -298,6 +318,7 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
         id: row.messageId,
         role: "assistant",
         text: (d.text as string) ?? "",
+        createdAt,
         questions,
         assetRef,
         continuityPack,
@@ -311,11 +332,44 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
           id: `${row.messageId}-answers`,
           role: "user",
           text: formatQaText(questions.questions, questions.answers),
+          createdAt,
         });
       }
     }
   }
   return messages;
+}
+
+export type MessagesPage = {
+  messages: ClientMessage[];
+  hasMore: boolean;
+  oldestCreatedAt: string | null;
+};
+
+/** Latest (or older-than-`before`) page of client messages with signed media URLs. */
+export async function loadMessagesPage(
+  sessionId: string,
+  before?: string | null
+): Promise<MessagesPage> {
+  const rows = await db
+    .select()
+    .from(filmSessionMessages)
+    .where(
+      and(
+        eq(filmSessionMessages.sessionId, sessionId),
+        before ? lt(filmSessionMessages.createdAt, new Date(before)) : undefined
+      )
+    )
+    .orderBy(desc(filmSessionMessages.createdAt))
+    .limit(MESSAGES_PAGE_SIZE * 3);
+
+  const chronological = [...rows].reverse();
+  const messages = await rowsToClientMessages(chronological);
+  const pageMessages = messages.slice(-MESSAGES_PAGE_SIZE);
+  const hasMore = messages.length > MESSAGES_PAGE_SIZE || rows.length >= MESSAGES_PAGE_SIZE * 3;
+  const oldestCreatedAt = pageMessages[0]?.createdAt ?? null;
+
+  return { messages: pageMessages, hasMore, oldestCreatedAt };
 }
 
 export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]> {

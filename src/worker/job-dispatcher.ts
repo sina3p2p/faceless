@@ -30,6 +30,9 @@ export async function dispatchWorkerJob(
         await patchMessageToolCall(assistantMessageRowId, toolCallId, {
           videoUrl: result.videoUrl,
           renderedDurationSeconds: result.durationSeconds,
+          ...(result.filmstripUrl
+            ? { filmstripUrl: result.filmstripUrl, filmstripTiles: result.filmstripTiles }
+            : {}),
           pending: false,
         });
         break;
@@ -97,7 +100,7 @@ type ShotPayload = {
 
 async function runGenerateShot(sessionId: string, payload: PayloadBase & ShotPayload) {
   const key = `v2/shots/${sessionId}/${payload.toolCallId}.mp4`;
-  const { url: videoUrl, durationSeconds, mediaId } = await renderAndUploadShot(
+  const { url: videoUrl, durationSeconds, mediaId, filmstripUrl, filmstripTiles } = await renderAndUploadShot(
     {
       prompt: payload.prompt,
       referenceImageUrls: payload.referenceImageUrls ?? [],
@@ -109,7 +112,7 @@ async function runGenerateShot(sessionId: string, payload: PayloadBase & ShotPay
     sessionId,
     key,
   );
-  return { videoUrl, durationSeconds, mediaId };
+  return { videoUrl, durationSeconds, mediaId, filmstripUrl, filmstripTiles };
 }
 
 type AssetPayload = {

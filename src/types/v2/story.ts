@@ -77,6 +77,10 @@ export type ShotResult = {
   toolCallId: string;
   loading: boolean;
   videoUrl?: string;
+  /** Signed URL for server-generated horizontal filmstrip JPEG. */
+  filmstripUrl?: string;
+  /** Frames in the filmstrip sprite (~1 per second). */
+  filmstripTiles?: number;
   duration?: number;
   error?: string;
   approved?: boolean;
@@ -97,6 +101,8 @@ export type ClientMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  /** ISO timestamp from DB — used as pagination cursor for load-older. */
+  createdAt?: string;
   reasoning?: string;
   questions?: QuestionsCall;
   assetRef?: AssetRef;

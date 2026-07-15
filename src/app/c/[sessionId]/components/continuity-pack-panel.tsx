@@ -110,6 +110,8 @@ export function ContinuityPackPanel({
                   <img
                     src={url}
                     alt={keyframes[i]?.caption ?? `Continuity keyframe ${i + 1}`}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 </div>

@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/server/db";
-import { filmSessions, filmSessionMessages } from "@/server/db/schema";
-import { eq, asc } from "drizzle-orm";
-import { rowsToClientMessages } from "@/server/services/showrunner/messages";
+import { filmSessions } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
+import { loadMessagesPage } from "@/server/services/showrunner/messages";
 import { StoryChat } from "./components/story-chat";
 
 export default async function StorySessionPage({
@@ -25,13 +25,14 @@ export default async function StorySessionPage({
 
   if (!session || session.userId !== userId) redirect("/");
 
-  const rows = await db
-    .select()
-    .from(filmSessionMessages)
-    .where(eq(filmSessionMessages.sessionId, sessionId))
-    .orderBy(asc(filmSessionMessages.createdAt));
+  const { messages, hasMore, oldestCreatedAt } = await loadMessagesPage(sessionId);
 
-  const initialMessages = await rowsToClientMessages(rows);
-
-  return <StoryChat sessionId={session.id} initialMessages={initialMessages} />;
+  return (
+    <StoryChat
+      sessionId={session.id}
+      initialMessages={messages}
+      initialHasMore={hasMore}
+      initialOldestCreatedAt={oldestCreatedAt}
+    />
+  );
 }

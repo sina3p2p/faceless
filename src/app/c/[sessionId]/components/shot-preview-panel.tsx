@@ -1,4 +1,39 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
 import type { ShotResult } from "@/types/v2/story";
+
+function LazyShotVideo({ src }: { src: string }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setActive(true);
+          io.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <video
+      ref={ref}
+      src={active ? src : undefined}
+      controls
+      preload={active ? "metadata" : "none"}
+      className="w-full"
+      style={{ aspectRatio: "16/9", background: "rgba(255,255,255,0.03)" }}
+    />
+  );
+}
 
 export function ShotPreviewPanel({
   shotResult,
@@ -31,7 +66,7 @@ export function ShotPreviewPanel({
     return (
       <div className="mt-1 space-y-2">
         <div className="rounded-xl overflow-hidden border border-white/10">
-          <video src={shotResult.videoUrl} controls preload="metadata" className="w-full" />
+          <LazyShotVideo src={shotResult.videoUrl} />
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {shotResult.approved ? (

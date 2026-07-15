@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { type PlayerRef } from "@remotion/player";
-import { prefetch } from "remotion";
 import { getVideoMetadata } from "@remotion/media-utils";
 import { type StoryCompositionProps, type AudioClipConfig, computeSequenceLayout, FPS } from "@/remotion/StoryComposition";
 import { FloatingPanel } from "../floating-panel";
@@ -24,6 +23,8 @@ import PlayerView from "./player-view";
 export type Clip = {
   toolCallId: string;
   videoUrl: string;
+  filmstripUrl?: string;
+  filmstripTiles?: number;
   duration?: number;
   approved?: boolean;
 };
@@ -50,7 +51,19 @@ const HISTORY_LIMIT = 50;
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toInternalClip(c: Clip, startTime = 0, trackIndex = 0): InternalClip {
-  return { id: c.toolCallId, sourceId: c.toolCallId, videoUrl: c.videoUrl, approved: c.approved, startTime, trackIndex, trimStart: 0, trimEnd: null, reversed: false };
+  return {
+    id: c.toolCallId,
+    sourceId: c.toolCallId,
+    videoUrl: c.videoUrl,
+    filmstripUrl: c.filmstripUrl,
+    filmstripTiles: c.filmstripTiles,
+    approved: c.approved,
+    startTime,
+    trackIndex,
+    trimStart: 0,
+    trimEnd: null,
+    reversed: false,
+  };
 }
 
 // Classic array-move reindexing for dragging a track to a new position:
@@ -229,9 +242,23 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
       let changed = filtered.length !== prev.length;
       const updated = filtered.map((c) => {
         const src = clips.find((s) => s.toolCallId === c.sourceId);
-        if (!src || (src.videoUrl === c.videoUrl && src.approved === c.approved)) return c;
+        if (
+          !src ||
+          (src.videoUrl === c.videoUrl &&
+            src.approved === c.approved &&
+            src.filmstripUrl === c.filmstripUrl &&
+            src.filmstripTiles === c.filmstripTiles)
+        ) {
+          return c;
+        }
         changed = true;
-        return { ...c, videoUrl: src.videoUrl, approved: src.approved };
+        return {
+          ...c,
+          videoUrl: src.videoUrl,
+          filmstripUrl: src.filmstripUrl,
+          filmstripTiles: src.filmstripTiles,
+          approved: src.approved,
+        };
       });
       const existingSourceIds = new Set(updated.map((c) => c.sourceId));
       const incoming = clips.filter((c) => !existingSourceIds.has(c.toolCallId));
@@ -312,39 +339,31 @@ export function VideoEditorPanel({ clips, sessionId, selectedClipId, onSelectCli
     });
   }, []);
 
-  // ── prefetch clip videos into Remotion's blob cache ───────────────────────
-  // remotion's prefetch() is what OffthreadVideo's usePreload() actually reads.
-  // @remotion/preload's preloadVideo() only hints the browser and does not
-  // feed that cache. Prefetch hits signed R2 URLs directly (requires CORS).
-  // Duration still comes from getVideoMetadata.
-  const prefetchesRef = useRef(new Map<string, () => void>());
+  // Resolve unknown durations for the focused clip only. Remotion's
+  // OffthreadVideo loads on demand during playback — do NOT prefetch() full
+  // blobs on mount (that alone was tens–hundreds of MB per reload).
+  const metaRequestedRef = useRef(new Set<string>());
   useEffect(() => {
-    const active = prefetchesRef.current;
-    const byUrl = new Map<string, string[]>();
-    for (const c of internalClips) {
-      byUrl.set(c.videoUrl, [...(byUrl.get(c.videoUrl) ?? []), c.id]);
-    }
-    for (const [url, free] of active) {
-      if (!byUrl.has(url)) {
-        free();
-        active.delete(url);
-      }
-    }
-    for (const [url, ids] of byUrl) {
-      if (active.has(url)) continue;
-      const { free } = prefetch(url);
-      active.set(url, free);
-      getVideoMetadata(url)
-        .then(({ durationInSeconds }) => {
-          for (const id of ids) applyRealDuration(id, durationInSeconds);
-        })
-        .catch((err) => { console.error("getVideoMetadata failed", url, err); });
-    }
-  }, [internalClips, applyRealDuration]);
+    if (isHidden || internalClips.length === 0) return;
 
-  useEffect(() => () => {
-    for (const free of prefetchesRef.current.values()) free();
-  }, []);
+    const selectedIdx = selectedClipId
+      ? internalClips.findIndex((c) => c.id === selectedClipId)
+      : 0;
+    const focusIdx = selectedIdx >= 0 ? selectedIdx : 0;
+    const focus = internalClips[focusIdx];
+    if (!focus) return;
+    if (clipMetaRef.current.has(focus.id) || metaRequestedRef.current.has(focus.id)) return;
+
+    metaRequestedRef.current.add(focus.id);
+    getVideoMetadata(focus.videoUrl)
+      .then(({ durationInSeconds }) => {
+        applyRealDuration(focus.id, durationInSeconds);
+      })
+      .catch((err) => {
+        metaRequestedRef.current.delete(focus.id);
+        console.error("getVideoMetadata failed", focus.videoUrl, err);
+      });
+  }, [internalClips, selectedClipId, isHidden, applyRealDuration]);
 
   // ── derived ───────────────────────────────────────────────────────────────
 

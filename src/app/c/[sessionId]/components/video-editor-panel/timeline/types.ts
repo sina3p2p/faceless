@@ -5,6 +5,8 @@ export type InternalClip = {
   id: string;
   sourceId: string;
   videoUrl: string;
+  filmstripUrl?: string;
+  filmstripTiles?: number;
   approved?: boolean;
   startTime: number;   // absolute position on timeline (seconds)
   trackIndex: number;  // which row (0 = top/primary)

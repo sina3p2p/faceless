@@ -62,7 +62,7 @@ export function ShotCompilePanel({
                   <PhotoView key={`${url}-${i}`} src={url}>
                     <div className="relative shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-white/10 bg-white/5 cursor-zoom-in">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Image${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={url} alt={`Image${i + 1}`} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                       <span className="pointer-events-none absolute bottom-0 inset-x-0 bg-black/60 text-[8px] text-center text-white/80 py-0.5">
                         Image{i + 1}
                       </span>

@@ -85,6 +85,8 @@ export function GenerationGridPanel({
             <img
               src={image}
               alt={`${label} storyboard`}
+              loading="lazy"
+              decoding="async"
               className="w-full h-full object-cover"
             />
           </div>

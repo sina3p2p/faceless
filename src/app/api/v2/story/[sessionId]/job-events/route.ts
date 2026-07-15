@@ -14,6 +14,8 @@ const MAX_WAIT_MS = 10 * 60 * 1_000;
 type JobResult = {
   images?: string[];
   videoUrl?: string;
+  filmstripUrl?: string;
+  filmstripTiles?: number;
   mediaId?: string;
   durationSeconds?: number;
   error?: string;
@@ -118,11 +120,19 @@ export async function GET(
               const durationSeconds =
                 result?.durationSeconds ??
                 (job.mediaMetadata as { duration?: number } | null)?.duration;
+              const filmstripKey =
+                result?.filmstripUrl ??
+                (job.mediaMetadata as { filmstripUrl?: string } | null)?.filmstripUrl;
+              const filmstripTiles =
+                result?.filmstripTiles ??
+                (job.mediaMetadata as { filmstripTiles?: number } | null)?.filmstripTiles;
               enqueue({
                 type: "shot_complete",
                 toolCallId,
                 videoUrl: await mediaUrl(job.mediaUrl || result!.videoUrl!),
                 durationSeconds,
+                filmstripUrl: filmstripKey ? await mediaUrl(filmstripKey) : undefined,
+                filmstripTiles,
               });
             } else {
               enqueue({

@@ -73,6 +73,8 @@ export function AssetRefPanel({
                   <img
                     src={url}
                     alt="Reference candidate"
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover cursor-zoom-in"
                   />
                 </PhotoView>

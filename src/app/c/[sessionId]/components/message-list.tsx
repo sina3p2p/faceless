@@ -13,6 +13,9 @@ export function MessageList({
   messages,
   isStreaming,
   streamingMsgId,
+  hasMore = false,
+  loadingOlder = false,
+  onLoadOlder,
   onAssetApproval,
   onContinuityPackApproval,
   onGridApproval,
@@ -23,6 +26,9 @@ export function MessageList({
   messages: ClientMessage[];
   isStreaming: boolean;
   streamingMsgId: string | null;
+  hasMore?: boolean;
+  loadingOlder?: boolean;
+  onLoadOlder?: () => void;
   onAssetApproval: (toolCallId: string, assetHandle: string, url: string) => void;
   onContinuityPackApproval: (
     toolCallId: string,
@@ -39,7 +45,28 @@ export function MessageList({
   const contentRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isAtBottomRef = useRef(true);
+  const pendingPrependRef = useRef(false);
+  const scrollHeightBeforeLoadRef = useRef(0);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+
+  // When loadingOlder flips true→false with more messages, restore scroll offset.
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    if (loadingOlder) {
+      if (!pendingPrependRef.current) {
+        scrollHeightBeforeLoadRef.current = el.scrollHeight;
+        pendingPrependRef.current = true;
+        isAtBottomRef.current = false;
+      }
+      return;
+    }
+    if (pendingPrependRef.current) {
+      pendingPrependRef.current = false;
+      const delta = el.scrollHeight - scrollHeightBeforeLoadRef.current;
+      if (delta > 0) el.scrollTop += delta;
+    }
+  }, [loadingOlder, messages.length]);
 
   // Content height can grow without `messages` changing — e.g. an image
   // finishing load. A ResizeObserver catches that growth directly instead
@@ -60,6 +87,9 @@ export function MessageList({
     if (!el) return;
     isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
     setShowScrollBtn(!isAtBottomRef.current);
+    if (hasMore && onLoadOlder && !loadingOlder && el.scrollTop < 80) {
+      onLoadOlder();
+    }
   }
 
   return (
@@ -70,6 +100,21 @@ export function MessageList({
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 [scrollbar-width:thin] [scrollbar-color:#333_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb:hover]:bg-white/30"
       >
         <div ref={contentRef} className="space-y-7 pb-4 max-w-3xl mx-auto w-full">
+          {(hasMore || loadingOlder) && (
+            <div className="flex justify-center py-1">
+              {loadingOlder ? (
+                <p className="text-[11px] text-muted-foreground/40 animate-pulse">Loading earlier messages…</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={onLoadOlder}
+                  className="text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                >
+                  Load earlier messages
+                </button>
+              )}
+            </div>
+          )}
           {messages.map((msg) => {
             if (msg.role === "user") {
               return (
@@ -116,8 +161,6 @@ export function MessageList({
                     </button>
                   </div>
                 )}
-
-
 
                 {msg.assetRef && (
                   <AssetRefPanel

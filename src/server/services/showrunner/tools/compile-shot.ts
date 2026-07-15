@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { generateVideo, type VideoResult } from "@/server/services/ai/video";
 import { addSeedanceNoiseEnhanced } from "@/server/services/ai/video/seedance-noise";
 import { uploadFile, mediaUrl } from "@/lib/storage";
-import { probeVideoDuration } from "@/lib/media-probe";
+import { probeVideoDuration, generateFilmstripJpeg } from "@/lib/media-probe";
 import { db } from "@/server/db";
 import { filmSessions, media } from "@/server/db/schema";
 
@@ -132,6 +132,10 @@ export interface UploadedShot {
   url: string;
   durationSeconds: number;
   mediaId: string;
+  /** Storage key for the horizontal filmstrip JPEG (optional if generation fails). */
+  filmstripUrl?: string;
+  /** Number of frames in the filmstrip sprite (~1/sec). */
+  filmstripTiles?: number;
 }
 
 /**
@@ -153,6 +157,17 @@ export async function renderAndUploadShot(
 
   const durationSeconds = (await probeVideoDuration(videoBuffer)) ?? result.durationSeconds;
 
+  let filmstripUrl: string | undefined;
+  let filmstripTiles: number | undefined;
+  try {
+    const strip = await generateFilmstripJpeg(videoBuffer, durationSeconds);
+    filmstripUrl = storageKey.replace(/\.mp4$/i, "") + "-filmstrip.jpg";
+    filmstripTiles = strip.tiles;
+    await uploadFile(filmstripUrl, strip.jpeg, "image/jpeg");
+  } catch (err) {
+    console.warn("Filmstrip generation failed", { sessionId, storageKey, err });
+  }
+
   const [session] = await db.select({ userId: filmSessions.userId }).from(filmSessions).where(eq(filmSessions.id, sessionId));
   const [mediaRow] = await db.insert(media).values({
     userId: session.userId,
@@ -160,8 +175,17 @@ export async function renderAndUploadShot(
     url: storageKey,
     prompt: args.prompt,
     modelUsed: "seedance-2-mini",
-    metadata: { duration: durationSeconds },
+    metadata: {
+      duration: durationSeconds,
+      ...(filmstripUrl ? { filmstripUrl, filmstripTiles } : {}),
+    },
   }).returning({ id: media.id });
 
-  return { url: await mediaUrl(storageKey), durationSeconds, mediaId: mediaRow.id };
+  return {
+    url: await mediaUrl(storageKey),
+    durationSeconds,
+    mediaId: mediaRow.id,
+    filmstripUrl,
+    filmstripTiles,
+  };
 }

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/server/db";
-import { filmSessions, filmSessionMessages } from "@/server/db/schema";
+import { filmSessions } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound } from "@/lib/api-utils";
-import { eq, lt, and, desc } from "drizzle-orm";
-import { rowsToClientMessages } from "@/server/services/showrunner/messages";
-
-const PAGE_SIZE = 30;
+import { eq } from "drizzle-orm";
+import { loadMessagesPage } from "@/server/services/showrunner/messages";
 
 export async function GET(
   req: NextRequest,
@@ -24,23 +22,6 @@ export async function GET(
 
   if (!session || session.userId !== user.id) return notFound("Session not found");
 
-  const rows = await db
-    .select()
-    .from(filmSessionMessages)
-    .where(
-      and(
-        eq(filmSessionMessages.sessionId, sessionId),
-        before ? lt(filmSessionMessages.createdAt, new Date(before)) : undefined
-      )
-    )
-    .orderBy(desc(filmSessionMessages.createdAt))
-    .limit(PAGE_SIZE * 3);
-
-  const chronological = [...rows].reverse();
-  const messages = await rowsToClientMessages(chronological);
-  const pageMessages = messages.slice(-PAGE_SIZE);
-  const hasMore = messages.length > PAGE_SIZE || rows.length >= PAGE_SIZE * 3;
-  const oldestCreatedAt = chronological[0]?.createdAt.toISOString() ?? null;
-
-  return NextResponse.json({ messages: pageMessages, hasMore, oldestCreatedAt });
+  const page = await loadMessagesPage(sessionId, before);
+  return NextResponse.json(page);
 }

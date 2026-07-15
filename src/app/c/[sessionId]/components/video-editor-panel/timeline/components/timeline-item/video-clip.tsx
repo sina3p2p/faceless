@@ -31,6 +31,8 @@ function propsEqual(prev: VideoClipProps, next: VideoClipProps): boolean {
     prev.item.start === next.item.start &&
     prev.item.end === next.item.end &&
     prev.item.clip.videoUrl === next.item.clip.videoUrl &&
+    prev.item.clip.filmstripUrl === next.item.clip.filmstripUrl &&
+    prev.item.clip.filmstripTiles === next.item.clip.filmstripTiles &&
     prev.item.clip.trimStart === next.item.clip.trimStart &&
     prev.item.clip.trimEnd === next.item.clip.trimEnd &&
     prev.item.clip.reversed === next.item.clip.reversed &&
@@ -79,11 +81,17 @@ export const VideoClip = memo(function VideoClip({
         <>
           <div className="absolute inset-0 bg-gradient-to-br from-violet-900/50 to-indigo-950/80" />
 
-          {raw > 0 ? (
-            <Filmstrip videoUrl={clip.videoUrl} trimStart={clip.trimStart} trimEnd={clip.trimEnd} raw={raw} />
-          ) : (
-            <video src={clip.videoUrl} className="absolute inset-0 w-full h-full object-cover opacity-60" preload="metadata" muted />
-          )}
+          {clip.filmstripUrl ? (
+            <Filmstrip
+              filmstripUrl={clip.filmstripUrl}
+              tileCount={clip.filmstripTiles}
+              durationSeconds={raw > 0 ? raw : undefined}
+              trimStart={clip.trimStart}
+              trimEnd={clip.trimEnd}
+              reversed={clip.reversed}
+              pxPerSec={pxPerSec}
+            />
+          ) : null}
 
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
 
