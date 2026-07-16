@@ -204,8 +204,8 @@ export async function POST(
       messages: modelMessages,
       tools: storyTools,
       seed: session.seed ?? undefined,
-      // Allow the model to call loadReference / webExtract (auto-executed) and then continue
-      // responding in the same turn. Cap at 10 to prevent runaway loops.
+      // Allow the model to call loadReference / loadApprovedImage / webExtract (auto-executed)
+      // and then continue responding in the same turn. Cap at 10 to prevent runaway loops.
       stopWhen: stepCountIs(10),
       providerOptions: {
         openrouter: {
@@ -268,6 +268,7 @@ export async function POST(
       } else if (chunk.type === "tool-result") {
         if (
           chunk.toolName === "loadReference" ||
+          chunk.toolName === "loadApprovedImage" ||
           chunk.toolName === "webExtract" ||
           chunk.toolName === "recordContinuityPackEntry" ||
           chunk.toolName === "recordGenerationGridEntry" ||

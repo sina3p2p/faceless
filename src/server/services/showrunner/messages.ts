@@ -25,6 +25,12 @@ type DbRow = {
 
 export const MESSAGES_PAGE_SIZE = 30;
 
+/** Max images auto-attached as vision when replaying session history. */
+export const MAX_HISTORY_VISION_IMAGES = 5;
+
+const VISION_HINT =
+  "Image not attached — older than vision window. Call loadApprovedImage with the URL to inspect pixels.";
+
 type RawToolCall = {
   id: string;
   type: "function";
@@ -459,6 +465,25 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
     }
   }
 
+  // Chronological vision candidates (approvals + prior loadApprovedImage calls).
+  // Only the last MAX_HISTORY_VISION_IMAGES keep image-url parts on replay.
+  const visionOrder: string[] = [];
+  for (const row of rows) {
+    if (row.role !== "assistant" || row.type !== "turn") continue;
+    for (const tc of getToolCalls(rowData(row))) {
+      if (collectedResults.get(tc.id)?.imageUrl) {
+        visionOrder.push(tc.id);
+      } else if (
+        tc.function.name === "loadApprovedImage" &&
+        typeof tc.function.arguments.url === "string" &&
+        tc.function.arguments.url.trim()
+      ) {
+        visionOrder.push(tc.id);
+      }
+    }
+  }
+  const keepVision = new Set(visionOrder.slice(-MAX_HISTORY_VISION_IMAGES));
+
   const msgs: ModelMessage[] = [];
 
   for (const row of rows) {
@@ -532,6 +557,56 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
                 output: toToolResultOutput(storedToolResults[tc.id], fallback),
               };
             }
+            // Rebuild from args so historical loads respect the vision window
+            // (stored content would otherwise re-attach every past image).
+            if (tc.function.name === "loadApprovedImage") {
+              const rawUrl =
+                typeof tc.function.arguments.url === "string"
+                  ? tc.function.arguments.url.trim()
+                  : "";
+              const label =
+                typeof tc.function.arguments.label === "string"
+                  ? tc.function.arguments.label.trim()
+                  : "";
+              const resolved = rawUrl ? await mediaUrl(rawUrl) : null;
+              if (!resolved) {
+                return {
+                  type: "tool-result" as const,
+                  toolCallId: tc.id,
+                  toolName,
+                  output: toToolResultOutput(
+                    storedToolResults[tc.id],
+                    `Could not resolve image URL: ${rawUrl || "(missing)"}`
+                  ),
+                };
+              }
+              const loadedText = label
+                ? `Loaded image "${label}": ${resolved}`
+                : `Loaded image: ${resolved}`;
+              if (keepVision.has(tc.id)) {
+                return {
+                  type: "tool-result" as const,
+                  toolCallId: tc.id,
+                  toolName,
+                  output: {
+                    type: "content" as const,
+                    value: [
+                      { type: "text" as const, text: loadedText },
+                      { type: "image-url" as const, url: resolved },
+                    ],
+                  },
+                };
+              }
+              return {
+                type: "tool-result" as const,
+                toolCallId: tc.id,
+                toolName,
+                output: {
+                  type: "text" as const,
+                  value: `${loadedText} (${VISION_HINT})`,
+                },
+              };
+            }
             // Continuity-chain / panel validation failures — prefer stored execute() JSON
             // so the agent can fix isFirstInScene / previousGenerationId / incomingAnchor_*.
             if (
@@ -579,19 +654,31 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
                         ? "Shot render in progress — waiting for the video to finish."
                         : "Shot prompt compiled and shown to user for review. Awaiting their approval before rendering starts."
                     : "User has not yet answered these questions.");
+            const attachVision =
+              Boolean(collected?.imageUrl) && keepVision.has(tc.id);
+            if (attachVision && collected?.imageUrl) {
+              return {
+                type: "tool-result" as const,
+                toolCallId: tc.id,
+                toolName,
+                output: {
+                  type: "content" as const,
+                  value: [
+                    { type: "text" as const, text: resultText },
+                    { type: "image-url" as const, url: collected.imageUrl },
+                  ],
+                },
+              };
+            }
+            const textOnly =
+              collected?.imageUrl && !keepVision.has(tc.id)
+                ? `${resultText} (${VISION_HINT})`
+                : resultText;
             return {
               type: "tool-result" as const,
               toolCallId: tc.id,
               toolName,
-              output: collected?.imageUrl
-                ? {
-                    type: "content" as const,
-                    value: [
-                      { type: "text" as const, text: resultText },
-                      { type: "image-url" as const, url: collected.imageUrl },
-                    ],
-                  }
-                : { type: "text" as const, value: resultText },
+              output: { type: "text" as const, value: textOnly },
             };
           })
         );
