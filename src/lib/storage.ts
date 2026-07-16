@@ -155,18 +155,6 @@ export function buildMediaProxyUrl(
   return `${APP.url.replace(/\/$/, "")}/api/media/${path}?exp=${exp}&sig=${sig}`;
 }
 
-export function verifyMediaProxyRequest(
-  key: string,
-  expRaw: string | null,
-  sig: string | null
-): boolean {
-  if (!key || !expRaw || !sig) return false;
-  if (key.includes("..") || key.startsWith("/") || key.includes("\0")) return false;
-  const exp = Number(expRaw);
-  if (!Number.isFinite(exp) || exp < Math.floor(Date.now() / 1000)) return false;
-  return safeEqual(sig, signMediaProxy(key, exp));
-}
-
 /** Fetch object bytes from private storage (used by `/api/media/[...key]`). */
 export async function getStoredObject(
   key: string

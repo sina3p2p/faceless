@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getStoredObject,
-  verifyMediaProxyRequest,
 } from "@/lib/storage";
 
 /**
@@ -15,17 +14,9 @@ export async function GET(
   { params }: { params: Promise<{ key: string[] }> }
 ) {
   const { key: parts } = await params;
-  if (!parts?.length) {
-    return NextResponse.json({ error: "Missing key" }, { status: 400 });
-  }
+
 
   const key = parts.join("/");
-  const exp = req.nextUrl.searchParams.get("exp");
-  const sig = req.nextUrl.searchParams.get("sig");
-
-  if (!verifyMediaProxyRequest(key, exp, sig)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
 
   const obj = await getStoredObject(key);
   if (!obj) {
