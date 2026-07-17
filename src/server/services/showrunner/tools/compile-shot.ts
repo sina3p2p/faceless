@@ -21,7 +21,7 @@ export const compileShot = tool({
     "continues the same character through the same space (walks / approaches / same-surface carries). " +
     "Use 'fresh' for scene opens, clean breaks, and hard cuts that start a new take. " +
     "Attach referenceImageUrls in precision order: character → object → location → " +
-    "continuity-pack keyframes → incoming anchor → motion sheet. " +
+    "scene anchor (scene's first approved sheet) → incoming anchor → motion sheet. " +
     "Prompt must interpolate the motion sheet (continuous take; no hard cuts; never show grid/gutters) " +
     "with COMPOSITION LOCK on Panel 1 and END STATE LOCK on Panel n. " +
     "The user reviews/edits the prompt, then approves — rendering starts only after approval. " +
@@ -39,9 +39,10 @@ export const compileShot = tool({
       .max(9)
       .describe(
         "Approved reference image URLs in precision order: character → object → location → " +
-        "continuity-pack keyframes (1–3) → incoming anchor (prior terminal panel / last frame, when continuous) → " +
-        "motion sheet. Required for fresh; optional for extend_video when identity is carried by the source clip " +
-        "(still attach sheet + continuity refs when available)."
+        "scene anchor (scene's first approved sheet, when later in scene) → " +
+        "incoming anchor (prior terminal panel / last frame, when continuous) → motion sheet. " +
+        "Required for fresh; optional for extend_video when identity is carried by the source clip " +
+        "(still attach sheet + scene/incoming anchors when available)."
       ),
     duration: z
       .number()

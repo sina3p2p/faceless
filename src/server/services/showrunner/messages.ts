@@ -267,6 +267,7 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
             shotIds: args.shotIds as number[] | undefined,
             estimatedDurationSeconds: args.estimatedDurationSeconds as number | undefined,
             previousGenerationId: args.previousGenerationId as string | null | undefined,
+            sceneAnchorHandle: args.sceneAnchorHandle as string | null | undefined,
             incomingAnchorHandle: args.incomingAnchorHandle as string | null | undefined,
             continuityBreakReason: args.continuityBreakReason as string | null | undefined,
             images: rawImages ? await mediaUrls(rawImages) : undefined,
@@ -279,7 +280,25 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
         } else if (tc.function.name === "compileShot") {
           const isPending = (args.pending as boolean | undefined) === true;
           const hasVideo = !!(args.videoUrl as string | undefined);
-          if (isPending || hasVideo) {
+          const refs = args.referenceImageUrls as string[] | undefined;
+          const sourceVideoUrl = args.sourceVideoUrl as string | undefined;
+          const compileFields = {
+            toolCallId: tc.id,
+            loading: false as const,
+            renderPrompt: args.prompt as string,
+            referenceImageUrls: refs ? await mediaUrls(refs) : [],
+            duration: args.duration as number,
+            aspectRatio: args.aspectRatio as ShotCompile["aspectRatio"],
+            continuityMode: args.continuityMode as ShotCompile["continuityMode"],
+            sourceVideoUrl: sourceVideoUrl
+              ? await mediaUrl(sourceVideoUrl)
+              : undefined,
+          };
+          if (isPending) {
+            // Keep the compile panel visible (disabled + shimmer) while the job runs.
+            shotCompile = { ...compileFields, rendering: true };
+            shotResult = { toolCallId: tc.id, loading: true };
+          } else if (hasVideo || args.shotError) {
             const videoUrl = args.videoUrl as string | undefined;
             const videoKey = videoUrl ? storageKeyFrom(videoUrl) : null;
             // Prefer explicit key; otherwise conventional sibling of the MP4
@@ -291,31 +310,31 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
             const filmstripTiles =
               (args.filmstripTiles as number | undefined) ??
               (duration != null ? filmstripTileCount(duration) : undefined);
+            const signedVideo = videoUrl ? await mediaUrl(videoUrl) : undefined;
+            const signedFilmstrip = filmstripKey ? await mediaUrl(filmstripKey) : undefined;
+            const approved = shotApprovals.has(tc.id);
+            const error = args.shotError as string | undefined;
+            shotCompile = {
+              ...compileFields,
+              videoUrl: signedVideo,
+              filmstripUrl: signedFilmstrip,
+              filmstripTiles,
+              error,
+              approved,
+            };
+            // Keep shotResult for the timeline editor.
             shotResult = {
               toolCallId: tc.id,
-              loading: isPending,
-              videoUrl: videoUrl ? await mediaUrl(videoUrl) : undefined,
-              filmstripUrl: filmstripKey ? await mediaUrl(filmstripKey) : undefined,
+              loading: false,
+              videoUrl: signedVideo,
+              filmstripUrl: signedFilmstrip,
               filmstripTiles,
               duration,
-              error: args.shotError as string | undefined,
-              approved: shotApprovals.has(tc.id),
+              error,
+              approved,
             };
           } else {
-            const refs = args.referenceImageUrls as string[] | undefined;
-            const sourceVideoUrl = args.sourceVideoUrl as string | undefined;
-            shotCompile = {
-              toolCallId: tc.id,
-              loading: false,
-              renderPrompt: args.prompt as string,
-              referenceImageUrls: refs ? await mediaUrls(refs) : [],
-              duration: args.duration as number,
-              aspectRatio: args.aspectRatio as ShotCompile["aspectRatio"],
-              continuityMode: args.continuityMode as ShotCompile["continuityMode"],
-              sourceVideoUrl: sourceVideoUrl
-                ? await mediaUrl(sourceVideoUrl)
-                : undefined,
-            };
+            shotCompile = compileFields;
           }
         }
       }
@@ -434,15 +453,19 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
         text:
           `User approved continuity pack "${d.packHandle as string}" for scene ${d.sceneId as string | number} ` +
           `with ${approvedUrls.length} keyframe(s): ${approvedUrls.join(", ")}. ` +
-          `Record via recordContinuityPackEntry, then generate motion sheets (one per shot, 4–9 panels). ` +
-          `Keyframes are continuity references only — not a Seedance shot sequence.`,
+          `(Legacy continuity-pack artifact — current pipeline uses the scene header continuity block + ` +
+          `first approved motion sheet as scene anchor instead.)`,
         imageUrl: approvedUrls[0],
       });
     } else if (row.role === "user" && row.type === "grid_approval") {
       const d = rowData(row);
       const approvedUrl = agentMediaUrl(d.approvedUrl as string);
       collectedResults.set(d.toolCallId as string, {
-        text: `User approved this motion sheet for scene ${d.sceneId as string | number}: ${approvedUrl}`,
+        text:
+          `User approved this motion sheet for scene ${d.sceneId as string | number}: ${approvedUrl}. ` +
+          `Record via recordGenerationGridEntry. The first approved sheet in a scene becomes the scene ` +
+          `anchor for later sheets; later sheets must also set previous_generation_id + incoming_anchor_* ` +
+          `(or continuity_break_reason) and attach those images.`,
         imageUrl: approvedUrl ?? undefined,
       });
     } else if (row.role === "user" && row.type === "shot_approval") {
@@ -608,7 +631,7 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
               };
             }
             // Continuity-chain / panel validation failures — prefer stored execute() JSON
-            // so the agent can fix isFirstInScene / previousGenerationId / incomingAnchor_*.
+            // so the agent can fix isFirstInScene / sceneAnchorHandle / previousGenerationId / incomingAnchor_*.
             if (
               (tc.function.name === "generateGenerationGrid" ||
                 tc.function.name === "generateSceneGrid") &&

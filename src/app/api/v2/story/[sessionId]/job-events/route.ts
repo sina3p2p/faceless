@@ -34,6 +34,7 @@ type JobPayload = {
   shotIds?: number[];
   estimatedDurationSeconds?: number;
   previousGenerationId?: string | null;
+  sceneAnchorHandle?: string | null;
   incomingAnchorHandle?: string | null;
   continuityBreakReason?: string | null;
   panelCount?: number;
@@ -174,6 +175,7 @@ export async function GET(
                 shotIds: payload.shotIds,
                 estimatedDurationSeconds: payload.estimatedDurationSeconds,
                 previousGenerationId: payload.previousGenerationId,
+                sceneAnchorHandle: payload.sceneAnchorHandle,
                 incomingAnchorHandle: payload.incomingAnchorHandle,
                 continuityBreakReason: payload.continuityBreakReason,
                 panelCount: payload.panelCount,
@@ -214,6 +216,7 @@ export async function GET(
               shotIds: payload.shotIds,
               estimatedDurationSeconds: payload.estimatedDurationSeconds,
               previousGenerationId: payload.previousGenerationId,
+              sceneAnchorHandle: payload.sceneAnchorHandle,
               incomingAnchorHandle: payload.incomingAnchorHandle,
               continuityBreakReason: payload.continuityBreakReason,
               panelCount: payload.panelCount,

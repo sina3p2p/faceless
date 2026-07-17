@@ -13,7 +13,6 @@ import type {
   QuestionsCall,
   GenerationGrid,
   ShotCompile,
-  ShotResult,
 } from "@/types/v2/story";
 import { useMobileTab } from "@/components/story-shell";
 import { cn } from "@/lib/utils";
@@ -155,6 +154,7 @@ export function StoryChat({
     return msgs.some(
       (m) =>
         m.shotResult?.loading ||
+        m.shotCompile?.rendering ||
         m.assetRef?.loading ||
         m.continuityPack?.loading ||
         m.generationGrid?.loading
@@ -177,8 +177,27 @@ export function StoryChat({
           const filmstripTiles = event.filmstripTiles as number | undefined;
           setMessages((prev) => {
             const next = prev.map((m) =>
-              m.shotResult?.toolCallId === toolCallId
-                ? { ...m, shotResult: { ...m.shotResult, toolCallId, loading: false, videoUrl, duration, filmstripUrl, filmstripTiles } }
+              m.shotResult?.toolCallId === toolCallId || m.shotCompile?.toolCallId === toolCallId
+                ? {
+                    ...m,
+                    shotCompile: {
+                      ...(m.shotCompile ?? { toolCallId, loading: false }),
+                      rendering: false,
+                      videoUrl,
+                      filmstripUrl,
+                      filmstripTiles,
+                      error: undefined,
+                    },
+                    shotResult: {
+                      toolCallId,
+                      loading: false,
+                      videoUrl,
+                      duration,
+                      filmstripUrl,
+                      filmstripTiles,
+                      approved: m.shotResult?.approved ?? m.shotCompile?.approved,
+                    },
+                  }
                 : m
             );
             if (!hasPendingJobs(next)) closeJobEventsStream();
@@ -189,8 +208,17 @@ export function StoryChat({
           const error = event.error as string;
           setMessages((prev) => {
             const next = prev.map((m) =>
-              m.shotResult?.toolCallId === toolCallId
-                ? { ...m, shotResult: { toolCallId, loading: false, error } }
+              m.shotResult?.toolCallId === toolCallId || m.shotCompile?.toolCallId === toolCallId
+                ? {
+                    ...m,
+                    shotCompile: {
+                      ...(m.shotCompile ?? { toolCallId, loading: false }),
+                      rendering: false,
+                      videoUrl: undefined,
+                      error,
+                    },
+                    shotResult: { toolCallId, loading: false, error },
+                  }
                 : m
             );
             if (!hasPendingJobs(next)) closeJobEventsStream();
@@ -260,6 +288,9 @@ export function StoryChat({
                       previousGenerationId:
                         (event.previousGenerationId as string | null | undefined) ??
                         m.generationGrid!.previousGenerationId,
+                      sceneAnchorHandle:
+                        (event.sceneAnchorHandle as string | null | undefined) ??
+                        m.generationGrid!.sceneAnchorHandle,
                       incomingAnchorHandle:
                         (event.incomingAnchorHandle as string | null | undefined) ??
                         m.generationGrid!.incomingAnchorHandle,
@@ -432,6 +463,7 @@ export function StoryChat({
         shotIds: event.shotIds as number[] | undefined,
         estimatedDurationSeconds: event.estimatedDurationSeconds as number | undefined,
         previousGenerationId: event.previousGenerationId as string | null | undefined,
+        sceneAnchorHandle: event.sceneAnchorHandle as string | null | undefined,
         incomingAnchorHandle: event.incomingAnchorHandle as string | null | undefined,
         continuityBreakReason: event.continuityBreakReason as string | null | undefined,
         images: event.images as string[] | undefined,
@@ -464,29 +496,60 @@ export function StoryChat({
         prev.map((m) => (m.id === tempId ? { ...m, shotCompile } : m))
       );
     } else if (event.type === "shot_submitted") {
-      const shotResult: ShotResult = { toolCallId: event.toolCallId as string, loading: true };
+      const toolCallId = event.toolCallId as string;
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
+        prev.map((m) =>
+          m.id === tempId
+            ? {
+                ...m,
+                shotCompile: m.shotCompile?.toolCallId === toolCallId
+                  ? { ...m.shotCompile, rendering: true, videoUrl: undefined, error: undefined }
+                  : m.shotCompile,
+                shotResult: { toolCallId, loading: true },
+              }
+            : m
+        )
       );
       openJobEventsStream();
     } else if (event.type === "shot_generated") {
-      const shotResult: ShotResult = {
-        toolCallId: event.toolCallId as string,
-        loading: false,
-        videoUrl: event.videoUrl as string,
-        filmstripUrl: event.filmstripUrl as string | undefined,
-      };
+      const toolCallId = event.toolCallId as string;
+      const videoUrl = event.videoUrl as string;
+      const filmstripUrl = event.filmstripUrl as string | undefined;
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
+        prev.map((m) =>
+          m.id === tempId
+            ? {
+                ...m,
+                shotCompile: {
+                  ...(m.shotCompile ?? { toolCallId, loading: false }),
+                  rendering: false,
+                  videoUrl,
+                  filmstripUrl,
+                  error: undefined,
+                },
+                shotResult: { toolCallId, loading: false, videoUrl, filmstripUrl },
+              }
+            : m
+        )
       );
     } else if (event.type === "shot_error") {
-      const shotResult: ShotResult = {
-        toolCallId: event.toolCallId as string,
-        loading: false,
-        error: event.error as string,
-      };
+      const toolCallId = event.toolCallId as string;
+      const error = event.error as string;
       setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, shotResult } : m))
+        prev.map((m) =>
+          m.id === tempId
+            ? {
+                ...m,
+                shotCompile: {
+                  ...(m.shotCompile ?? { toolCallId, loading: false }),
+                  rendering: false,
+                  videoUrl: undefined,
+                  error,
+                },
+                shotResult: { toolCallId, loading: false, error },
+              }
+            : m
+        )
       );
     } else if (event.type === "done") {
       setMessages((prev) => {
@@ -563,8 +626,16 @@ export function StoryChat({
   async function handleShotApproval(toolCallId: string, videoUrl: string) {
     setMessages((prev) =>
       prev.map((m) =>
-        m.shotResult?.toolCallId === toolCallId
-          ? { ...m, shotResult: { ...m.shotResult!, approved: true } }
+        m.shotCompile?.toolCallId === toolCallId || m.shotResult?.toolCallId === toolCallId
+          ? {
+              ...m,
+              shotCompile: m.shotCompile
+                ? { ...m.shotCompile, approved: true }
+                : m.shotCompile,
+              shotResult: m.shotResult
+                ? { ...m.shotResult, approved: true }
+                : m.shotResult,
+            }
           : m
       )
     );
@@ -575,7 +646,17 @@ export function StoryChat({
     setMessages((prev) =>
       prev.map((m) =>
         m.shotCompile?.toolCallId === toolCallId
-          ? { ...m, shotCompile: undefined, shotResult: { toolCallId, loading: true } }
+          ? {
+              ...m,
+              shotCompile: {
+                ...m.shotCompile!,
+                rendering: true,
+                renderPrompt,
+                videoUrl: undefined,
+                error: undefined,
+              },
+              shotResult: { toolCallId, loading: true },
+            }
           : m
       )
     );
@@ -590,8 +671,16 @@ export function StoryChat({
     } catch (err) {
       setMessages((prev) =>
         prev.map((m) =>
-          m.shotResult?.toolCallId === toolCallId
-            ? { ...m, shotResult: { toolCallId, loading: false, error: String(err) } }
+          m.shotCompile?.toolCallId === toolCallId
+            ? {
+                ...m,
+                shotCompile: {
+                  ...m.shotCompile!,
+                  rendering: false,
+                  error: String(err),
+                },
+                shotResult: { toolCallId, loading: false, error: String(err) },
+              }
             : m
         )
       );
@@ -604,6 +693,7 @@ export function StoryChat({
         m.generationGrid?.toolCallId === toolCallId ||
         m.continuityPack?.toolCallId === toolCallId ||
         m.assetRef?.toolCallId === toolCallId ||
+        m.shotCompile?.toolCallId === toolCallId ||
         m.shotResult?.toolCallId === toolCallId
     );
     // Continuity/panel validation failures can't be fixed by replaying the same args —
@@ -618,8 +708,21 @@ export function StoryChat({
 
     setMessages((prev) =>
       prev.map((m) => {
-        if (m.shotResult?.toolCallId === toolCallId)
-          return { ...m, shotResult: { toolCallId, loading: true } };
+        if (m.shotCompile?.toolCallId === toolCallId || m.shotResult?.toolCallId === toolCallId) {
+          return {
+            ...m,
+            shotCompile: m.shotCompile
+              ? {
+                  ...m.shotCompile,
+                  rendering: true,
+                  videoUrl: undefined,
+                  error: undefined,
+                  approved: undefined,
+                }
+              : { toolCallId, loading: false, rendering: true },
+            shotResult: { toolCallId, loading: true },
+          };
+        }
         if (m.assetRef?.toolCallId === toolCallId)
           return { ...m, assetRef: { ...m.assetRef!, loading: true, error: undefined, images: undefined } };
         if (m.continuityPack?.toolCallId === toolCallId)
@@ -649,8 +752,15 @@ export function StoryChat({
     } catch (err) {
       setMessages((prev) =>
         prev.map((m) => {
-          if (m.shotResult?.toolCallId === toolCallId)
-            return { ...m, shotResult: { toolCallId, loading: false, error: String(err) } };
+          if (m.shotCompile?.toolCallId === toolCallId || m.shotResult?.toolCallId === toolCallId) {
+            return {
+              ...m,
+              shotCompile: m.shotCompile
+                ? { ...m.shotCompile, rendering: false, error: String(err) }
+                : { toolCallId, loading: false, error: String(err) },
+              shotResult: { toolCallId, loading: false, error: String(err) },
+            };
+          }
           if (m.assetRef?.toolCallId === toolCallId)
             return { ...m, assetRef: { ...m.assetRef!, loading: false, error: String(err) } };
           if (m.continuityPack?.toolCallId === toolCallId)

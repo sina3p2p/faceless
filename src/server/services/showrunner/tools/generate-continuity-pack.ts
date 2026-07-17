@@ -80,10 +80,9 @@ export function validateContinuityPackKeyframes(
 
 export const generateContinuityPack = tool({
   description:
-    "Generate an approved-candidate scene continuity pack for ONE scene (Stage 1 Step 16, before any generation grid). " +
-    "Required: structured notes + 1–3 visual keyframes. The pack guides generation-grid geography; it is NOT a Seedance " +
-    "shot sequence and must never be compiled as panels-to-render. Call once per scene, present, wait for approval, " +
-    "then recordContinuityPackEntry before generateGenerationGrid.",
+    "RETIRED — not registered on storyTools. Scene continuity is now the scene header's continuity " +
+    "block (text) plus the first approved motion sheet as scene anchor. Kept only for legacy session " +
+    "hydration / worker retries of old generateContinuityPack calls.",
   inputSchema: generateContinuityPackInputSchema,
 });
 

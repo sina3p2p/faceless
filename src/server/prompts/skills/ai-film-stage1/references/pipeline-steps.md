@@ -1,112 +1,73 @@
 # Pipeline Steps — Detailed Guidance
 
-Read this before running the steps. For each step: Purpose, Lock, Feeds, and **the kinds of options to offer.** Method: _diverge → user converges → lock → advance._ Number options, give a reasoned recommendation, stop and let the user choose.
+Per-step guidance for the 10-step pipeline in SKILL.md. Method everywhere: _diverge → user converges → lock → advance._ Number the options, give a reasoned recommendation, stop and let the user choose. Worked fragments from past runs are FORM models (specificity, motion arcs, cut handoffs), never content or genre to reuse — adapt option labels to the locked tone. Steps 1–5 stay short: options + one ask.
 
-Worked fragments below come from past runs (including a desert comedy). Use them as a model for **specificity and form**, not as content or genre to reuse. Option menus below are genre-neutral — adapt labels to the locked tone (comedy, horror, romance, thriller, drama, etc.).
+## Step 1 — Premise
 
-**Turn budget:** Steps 1–8 stay short (options + one ask). Do not preview later machinery.
+Lock the seed sentence plainly and name what it already fixes — genre, setting, any built-in "button" (recurring payoff); it's a coordinate, not a destination. URL in the seed → `webExtract` first; lock the seed with what the source actually says. Then offer ~6 distinct directions, each with a different protagonist AND a different engine (the mechanism that generates scenes/tension/humor/dread), plus each one's recurring payoff. Flag which options give a single clear protagonist (easiest consistency) and which are most purely visual (best for AI). Lock one direction or a splice.
 
----
+## Step 2 — Story spine (logline + conflict + theme, one artifact)
 
-## Step 1 — Seed
+Prove the story has a spine, in one bundled turn.
 
-**Purpose:** the raw spark. **Lock:** the sentence, stated plainly. **Do:** name what it already fixes — genre, setting, and any built-in "button" (a recurring payoff). Don't fall in love with it; it's a coordinate, not a destination. **If the seed includes a URL:** call `webExtract` first, then lock the seed with what the source actually says (do not invent article contents). **Feeds:** everything.
+- **Logline:** offer several on different axes — tone-forward, irony-forward, lean one-liner, character-stakes-forward (smuggles in a ticking clock). Judge each: would a stranger want to watch this? Recommend blending real stakes/clock with the clean statement of the core irony. If no version is compelling, STOP and rework the premise.
+- **Conflict:** separate the external _want_ (conscious goal, drives plot) from the deeper _need_ (internal lack the story resolves) — the gap between them is where drama lives. Define the opposing force concretely and why it's hard to beat (the best obstacles don't know what they're obstructing). Build in any "why can't they just…" trap that keeps a powerful character stuck at human scale. Offer 2–3 candidates for the deeper need — each colors the ending differently; recommend the need the plot already dramatizes.
+- **Theme:** offer ~5 one-sentence _claims_ about life (not topics). The theme's flavor sets the mood vocabulary that later picks lighting and color. Recommend the claim the ending will literally prove.
 
-## Step 2 — Premise exploration
+Bundle the asks (logline choice, need choice, theme choice) in ONE `askQuestions` call. Lock the spine as one block: protagonist + goal + obstacle + stakes + irony; want vs need; the claim.
 
-**Purpose:** find the _interesting_ version before committing. **Offer:** ~6 distinct directions, each with a different protagonist AND a different engine (the mechanism that generates scenes / tension / humor / dread). Note for each what the recurring payoff would be. **Recommend:** flag which options give a single clear protagonist (easiest consistency) and which are most purely visual (best for AI). **Lock:** one direction (or a splice of two). **Feeds:** the logline.
+## Step 3 — Character design
 
-## Step 3 — Logline
+First audit the cast to the minimum viable set; name hero faces (each earns a reference image at Step 9) vs disposable background (no reference). For each main character offer the consequential forks: look/design (2–4 options, explicitly trading expressiveness against consistency — simple distinctive silhouettes drift least), any constraint the premise needs, supporting characters' flavor. Then write the locked result as a renderable `@material` spec: species/build, fixed proportions, silhouette anchor, **fixed wardrobe** + one instantly-readable detail, signature expression, 2–3 never-drift anchor features, and a handle name (`hero_charsheet`). The spec is the source for Step 9 expansion, written for a human — expansion turns it into the image prompt. Tip: turn invisible stakes into a visible on-character detail.
 
-**Purpose:** prove the story has a spine. **Offer:** several loglines, each emphasizing a different axis — tone-forward, irony-forward, lean one-liner, character-stakes-forward (smuggles in a ticking clock). **Judge** each: would a stranger want to watch this? **Recommend** blending real stakes/clock with the version that states the core irony cleanly. **Lock:** protagonist + goal + obstacle + stakes + irony in 1–2 sentences. If you can't make it compelling, STOP and rework. **Feeds:** synopsis, genre sense → the Look.
+## Step 4 — World & locations
 
-## Step 4 — Conflict
+Write each location as a named renderable plate spec (geometry, light direction, atmosphere), then consolidate ruthlessly: one master location with zones beats many places. Offer the time-of-day structure: a single day (visible sky-clock, most consistent) vs multiple days (more scale, more lighting variation — tame it with a small set of canonical lighting states and a clock that changes _between_ shots). Lock the plate list + time structure.
 
-**Purpose:** define the engine. **Separate:** external _want_ (conscious goal, drives plot) vs deeper _need_ (internal lack the story resolves). The gap is where drama and heart live. **Define** the opposing force concretely and _why_ it's hard to beat — the best obstacles don't know what they're obstructing. **Build in any "why can't they just…" trap** that keeps a powerful character stuck at human scale when the premise needs it. **Offer** 2–3 options for the deeper need; each colors the ending differently. **Recommend** the need the plot _already_ dramatizes (so genre engine and theme are one engine). **Lock.** **Feeds:** beat-sheet turning points.
+## Step 5 — The Look [critical]
 
-## Step 5 — Theme
+The #1 consistency tool: the renderer re-specifies lighting/grade/lens on every prompt, so drift here disintegrates the film. Draft ONE reusable block per the Bible §1 template (`deliverable-templates.md`) and offer only the genuine forks inside it (typically dialogue register and aspect ratio — aspect must be an API-supported value; anamorphic FEEL is lens character, not a ratio). Recommend deriving it from theme + genre + the premise's natural setting. Lock verbatim.
 
-**Purpose:** the unifying argument. **Offer** ~5 one-sentence _claims_ about life (not topics) from broad to sharp. Note that the theme's _flavor_ sets the "mood vocabulary" that later picks lighting/color (wry → one palette; wistful → another; dread → another). **Recommend** the claim the ending will literally prove. **Lock.** **Feeds:** character arcs; mood vocabulary.
+## Step 6 — Beat sheet (with the connective read)
 
-## Step 6 — Character design [+]
+List the structural turns in order (opening image, inciting event, midpoint shift, low point, climax, resolution — compressed for shorts), threaded with short connective prose between beats so the whole story reads continuously — this replaces a standalone synopsis. Tag every beat: MOOD word, LIGHT state, HOOK yes/no (almost none), MATERIALS needed. Interrogate here for the saggy middle and the unearned ending — this is the last cheap place to fix story; check the mood tags trace a deliberate emotional curve; flag any beat leaning toward a theme that was set aside. Give dramatic irony its own beat when the film runs on the audience knowing more than the hero. End with the continuous-read sanity check (does it flow, does the click land, is the tone arc intact?). Size to runtime (below).
 
-**Purpose:** build the people who carry it, the AI-film way.
-**First, audit the cast** for the minimum viable set; name which faces are "hero" (each earns a dedicated reference image at Step 15) and which are disposable background (no reference).
-**For each main character offer the consequential design forks**, e.g.:
+## Step 7 — Shot list (scenes built with outline logic inline)
 
-- _Look/design_ — 2–4 options; **explicitly trade expressiveness against consistency** (simple, distinctive silhouettes drift least; irregular/complex shapes drift most).
-- Any _constraint_ the premise needs (e.g. why powers can't be used) — pick the one that ties to the clock/stakes.
-- _Supporting characters'_ dramatic/tonal flavor.
-  **Then write the locked result as renderable `@material` specs** (source for Step 15 expansion — never the image prompt itself; see `medium-constraints.md`):
-- species/build, fixed proportions, distinctive **silhouette anchor**
-- **fixed wardrobe** that never changes, plus one instantly-readable detail
-- signature expression
-- explicit **consistency notes** (2–3 anchor features that must never drift)
-- a **name** (`hero_charsheet`, etc.)
-  **Tip:** turn invisible stakes into a _visible_ on-character detail when possible (writing-to-the-medium). **Feeds:** `@material` refs on every prompt with that character.
+THE deliverable, built **scene by scene**: for each beat, break it into scenes (one location + one continuous time span; an intercut beat = two scenes with alternating rows), write the scene's full continuity-block header, then its rows — and only then move to the next beat's scenes.
 
-## Step 7 — World & locations [+]
+While writing each header, apply the old outline's disciplines inline:
 
-**Purpose:** settings as plates. **Write** each location as a renderable plate spec (geometry, light direction, atmosphere), named. **Then consolidate ruthlessly:** one master location with zones > many places; cut locations the story doesn't need; keep offscreen what can stay offscreen. **Offer** a time-of-day structure: a single day (clock visible in the sky, most consistent) vs multiple days (more scale/escalation, more lighting variation). If multiple days, **tame it** with a small set of canonical lighting states and a visible clock that changes _between_ shots. **Lock** the plate list + time structure. **Feeds:** location refs; constrains the shot list.
+- **Scene-delta rule:** every scene names its ONE job and its irreversible story-state change; a scene that can't state a new end state gets merged, cut, or rewritten, and consecutive scenes must differ visibly (a State Schedule value or the lighting state).
+- **Running accounting:** track total locations and characters against the locked inventory as scenes accumulate; consolidate while it's still text; cut assets no scene uses.
 
-## Step 8 — The Look [+, critical]
+Header schema, column rules, and camera-choosing vocabulary: `deliverable-templates.md` §B and §B2. Keep a running total of shots and seconds against the target runtime.
 
-**Purpose:** the #1 consistency tool. The renderer re-specifies lighting/grade/lens on _every_ prompt — if they drift, the film disintegrates. **Draft ONE reusable block** and offer the one or two genuine forks inside it (e.g. dialogue register; aspect ratio):
+**Dialogue pass (conditional):** for dialogue-driven scenes, write the lean dialogue beats directly into the rows' motion arcs; when spoken flow needs judging on the page, draft a short screenplay-format excerpt for just those scenes and lock the lines before the rows. A full formatted screenplay is produced only if the user asks for one as a deliverable.
 
-- **aspect ratio** (must be a value the render API supports — check before locking; API parameter, never prompt text; anamorphic/scope FEEL = lens character, not a ratio)
-- **lens/film-stock character** (grain, halation, flares, DoF behavior)
-- **the single color grade** for the whole film (allow one accent color to "pop")
-- **canonical lighting states** (typically 3–4), each with Kelvin + shadow behavior + intended use
-- **sound palette** (one recurring score idea with arrangements matching the locked tone; ambient bed; foley; dialogue approach + named voices if using an external voice tool)
-- a one-line **tone north-star**
-  **Recommend** deriving it from theme + genre + the premise's natural setting. **Lock verbatim.** **Feeds:** LIGHTING and COLOR GRADE of every prompt, identically.
+Author rows only — prompt assembly is Stage 2's job.
 
-## Step 9 — Synopsis
+## Step 8 — The Bible (assembly + State Schedule fork)
 
-**Purpose:** first full commit. **Write** the whole story in prose (a paragraph to a page). **Interrogate** for a saggy middle or unearned ending; fix here. **Flag** any beat that leans toward a theme you set aside, and offer to recut. End with a **one-paragraph continuous-read** sanity check (does it flow, does the click land, is the tone arc intact?). **Lock.** **Feeds:** beat sheet.
+Assemble §A from locked artifacts: §1 the Look verbatim (Step 5), §2 the master `@material` list with canonical definition lines (Steps 3–4 specs), §3 the standing directives from the template (fill G's hook shots and D's deliberate-motion list from the beat sheet and rows). The one authored part is **§4 the State Schedule** — every changing element's progression across shots, the lighting progression, and match-cut pairs. Present the State Schedule as this step's fork (the rest is a silent concatenation check), lock, and the Bible is done.
 
-## Step 10 — Beat sheet [+]
+## Step 9 — Asset reference generation
 
-**Purpose:** the structural skeleton. **List** the key turns in order (opening image, inciting event, midpoint shift, low point, climax, resolution — compressed for shorts). **Tag every beat** with: a **MOOD word**, a **LIGHT** state, whether it earns a **HOOK** (almost none do), and the **MATERIALS** it needs. **Check** the mood tags trace a deliberate emotional curve, not a flat string of same-energy beats. **Give dramatic irony its own beat** if the film runs on the audience knowing what the hero doesn't. **Size to runtime** (see sizing note below). **Lock.** **Feeds:** per-shot lighting/camera and the hook decision.
+Audit the manifest first: identity anchors only (characters, plates, recurring hero props in ONE neutral state), typically 4–8 images; strike disguised shots; fused entities get their own object refs; plates stay environment-only when a hero prop has its own ref; charsheets follow the held-tool policy in `medium-constraints.md`. Present the audited list as a fork. Then one asset at a time, characters first: expand the spec per `medium-constraints.md`, generate candidates, bind the approved image to its handle. Assets approved ≠ Stage 1 done — proceed to Step 10.
 
-## Step 11 — Outline [+]
+## Step 10 — Motion sheets
 
-**Purpose:** beats → scenes. **Break** each beat into numbered scene-beats (what happens, where, who's present). **Keep running accounting:** total locations and characters; consolidate while it's still text. **Surface** unused assets (cut them). **Scene-delta rule:** every scene must earn its existence with a unique, irreversible story-state change — name each scene's ONE job and its delta. A scene that cannot state a new end state gets merged, cut, or rewritten; consecutive scenes must also differ visibly (State Schedule value or lighting state). **Lock** the scene sequence + final inventory. **Feeds:** the shot list (each scene's delta feeds its header and its grid prompt).
-
-## Step 12 — Screenplay [+]
-
-**Purpose:** the blueprint. **Write** proper format with two disciplines: **lean visual action lines**, each ≈ one shot's image; and **short scenes/dialogue beats** (clips are seconds long). **Lock.** **Feeds:** the shot list directly.
-
-## Step 13 — Shot list [+]
-
-**Purpose:** the deliverable; the unit of generation. **First group into SCENES** (one location + one continuous time span; an intercut beat = two scenes with alternating rows), each with a one-line header: Delta, coverage plan, Space line. **Then produce the table**, one row per shot:
-`# | scene | mood | scale (W/M/CU/INSERT/POV) | motion arc (start → change → end) | primary (SUBJ/CAM) | camera move | cut-out → cut-in | light (ONE state) | duration | materials`
-
-Column rules and camera-authoring vocabulary: `deliverable-templates.md` §B / §B2. **No-delta-no-shot:** if "what changes?" is "nothing," give a delta or cut the row. **One lighting state per row** — never "Golden Hour transitioning toward dusk"; pick ONE canonical state or split into two rows. Do NOT expand rows into render prompts and do NOT load the Stage 2 compilation recipe. **Feeds:** grids (Step 16) and prompts (Stage 2).
-
-## Step 14 — The Bible [+]
-
-See `deliverable-templates.md` §A. Four parts: locked Look; master `@material` list (with version notes + canonical definition lines); standing craft directives; **state schedule** (what changes between shots — fixed within each shot).
-
-## Step 15 — Asset reference generation
-
-Locked artifacts are text; the renderer needs images. **First audit the manifest** (identity anchors only — characters, plates, recurring hero props in ONE neutral state; strike disguised shots; fused entities get their own object refs; typical 4–8 images). **Plates must not embed a hero prop that has its own object ref.** **Charsheets: empty hands + object ref, OR tool-as-wardrobe — never both.** Present the audited list as a fork before generating. Then one asset at a time (characters first): **expand** via `medium-constraints.md`, **generate candidates**, **bind** on approval. Assets approved ≠ Stage 1 done. **Feeds:** Step 16.
-
-## Step 16 — Generation grids
-
-With assets approved, load `generation-grids.md`. Per scene: (1) generate and approve a **scene continuity pack** via `generateContinuityPack` (structured notes + **required** 1–3 visual keyframes — reference only, not a Seedance sequence) → `recordContinuityPackEntry`; (2) generate one **motion sheet per shot** via `generateGenerationGrid` (**4–9** panels; Panel 1 = cut-in, middle = milestones, Panel n = cut-out; estimated Dur ≤15s, prefer 8–12) — later sheets **must** bind prior terminal panel (`previousGenerationId` + `incomingAnchor*`) unless `continuityBreakReason`; (3) **record each via `recordGenerationGridEntry`** with `panel_count` + continuity-chain fields + `continuity_pack_handle` + `approved_candidate_id` = the toolCallId. One sheet = one continuous Seedance take (interpolate; no hard cuts). Stage 1 completes when every shot has a validated registry entry. **Feeds:** Stage 2.
-
-_(No package step. Handoff = Bible + shot list + approved images + approved grids + passing registry. Export on request = concatenate locked artifacts verbatim.)_
+With assets approved, load `generation-grids.md` and follow it: one motion sheet per shot, anchored for scene continuity by the header's continuity block + plate + the scene's first approved sheet + the prior terminal panel, recording every approval or skip via `recordGenerationGridEntry`. Stage 1 completes when every shot has a validated registry entry.
 
 ---
 
-## Runtime sizing (apply at Step 10, re-check at 13)
+## Runtime sizing (apply at Step 6, re-check at 7)
 
-Compute the shot budget: total seconds ÷ average clip length ≈ shot count.
+Shot budget = total seconds ÷ average clip length.
 
-- ~2–3 min short ≈ 20–26 shots ≈ a 7-beat spine (compress multi-day grinds into ONE "time-passing" beat using a match-cut + a scheduled changing element).
+- ~2–3 min short ≈ 20–26 shots ≈ a 7-beat spine (compress multi-day grinds into ONE time-passing beat: match-cut + a scheduled changing element).
 - ~8–12 min short ≈ ~13 beats, room for a real escalation montage.
-  Same spine scales: to lengthen, give the middle and climax beats more shots rather than adding beats.
+  To lengthen, give the middle and climax more shots rather than adding beats.
 
 ## The interrogation prompts (use after each artifact)
 
@@ -114,4 +75,4 @@ Compute the shot budget: total seconds ÷ average clip length ≈ shot count.
 - What's the weakest link — the thing that would make a viewer disengage?
 - Is each beat doing a _different_ job, or are two beats the same energy?
 - Does the ending _prove_ the theme, or just stop?
-- Is anything in here impossible/expensive for AI video, and can we rewrite toward the medium's strengths without losing the point?
+- Is anything here expensive for AI video, and can we rewrite toward the medium's strengths without losing the point?

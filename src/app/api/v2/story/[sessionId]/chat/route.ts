@@ -286,6 +286,7 @@ export async function POST(
             estimatedDurationSeconds?: number;
             previousGenerationId?: string | null;
             isFirstInScene?: boolean;
+            sceneAnchorHandle?: string | null;
             incomingAnchorHandle?: string | null;
             incomingAnchorKind?: string | null;
             incomingAnchorPanel?: number | null;
@@ -309,6 +310,7 @@ export async function POST(
               shotIds: args.shotIds,
               estimatedDurationSeconds: args.estimatedDurationSeconds,
               previousGenerationId: args.previousGenerationId,
+              sceneAnchorHandle: args.sceneAnchorHandle,
               incomingAnchorHandle: args.incomingAnchorHandle,
               continuityBreakReason: args.continuityBreakReason,
               error: gridError,
@@ -418,6 +420,7 @@ export async function POST(
         estimatedDurationSeconds?: number;
         previousGenerationId?: string | null;
         isFirstInScene?: boolean;
+        sceneAnchorHandle?: string | null;
         incomingAnchorHandle?: string | null;
         incomingAnchorKind?: string | null;
         incomingAnchorPanel?: number | null;
@@ -438,6 +441,7 @@ export async function POST(
         ? null
         : validateGenerationGridContinuity({
           isFirstInScene: args.isFirstInScene,
+          sceneAnchorHandle: args.sceneAnchorHandle,
           previousGenerationId: args.previousGenerationId,
           incomingAnchorHandle: args.incomingAnchorHandle,
           incomingAnchorKind: args.incomingAnchorKind,
@@ -456,6 +460,7 @@ export async function POST(
           shotIds: args.shotIds,
           estimatedDurationSeconds: args.estimatedDurationSeconds,
           previousGenerationId: args.previousGenerationId,
+          sceneAnchorHandle: args.sceneAnchorHandle,
           incomingAnchorHandle: args.incomingAnchorHandle,
           continuityBreakReason: args.continuityBreakReason,
           error: gridError,
@@ -475,6 +480,7 @@ export async function POST(
         shotIds: args.shotIds,
         estimatedDurationSeconds: args.estimatedDurationSeconds,
         previousGenerationId: args.previousGenerationId,
+        sceneAnchorHandle: args.sceneAnchorHandle,
         incomingAnchorHandle: args.incomingAnchorHandle,
         continuityBreakReason: args.continuityBreakReason,
         panelCount: args.panelCount,
@@ -491,6 +497,7 @@ export async function POST(
           shotIds: args.shotIds,
           estimatedDurationSeconds: args.estimatedDurationSeconds,
           previousGenerationId: args.previousGenerationId,
+          sceneAnchorHandle: args.sceneAnchorHandle,
           incomingAnchorHandle: args.incomingAnchorHandle,
           continuityBreakReason: args.continuityBreakReason,
           panelCount: args.panelCount,

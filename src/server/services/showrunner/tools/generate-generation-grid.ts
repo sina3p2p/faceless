@@ -1,7 +1,10 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { generateImage } from "@/server/services/media";
-import { validateContinuityChain } from "./record-generation-grid-entry";
+import {
+  validateContinuityChain,
+  validateSceneAnchor,
+} from "./record-generation-grid-entry";
 import { mediaUrl } from "@/lib/storage";
 
 const GRID_CANDIDATE_COUNT = 1;
@@ -50,6 +53,12 @@ const generateGenerationGridInputSchema = z.object({
   isFirstInScene: z
     .boolean()
     .describe("True ONLY for the first motion sheet in this scene; false for every later one."),
+  sceneAnchorHandle: z
+    .string()
+    .nullable()
+    .describe(
+      "The scene's FIRST approved motion-sheet handle. Required when isFirstInScene=false (including breaks). Null on the first sheet."
+    ),
   incomingAnchorHandle: z
     .string()
     .nullable()
@@ -74,17 +83,20 @@ const generateGenerationGridInputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Intentional continuity break (hard cut / time jump / new axis). When set, omit previousGenerationId and incomingAnchor_*."
+      "Intentional continuity break (hard cut / time jump / new axis). When set, omit previousGenerationId and incomingAnchor_*. Scene anchor still required."
     ),
   imagePrompt: z
     .string()
     .describe(
-      "Full motion-sheet image prompt per references/generation-grids.md. Must bind continuity pack keyframes; for later sheets also bind the incoming anchor (prior terminal panel / last frame) unless continuityBreakReason is set. Include interpolate / continuous-take / no-cuts language."
+      "Full motion-sheet image prompt per references/generation-grids.md. Honor the scene header's continuity block. " +
+        "For later sheets bind the scene anchor (first approved sheet) and the incoming anchor (prior terminal panel / last frame) " +
+        "unless continuityBreakReason is set (scene anchor still binds). Include interpolate / continuous-take / no-cuts language."
     ),
   referenceImageUrls: z
     .array(z.string())
     .describe(
-      "Approved refs in order: characters → objects → location → continuity pack keyframes (1–3) → incoming anchor image (mandatory for continuous later sheets)."
+      "Approved refs in order: characters → objects → location plate → scene anchor (later sheets) → " +
+        "incoming anchor image (mandatory for continuous later sheets)."
     ),
   panelCount: z
     .number()
@@ -137,9 +149,10 @@ export function validatePanelCaptionCount(
   return null;
 }
 
-/** Validate continuity chain fields on generateGenerationGrid args. */
+/** Validate continuity chain + scene-anchor fields on generateGenerationGrid args. */
 export function validateGenerationGridContinuity(args: {
   isFirstInScene?: boolean | null;
+  sceneAnchorHandle?: string | null;
   previousGenerationId?: string | null;
   incomingAnchorHandle?: string | null;
   incomingAnchorKind?: string | null;
@@ -147,6 +160,13 @@ export function validateGenerationGridContinuity(args: {
   continuityBreakReason?: string | null;
   referenceImageUrls?: string[];
 }): string | null {
+  const sceneErrors = validateSceneAnchor({
+    is_first_in_scene: args.isFirstInScene,
+    scene_anchor_handle: args.sceneAnchorHandle ?? null,
+    requireForApproved: true,
+  });
+  if (sceneErrors.length > 0) return sceneErrors.join("; ");
+
   const chainErrors = validateContinuityChain({
     is_first_in_scene: args.isFirstInScene,
     previous_generation_id: args.previousGenerationId ?? null,
@@ -158,27 +178,33 @@ export function validateGenerationGridContinuity(args: {
   });
   if (chainErrors.length > 0) return chainErrors.join("; ");
 
-  const needsAnchor =
+  const needsIncoming =
     args.isFirstInScene === false &&
     !!args.previousGenerationId &&
     !args.continuityBreakReason?.trim();
-  if (needsAnchor && (args.referenceImageUrls?.length ?? 0) === 0) {
-    return "continuous later sheets require the incoming anchor image in referenceImageUrls (plus continuity pack keyframes)";
+  if (needsIncoming && (args.referenceImageUrls?.length ?? 0) === 0) {
+    return "continuous later sheets require the scene anchor + incoming anchor images in referenceImageUrls";
+  }
+  const needsSceneAnchor = args.isFirstInScene === false;
+  if (needsSceneAnchor && (args.referenceImageUrls?.length ?? 0) === 0) {
+    return "later sheets require the scene anchor image in referenceImageUrls";
   }
   return null;
 }
 
 export const generateGenerationGrid = tool({
   description:
-    "Generate a candidate motion sheet for ONE shot / Seedance generation (Stage 1 Step 16). " +
+    "Generate a candidate motion sheet for ONE shot / Seedance generation (Stage 1 Step 10). " +
     "One motion sheet = one uninterrupted shot: 4–9 temporal panels (Panel 1 = cut-in, middle = milestones only, " +
     "Panel n = cut-out). Estimated Dur ≤15s (prefer 8–12). Never pack multiple shots onto one sheet. " +
     "Call once per shot, present it, wait for approval, record via recordGenerationGridEntry, then the next shot. " +
-    "Requires an approved scene continuity pack. Later sheets in the same scene MUST pass " +
-    "previousGenerationId + incomingAnchorHandle/Kind/Panel (prior terminal panel Pn; later prior last frame) " +
-    "and attach that image in referenceImageUrls — unless continuityBreakReason documents an intentional break. " +
-    "Always pass panelCount (4–9), panelCaptions (same length), and shotIds (exactly one shot). " +
-    "If this tool returns ok:false, fix the listed continuity/panel errors and call again in the same turn.",
+    "Scene continuity comes from the scene header's continuity block (text) plus image anchors — there is no " +
+    "separate continuity-pack artifact. Later sheets in the same scene MUST pass sceneAnchorHandle (first " +
+    "approved sheet) and previousGenerationId + incomingAnchorHandle/Kind/Panel (prior terminal panel Pn; " +
+    "later prior last frame), attaching those images in referenceImageUrls — unless continuityBreakReason " +
+    "documents an intentional break (scene anchor still required). Always pass panelCount (4–9), " +
+    "panelCaptions (same length), and shotIds (exactly one shot). If this tool returns ok:false, fix the " +
+    "listed continuity/panel errors and call again in the same turn.",
   inputSchema: generateGenerationGridInputSchema,
   execute: async (args) => {
     const captionError = validatePanelCaptionCount(
@@ -194,6 +220,7 @@ export const generateGenerationGrid = tool({
     }
     const continuityError = validateGenerationGridContinuity({
       isFirstInScene: args.isFirstInScene,
+      sceneAnchorHandle: args.sceneAnchorHandle,
       previousGenerationId: args.previousGenerationId,
       incomingAnchorHandle: args.incomingAnchorHandle,
       incomingAnchorKind: args.incomingAnchorKind,

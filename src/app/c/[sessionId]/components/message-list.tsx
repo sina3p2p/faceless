@@ -6,7 +6,6 @@ import { AssetRefPanel } from "./asset-ref-panel";
 import { ContinuityPackPanel } from "./continuity-pack-panel";
 import { GenerationGridPanel } from "./generation-grid-panel";
 import { ShotCompilePanel } from "./shot-compile-panel";
-import { ShotPreviewPanel } from "./shot-preview-panel";
 import type { ClientMessage } from "@/types/v2/story";
 
 export function MessageList({
@@ -224,20 +223,19 @@ export function MessageList({
                   <ShotCompilePanel
                     compile={msg.shotCompile}
                     disabled={isStreaming}
-                    onApprove={(renderPrompt) => onRenderShot(msg.shotCompile!.toolCallId, renderPrompt)}
-                  />
-                )}
-
-                {msg.shotResult && (
-                  <ShotPreviewPanel
-                    shotResult={msg.shotResult}
-                    disabled={isStreaming}
-                    onApprove={
-                      msg.shotResult.videoUrl && !msg.shotResult.approved && !msg.shotResult.loading
-                        ? () => onShotApproval(msg.shotResult!.toolCallId, msg.shotResult!.videoUrl!)
+                    onApproveRender={(renderPrompt) =>
+                      onRenderShot(msg.shotCompile!.toolCallId, renderPrompt)
+                    }
+                    onApproveShot={
+                      msg.shotCompile.videoUrl && !msg.shotCompile.approved && !msg.shotCompile.rendering
+                        ? () => onShotApproval(msg.shotCompile!.toolCallId, msg.shotCompile!.videoUrl!)
                         : undefined
                     }
-                    onRetry={!msg.shotResult.loading ? () => onRetry(msg.shotResult!.toolCallId) : undefined}
+                    onRetry={
+                      !msg.shotCompile.rendering && (msg.shotCompile.videoUrl || msg.shotCompile.error)
+                        ? () => onRetry(msg.shotCompile!.toolCallId)
+                        : undefined
+                    }
                   />
                 )}
               </div>

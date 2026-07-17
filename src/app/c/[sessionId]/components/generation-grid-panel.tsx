@@ -75,6 +75,9 @@ export function GenerationGridPanel({
     : generationGrid.previousGenerationId
       ? ` · from ${generationGrid.previousGenerationId}`
       : "";
+  const anchorLabel = generationGrid.sceneAnchorHandle
+    ? ` · anchor ${generationGrid.sceneAnchorHandle}`
+    : "";
 
   return (
     <div className="mt-1 space-y-2">
@@ -85,6 +88,7 @@ export function GenerationGridPanel({
           {panelLabel}
           {durationLabel}
           {chainLabel}
+          {anchorLabel}
         </span>
         {isLocked && (
           <span className="ml-1 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-2 py-0.5">

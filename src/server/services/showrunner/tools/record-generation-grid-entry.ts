@@ -33,11 +33,12 @@ const inputSchema = z.object({
     .describe(
       "Temporal panel count on the motion sheet (4–9). Required for approved_grid; null for skips."
     ),
-  continuity_pack_handle: z
+  scene_anchor_handle: z
     .string()
     .nullable()
     .describe(
-      "Approved @sceneN_continuity handle from recordContinuityPackEntry. Required for approved_grid."
+      "The scene's FIRST approved motion-sheet handle (e.g. @scene3_gen3A_grid). " +
+        "Required for later generations in the scene (including continuity breaks). Null when is_first_in_scene=true."
     ),
   is_first_in_scene: z
     .boolean()
@@ -74,11 +75,34 @@ const inputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "If set, this generation intentionally does NOT continue the prior generation (hard cut / time jump / new axis). Omit previous_generation_id and incoming_anchor_* when set. Not allowed when is_first_in_scene=true."
+      "If set, this generation intentionally does NOT continue the prior generation (hard cut / time jump / new axis). Omit previous_generation_id and incoming_anchor_* when set. Not allowed when is_first_in_scene=true. Scene anchor still required."
     ),
 });
 
 export type GenerationGridRegistryEntry = z.infer<typeof inputSchema>;
+
+/** Scene-anchor rules: first sheet IS the anchor; later sheets must cite it. */
+export function validateSceneAnchor(fields: {
+  is_first_in_scene?: boolean | null;
+  scene_anchor_handle: string | null | undefined;
+  requireForApproved?: boolean;
+}): string[] {
+  const errors: string[] = [];
+  if (fields.requireForApproved === false) return errors;
+  if (fields.is_first_in_scene == null) return errors;
+
+  const handle = fields.scene_anchor_handle?.trim() || null;
+  if (fields.is_first_in_scene === true) {
+    if (handle) {
+      errors.push("first generation in scene must not set scene_anchor_handle (it IS the scene anchor)");
+    }
+  } else if (!handle) {
+    errors.push(
+      "later generation requires scene_anchor_handle (the scene's first approved motion-sheet handle)"
+    );
+  }
+  return errors;
+}
 
 /** Shared continuity-chain rules for registry + generate tool. */
 export function validateContinuityChain(fields: {
@@ -160,9 +184,6 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
     if (!entry.grid_handle) errors.push("approved_grid requires grid_handle");
     if (!entry.approved_candidate_id) errors.push("approved_grid requires approved_candidate_id");
     if (entry.skip_reason != null) errors.push("approved_grid must not set skip_reason");
-    if (!entry.continuity_pack_handle) {
-      errors.push("approved_grid requires continuity_pack_handle from an approved continuity pack");
-    }
     if (entry.shot_ids.length !== 1) {
       errors.push("approved_grid requires exactly one shot_id (one motion sheet = one shot)");
     }
@@ -174,6 +195,13 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
     ) {
       errors.push(`approved_grid requires panel_count from ${MIN_PANELS} to ${MAX_PANELS}`);
     }
+    errors.push(
+      ...validateSceneAnchor({
+        is_first_in_scene: entry.is_first_in_scene,
+        scene_anchor_handle: entry.scene_anchor_handle,
+        requireForApproved: true,
+      })
+    );
     errors.push(
       ...validateContinuityChain({
         ...entry,
@@ -229,12 +257,13 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
 
 export const recordGenerationGridEntry = tool({
   description:
-    "Record ONE motion-sheet registry entry after approval or an explicit skip (Stage 1 Step 16). " +
+    "Record ONE motion-sheet registry entry after approval or an explicit skip (Stage 1 Step 10). " +
     "One approved entry = one shot = one Seedance generation (4–9 temporal panels, estimated Dur ≤15s). " +
-    "Requires continuity_pack_handle + panel_count for approved_grid. Later sheets in a scene MUST set " +
-    "previous_generation_id + incoming_anchor_handle (prior terminal panel Pn, later prior last frame) unless " +
-    "continuity_break_reason documents an intentional break. Stage 1 is incomplete until every shot is covered " +
-    "by exactly one passing entry. Stage 2 preflight reads these validated entries.",
+    "Requires panel_count for approved_grid. Later sheets MUST set scene_anchor_handle (the scene's first " +
+    "approved sheet) plus previous_generation_id + incoming_anchor_handle (prior terminal panel Pn, later " +
+    "prior last frame) unless continuity_break_reason documents an intentional break (scene anchor still " +
+    "required on breaks). Stage 1 is incomplete until every shot is covered by exactly one passing entry. " +
+    "Stage 2 preflight reads these validated entries.",
   inputSchema,
   execute: async (entry) => {
     const errors = validateEntry(entry);

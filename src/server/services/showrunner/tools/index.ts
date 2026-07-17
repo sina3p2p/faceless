@@ -8,7 +8,10 @@ export {
   validatePanelCaptionCount,
   validateGenerationGridContinuity,
 } from "./generate-generation-grid";
-export { validateContinuityChain } from "./record-generation-grid-entry";
+export {
+  validateContinuityChain,
+  validateSceneAnchor,
+} from "./record-generation-grid-entry";
 export {
   generateShotWithFallback,
   renderAndUploadShot,

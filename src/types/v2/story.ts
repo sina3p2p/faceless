@@ -63,6 +63,7 @@ export type GenerationGrid = {
   shotIds?: number[];
   estimatedDurationSeconds?: number;
   previousGenerationId?: string | null;
+  sceneAnchorHandle?: string | null;
   incomingAnchorHandle?: string | null;
   continuityBreakReason?: string | null;
   images?: string[];
@@ -89,12 +90,20 @@ export type ShotResult = {
 export type ShotCompile = {
   toolCallId: string;
   loading: boolean;
+  /** True after user approves — panel stays visible with disabled controls while the shot renders. */
+  rendering?: boolean;
   renderPrompt?: string;
   referenceImageUrls?: string[];
   duration?: number;
   aspectRatio?: "16:9" | "9:16" | "1:1";
   continuityMode?: "fresh" | "extend_video";
   sourceVideoUrl?: string;
+  /** Filled when the render job completes — shown in the panel placeholder. */
+  videoUrl?: string;
+  filmstripUrl?: string;
+  filmstripTiles?: number;
+  error?: string;
+  approved?: boolean;
 };
 
 export type ClientMessage = {

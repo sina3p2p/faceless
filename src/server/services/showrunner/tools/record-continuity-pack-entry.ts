@@ -49,10 +49,8 @@ function validateEntry(entry: ContinuityPackRegistryEntry): string[] {
 
 export const recordContinuityPackEntry = tool({
   description:
-    "Record ONE scene's approved continuity pack after continuity_pack_approval (Stage 1 Step 16). " +
-    "Required before any generateGenerationGrid / recordGenerationGridEntry for that scene. " +
-    "Pack = structured notes + 1–3 visual keyframes (reference only — not a Seedance sequence). " +
-    "Set approved_candidate_id to the exact generateContinuityPack toolCallId.",
+    "RETIRED — not registered on storyTools. Use scene_anchor_handle on recordGenerationGridEntry instead. " +
+    "Kept only for legacy session hydration of old continuity-pack approvals.",
   inputSchema,
   execute: async (entry) => {
     const errors = validateEntry(entry);

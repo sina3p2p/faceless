@@ -132,6 +132,7 @@ export async function POST(
       shotIds,
       estimatedDurationSeconds,
       previousGenerationId,
+      sceneAnchorHandle,
       incomingAnchorHandle,
       incomingAnchorKind,
       incomingAnchorPanel,
@@ -148,6 +149,7 @@ export async function POST(
       shotIds?: number[];
       estimatedDurationSeconds?: number;
       previousGenerationId?: string | null;
+      sceneAnchorHandle?: string | null;
       incomingAnchorHandle?: string | null;
       incomingAnchorKind?: string | null;
       incomingAnchorPanel?: number | null;
@@ -165,6 +167,7 @@ export async function POST(
     }
     const continuityError = validateGenerationGridContinuity({
       isFirstInScene,
+      sceneAnchorHandle,
       previousGenerationId,
       incomingAnchorHandle,
       incomingAnchorKind,
@@ -184,6 +187,7 @@ export async function POST(
       shotIds,
       estimatedDurationSeconds,
       previousGenerationId,
+      sceneAnchorHandle,
       incomingAnchorHandle,
       continuityBreakReason,
       panelCount,
