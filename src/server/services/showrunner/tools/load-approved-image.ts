@@ -8,8 +8,8 @@ import { agentMediaUrl } from "@/lib/storage";
  */
 export const loadApprovedImage = tool({
   description:
-    "Load one approved reference / continuity keyframe / generation-grid / last-frame " +
-    "image into vision for this turn. Conversation history only auto-attaches the last " +
+    "Load one approved reference image, motion sheet, scene/incoming anchor, or last-frame " +
+    "still into vision for this turn. Conversation history only auto-attaches the last " +
     "few images; call this when you need to visually inspect an older approved URL from " +
     "the thread. Pass a single URL or storage key. Prefer at most 2 calls per turn.",
   inputSchema: z.object({

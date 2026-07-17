@@ -1,4 +1,4 @@
-export { generateAssetImages } from "./generate-asset-references";
+export { generateAssetImages, generateAssetGallery } from "./generate-asset-references";
 export {
   generateContinuityPackImages,
   validateContinuityPackKeyframes,
@@ -16,5 +16,8 @@ export {
   generateShotWithFallback,
   renderAndUploadShot,
   validateCompileContinuity,
+  validateCompilePackage,
+  toCompileShotArgs,
   type CompileShotArgs,
+  type CompileShotToolInput,
 } from "./compile-shot";

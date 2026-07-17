@@ -23,7 +23,8 @@ const inputSchema = z.object({
   grid_handle: z.string().nullable(),
   approved_candidate_id: z.string().nullable(),
   skip_reason: z.enum(SKIP_REASONS).nullable(),
-  panel_map: z.record(z.string(), z.number().int().positive().nullable()),
+  /** Optional — app fills shot→panel 1 for approved_grid when omitted (one sheet = one shot). */
+  panel_map: z.record(z.string(), z.number().int().positive().nullable()).optional(),
   panel_count: z
     .number()
     .int()
@@ -179,6 +180,14 @@ export function validateContinuityChain(fields: {
 
 function validateEntry(entry: GenerationGridRegistryEntry): string[] {
   const errors: string[] = [];
+  const panel_map =
+    entry.panel_map ??
+    Object.fromEntries(
+      entry.shot_ids.map((id) => [
+        String(id),
+        entry.status === "approved_grid" ? 1 : null,
+      ])
+    );
 
   if (entry.status === "approved_grid") {
     if (!entry.grid_handle) errors.push("approved_grid requires grid_handle");
@@ -223,18 +232,18 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
   }
 
   for (const id of entry.shot_ids) {
-    if (!(String(id) in entry.panel_map)) {
+    if (!(String(id) in panel_map)) {
       errors.push(`panel_map missing shot_ids entry ${id}`);
     }
   }
-  for (const key of Object.keys(entry.panel_map)) {
+  for (const key of Object.keys(panel_map)) {
     if (!entry.shot_ids.includes(Number(key))) {
       errors.push(`panel_map has shot ${key} not in shot_ids`);
     }
   }
 
   const panels = entry.shot_ids
-    .map((id) => entry.panel_map[String(id)])
+    .map((id) => panel_map[String(id)])
     .filter((p): p is number => p != null);
   const unique = new Set(panels);
   if (unique.size !== panels.length) {
@@ -255,6 +264,19 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
   return errors;
 }
 
+function withDefaultPanelMap(entry: GenerationGridRegistryEntry): GenerationGridRegistryEntry {
+  if (entry.panel_map) return entry;
+  return {
+    ...entry,
+    panel_map: Object.fromEntries(
+      entry.shot_ids.map((id) => [
+        String(id),
+        entry.status === "approved_grid" ? 1 : null,
+      ])
+    ),
+  };
+}
+
 export const recordGenerationGridEntry = tool({
   description:
     "Record ONE motion-sheet registry entry after approval or an explicit skip (Stage 1 Step 10). " +
@@ -266,7 +288,8 @@ export const recordGenerationGridEntry = tool({
     "Stage 2 preflight reads these validated entries.",
   inputSchema,
   execute: async (entry) => {
-    const errors = validateEntry(entry);
+    const normalized = withDefaultPanelMap(entry);
+    const errors = validateEntry(normalized);
     if (errors.length > 0) {
       return {
         type: "text" as const,
@@ -275,7 +298,7 @@ export const recordGenerationGridEntry = tool({
     }
     return {
       type: "text" as const,
-      value: JSON.stringify({ ok: true, entry }),
+      value: JSON.stringify({ ok: true, entry: normalized }),
     };
   },
 });

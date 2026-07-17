@@ -11,63 +11,95 @@ import { filmSessions, media } from "@/server/db/schema";
 export const CONTINUITY_MODES = ["fresh", "extend_video"] as const;
 type ContinuityMode = (typeof CONTINUITY_MODES)[number];
 
-export const compileShot = tool({
-  description:
-    "Compile a shot prompt package and present it to the user for review before any rendering happens. " +
-    "Only after Stage 1 is complete (registry passing): load stage2-skill.md and shot-compilation-recipe.md, " +
-    "assemble the Seedance 2.0 prompt from the Bible, then call this tool. " +
-    "One compile = one motion sheet = one shot. " +
-    "Use continuityMode 'extend_video' + sourceVideoUrl (previous approved clip) when the next beat " +
-    "continues the same character through the same space (walks / approaches / same-surface carries). " +
-    "Use 'fresh' for scene opens, clean breaks, and hard cuts that start a new take. " +
-    "Attach referenceImageUrls in precision order: character → object → location → " +
-    "scene anchor (scene's first approved sheet) → incoming anchor → motion sheet. " +
-    "Prompt must interpolate the motion sheet (continuous take; no hard cuts; never show grid/gutters) " +
-    "with COMPOSITION LOCK on Panel 1 and END STATE LOCK on Panel n. " +
-    "The user reviews/edits the prompt, then approves — rendering starts only after approval. " +
-    "Wait for shot approval before compiling the next shot.",
-  inputSchema: z.object({
-    prompt: z
-      .string()
-      .describe(
-        "Full compiled Seedance 2.0 prompt from the Bible per the shot-compilation-recipe. " +
-        "For extend_video, open with Extend <Video_1>: … (never say 'reference <Video_1>'). " +
-        "When continuing across clips, CONTEXT must restate footing from the previous last frame."
-      ),
-    referenceImageUrls: z
-      .array(z.string())
-      .max(9)
-      .describe(
-        "Approved reference image URLs in precision order: character → object → location → " +
-        "scene anchor (scene's first approved sheet, when later in scene) → " +
-        "incoming anchor (prior terminal panel / last frame, when continuous) → motion sheet. " +
-        "Required for fresh; optional for extend_video when identity is carried by the source clip " +
-        "(still attach sheet + scene/incoming anchors when available)."
-      ),
-    duration: z
-      .number()
-      .int()
-      .min(4)
-      .max(15)
-      .describe("Target clip duration in seconds (4–15). Solo = shot Dur; avoid padding with unused group sums."),
-    aspectRatio: z
-      .enum(["16:9", "9:16", "1:1"])
-      .default("16:9")
-      .describe("Aspect ratio — default 16:9 for cinematic film."),
-    continuityMode: z
-      .enum(CONTINUITY_MODES)
-      .default("fresh")
-      .describe(
-        "fresh = stills-only (scene open / clean break / new take). " +
-        "extend_video = continue from previous approved clip (walks / continuous action)."
-      ),
-    sourceVideoUrl: z
-      .string()
-      .optional()
-      .describe("Required for extend_video: the previous approved clip URL to continue from."),
-  }),
+const referenceSlotSchema = z.object({
+  slot: z.string().describe('Seedance slot label, e.g. "Image1"'),
+  handle: z.string().describe('Bound @material or grid handle, e.g. "@hero_charsheet"'),
+  kind: z
+    .string()
+    .describe("character | object | location | scene_anchor | incoming_anchor | grid"),
+  controls: z.string().describe("What this reference governs"),
 });
 
+/**
+ * Recipe render package (shot-compilation-recipe.md). The model emits this
+ * structured object; the app maps it onto Seedance API params.
+ */
+const compileShotInputSchema = z.object({
+  status: z
+    .enum(["ok", "gap"])
+    .describe('"ok" to present for review; "gap" when Bible+row cannot compile — name gaps, no prompt'),
+  shot_id: z.string().describe("Shot id being compiled, e.g. \"14\""),
+  generation_shot_ids: z
+    .array(z.string())
+    .length(1)
+    .describe("Exactly one shot — one compile = one motion sheet = one shot"),
+  grid_reference: z
+    .string()
+    .nullable()
+    .describe("Motion-sheet handle e.g. @scene3_gen3A_grid, or null for skip_recorded shots"),
+  continuity_mode: z
+    .enum(CONTINUITY_MODES)
+    .describe(
+      "fresh = stills-only (scene open / clean break / new take). " +
+        "extend_video = continue from previous approved clip (walks / continuous action)."
+    ),
+  source_video_url: z
+    .string()
+    .nullable()
+    .describe("Required for extend_video: the previous approved clip URL. Null for fresh."),
+  render_prompt: z
+    .string()
+    .nullable()
+    .describe(
+      "Full Seedance 2.0 prompt when status=ok; null when status=gap. " +
+        "For extend_video, open with Extend <Video_1>: … (never say 'reference <Video_1>'). " +
+        "When continuing across clips, CONTEXT must restate footing from the previous last frame."
+    ),
+  duration_seconds: z
+    .number()
+    .int()
+    .min(4)
+    .max(15)
+    .nullable()
+    .describe("Registry estimate (4–15). Null when status=gap. API duration param — never prompt text."),
+  resolution: z
+    .string()
+    .default("1080p")
+    .describe("Structured API field only — never words inside render_prompt."),
+  aspect_ratio: z
+    .enum(["16:9", "9:16", "1:1"])
+    .default("16:9")
+    .describe("Locked Look aspect ratio — structured API field, not prompt text."),
+  references: z
+    .array(referenceSlotSchema)
+    .max(9)
+    .default([])
+    .describe(
+      "Slot metadata in precision order: character → object → location → scene anchor → " +
+        "incoming anchor → motion sheet. Must match reference_image_urls length/order."
+    ),
+  reference_image_urls: z
+    .array(z.string())
+    .max(9)
+    .default([])
+    .describe(
+      "Resolved approved image URLs in the same order as references. Required for fresh; " +
+        "optional for extend_video when identity is carried by the source clip " +
+        "(still attach sheet + scene/incoming anchors when available)."
+    ),
+  checks: z
+    .record(z.string(), z.unknown())
+    .optional()
+    .describe("Self-verified assertion checks from the recipe before emitting"),
+  gaps: z
+    .array(z.string())
+    .default([])
+    .describe("Named gaps when status=gap; empty when status=ok"),
+});
+
+export type CompileShotToolInput = z.infer<typeof compileShotInputSchema>;
+
+/** Normalized args used by the render worker / Seedance dispatch. */
 export type CompileShotArgs = {
   prompt: string;
   referenceImageUrls: string[];
@@ -75,7 +107,128 @@ export type CompileShotArgs = {
   aspectRatio: "16:9" | "9:16" | "1:1";
   continuityMode?: ContinuityMode;
   sourceVideoUrl?: string;
+  resolution?: string;
 };
+
+/** Map recipe package (or legacy camelCase args) onto render worker fields. */
+export function toCompileShotArgs(
+  args: CompileShotToolInput | Record<string, unknown>
+): CompileShotArgs | null {
+  const a = args as Record<string, unknown>;
+  const status = (a.status as string | undefined) ?? "ok";
+  if (status === "gap") return null;
+
+  const prompt =
+    (a.render_prompt as string | null | undefined) ??
+    (a.prompt as string | undefined);
+  if (!prompt?.trim()) return null;
+
+  const refs =
+    (a.reference_image_urls as string[] | undefined) ??
+    (a.referenceImageUrls as string[] | undefined) ??
+    [];
+
+  const duration =
+    (a.duration_seconds as number | null | undefined) ??
+    (a.duration as number | undefined);
+  if (duration == null) return null;
+
+  const continuityMode = ((a.continuity_mode as ContinuityMode | undefined) ??
+    (a.continuityMode as ContinuityMode | undefined) ??
+    "fresh") as ContinuityMode;
+
+  const sourceVideoUrl =
+    (a.source_video_url as string | null | undefined) ??
+    (a.sourceVideoUrl as string | undefined) ??
+    undefined;
+
+  return {
+    prompt,
+    referenceImageUrls: refs,
+    duration,
+    aspectRatio:
+      ((a.aspect_ratio as CompileShotArgs["aspectRatio"] | undefined) ??
+        (a.aspectRatio as CompileShotArgs["aspectRatio"] | undefined) ??
+        "16:9"),
+    continuityMode,
+    sourceVideoUrl: sourceVideoUrl || undefined,
+    resolution: (a.resolution as string | undefined) ?? "1080p",
+  };
+}
+
+export function validateCompilePackage(args: CompileShotToolInput): string[] {
+  const errors: string[] = [];
+  if (args.status === "gap") {
+    if (!args.gaps?.length) errors.push("status=gap requires at least one named gap");
+    if (args.render_prompt != null) errors.push("status=gap must set render_prompt to null");
+    return errors;
+  }
+  if (!args.render_prompt?.trim()) errors.push("status=ok requires render_prompt");
+  if (args.duration_seconds == null) errors.push("status=ok requires duration_seconds");
+  if (args.gaps?.length) errors.push("status=ok must not list gaps (use status=gap instead)");
+  if (args.generation_shot_ids.length !== 1) {
+    errors.push("generation_shot_ids must contain exactly one shot");
+  }
+  if (args.references.length !== args.reference_image_urls.length) {
+    errors.push("references length must match reference_image_urls length");
+  }
+  errors.push(
+    ...validateCompileContinuity({
+      prompt: args.render_prompt ?? "",
+      referenceImageUrls: args.reference_image_urls,
+      duration: args.duration_seconds ?? 0,
+      aspectRatio: args.aspect_ratio,
+      continuityMode: args.continuity_mode,
+      sourceVideoUrl: args.source_video_url ?? undefined,
+    })
+  );
+  return errors;
+}
+
+export const compileShot = tool({
+  description:
+    "Compile ONE shot into the structured render package from shot-compilation-recipe.md and " +
+    "present it for user review before any rendering. Only after Stage 1 is complete (registry " +
+    "passing): load stage2-skill.md and shot-compilation-recipe.md, then call this tool. " +
+    "One compile = one motion sheet = one shot. Emit status=ok with the full package, or " +
+    "status=gap naming missing Bible/row values (never invent). " +
+    "continuity_mode extend_video requires source_video_url; fresh requires reference_image_urls. " +
+    "Slot order: character → object → location → scene anchor → incoming anchor → motion sheet. " +
+    "Prompt must interpolate the motion sheet (continuous take; COMPOSITION LOCK on Panel 1, " +
+    "END STATE LOCK on Panel n). Wait for shot approval before compiling the next shot.",
+  inputSchema: compileShotInputSchema,
+  execute: async (args) => {
+    const errors = validateCompilePackage(args);
+    if (errors.length > 0) {
+      return {
+        type: "text" as const,
+        value: JSON.stringify({ ok: false, errors }),
+      };
+    }
+    if (args.status === "gap") {
+      return {
+        type: "text" as const,
+        value: JSON.stringify({
+          ok: true,
+          status: "gap",
+          shot_id: args.shot_id,
+          gaps: args.gaps,
+          message: "Gap recorded — fix upstream, then recompile. Do not present for render.",
+        }),
+      };
+    }
+    return {
+      type: "text" as const,
+      value: JSON.stringify({
+        ok: true,
+        status: "ok",
+        shot_id: args.shot_id,
+        message:
+          "Package accepted. Shown to the user for review. Do not assume approval — wait for the Approve button.",
+      }),
+    };
+  },
+});
 
 export function validateCompileContinuity(args: CompileShotArgs): string[] {
   const mode = args.continuityMode ?? "fresh";

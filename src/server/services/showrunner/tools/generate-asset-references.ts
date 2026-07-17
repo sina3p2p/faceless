@@ -7,21 +7,42 @@ import { db } from "@/server/db";
 
 const ASSET_CANDIDATE_COUNT = 1;
 
+const assetSpecSchema = z.object({
+  assetHandle: z
+    .string()
+    .describe('Named handle, e.g. "hero_charsheet", "rooftop_plate", or "ship_object_ref"'),
+  assetKind: z.enum(["character", "location", "object"]),
+  imagePrompt: z
+    .string()
+    .describe(
+      "Full image generation prompt: expand the locked spec + the locked Look block into a single self-contained prompt ready for an image model."
+    ),
+});
+
+export type AssetSpecInput = z.infer<typeof assetSpecSchema>;
+
+export type AssetCandidate = { id: string; url: string };
+
+export type GeneratedAssetItem = {
+  assetHandle: string;
+  assetKind: "character" | "location" | "object";
+  candidates: AssetCandidate[];
+};
+
 export const generateAssetReferences = tool({
   description:
-    "Generate candidate reference images for ONE locked character or location asset. " +
-    "Call this once per asset, one at a time — present an asset, wait for the user's " +
-    "approval, then call again for the next asset. Never batch multiple assets in a single " +
-    "turn. Only call once the Look block is locked.",
+    "Generate candidate reference images for the FULL audited asset manifest (Stage 1 Step 9). " +
+    "After the user approves the manifest list, call this ONCE with every asset expanded — characters " +
+    "first, then objects, then locations. Assets are independent (each prompt derives only from its " +
+    "locked spec + the locked Look). The app dispatches all generations together and presents ONE " +
+    "gallery. Wait for gallery approval (`asset_approval` with per-asset candidate ids) before " +
+    "proceeding — never treat free text as approval. Do not call this one asset at a time.",
   inputSchema: z.object({
-    assetHandle: z
-      .string()
-      .describe('Named handle, e.g. "hero_charsheet", "rooftop_plate", or "ship_object_ref"'),
-    assetKind: z.enum(["character", "location", "object"]),
-    imagePrompt: z
-      .string()
+    assets: z
+      .array(assetSpecSchema)
+      .min(1)
       .describe(
-        "Full image generation prompt: expand the locked spec + the locked Look block into a single self-contained prompt ready for an image model."
+        "Every manifest entry, characters first. One call = the whole gallery."
       ),
   }),
 });
@@ -30,8 +51,8 @@ export const generateAssetReferences = tool({
 export async function generateAssetImages(
   imagePrompt: string,
   assetKind: "character" | "location" | "object",
-  userId: string,
-): Promise<string[]> {
+  userId: string
+): Promise<AssetCandidate[]> {
   const aspectRatio = assetKind === "location" ? ("16:9" as const) : ("1:1" as const);
   const results = await Promise.all(
     Array.from({ length: ASSET_CANDIDATE_COUNT }, () =>
@@ -44,14 +65,35 @@ export async function generateAssetImages(
   );
   const images = results.flat();
 
-  await db.insert(media).values(images.map(img => ({
-    userId,
-    type: "image",
-    url: img,
-    prompt: imagePrompt,
-    modelUsed: "gpt-image-2",
-    metadata: { aspectRatio },
-  })));
+  await db.insert(media).values(
+    images.map((img) => ({
+      userId,
+      type: "image" as const,
+      url: img,
+      prompt: imagePrompt,
+      modelUsed: "gpt-image-2",
+      metadata: { aspectRatio },
+    }))
+  );
 
-  return Promise.all(images.map((img) => mediaUrl(img)));
+  return Promise.all(
+    images.map(async (img) => ({
+      id: img,
+      url: await mediaUrl(img),
+    }))
+  );
+}
+
+/** Parallel gallery generation — one result row per manifest entry. */
+export async function generateAssetGallery(
+  assets: AssetSpecInput[],
+  userId: string
+): Promise<GeneratedAssetItem[]> {
+  return Promise.all(
+    assets.map(async (asset) => ({
+      assetHandle: asset.assetHandle,
+      assetKind: asset.assetKind,
+      candidates: await generateAssetImages(asset.imagePrompt, asset.assetKind, userId),
+    }))
+  );
 }
