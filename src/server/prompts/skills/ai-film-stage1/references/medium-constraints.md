@@ -38,7 +38,7 @@ A spec is written for a human ("frail, sympathetic grey alien with a teal chest 
 - **Default:** empty hands on the sheet + a separate `*_object_ref` for the recurring tool. Story shots attach both.
 - **Wardrobe exception:** only when the tool is inseparable identity (part of the silhouette, always carried) AND no object ref will exist for it — bake it into the sheet as locked wardrobe. The two policies never mix on one asset; "tool never puts down" in the design + empty hands on the sheet + a separate object ref is a three-way identity fight.
 
-**Charsheet approval checklist — REJECT (never "close enough") on any of:** views not reading as the SAME person (the sheet's cardinal failure); anything held or worn that isn't locked wardrobe under the empty-hands policy; an environment or scene lighting instead of flat studio; a tinted/gradient background; a non-neutral pose or expression; the face obscured in the front view.
+**Charsheet approval checklist (applied twice: as the model's pre-screen before the gallery, and as the user's rejection guide in it) — REJECT (never "close enough") on any of:** views not reading as the SAME person (the sheet's cardinal failure); anything held or worn that isn't locked wardrobe under the empty-hands policy; an environment or scene lighting instead of flat studio; a tinted/gradient background; a non-neutral pose or expression; the face obscured in the front view.
 
 **The ten-generations test for any reference prompt:** if you generated this same prompt ten times, would all ten be recognizably the same character/place? Looseness that lets them diverge is exactly what becomes drift downstream — tighten the anchors before generating.
 

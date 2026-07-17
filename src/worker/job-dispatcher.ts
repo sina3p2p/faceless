@@ -1,5 +1,8 @@
 import { renderAndUploadShot } from "@/server/services/showrunner/tools/compile-shot";
-import { generateAssetImages } from "@/server/services/showrunner/tools/generate-asset-references";
+import {
+  generateAssetGallery,
+  generateAssetImages,
+} from "@/server/services/showrunner/tools/generate-asset-references";
 import { generateContinuityPackImages } from "@/server/services/showrunner/tools/generate-continuity-pack";
 import { generateGenerationGridImages } from "@/server/services/showrunner/tools/generate-generation-grid";
 import { JOB_NAMES, type WorkerJobName } from "@/lib/worker-queue";
@@ -41,8 +44,9 @@ export async function dispatchWorkerJob(
         const result = await runGenerateAssetImages(payload as PayloadBase & AssetPayload);
         await setJobStatus(jobId, "succeeded", result);
         await patchMessageToolCall(assistantMessageRowId, toolCallId, {
-          generatedImages: result.images,
+          ...result.patch,
           pending: false,
+          error: undefined,
         });
         break;
       }
@@ -116,18 +120,48 @@ async function runGenerateShot(sessionId: string, payload: PayloadBase & ShotPay
 }
 
 type AssetPayload = {
-  imagePrompt: string;
-  assetKind: "character" | "location" | "object";
   userId: string;
+  assets?: Array<{
+    assetHandle: string;
+    assetKind: "character" | "location" | "object";
+    imagePrompt: string;
+  }>;
+  assetHandle?: string;
+  assetKind?: "character" | "location" | "object";
+  imagePrompt?: string;
+  existingGeneratedAssets?: Array<{
+    assetHandle: string;
+    assetKind: "character" | "location" | "object";
+    candidates: Array<{ id: string; url: string }>;
+  }>;
 };
 
 async function runGenerateAssetImages(payload: PayloadBase & AssetPayload) {
-  const images = await generateAssetImages(
-    payload.imagePrompt,
-    payload.assetKind,
-    payload.userId,
-  );
-  return { images };
+  if (payload.assets?.length) {
+    const generatedAssets = await generateAssetGallery(payload.assets, payload.userId);
+    return {
+      images: generatedAssets.flatMap((a) => a.candidates.map((c) => c.id)),
+      generatedAssets,
+      patch: { generatedAssets, generatedImages: undefined },
+    };
+  }
+
+  const handle = payload.assetHandle!;
+  const kind = payload.assetKind!;
+  const prompt = payload.imagePrompt!;
+  const candidates = await generateAssetImages(prompt, kind, payload.userId);
+  const existing = payload.existingGeneratedAssets ?? [];
+  const generatedAssets = existing.some((a) => a.assetHandle === handle)
+    ? existing.map((a) =>
+        a.assetHandle === handle ? { assetHandle: handle, assetKind: kind, candidates } : a
+      )
+    : [...existing, { assetHandle: handle, assetKind: kind, candidates }];
+
+  return {
+    images: candidates.map((c) => c.id),
+    generatedAssets,
+    patch: { generatedAssets },
+  };
 }
 
 type ContinuityPayload = {

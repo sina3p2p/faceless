@@ -53,7 +53,18 @@ Assemble §A from locked artifacts: §1 the Look verbatim (Step 5), §2 the mast
 
 ## Step 9 — Asset reference generation
 
-Audit the manifest first: identity anchors only (characters, plates, recurring hero props in ONE neutral state), typically 4–8 images; strike disguised shots; fused entities get their own object refs; plates stay environment-only when a hero prop has its own ref; charsheets follow the held-tool policy in `medium-constraints.md`. Present the audited list as a fork. Then one asset at a time, characters first: expand the spec per `medium-constraints.md`, generate candidates, bind the approved image to its handle. Assets approved ≠ Stage 1 done — proceed to Step 10.
+Audit the manifest first: identity anchors only (characters, plates, recurring hero props in ONE neutral state), typically 4–8 images; strike disguised shots; fused entities get their own object refs; plates stay environment-only when a hero prop has its own ref; charsheets follow the held-tool policy in `medium-constraints.md`. Present the audited list as a fork — this is the taste decision; everything after it is verification.
+
+On manifest approval, run the batch: expand EVERY spec per `medium-constraints.md` (assets are independent — every expansion derives only from the locked spec + the locked Look, so nothing waits on anything), dispatch all generations together, and present ONE gallery of candidates labeled by handle.
+
+**Gallery review is per-item, by exception:**
+
+- Before presenting, self-check every candidate against its approval checklist (`medium-constraints.md`) — candidates that fail a checklist item are regenerated before the user sees them, or shown pre-flagged with the failure named when regeneration budget is a concern.
+- The user REJECTS individual assets (each rejection names the objection; that asset regenerates with the objection folded into its expansion prompt and returns to the gallery) and APPROVES the remainder in one action.
+- Approval binds each approved image to its `@material` handle. Approval is the gallery's Approve button (`asset_approval` tool result carrying per-asset candidate ids) — never free text.
+- Regenerated assets come back as a small follow-up gallery; repeat until every manifest entry is bound.
+
+Characters still lead the gallery ordering (they're the highest-stakes identities and the most likely rejections — surfacing them first gets their re-roll cycle started earliest). Assets approved ≠ Stage 1 done — proceed to Step 10.
 
 ## Step 10 — Motion sheets
 
