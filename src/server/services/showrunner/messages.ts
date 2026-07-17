@@ -9,7 +9,7 @@ import type {
   ShotCompile,
   ShotResult,
 } from "@/types/v2/story";
-import { mediaUrl, mediaUrls, storageKeyFrom } from "@/lib/storage";
+import { mediaUrl, mediaUrls, agentMediaUrl, agentMediaUrls, storageKeyFrom } from "@/lib/storage";
 import { filmstripTileCount } from "@/lib/filmstrip";
 import { db } from "@/server/db";
 import { filmSessionMessages } from "@/server/db/schema";
@@ -422,34 +422,34 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
       });
     } else if (row.role === "user" && row.type === "asset_approval") {
       const d = rowData(row);
-      const approvedUrl = await mediaUrl(d.approvedUrl as string);
+      const approvedUrl = agentMediaUrl(d.approvedUrl as string);
       collectedResults.set(d.toolCallId as string, {
         text: `User approved this reference image for "${d.assetHandle as string}": ${approvedUrl}`,
-        imageUrl: approvedUrl,
+        imageUrl: approvedUrl ?? undefined,
       });
     } else if (row.role === "user" && row.type === "continuity_pack_approval") {
       const d = rowData(row);
-      const approvedUrls = await mediaUrls((d.approvedUrls as string[]) ?? []);
+      const approvedUrls = agentMediaUrls((d.approvedUrls as string[]) ?? []);
       collectedResults.set(d.toolCallId as string, {
         text:
           `User approved continuity pack "${d.packHandle as string}" for scene ${d.sceneId as string | number} ` +
           `with ${approvedUrls.length} keyframe(s): ${approvedUrls.join(", ")}. ` +
-          `Record via recordContinuityPackEntry, then generate generation grids. ` +
+          `Record via recordContinuityPackEntry, then generate motion sheets (one per shot, 4–9 panels). ` +
           `Keyframes are continuity references only — not a Seedance shot sequence.`,
         imageUrl: approvedUrls[0],
       });
     } else if (row.role === "user" && row.type === "grid_approval") {
       const d = rowData(row);
-      const approvedUrl = await mediaUrl(d.approvedUrl as string);
+      const approvedUrl = agentMediaUrl(d.approvedUrl as string);
       collectedResults.set(d.toolCallId as string, {
-        text: `User approved this generation grid for scene ${d.sceneId as string | number}: ${approvedUrl}`,
-        imageUrl: approvedUrl,
+        text: `User approved this motion sheet for scene ${d.sceneId as string | number}: ${approvedUrl}`,
+        imageUrl: approvedUrl ?? undefined,
       });
     } else if (row.role === "user" && row.type === "shot_approval") {
       const d = rowData(row);
-      const videoUrl = await mediaUrl(d.videoUrl as string);
+      const videoUrl = agentMediaUrl(d.videoUrl as string);
       const lastFrameUrl = d.lastFrameUrl
-        ? await mediaUrl(d.lastFrameUrl as string)
+        ? agentMediaUrl(d.lastFrameUrl as string)
         : undefined;
       collectedResults.set(d.toolCallId as string, {
         text: lastFrameUrl
@@ -460,7 +460,7 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
           : `Shot rendered and approved by user: ${videoUrl}. ` +
             `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${videoUrl}. ` +
             `For a clean break / new take use continuityMode "fresh" with stills.`,
-        imageUrl: lastFrameUrl,
+        imageUrl: lastFrameUrl ?? undefined,
       });
     }
   }
@@ -568,7 +568,7 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
                 typeof tc.function.arguments.label === "string"
                   ? tc.function.arguments.label.trim()
                   : "";
-              const resolved = rawUrl ? await mediaUrl(rawUrl) : null;
+              const resolved = rawUrl ? agentMediaUrl(rawUrl) : null;
               if (!resolved) {
                 return {
                   type: "tool-result" as const,
@@ -627,7 +627,7 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
             }
             const collected = collectedResults.get(tc.id);
             const shotVideoUrl = tc.function.arguments.videoUrl
-              ? await mediaUrl(tc.function.arguments.videoUrl as string)
+              ? agentMediaUrl(tc.function.arguments.videoUrl as string)
               : undefined;
             const resultText =
               collected?.text ??
@@ -642,7 +642,7 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
                       }. User has not yet approved it.`
                 : tc.function.name === "generateGenerationGrid" ||
                     tc.function.name === "generateSceneGrid"
-                  ? `A generation grid candidate has been generated for ${
+                  ? `A motion sheet candidate has been generated for ${
                       (tc.function.arguments.generationId as string | undefined) ??
                       `scene ${tc.function.arguments.sceneId as string | number}`
                     }. User has not yet approved it.`

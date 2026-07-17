@@ -10,17 +10,29 @@ const SKIP_REASONS = [
 
 const ANCHOR_KINDS = ["prior_grid_terminal_panel", "prior_render_last_frame"] as const;
 
+const MIN_PANELS = 4;
+const MAX_PANELS = 9;
+
 /** Loose input schema for the tool (JSON-schema friendly). Strict checks run in execute. */
 const inputSchema = z.object({
   scene_id: z.number().int().positive(),
   generation_id: z.string().min(1),
-  shot_ids: z.array(z.number().int().positive()).min(1).max(4),
+  shot_ids: z.array(z.number().int().positive()).min(1),
   estimated_duration_seconds: z.number().min(4).max(15),
   status: z.enum(["approved_grid", "skip_recorded"]),
   grid_handle: z.string().nullable(),
   approved_candidate_id: z.string().nullable(),
   skip_reason: z.enum(SKIP_REASONS).nullable(),
   panel_map: z.record(z.string(), z.number().int().positive().nullable()),
+  panel_count: z
+    .number()
+    .int()
+    .min(MIN_PANELS)
+    .max(MAX_PANELS)
+    .nullable()
+    .describe(
+      "Temporal panel count on the motion sheet (4–9). Required for approved_grid; null for skips."
+    ),
   continuity_pack_handle: z
     .string()
     .nullable()
@@ -30,7 +42,7 @@ const inputSchema = z.object({
   is_first_in_scene: z
     .boolean()
     .describe(
-      "True ONLY for the first generation grid in this scene. False for every later generation."
+      "True ONLY for the first motion sheet in this scene. False for every later generation."
     ),
   previous_generation_id: z
     .string()
@@ -42,7 +54,7 @@ const inputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Visual anchor for cut-in continuity: prior generation grid handle (terminal panel) or prior render last-frame handle/URL. Required when previous_generation_id is set."
+      "Visual anchor for cut-in continuity: prior motion sheet handle (terminal panel) or prior render last-frame handle/URL. Required when previous_generation_id is set."
     ),
   incoming_anchor_kind: z
     .enum(ANCHOR_KINDS)
@@ -56,7 +68,7 @@ const inputSchema = z.object({
     .positive()
     .nullable()
     .describe(
-      "Panel number of the prior grid's terminal panel when incoming_anchor_kind is prior_grid_terminal_panel; null for last-frame anchors."
+      "Panel number of the prior sheet's terminal panel (Pn) when incoming_anchor_kind is prior_grid_terminal_panel; null for last-frame anchors."
     ),
   continuity_break_reason: z
     .string()
@@ -81,7 +93,6 @@ export function validateContinuityChain(fields: {
 }): string[] {
   const errors: string[] = [];
   const isFirst = fields.is_first_in_scene === true;
-  const isLater = fields.is_first_in_scene === false;
   const prev = fields.previous_generation_id ?? null;
   const anchor = fields.incoming_anchor_handle ?? null;
   const kind = fields.incoming_anchor_kind ?? null;
@@ -128,15 +139,16 @@ export function validateContinuityChain(fields: {
   if (!kind) {
     errors.push("incoming_anchor_kind is required for continuous later generations");
   }
-  if (kind === "prior_grid_terminal_panel" && (panel == null || panel < 1)) {
-    errors.push("incoming_anchor_panel is required for prior_grid_terminal_panel");
+  if (kind === "prior_grid_terminal_panel") {
+    if (panel == null || panel < MIN_PANELS || panel > MAX_PANELS) {
+      errors.push(
+        `incoming_anchor_panel must be the prior sheet's last panel (${MIN_PANELS}–${MAX_PANELS}) for prior_grid_terminal_panel`
+      );
+    }
   }
   if (kind === "prior_render_last_frame" && panel != null) {
     errors.push("incoming_anchor_panel must be null for prior_render_last_frame");
   }
-
-  // silence unused when somehow neither
-  void isLater;
 
   return errors;
 }
@@ -151,6 +163,17 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
     if (!entry.continuity_pack_handle) {
       errors.push("approved_grid requires continuity_pack_handle from an approved continuity pack");
     }
+    if (entry.shot_ids.length !== 1) {
+      errors.push("approved_grid requires exactly one shot_id (one motion sheet = one shot)");
+    }
+    if (
+      entry.panel_count == null ||
+      !Number.isInteger(entry.panel_count) ||
+      entry.panel_count < MIN_PANELS ||
+      entry.panel_count > MAX_PANELS
+    ) {
+      errors.push(`approved_grid requires panel_count from ${MIN_PANELS} to ${MAX_PANELS}`);
+    }
     errors.push(
       ...validateContinuityChain({
         ...entry,
@@ -161,11 +184,9 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
   if (entry.status === "skip_recorded") {
     if (!entry.skip_reason) errors.push("skip_recorded requires skip_reason");
     if (entry.grid_handle != null) errors.push("skip_recorded must not set grid_handle");
+    if (entry.panel_count != null) errors.push("skip_recorded must not set panel_count");
   }
 
-  if (entry.shot_ids.length > 4) {
-    errors.push("shot_ids must have at most 4 shots (one generation window)");
-  }
   if (entry.estimated_duration_seconds > 15) {
     errors.push("estimated_duration_seconds must be ≤15");
   }
@@ -191,8 +212,16 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
   if (unique.size !== panels.length) {
     errors.push("panel_map panel numbers must be unique within the generation");
   }
-  if (entry.status === "approved_grid" && panels.length !== entry.shot_ids.length) {
-    errors.push("approved_grid requires a non-null panel for every shot_id");
+  if (entry.status === "approved_grid") {
+    if (panels.length !== entry.shot_ids.length) {
+      errors.push("approved_grid requires a non-null panel for every shot_id");
+    }
+    // Cut-in index on the sheet is always panel 1
+    for (const p of panels) {
+      if (p !== 1) {
+        errors.push("approved_grid panel_map must map the shot to cut-in panel 1");
+      }
+    }
   }
 
   return errors;
@@ -200,12 +229,12 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
 
 export const recordGenerationGridEntry = tool({
   description:
-    "Record ONE generation-grid registry entry after grid approval or an explicit skip (Stage 1 Step 16). " +
-    "One entry = one Seedance generation (1–4 shots, estimated Dur ≤15s). A scene may have many entries. " +
-    "Requires continuity_pack_handle. Later generations in a scene MUST set previous_generation_id + " +
-    "incoming_anchor_handle (prior terminal panel, later prior last frame) unless continuity_break_reason " +
-    "documents an intentional break. Stage 1 is incomplete until every shot is covered by exactly one " +
-    "passing entry. Stage 2 preflight reads these validated entries.",
+    "Record ONE motion-sheet registry entry after approval or an explicit skip (Stage 1 Step 16). " +
+    "One approved entry = one shot = one Seedance generation (4–9 temporal panels, estimated Dur ≤15s). " +
+    "Requires continuity_pack_handle + panel_count for approved_grid. Later sheets in a scene MUST set " +
+    "previous_generation_id + incoming_anchor_handle (prior terminal panel Pn, later prior last frame) unless " +
+    "continuity_break_reason documents an intentional break. Stage 1 is incomplete until every shot is covered " +
+    "by exactly one passing entry. Stage 2 preflight reads these validated entries.",
   inputSchema,
   execute: async (entry) => {
     const errors = validateEntry(entry);

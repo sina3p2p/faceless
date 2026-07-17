@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { mediaUrl } from "@/lib/storage";
+import { agentMediaUrl } from "@/lib/storage";
 
 /**
  * On-demand vision for approved stills that fell outside the history vision
@@ -28,7 +28,7 @@ export const loadApprovedImage = tool({
     url: string;
     label?: string;
   }) => {
-    const resolved = await mediaUrl(url.trim());
+    const resolved = agentMediaUrl(url.trim());
     if (!resolved) {
       return {
         type: "text" as const,

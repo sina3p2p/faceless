@@ -15,7 +15,6 @@ export async function GET(
 ) {
   const { key: parts } = await params;
 
-
   const key = parts.join("/");
 
   const obj = await getStoredObject(key);

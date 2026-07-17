@@ -16,14 +16,16 @@ export const compileShot = tool({
     "Compile a shot prompt package and present it to the user for review before any rendering happens. " +
     "Only after Stage 1 is complete (registry passing): load stage2-skill.md and shot-compilation-recipe.md, " +
     "assemble the Seedance 2.0 prompt from the Bible, then call this tool. " +
-    "DEFAULT to solo generations (one shot per call). " +
+    "One compile = one motion sheet = one shot. " +
     "Use continuityMode 'extend_video' + sourceVideoUrl (previous approved clip) when the next beat " +
     "continues the same character through the same space (walks / approaches / same-surface carries). " +
     "Use 'fresh' for scene opens, clean breaks, and hard cuts that start a new take. " +
     "Attach referenceImageUrls in precision order: character → object → location → " +
-    "continuity-pack keyframes → incoming anchor → generation grid. " +
+    "continuity-pack keyframes → incoming anchor → motion sheet. " +
+    "Prompt must interpolate the motion sheet (continuous take; no hard cuts; never show grid/gutters) " +
+    "with COMPOSITION LOCK on Panel 1 and END STATE LOCK on Panel n. " +
     "The user reviews/edits the prompt, then approves — rendering starts only after approval. " +
-    "Wait for shot approval before compiling the next generation.",
+    "Wait for shot approval before compiling the next shot.",
   inputSchema: z.object({
     prompt: z
       .string()
@@ -38,8 +40,8 @@ export const compileShot = tool({
       .describe(
         "Approved reference image URLs in precision order: character → object → location → " +
         "continuity-pack keyframes (1–3) → incoming anchor (prior terminal panel / last frame, when continuous) → " +
-        "generation grid. Required for fresh; optional for extend_video when identity is carried by the source clip " +
-        "(still attach grid + continuity refs when available)."
+        "motion sheet. Required for fresh; optional for extend_video when identity is carried by the source clip " +
+        "(still attach sheet + continuity refs when available)."
       ),
     duration: z
       .number()

@@ -1,6 +1,6 @@
 # Deliverable Templates
 
-The two TEXT documents of Stage 1's five-artifact handoff (Bible + shot list; the other three parts — approved reference images, generation grids, and the Generation Grid Registry — are produced at Steps 15–16). Fill these from locked decisions only. Prompt assembly for Seedance lives in the Stage 2 skill / `shot-compilation-recipe.md` — not here.
+The two TEXT documents of Stage 1's five-artifact handoff (Bible + shot list; the other three parts — approved reference images, motion sheets / generation grids, and the Generation Grid Registry — are produced at Steps 15–16). Fill these from locked decisions only. Prompt assembly for Seedance lives in the Stage 2 skill / `shot-compilation-recipe.md` — not here.
 
 ---
 
@@ -121,7 +121,7 @@ One row per shot. Columns:
   **Continuous walks across generations should prefer video extension** (Stage 2)
   over hoping text cut-ins preserve geography.
 - **Light** exactly ONE canonical state per row — never a transition ("Golden Hour → dusk", "transitioning toward…"). Time passes BETWEEN shots; pick one state or split the row. In-shot light morphs are a State Schedule violation.
-- **Dur** seconds — an ESTIMATE used for generation-partition math and the runtime total; it never appears in a prompt (API duration = the generation's summed estimate ≤15s; Seedance paces internal cuts).
+- **Dur** seconds — an ESTIMATE used for per-shot Seedance duration and the runtime total; it never appears in a prompt (API duration = that shot's estimate ≤15s; Seedance interpolates the motion sheet as one continuous take).
 - **Materials** every asset that APPEARS IN THE MOTION ARC must be listed — characters,
   plates (at which version), AND hero props/objects. If the arc says the ship streaks,
   lifts, or is exited, `ship_object_ref` is in this cell; an entity named in the arc
@@ -153,7 +153,7 @@ This is the CHOOSING vocabulary for the Camera move and Scale cells — availabl
 
 **Camera height and angle belong in the Camera move cell** whenever they carry meaning: eye-level is the invisible default; name low/high/overhead/ground-level ONLY when the beat wants power, vulnerability, layout, or texture — an unmotivated fancy angle reads as showing off.
 
-**Depth staging (the strongest realism cue AI shot lists neglect):** compose in THREE planes, not one — something soft in the extreme foreground (a shoulder, a tool, a doorframe edge), the subject in the mid, life in the deep background — and prefer movement TOWARD or AWAY from camera over lateral crosses: depth movement generates parallax, and correct parallax is what subconsciously reads as "filmed" rather than "generated." Per scene, aim for at least one row staged in three planes and one whose movement travels through depth. Write the planes into the motion arc ("past the foreground doorway, the hero walks toward camera from the deep corridor") — the grid panels will then inherit the depth composition.
+**Depth staging (the strongest realism cue AI shot lists neglect):** compose in THREE planes, not one — something soft in the extreme foreground (a shoulder, a tool, a doorframe edge), the subject in the mid, life in the deep background — and prefer movement TOWARD or AWAY from camera over lateral crosses: depth movement generates parallax, and correct parallax is what subconsciously reads as "filmed" rather than "generated." Per scene, aim for at least one row staged in three planes and one whose movement travels through depth. Write the planes into the motion arc ("past the foreground doorway, the hero walks toward camera from the deep corridor") — the motion-sheet panels will then inherit the depth composition.
 
 ---
 

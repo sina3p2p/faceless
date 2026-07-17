@@ -5,36 +5,41 @@ import { validateContinuityChain } from "./record-generation-grid-entry";
 import { mediaUrl } from "@/lib/storage";
 
 const GRID_CANDIDATE_COUNT = 1;
+const MIN_PANELS = 4;
+const MAX_PANELS = 9;
 
 const panelCaptionSchema = z.object({
   motionArc: z
     .string()
-    .describe("Motion arc for this panel from the shot row (what moves / changes in the cut-in moment)."),
+    .describe(
+      "What this panel locks: Panel 1 = cut-in state; middle = one action/camera milestone; last = cut-out end state."
+    ),
   handoff: z
     .string()
-    .describe("Handoff into the next panel / shot (eyeline, exit, match cut, or end-of-generation)."),
+    .describe(
+      "Bridge into the next panel (or, on the last panel, into the next shot's cut-in). Empty string only if truly terminal."
+    ),
 });
 
 export type PanelCaptionInput = z.infer<typeof panelCaptionSchema>;
 
 const generateGenerationGridInputSchema = z.object({
-  sceneId: z.union([z.string(), z.number()]).describe("Scene id/number this generation belongs to, e.g. 3"),
+  sceneId: z.union([z.string(), z.number()]).describe("Scene id/number this shot belongs to, e.g. 3"),
   generationId: z
     .string()
     .describe(
-      "Stable id for this generation within the scene, e.g. '3A' or '3-1'. One generation grid = one Seedance render."
+      "Stable id for this generation within the scene, e.g. '3A' or '3-1'. One motion sheet = one shot = one Seedance render."
     ),
   shotIds: z
     .array(z.number().int().positive())
-    .min(1)
-    .max(4)
-    .describe("1–4 consecutive shot numbers this generation will render, in order."),
+    .length(1)
+    .describe("Exactly one shot number — one motion sheet covers one uninterrupted shot."),
   estimatedDurationSeconds: z
     .number()
     .min(4)
     .max(15)
     .describe(
-      "Sum of this generation's estimated Dur values (4–15). Prefer 8–12 for stability. Becomes the Seedance API duration."
+      "This shot's estimated Dur (4–15). Prefer 8–12 for stability. Becomes the Seedance API duration."
     ),
   previousGenerationId: z
     .string()
@@ -44,12 +49,12 @@ const generateGenerationGridInputSchema = z.object({
     ),
   isFirstInScene: z
     .boolean()
-    .describe("True ONLY for the first generation grid in this scene; false for every later one."),
+    .describe("True ONLY for the first motion sheet in this scene; false for every later one."),
   incomingAnchorHandle: z
     .string()
     .nullable()
     .describe(
-      "Prior generation grid handle (terminal panel) or prior render last-frame URL/handle. Required when previousGenerationId is set — attach its image in referenceImageUrls."
+      "Prior motion sheet handle (terminal panel) or prior render last-frame URL/handle. Required when previousGenerationId is set — attach its image in referenceImageUrls."
     ),
   incomingAnchorKind: z
     .enum(["prior_grid_terminal_panel", "prior_render_last_frame"])
@@ -62,7 +67,9 @@ const generateGenerationGridInputSchema = z.object({
     .int()
     .positive()
     .nullable()
-    .describe("Terminal panel number on the prior grid when kind is prior_grid_terminal_panel."),
+    .describe(
+      "Prior sheet's last panel number (Pn) when kind is prior_grid_terminal_panel — Panel 1 of this sheet inherits that state."
+    ),
   continuityBreakReason: z
     .string()
     .nullable()
@@ -72,25 +79,27 @@ const generateGenerationGridInputSchema = z.object({
   imagePrompt: z
     .string()
     .describe(
-      "Full generation-grid image prompt per references/generation-grids.md. Must bind continuity pack keyframes; for later generations also bind the incoming anchor (prior terminal panel / last frame) unless continuityBreakReason is set."
+      "Full motion-sheet image prompt per references/generation-grids.md. Must bind continuity pack keyframes; for later sheets also bind the incoming anchor (prior terminal panel / last frame) unless continuityBreakReason is set. Include interpolate / continuous-take / no-cuts language."
     ),
   referenceImageUrls: z
     .array(z.string())
     .describe(
-      "Approved refs in order: characters → objects → location → continuity pack keyframes (1–3) → incoming anchor image (mandatory for continuous later generations)."
+      "Approved refs in order: characters → objects → location → continuity pack keyframes (1–3) → incoming anchor image (mandatory for continuous later sheets)."
     ),
   panelCount: z
     .number()
     .int()
-    .min(1)
-    .max(4)
-    .describe("Number of panels (1–4). Must equal shotIds.length and panelCaptions.length."),
+    .min(MIN_PANELS)
+    .max(MAX_PANELS)
+    .describe(
+      "Number of temporal panels (4–9). Must equal panelCaptions.length. Prefer fewer when the arc is simple."
+    ),
   panelCaptions: z
     .array(panelCaptionSchema)
-    .min(1)
-    .max(4)
+    .min(MIN_PANELS)
+    .max(MAX_PANELS)
     .describe(
-      "One caption per panel, in panel order. Length MUST equal panelCount. Shown under the grid as a caption strip."
+      "One caption per panel, in reading order (L→R, T→B). Length MUST equal panelCount. Shown under the sheet as a caption strip."
     ),
   aspectRatio: z
     .enum(["16:9", "9:16", "1:1"])
@@ -106,8 +115,13 @@ export function validatePanelCaptionCount(
   panelCaptions: PanelCaptionInput[] | undefined,
   shotIds?: number[]
 ): string | null {
-  if (panelCount == null || !Number.isInteger(panelCount) || panelCount < 1 || panelCount > 4) {
-    return "panelCount is required and must be an integer from 1 to 4";
+  if (
+    panelCount == null ||
+    !Number.isInteger(panelCount) ||
+    panelCount < MIN_PANELS ||
+    panelCount > MAX_PANELS
+  ) {
+    return `panelCount is required and must be an integer from ${MIN_PANELS} to ${MAX_PANELS}`;
   }
   if (!panelCaptions || panelCaptions.length === 0) {
     return "panelCaptions is required — one motionArc + handoff per panel";
@@ -115,8 +129,10 @@ export function validatePanelCaptionCount(
   if (panelCaptions.length !== panelCount) {
     return `panelCaptions length (${panelCaptions.length}) must equal panelCount (${panelCount})`;
   }
-  if (shotIds && shotIds.length !== panelCount) {
-    return `shotIds length (${shotIds.length}) must equal panelCount (${panelCount})`;
+  if (shotIds) {
+    if (shotIds.length !== 1) {
+      return "shotIds must contain exactly one shot (one motion sheet = one uninterrupted shot)";
+    }
   }
   return null;
 }
@@ -147,21 +163,21 @@ export function validateGenerationGridContinuity(args: {
     !!args.previousGenerationId &&
     !args.continuityBreakReason?.trim();
   if (needsAnchor && (args.referenceImageUrls?.length ?? 0) === 0) {
-    return "continuous later generations require the incoming anchor image in referenceImageUrls (plus continuity pack keyframes)";
+    return "continuous later sheets require the incoming anchor image in referenceImageUrls (plus continuity pack keyframes)";
   }
   return null;
 }
 
 export const generateGenerationGrid = tool({
   description:
-    "Generate a candidate generation-grid storyboard for ONE Seedance generation (Stage 1 Step 16). " +
-    "One generation grid = one video render: 1–4 consecutive shots whose estimated Dur sum is ≤15s " +
-    "(prefer 8–12). Never build a scene-sized grid and partition later. Call once per generation, " +
-    "present it, wait for approval, record via recordGenerationGridEntry, then the next generation. " +
-    "Requires an approved scene continuity pack. Later generations in the same scene MUST pass " +
-    "previousGenerationId + incomingAnchorHandle/Kind (prior terminal panel; later prior last frame) " +
+    "Generate a candidate motion sheet for ONE shot / Seedance generation (Stage 1 Step 16). " +
+    "One motion sheet = one uninterrupted shot: 4–9 temporal panels (Panel 1 = cut-in, middle = milestones only, " +
+    "Panel n = cut-out). Estimated Dur ≤15s (prefer 8–12). Never pack multiple shots onto one sheet. " +
+    "Call once per shot, present it, wait for approval, record via recordGenerationGridEntry, then the next shot. " +
+    "Requires an approved scene continuity pack. Later sheets in the same scene MUST pass " +
+    "previousGenerationId + incomingAnchorHandle/Kind/Panel (prior terminal panel Pn; later prior last frame) " +
     "and attach that image in referenceImageUrls — unless continuityBreakReason documents an intentional break. " +
-    "Always pass panelCount, panelCaptions, and shotIds with matching lengths. " +
+    "Always pass panelCount (4–9), panelCaptions (same length), and shotIds (exactly one shot). " +
     "If this tool returns ok:false, fix the listed continuity/panel errors and call again in the same turn.",
   inputSchema: generateGenerationGridInputSchema,
   execute: async (args) => {
@@ -219,7 +235,7 @@ export async function generateGenerationGridImages(
         model: "gpt-image-2",
         prompt: imagePrompt,
         referenceImages: referenceImageUrls,
-        aspectRatio
+        aspectRatio,
       })
     )
   );

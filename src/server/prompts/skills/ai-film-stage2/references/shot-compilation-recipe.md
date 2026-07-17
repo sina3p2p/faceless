@@ -1,8 +1,8 @@
 # Shot Compilation Recipe — Turning the Locked Bible into Seedance 2.0 Prompts
 
-> **DO NOT LOAD THIS FILE DURING STAGE 1.** It is useless before reference images exist, and reading it while authoring the story or shot list will contaminate that work with premature render-prompt thinking. Load it ONLY after Stage 1 is fully complete — the Bible is locked, every `@material` has an approved reference image, AND every shot is covered by an approved generation grid (or skip) in the Generation Grid Registry (Stage 1 Step 16) — at the moment you begin writing Seedance prompts in Stage 2. If you are still developing premise, characters, screenplay, shot-list intent, or generating asset images, this file is not yet relevant.
+> **DO NOT LOAD THIS FILE DURING STAGE 1.** It is useless before reference images exist, and reading it while authoring the story or shot list will contaminate that work with premature render-prompt thinking. Load it ONLY after Stage 1 is fully complete — the Bible is locked, every `@material` has an approved reference image, AND every shot is covered by an approved motion sheet (or skip) in the Generation Grid Registry (Stage 1 Step 16) — at the moment you begin writing Seedance prompts in Stage 2. If you are still developing premise, characters, screenplay, shot-list intent, or generating asset images, this file is not yet relevant.
 
-This is the reference the showrunner loads in Stage 2 (Bible locked, all assets approved, all generation grids approved) when writing Seedance prompts. It is **not** a story tool — every creative decision was already made and frozen in the Bible. This document is purely about _compiling_ those locked decisions into precise, renderable Seedance 2.0 prompts.
+This is the reference the showrunner loads in Stage 2 (Bible locked, all assets approved, all motion sheets approved) when writing Seedance prompts. It is **not** a story tool — every creative decision was already made and frozen in the Bible. This document is purely about _compiling_ those locked decisions into precise, renderable Seedance 2.0 prompts.
 
 ---
 
@@ -44,51 +44,52 @@ Ambient environmental life (mist, foliage, water, light) is tier (b) seasoning a
 
 ## Generation grids (how shots become generations)
 
-**Compile precondition (machine-checkable):** compilation input MUST include the completed Generation Grid Registry from Stage 1 Step 16 (written via `recordGenerationGridEntry`, validated by the app). If the registry is missing, incomplete, or any shot lacks an entry whose status is `approved_grid` or `skip_recorded` (with required fields), emit `status: "gap"` and do not compile: `"Shot N: Generation Grid Registry missing/failing for shot N — run Stage 1 Step 16 before compiling."` Per generation: `approved_grid` must attach that generation's grid and open with a COMPOSITION LOCK for every panel; `skip_recorded` must carry the registry's `skip_reason` in the render package. A missing `grid_handle` is not a skip. A missing registry is not a skip. Never skip the grid phase silently because assets are done.
+**Compile precondition (machine-checkable):** compilation input MUST include the completed Generation Grid Registry from Stage 1 Step 16 (written via `recordGenerationGridEntry`, validated by the app). If the registry is missing, incomplete, or any shot lacks an entry whose status is `approved_grid` or `skip_recorded` (with required fields), emit `status: "gap"` and do not compile: `"Shot N: Generation Grid Registry missing/failing for shot N — run Stage 1 Step 16 before compiling."` Per shot: `approved_grid` must attach that shot's motion sheet, open with COMPOSITION LOCK on Panel 1 and END STATE LOCK on Panel n, and instruct continuous-take interpolation; `skip_recorded` must carry the registry's `skip_reason` in the render package. A missing `grid_handle` is not a skip. A missing registry is not a skip. Never skip the sheet phase silently because assets are done.
 
-The unit of DRAMA is the scene; the unit of GENERATION is the **generation grid**. They are deliberately separate layers — a scene may span several generations; the render window must never redefine what a scene is.
+The unit of DRAMA is the scene; the unit of GENERATION is the **motion sheet (one shot)**. They are deliberately separate layers — a scene spans several shots/sheets; the render window must never redefine what a scene is.
 
-**Scene continuity pack (reference only).** Locked in Stage 1 per scene via `recordContinuityPackEntry`: structured notes + 1–3 visual keyframes. It is NOT a Seedance sequence input. Attach keyframes as geography references; never instruct Seedance to "render the continuity pack panels." Honor notes in CONTEXT / COMPOSITION LOCK wording.
+**Scene continuity pack (reference only).** Locked in Stage 1 per scene via `recordContinuityPackEntry`: structured notes + 1–3 visual keyframes. It is NOT a Seedance sequence input. Attach keyframes as geography references; never instruct Seedance to "render the continuity pack panels" or hard-cut them. Honor notes in CONTEXT / COMPOSITION LOCK wording.
 
 **Incoming anchor chain (from Stage 1 registry).** Honor `previous_generation_id` / `incoming_anchor_*` / `continuity_break_reason` from the Generation Grid Registry:
 
-- Continuous later generation: attach the incoming anchor. Prefer upgrading `incoming_anchor_kind` to **`prior_render_last_frame`** once the previous clip is approved (pixels beat the planned terminal panel). Use `extend_video` + that clip for motion joins.
+- Continuous later shot: attach the incoming anchor. Prefer upgrading `incoming_anchor_kind` to **`prior_render_last_frame`** once the previous clip is approved (pixels beat the planned terminal panel). Use `extend_video` + that clip for motion joins. Panel 1 of this sheet must open from that anchor.
 - Intentional break (`continuity_break_reason` set): `fresh` mode; do not extend; still honor the continuity pack for geography.
 - First-in-scene: pack + character/location only.
 
-**The generation grid (the edit, approved at image price).** Built in Stage 1 Step 16 — full reference: Stage 1 `generation-grids.md`. One grid = 1–4 consecutive shots, estimated Dur ≤15s (prefer 8–12), one continuous dramatic beat. At compile time, consume the approved grid (or skip record) from the registry; do not regenerate grids here. **One `compileShot` = one generation grid.**
+**The motion sheet (trajectory, approved at image price).** Built in Stage 1 Step 16 — full reference: Stage 1 `generation-grids.md`. One sheet = **one uninterrupted shot**, **4–9** temporal panels (Panel 1 = cut-in, middle = milestones only, Panel n = cut-out), estimated Dur ≤15s (prefer 8–12). At compile time, consume the approved sheet (or skip record) from the registry; do not regenerate sheets here. **One `compileShot` = one motion sheet = one shot.**
 
-**Do not re-partition.** The generation was decided during Stage 1 and recorded as a registry entry. Compile it as-is. If a shot arrives unmarked, that is a gap (Step 16 incomplete), not an invitation to invent a new window here.
+**Do not re-partition.** The sheet was decided during Stage 1 and recorded as a registry entry. Compile it as-is. If a shot arrives unmarked, that is a gap (Step 16 incomplete), not an invitation to invent a new window here.
 
-**1-panel for spectacle.** Crash / impact / liftoff / fulcrum / deliberate-motion-rich beats that Step 16 marked as 1-panel generations stay solo. Do not quietly merge them with quieter character beats to "save a generation." Override only when the user explicitly accepts the tradeoff.
+**Duration semantics (important):** the shot list's Dur column is an ESTIMATE — planning data and the runtime total. It NEVER enters any prompt. The API duration parameter = the entry's `estimated_duration_seconds` (≤15s). The motion sheet is **one continuous take** — Seedance must interpolate between panel states, not hard-cut. Steer pace with RELATIVE pace words along the trajectory ("lingers on the open, accelerates through the turn"). If pacing is wrong, targeted reroll with stronger pace words — or regenerate the sheet with clearer milestones.
 
-**Duration semantics (important):** the shot list's Dur column is an ESTIMATE — planning data for partition math and the runtime total. It NEVER enters any prompt. The API duration parameter = the generation's `estimated_duration_seconds` (≤15s). For multi-panel generations, **Seedance distributes time across the cuts itself** — in-prompt timing is officially unstable. Steer proportions only with RELATIVE pace words ("the first shot lingers; the last two cut quickly"). If a returned generation paced a beat wrong, targeted reroll with a stronger pace word — or demote spectacle to a 1-panel generation.
-
-**COMPOSITION LOCK (mandatory on every gridded shot — soft panel citations are forbidden).** A panel number alone (`composition matches panel a`, `composition follows panel 4`) is a polite suggestion; models ignore it. Every shot block MUST open with an explicit lock extracted from the approved panel pixels + shot row (Scale / Space / cut-in) + `panelCaptions` when present. Do not invent geography that contradicts the panel. Worked form:
+**COMPOSITION LOCK + END STATE LOCK (mandatory — soft panel citations are forbidden).** A panel number alone (`composition matches panel a`, `composition follows panel 4`) is a polite suggestion; models ignore it. Every shot MUST open with an explicit cut-in lock from Panel 1 and an end-state lock from Panel n, extracted from approved panel pixels + shot row + `panelCaptions`. Middle panels guide milestones in PRIMARY ACTION / CAMERA — they are not hard cuts. Do not invent geography that contradicts the sheet. Worked form:
 
 ```
-Shot [n] (panel [p] of [ImageN]):
-COMPOSITION LOCK: match panel [p] of the approved generation grid — [brief extraction: framing/scale, subject position in frame, background geography, screen direction, footing/surface if relevant, key visible state].
-PRIMARY ACTION: ...
+Shot [n] (motion sheet [ImageN], panels 1…N):
+COMPOSITION LOCK: match panel 1 of the approved motion sheet — [brief extraction: framing/scale, subject position in frame, background geography, screen direction, footing/surface if relevant, key visible state].
+END STATE LOCK: match panel N of the approved motion sheet — [end framing, footing, screen direction, key visible state prepared for the next shot's cut-in].
+PRIMARY ACTION: … (honor middle-panel milestones as continuous beats, not cuts)
 ```
 
-- A panel citation without a filled COMPOSITION LOCK fails compile → emit `status: "gap"`: `"Shot N: COMPOSITION LOCK missing or empty for panel P — extract framing/subject position/geography/screen direction/footing from the approved panel + row; a panel citation alone is insufficient."`
-- If the active panel has no stored lock AND no extractable composition from panel + row + captions (ambiguous Space, blank captions, panel unreadable), emit `status: "gap"` and return — do not invent a lock from imagination.
-- The lock is **extraction from the approved edit**, not a second authorship pass that can fight the pixels. Optional app-side derived panel crop remains the strongest companion; text lock alone still beats soft citation.
+- A panel citation without filled COMPOSITION LOCK / END STATE LOCK fails compile → emit `status: "gap"`.
+- If locks cannot be extracted from panel + row + captions without inventing → gap, not a render.
+- The locks are **extraction from the approved trajectory**, not a second authorship pass that can fight the pixels.
 
-**Multi-panel generation prompt structure:** one shared SUBJECT DEFINITIONS block (verbatim Bible lines) which ALSO defines the generation grid — `Define the panel sequence in [ImageN] as **the approved generation grid for generation {id}**; THIS generation renders ALL panels in order with hard cuts — every panel on the grid is in-scope` — then labeled shot blocks each opening with the COMPOSITION LOCK form above (`Shot 1 (panel 1 of [ImageN]): COMPOSITION LOCK: … PRIMARY ACTION: …`, then PERFORMANCE / CAMERA / pace word as needed), in event order with NO timestamps, each block's action ending at its cut-out; then the global render notes and constraint tail at the END. **Forbidden:** any "other panels are continuity context only / must NOT be rendered" clause. If the grid has panels you do not want rendered, that is a Stage 1 bug — regenerate a correctly sized generation grid, do not scope-out at compile time.
+**Motion-sheet prompt structure:** one SUBJECT DEFINITIONS block (verbatim Bible lines) which ALSO defines the motion sheet —
 
-**1-panel generation:** attach the grid and open with the same COMPOSITION LOCK form — `Shot [n] (panel 1 of [ImageN]): COMPOSITION LOCK: match panel 1 …`.
+`Define the panel sequence in [ImageN] as **the approved motion sheet for shot {id}** — Panel 1 is the cut-in, Panel N is the cut-out, middle panels are milestones only. Interpolate naturally between these states; one continuous take; no cuts; never show the grid or gutters.`
 
-**App-side contract:** the returned multi-shot clip is pre-split at the cuts for per-shot review. Rejection of one sub-shot offers "reroll generation" or "demote to 1-panel generations" — the good sub-shots will not return identical on a reroll; that is the known cost of multi-panel generations.
+— then the single shot block with COMPOSITION LOCK + END STATE LOCK + PRIMARY ACTION / PERFORMANCE / CAMERA / pace words, NO timestamps; then GLOBAL RENDER NOTES + constraint tail. **Forbidden:** hard-cut language between sheet panels; "render all panels in order as separate shots"; any "ignore other panels" clause.
 
-**Validation caveat:** the grid's value rests on the image model keeping cross-panel geometry coherent. Treat the first film through this flow as the validation run; if grids return spatially contradictory panels, fall back to 1-panel generations with per-panel COMPOSITION LOCK (not soft citation).
+**App-side contract:** one sheet → one continuous clip for that shot. Rejection rerolls the shot generation (or regenerates the sheet in Stage 1) — there are no sub-shot splits inside a motion sheet.
 
-## Continuity across generations — native extension and track completion
+**Validation caveat:** the sheet's value rests on (1) the image model keeping cross-panel geometry coherent and (2) Seedance interpolating rather than hard-cutting. Treat early films as validation runs; if sheets return contradictory panels or video chops the board into cuts, reduce panel count and strengthen interpolate wording.
+
+## Continuity across shots — native extension and track completion
 
 **The #1 cross-clip failure: geography teleport.** Shot N ends with a character on surface A; shot N+1 opens with them on surface B (stairs → sidewalk, doorway → street, bridge → bank). Text-only cut-ins ("toward the stairs", "approaching", "near the entrance") under-specify footing, so Seedance invents a new floor. Fix in three layers:
 
-1. **Position-locked cut-out / cut-in (always).** Cut-out must name the character's exact footing/surface at the last frame: `the hero stands ON the stone staircase, mid-flight, facing up toward the landing — NOT on the street below`. Cut-in of the next shot must OPEN by restating that same footing verbatim before any new action. Vague handoffs ("toward the stairs", "near the site", "at the entrance") are gaps — regenerate the row or the compile.
+1. **Position-locked cut-out / cut-in (always).** Cut-out must name the character's exact footing/surface at the last frame: `the hero stands ON the stone staircase, mid-flight, facing up toward the landing — NOT on the street below`. Cut-in of the next shot must OPEN by restating that same footing verbatim before any new action. Vague handoffs ("toward the stairs", "near the site", "at the entrance") are gaps — regenerate the row or the compile. Motion sheets reinforce this: prior Panel n ↔ next Panel 1.
 
 2. **Use `compileShot` continuity modes (do not invent URLs).** After each approved clip the app returns the clip URL (and a last-frame still for CONTEXT). Choose:
    - `continuityMode: "extend_video"` + `sourceVideoUrl` = previous approved clip — for continuous walks / approaches / same-surface carries / hard joins that must keep pose and footing. Prompt opens with `Extend <Video_1>: [next beat]`. Never say "reference `<Video_1>`" (that flips into reference-transfer mode). Optional stills OK.
@@ -102,9 +103,9 @@ When two generations must connect seamlessly, prefer **extend_video** over manua
 - **Quality degrades over repeated extensions** — mottled artifacts accumulate, especially on faces. Keep chains short (2–3 links); never build the whole film as one extension chain.
 - **Joins can jump-cut.** Standard post fix: trim ~6 frames from the end of the earlier clip and ~1 frame from the start of the later one at each join.
 - **Track completion** stitches existing approved clips: up to 3 video inputs, ≤15s combined, with the model generating the transitions (`<Video_1> + [transition description] + followed by <Video_2>`). Useful for bridging two approved shots with a generated connective beat.
-- **Grid-internal cuts can teleport too.** Even inside one multi-shot generation, if panel A ends on surface A and panel B opens on surface B, the model invented a new floor at the cut. Prefer keeping continuous walks as ONE continuous take (or extension) rather than trusting an in-prompt hard cut to preserve footing.
+- **Trajectory drift inside a sheet.** If middle milestones invent a new floor/axis, the interpolate path will teleport mid-take. Prefer fewer, real milestones; keep continuous walks on one surface.
 
-Extension is a _continuity_ tool, not a substitute for correct generation sizing: do not invent oversized multi-shot grids just to preserve geography; use continuity modes across correctly sized generations instead.
+Extension is a _continuity_ tool, not a substitute for correct per-shot sizing: do not invent multi-shot boards just to preserve geography; use continuity modes across correctly sized motion sheets instead.
 
 ---
 
@@ -116,20 +117,20 @@ Four hard rules:
 
 1. **Slot order = precision priority.** The more precisely an asset must be matched, the EARLIER it goes:
 
-   **character → object/prop → location plate → continuity-pack keyframes → incoming anchor → generation grid**
+   **character → object/prop → location plate → continuity-pack keyframes → incoming anchor → motion sheet**
 
    Seedance weights earlier assets more heavily for precise reference. Put `referenceImageUrls` in that order when calling `compileShot`.
 
    | Slot group | Kind | Role |
    | --- | --- | --- |
    | Earliest | character / object / location | Identity + environment (precise match) |
-   | Mid | continuity-pack keyframes (1–3) | Scene geography reference only — **not** panels to render |
-   | Mid–late | incoming anchor | Prior terminal panel or prior last frame (continuous later gens; omit on first-in-scene / intentional break) |
-   | Last | generation grid | The sequence THIS generation renders (all panels in order) |
+   | Mid | continuity-pack keyframes (1–3) | Scene geography reference only — **not** panels to hard-cut |
+   | Mid–late | incoming anchor | Prior terminal panel or prior last frame (continuous later shots; omit on first-in-scene / intentional break) |
+   | Last | motion sheet | Continuous-take trajectory THIS shot interpolates |
 
-   Never put the generation grid before identity refs. Never treat continuity-pack or incoming-anchor images as the shot sequence.
+   Never put the motion sheet before identity refs. Never treat continuity-pack or incoming-anchor images as hard-cut sequences.
 
-2. **Attach only the assets that appear in this generation**, plus required continuity refs. Reference mode accepts up to 9 images, but focused refs beat more. Always include: on-screen character(s)/object(s)/location, the scene continuity-pack keyframes, the incoming anchor when the registry requires it, and this generation's grid. If identity assets alone would blow the budget before continuity/grid fit, that's a gap — flag it (the beat is probably too crowded), don't silently drop continuity or the grid.
+2. **Attach only the assets that appear in this shot**, plus required continuity refs. Reference mode accepts up to 9 images, but focused refs beat more. Always include: on-screen character(s)/object(s)/location, the scene continuity-pack keyframes, the incoming anchor when the registry requires it, and this shot's motion sheet. If identity assets alone would blow the budget before continuity/sheet fit, that's a gap — flag it (the beat is probably too crowded), don't silently drop continuity or the sheet.
 
 3. **DEFINE each subject up front, then use the label everywhere — and the definition text is LOCKED (Bible-verbatim).** Each asset's definition line (label, its 2–3 stable features, its anchor details) is written ONCE in the Bible §2 and pasted VERBATIM into every prompt that uses the asset. Never re-derive, expand, or re-essay the image per shot — bind + govern + label only. A character defined by "dust smudge, amulet, chisel at belt" in one shot and "bare feet, linen kilt" in the next is two different definitions competing for one identity — definition drift is identity drift by the back door. (Per-shot additions are allowed only as appended clauses after the locked line, e.g. adding a hand-relevant anchor for an insert — never as substitutions.) The official binding grammar: open the prompt with definitions —
    - `Define the [2–3 stable features, e.g. woman in the grey wool coat with the silver pendant] in [Image1] (facial features, styling, wardrobe, build) as **the detective**.`
@@ -138,7 +139,7 @@ Four hard rules:
 
 4. **State what each reference governs.** Never attach an image silently — the definition must say what attribute it controls (facial features / styling / environment / object form), or the model merges attributes unpredictably.
 
-For a multi-shot generation, the same definitions carry across all shots in the generation, which is exactly how Seedance keeps the character consistent across the internal cuts — keep the labels identical in every shot block.
+Keep labels identical for the whole prompt — definition drift is identity drift.
 
 ---
 
@@ -185,7 +186,7 @@ If a shot's State Schedule value is missing for something visibly stateful (a st
 
 ## Duration
 
-Duration is an API PARAMETER on the render package, never prompt text, and the shot row's Dur is an ESTIMATE. The API duration = the generation's summed estimates (≤15s, prefer 8–12); Seedance places internal cuts itself — steer proportions only with relative pace words ("the first shot lingers; the last two cut quickly"). Keep individual narrative shots short (estimates commonly 3–8s inside a multi-panel generation) — long single takes are where motion drift creeps in. A mistimed beat in a returned multi-panel generation = targeted reroll with a stronger pace word, or demotion to a 1-panel generation (where the API duration is exact).
+Duration is an API PARAMETER on the render package, never prompt text, and the shot row's Dur is an ESTIMATE. The API duration = that shot's estimate (≤15s, prefer 8–12). The motion sheet is one continuous take — steer pace along the trajectory with relative pace words. Long takes are where motion drift creeps in; if pacing fails, reroll with stronger pace words or regenerate the sheet with clearer milestones.
 
 ---
 
@@ -193,9 +194,9 @@ Duration is an API PARAMETER on the render package, never prompt text, and the s
 
 Assemble in this order, global notes last:
 
-1. **SUBJECT DEFINITIONS (first):** the Define-as-label bindings for every attached reference (see binding grammar above). These go FIRST — precise references are weighted by early placement, and every later mention depends on the labels existing. When a generation grid is attached, its definition states that ALL panels are rendered in order (no ignore / scope-out clause).
+1. **SUBJECT DEFINITIONS (first):** the Define-as-label bindings for every attached reference (see binding grammar above). These go FIRST — precise references are weighted by early placement, and every later mention depends on the labels existing. When a motion sheet is attached, its definition states continuous-take interpolation (Panel 1 cut-in → milestones → Panel n cut-out; no hard cuts; never show grid/gutters).
 2. **CONTEXT** — one line: what this shot is, where it sits in the scene — and if the previous shot's row specifies a cut-in for this shot, CONTEXT opens by ANSWERING it ("From her point of view: the empty doorway..."; "The turn completes: he now faces the window..."). **When continuing a character across generations, CONTEXT must restate exact footing/surface from the previous cut-out (or from the approved last-frame pixels if they diverge):** `Continuing: the hero is still standing ON the stone staircase, mid-flight, facing up — same footing as the previous shot's last frame; they are NOT on the street below.` Honor the scene's Space line and continuity pack: geography and screen direction here must match every other shot in the scene. (Not a hook. A continuation.)
-3. **COMPOSITION LOCK (required when a generation grid is attached):** immediately after CONTEXT (or as the opening of each shot block), write `COMPOSITION LOCK: match panel [p] of the approved generation grid — [brief extraction…]`. Soft phrases (`composition matches panel…`, `composition follows panel…`) fail. Source the extraction from approved panel + row + captions; if unextractable → gap.
+3. **COMPOSITION LOCK + END STATE LOCK (required when a motion sheet is attached):** immediately after CONTEXT (or as the opening of the shot block), write `COMPOSITION LOCK: match panel 1 of the approved motion sheet — [brief extraction…]` and `END STATE LOCK: match panel N — […]`. Soft phrases (`composition matches panel…`, `composition follows panel…`) fail. Source the extraction from approved panels + row + captions; if unextractable → gap.
 4. **PRIMARY ACTION** — the shot's dominant motion, phrased as a start→end arc with a real verb: what moves, how, and where it ends up. If Dominant = SUBJECT, this is the character/object action (or a written intentional hold); if Dominant = CAMERA, this states what the developing frame reveals while characters hold micro-performance. This section may never describe an unperformed motionless tableau — if the row gives you no delta and no written hold, that's a gap, not a compile. Secondary motion may appear only when slower, smaller, and subordinate. The action ENDS at the row's cut-out state, written explicitly as the final sentence — and that cut-out must lock **footing/surface/position**, not just intent ("toward the stairs" fails; "stands ON the stone staircase, mid-flight, facing up" passes). This is the half of the edit this generation owns; the next shot's CONTEXT answers it. **State scale relationships explicitly when scale matters** — the model defaults to wrong proportions if you don't. "Limestone blocks" alone renders person-height boulders and a toy-looking monument; instead write the relationship: "blocks roughly waist-to-chest height, the structure rising hundreds of feet, human figures tiny against it." Whenever a shot depends on bigness, smallness, or proportion, name the relationship between the elements — don't assume the model infers it.
 5. **PERFORMANCE** — explicit direction for every character in frame (by label): the scripted action if a character is the dominant motion, written micro-performance (breath, gaze, small gesture) or intentional hold (tension, posture, deadpan) otherwise. Never omitted when a character is on screen; never replaced by a static-lock. Three phrasing traps: **(a) partial figures need explicit ownership** — a hand, foot, or shadow entering frame must say whose it is, and if it belongs to an anonymous party, say so in a way that excludes the defined subjects ("another bystander's shoe, visible only from the shin down") — an unowned limb next to a defined character reads as _that character's_, which can invert a scene's meaning; and give the limb internally consistent attributes (never contradictory features that average into something wrong). **(b) Reactions to sound or off-screen events are reactions, not forces** — write "at the offscreen shout, her hand flinches back," never "her hand is yanked back by the shout"; physical-causation phrasing makes the model render physical contact. **(c) Eyeline / gaze target is mandatory on any reaction or discovery beat** — "shocked," "stares," "freezes," "sees," "looks up" without a named target is how you get a face of terror looking past the subject. Always write: **who looks → at what (by label) → where in frame / height**. Worked form: `the detective's eyes lock DOWN and RIGHT onto the child at waist height in the mid-ground — looking AT the child, not past them, not at the skyline, not off-camera`. If the target is shorter/smaller/taller, say the height relationship ("down onto", "up at"). If two characters share frame and one reacts to the other, the eyeline clause is non-negotiable — emotion without a gaze target is a failed reaction.
 6. **CAMERA** — the move from the shot row, matched to the beat's mood (see encyclopedia). State stillness explicitly if locked — allowed when the subject carries the dominant motion or holds a written performance.
@@ -206,7 +207,7 @@ Assemble in this order, global notes last:
 
 **No second-marks anywhere in the prompt.** Seedance's support for precise in-prompt timing ("0–3 seconds", "over 9s") is officially unstable and can produce abnormal generations. Total duration is an API parameter; pace _within_ the shot is controlled with words (slow, gradual, unhurried, brisk) and with the order of described events. Sequence beats by order ("begins as a slow dolly-in, then eases into a gentle pan right"), never by timestamps.
 
-For a multi-shot generation, follow the multi-panel prompt structure in the "Generation grids" section (the authoritative spec): one shared SUBJECT DEFINITIONS block that also defines the generation grid (ALL panels in-scope), then `Shot 1 (panel N of [ImageK]): COMPOSITION LOCK: … PRIMARY ACTION: …` / `Shot 2 (panel N+1 of [ImageK]): COMPOSITION LOCK: … PRIMARY ACTION: …` in event order with no timestamps, relative pace words only, then ONE shared GLOBAL RENDER NOTES block + constraint tail at the end covering all shots.
+Follow the motion-sheet prompt structure above: SUBJECT DEFINITIONS (including continuous-take interpolate clause), then one shot block with COMPOSITION LOCK + END STATE LOCK + PRIMARY ACTION / PERFORMANCE / CAMERA, relative pace words only, then GLOBAL RENDER NOTES + constraint tail.
 
 ---
 
@@ -222,7 +223,7 @@ Every compile produces ONE structured object, not free text. This makes the resu
   "grid_reference": "@scene3_gen3A_grid" | null,
   "continuity_mode": "fresh" | "extend_video",
   "source_video_url": null,
-  "render_prompt": "SUBJECT DEFINITIONS: Define ... in [Image1] (facial features, styling, wardrobe) as **hero**. Define ... in [Image2] as **the site**. Define ... in [Image3] as **continuity geography** (reference only — not shots to render). Define ... in [Image4] as **the incoming cut-in anchor** (prior terminal panel / last frame — reference only). Define the panel sequence in [Image5] as **the approved generation grid**; THIS generation renders ALL panels in order … CONTEXT: ... COMPOSITION LOCK: match panel 1 of the approved generation grid — [framing, subject position, geography, screen direction, footing]. PRIMARY ACTION: ... PERFORMANCE: ... CAMERA: ... STATE: ... [STATIC-LOCK: ...] GLOBAL RENDER NOTES: ... CONSTRAINT TAIL: Keep it subtitle-free; avoid generating any text or subtitles. Do not generate watermarks or logos.",
+  "render_prompt": "SUBJECT DEFINITIONS: Define ... in [Image1] (facial features, styling, wardrobe) as **hero**. Define ... in [Image2] as **the site**. Define ... in [Image3] as **continuity geography** (reference only — not shots to hard-cut). Define ... in [Image4] as **the incoming cut-in anchor** (prior terminal panel / last frame — reference only). Define the panel sequence in [Image5] as **the approved motion sheet for this shot** — Panel 1 is the cut-in, Panel N is the cut-out, middle panels are milestones only; Interpolate naturally between these states; one continuous take; no cuts; never show the grid or gutters. CONTEXT: ... COMPOSITION LOCK: match panel 1 of the approved motion sheet — [framing, subject position, geography, screen direction, footing]. END STATE LOCK: match panel N — [end framing, footing, screen direction]. PRIMARY ACTION: ... PERFORMANCE: ... CAMERA: ... STATE: ... [STATIC-LOCK: ...] GLOBAL RENDER NOTES: ... CONSTRAINT TAIL: Keep it subtitle-free; avoid generating any text or subtitles. Do not generate watermarks or logos.",
   "duration_seconds": 8,
   "resolution": "1080p",
   "references": [
@@ -230,7 +231,7 @@ Every compile produces ONE structured object, not free text. This makes the resu
     {"slot": "Image2", "handle": "@site_plate", "kind": "location", "controls": "environment, architecture, composition"},
     {"slot": "Image3", "handle": "@scene3_continuity", "kind": "continuity_pack", "controls": "scene geography / blocking (reference only)"},
     {"slot": "Image4", "handle": "@scene3_gen3A_grid", "kind": "incoming_anchor", "controls": "prior terminal panel cut-in (reference only)"},
-    {"slot": "Image5", "handle": "@scene3_gen3B_grid", "kind": "grid", "controls": "panel sequence / composition to render"}
+    {"slot": "Image5", "handle": "@scene3_gen3B_grid", "kind": "grid", "controls": "motion-sheet trajectory to interpolate (no hard cuts)"}
   ],
   "checks": {
     "duration_in_range": true,
@@ -247,8 +248,9 @@ Every compile produces ONE structured object, not free text. This makes the resu
     "positive_lock_only": true,
     "primary_motion_present": true,
     "character_performance_present": true,
-    "all_panels_rendered": true,
+    "motion_sheet_interpolated": true,
     "composition_lock_present": true,
+    "end_state_lock_present": true,
     "cut_handoff_compiled": true,
     "footing_continuity": true,
     "continuity_mode_valid": true,
@@ -265,8 +267,8 @@ Every compile produces ONE structured object, not free text. This makes the resu
 - `continuity_mode` maps to `compileShot.continuityMode`. `extend_video` requires `source_video_url` (prior approved clip); optional stills OK. `fresh` requires stills only. There is no first-frame / start-frame mode — use `extend_video` for pixel continuity, or `fresh` + CONTEXT footing for a new take.
 - `continuity_mode_valid`: mode matches the join type; required URLs present; extend prompts open with `Extend <Video_1>:`.
 - `render_prompt` is the assembled prompt in the section order below — this is the text shown to the user for approval/edit before any render.
-- `generation_shot_ids` lists every shot in this generation (a 1-panel generation is a one-element list). For multi-panel: `duration_seconds` = the sum of the shots' ESTIMATED durations (≤15s); the app pre-splits the returned clip at the cuts for per-shot review. Shot-list Dur values never appear in the prompt.
-- `grid_reference` is this generation's grid handle; every shot block consumes it with a COMPOSITION LOCK (not a soft panel citation).
+- `generation_shot_ids` lists exactly one shot (one motion sheet = one shot). `duration_seconds` = that shot's ESTIMATED duration (≤15s). Shot-list Dur values never appear in the prompt.
+- `grid_reference` is this shot's motion-sheet handle; the shot consumes it with COMPOSITION LOCK (Panel 1) + END STATE LOCK (Panel n) and interpolate / no-cuts language.
 - `resolution` is the render tier as a STRUCTURED FIELD ONLY — the app passes it (with quality and aspect ratio) as parameters on the generateShot API call. It must never appear as words inside `render_prompt`: the model ignores "1080p" in prompt text the same way it ignores f-stops and ISO. Tier policy: the cheap tier (e.g. 480p) is allowed for preview passes; the shot's APPROVED/final render is always the top tier (e.g. 1080p). Never mark a preview-tier render as final — a 480p clip in the edit is a quality bug.
 - `references` maps each `[Image#]` slot to its `@material` handle and the attribute it controls (the binding grammar, made explicit).
 - `checks` is the assertion result — each is a hard rule from this recipe, self-verified before emitting. If any check is false, fix the prompt before emitting (or emit a gap if it can't be fixed from the Bible).
@@ -278,8 +280,8 @@ Every compile produces ONE structured object, not free text. This makes the resu
   - `"Shot 7: no dominant motion — the row is an unperformed static tableau (subject has no action/hold, camera locked); it needs a delta or a written performance hold before it can render."`
   - `"Shot 14: lighting written as a transition (Golden Hour → dusk) — pick ONE state for this row; time passes between shots."`
   - `"Shot 22: the arc lifts the ship but @ship_object_ref is not in materials — bind it or the ship renders invented."`
-  - `"Shot 5: COMPOSITION LOCK missing or empty for panel 3 — extract framing/subject position/geography/screen direction/footing from the approved panel + row; a panel citation alone is insufficient."`
-  - `"Shot 8: COMPOSITION LOCK unextractable for panel 2 — Space/captions/panel do not yield a concrete lock; fix the row or regenerate the grid before compiling."`
+  - `"Shot 5: COMPOSITION LOCK or END STATE LOCK missing — extract framing/subject position/geography/screen direction/footing from Panel 1 and Panel N + row; soft panel citations are insufficient."`
+  - `"Shot 8: motion-sheet locks unextractable — Space/captions/panels do not yield concrete cut-in/cut-out locks; fix the row or regenerate the sheet before compiling."`
 
 A gap is a success — it caught an incompleteness cheaply, before a video generation. The gap goes back to the showrunner, which fixes the Bible (with full story context) and recompiles.
 
@@ -291,7 +293,7 @@ A gap is a success — it caught an incompleteness cheaply, before a video gener
 - `every_reference_has_controls`: each reference's definition states what it governs (facial features / styling / environment / object form).
 - `reference_images_distinct`: every attached slot resolves to a DIFFERENT image — a duplicated URL is a resolution bug wasting a slot. Fails as a gap, not a render.
 - `definitions_verbatim`: every definition line matches the Bible §2 canonical text for that handle exactly (appended per-shot clauses allowed; substitutions fail).
-- `subjects_defined_first`: the prompt opens with Define-as-label bindings for every attached reference; **character references occupy the earliest slots**, then objects, then plates, then continuity-pack keyframes, then incoming anchor (when present), then generation grid last — matching `referenceImageUrls` order. Continuity-pack and incoming-anchor definitions must state **reference only — not shots to render**.
+- `subjects_defined_first`: the prompt opens with Define-as-label bindings for every attached reference; **character references occupy the earliest slots**, then objects, then plates, then continuity-pack keyframes, then incoming anchor (when present), then motion sheet last — matching `referenceImageUrls` order. Continuity-pack and incoming-anchor definitions must state **reference only — not hard-cut panels**. Motion-sheet definition must state interpolate / continuous take / no cuts / never show grid or gutters.
 - `labels_consistent`: every mention of a defined subject uses its exact label; no unbound "the man"/"she" where a label exists.
 - `global_notes_last`: the Look/grade/lighting block is at the end (definitions are at the top, not here).
 - `constraint_tail_present`: the prompt ends with the subtitle/watermark/logo suppression tail.
@@ -300,8 +302,9 @@ A gap is a success — it caught an incompleteness cheaply, before a video gener
 - `primary_motion_present`: the prompt has one DOMINANT motion source (subject action with a start→end verb / written intentional hold, or a camera move). Secondary motion may appear only when slower, smaller, and subordinate. Ambient motion alone fails; both-fast fails; locked camera + unperformed subject fails and becomes a gap.
 - `character_performance_present`: every character on screen has explicit performance direction (scripted action, micro-performance, or written intentional hold: breath/gaze/tension/posture/deadpan); a character with no verb fails. Static-locking characters fails.
 - `eyeline_target_named`: any reaction / discovery / "sees" / "shocked" / "stares" / "looks" beat names the gaze target by label AND screen direction/height ("down-right onto the child at waist height"). Emotion words alone without a target fail — that is the "shocked face looking past the subject" bug.
-- `all_panels_rendered`: when a generation grid is attached, the grid definition states that ALL panels are rendered in order; every shot block names its panel matching the registry `panel_map`; any "continuity context only / must NOT be rendered" or partial-range ignore clause fails.
-- `composition_lock_present`: when a generation grid is attached, every shot block contains a non-empty `COMPOSITION LOCK:` section that extracts framing, subject position, background geography, screen direction, and footing/surface/key visible state when relevant. Soft citations only (`composition matches panel…`, `composition follows panel…`) fail. If the lock cannot be extracted from approved panel + row + captions without inventing → gap, not a render.
+- `motion_sheet_interpolated`: when a motion sheet is attached, its definition instructs continuous-take interpolation (Panel 1 → milestones → Panel n); hard-cut / "render all panels in order as separate shots" language fails; "ignore other panels" fails.
+- `composition_lock_present`: when a motion sheet is attached, the shot contains a non-empty `COMPOSITION LOCK:` on Panel 1 extracting framing, subject position, background geography, screen direction, and footing/surface/key visible state when relevant. Soft citations only fail. If unextractable → gap.
+- `end_state_lock_present`: when a motion sheet is attached, the shot contains a non-empty `END STATE LOCK:` on Panel n (cut-out). Soft citations only fail. If unextractable → gap.
 - `cut_handoff_compiled`: the prompt's action ends at the row's cut-out state, and (if the previous row specified a cut-in for this shot) CONTEXT opens by answering it — including **exact footing/surface/position** when a character continues across the cut. Vague cut-outs ("toward the stairs", "near the entrance") fail; position-locked ones ("ON the stone staircase, mid-flight") pass. A "rest" cut-out passes but is noted; a missing cut-out fails.
 - `footing_continuity`: when the previous approved generation left a character on a named surface, this prompt's CONTEXT restates that same surface before new action. Surface-A↔surface-B teleports (stairs↔street, interior↔exterior, bridge↔bank) fail.
 - `single_lighting_state`: the prompt carries exactly one canonical lighting state — any in-shot lighting transition fails and becomes a gap ("time passes between shots").
@@ -400,7 +403,7 @@ In reference mode, synchronized ambient audio is on by default — acceptable fo
 - **Is there one DOMINANT motion source — subject action with a real verb / written hold, or a camera move?** Secondary only if slower/smaller/subordinate. (Ambient-only, both-fast, or locked-camera-plus-unperformed-subject → gap.)
 - **Does every character on screen have performance direction** (scripted action, micro-performance, or intentional hold)? Is no character static-locked?
 - **If anyone reacts / sees / is shocked — is the gaze target named by label with screen direction and height?** (Emotion without eyeline = looking past the subject.)
-- Are references attached in order **character → object → location → continuity-pack keyframes → incoming anchor → generation grid**, each opened with a Define-as-label binding stating what it governs — continuity/anchor defs marked reference-only — and is every later mention using the exact label?
+- Are references attached in order **character → object → location → continuity-pack keyframes → incoming anchor → motion sheet**, each opened with a Define-as-label binding stating what it governs — continuity/anchor defs marked reference-only — motion sheet marked interpolate / continuous take / no cuts — and is every later mention using the exact label?
 - Is the prompt free of timestamps/second-counts (pace in words and event order only)?
 - Does the prompt end with the subtitle/watermark/logo constraint tail?
 - Are all definition lines verbatim from the Bible §2, and does every slot resolve to a distinct image (no duplicated URLs)?
@@ -408,11 +411,11 @@ In reference mode, synchronized ambient audio is on by default — acceptable fo
 - Is the grade the SHOW LOOK (or a locked Look trim), not a freestyle per-shot invent?
 - Is the lighting the shot's State Schedule state?
 - If anything rigid is fixed-within-shot, does the static-lock clause name that specific thing in positive phrasing (never "subject unchanged")?
-- Is this compile honoring the generation grid marked at Stage 1 Step 16 (1–4 shots, ≤15s prefer 8–12; 1-panel for spectacle) — not a re-partition invented at compile time?
+- Is this compile honoring the motion sheet marked at Stage 1 Step 16 (one shot, 4–9 panels, ≤15s prefer 8–12) — not a re-partition invented at compile time?
 - Is a motion-rich shot given its own full generation (not starved by sharing)?
 - Are scale relationships stated where proportion matters?
 - Does the action end at the row's cut-out state, and does CONTEXT answer the previous row's cut-in — **including exact footing/surface**? If the approved last frame put them ON surface A, does this prompt open ON surface A (not a different floor)?
-- **If a generation grid is attached: does every shot block open with a non-empty COMPOSITION LOCK** (framing, subject position, geography, screen direction, footing/state) — not a soft "composition matches/follows panel" citation? Are ALL panels rendered (no ignore clause)? If unextractable → gap.
+- **If a motion sheet is attached: does the shot open with non-empty COMPOSITION LOCK (Panel 1) and END STATE LOCK (Panel n)** — not soft citations? Does the sheet definition say interpolate / one continuous take / no cuts / never show grid or gutters? If unextractable → gap.
 - For continuous walks / same-surface carries / hard joins that must keep pose: is this `continuityMode: "extend_video"` with the prior approved clip as `sourceVideoUrl` (not a fresh stills-only invent)?
 - Exactly one lighting state in the prompt (no in-shot transitions)?
 - Is every entity named in the action bound in SUBJECT DEFINITIONS (hero props included) or explicitly background-tier?

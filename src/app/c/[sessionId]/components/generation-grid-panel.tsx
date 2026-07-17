@@ -7,6 +7,18 @@ const ASPECT: Record<NonNullable<GenerationGrid["aspectRatio"]>, string> = {
   "1:1": "1/1",
 };
 
+function captionColumns(count: number): number {
+  if (count <= 0) return 1;
+  if (count === 4) return 2;
+  return Math.min(3, count);
+}
+
+function panelRoleLabel(index: number, total: number): string {
+  if (index === 0) return "Cut-in";
+  if (index === total - 1) return "Cut-out";
+  return `Milestone ${index}`;
+}
+
 export function GenerationGridPanel({
   generationGrid,
   disabled,
@@ -30,7 +42,7 @@ export function GenerationGridPanel({
   if (generationGrid.error || !image) {
     return (
       <div className="mt-1 flex items-center gap-3">
-        <p className="text-xs text-red-400">{generationGrid.error ?? "Grid generation failed."}</p>
+        <p className="text-xs text-red-400">{generationGrid.error ?? "Sheet generation failed."}</p>
         {onRetry && (
           <button
             onClick={onRetry}
@@ -46,14 +58,18 @@ export function GenerationGridPanel({
 
   const isLocked = !!generationGrid.approvedUrl;
   const captions = generationGrid.panelCaptions ?? [];
+  const shotLabel =
+    generationGrid.shotIds?.length === 1 ? ` · Shot ${generationGrid.shotIds[0]}` : "";
   const label =
     generationGrid.generationId != null
-      ? `Gen ${generationGrid.generationId}`
-      : `Scene ${generationGrid.sceneId} grid`;
+      ? `Motion sheet ${generationGrid.generationId}`
+      : `Scene ${generationGrid.sceneId} motion sheet`;
   const durationLabel =
     generationGrid.estimatedDurationSeconds != null
       ? ` · ~${generationGrid.estimatedDurationSeconds}s`
       : "";
+  const panelLabel =
+    generationGrid.panelCount != null ? ` · ${generationGrid.panelCount} panels` : "";
   const chainLabel = generationGrid.continuityBreakReason
     ? ` · break: ${generationGrid.continuityBreakReason}`
     : generationGrid.previousGenerationId
@@ -62,9 +78,11 @@ export function GenerationGridPanel({
 
   return (
     <div className="mt-1 space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs font-medium text-primary">
           {label}
+          {shotLabel}
+          {panelLabel}
           {durationLabel}
           {chainLabel}
         </span>
@@ -96,15 +114,17 @@ export function GenerationGridPanel({
       {captions.length > 0 && (
         <div
           className="grid gap-1.5"
-          style={{ gridTemplateColumns: `repeat(${captions.length}, minmax(0, 1fr))` }}
+          style={{
+            gridTemplateColumns: `repeat(${captionColumns(captions.length)}, minmax(0, 1fr))`,
+          }}
         >
           {captions.map((cap, i) => (
             <div
               key={i}
-              className="rounded-lg border border-white/10 bg-white/[0.03] px-2 py-1.5 space-y-0.5 min-w-0"
+              className="rounded-lg border border-white/10 bg-white/3 px-2 py-1.5 space-y-0.5 min-w-0"
             >
               <p className="text-[9px] font-medium text-muted-foreground/50 uppercase tracking-wider">
-                Panel {i + 1}
+                P{i + 1} · {panelRoleLabel(i, captions.length)}
               </p>
               <p className="text-[10px] text-foreground/80 leading-snug line-clamp-3">{cap.motionArc}</p>
               {cap.handoff && (
@@ -127,7 +147,7 @@ export function GenerationGridPanel({
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" />
             </svg>
-            Approve grid
+            Approve sheet
           </button>
           {onRetry && (
             <button

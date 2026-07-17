@@ -55,7 +55,7 @@ Structural habits:
 
 - Before the FIRST fork (Step 2): `pipeline-steps.md` — option menus and recommendation logic.
 - Before the FIRST asset image (Step 15): `medium-constraints.md`.
-- Before the FIRST generation grid (Step 16): `generation-grids.md`.
+- Before the FIRST motion sheet (Step 16): `generation-grids.md`.
 - Before compiling the FIRST shot (Stage 2): load the Stage 2 skill, then `shot-compilation-recipe.md` — and not earlier.
   If a required file is unavailable, say so and STOP — never improvise from memory.
 
@@ -80,11 +80,11 @@ Each step: Purpose / Lock / Feeds — details and option menus in `pipeline-step
 13. **Shot list [+]** — the deliverable. Scene headers: Delta, coverage plan, Space line. Rows: #, scene, mood, scale (W/M/CU/INSERT/POV), motion arc (start→change→end), primary (SUBJ/CAM = dominant motion), camera move (vocab in deliverable-templates §B2), cut-out→cut-in, one lighting state per row (no "transitioning toward…"), duration, `@material`s covering every entity the arc names. **No-delta-no-shot:** if nothing changes last second vs first, give it a delta or cut it (intentional deadpan hold still needs a written performance verb). Do NOT write render prompts; do NOT load the Stage 2 recipe.
 14. **The Bible [+]** — Look + master `@material` list + standing directives + state schedule. Template: deliverable-templates §A.
 15. **Asset reference generation [+]** — audit manifest first (identity anchors only — not disguised shots; fused entities get their own refs; typical 4–8 images). **Plates = environment only** when a hero prop/vehicle has its own object ref — never fuse the ship/tool into the plate. **Charsheets = empty open hands**; a recurring held tool is either wardrobe (baked into the sheet, not a separate prop) OR a separate `*_object_ref` — pick one and stay consistent. User approves the LIST, then one asset at a time: expand spec → candidates → bind approved image to handle. Expansion method + approval checklists: `medium-constraints.md`. Assets done ≠ Stage 1 done — proceed to Step 16.
-16. **Generation grids [+]** — per scene: approve a **scene continuity pack** (`generateContinuityPack`: structured notes + **required** 1–3 visual keyframes → `recordContinuityPackEntry`), then partition into **generation grids** (1–4 consecutive shots, estimated Dur ≤15s, prefer 8–12). Later grids must bind the prior terminal panel (`previousGenerationId` + `incomingAnchor*`) unless `continuityBreakReason`. One grid = one Seedance render of **all** its panels. Record each via `recordGenerationGridEntry` with continuity-chain fields + `continuity_pack_handle` + `approved_candidate_id` = the exact toolCallId. Full rules: `generation-grids.md`.
+16. **Motion sheets [+]** — per scene: approve a **scene continuity pack** (`generateContinuityPack`: structured notes + **required** 1–3 visual keyframes → `recordContinuityPackEntry`), then one **motion sheet per shot** via `generateGenerationGrid` (**4–9** temporal panels, estimated Dur ≤15s, prefer 8–12). Panel 1 = cut-in; middle = milestones only; Panel n = cut-out. Later sheets must bind the prior terminal panel (`previousGenerationId` + `incomingAnchor*`) unless `continuityBreakReason`. One sheet = one continuous Seedance take (interpolate; no hard cuts). Record each via `recordGenerationGridEntry` with `panel_count` + continuity-chain fields + `continuity_pack_handle` + `approved_candidate_id` = the exact toolCallId. Full rules: `generation-grids.md`.
 
     **Tooling gap:** if no grid-capable image tool exists, report it and let the user choose (a) HALT or (b) grid-less with `skip_reason: "environment_no_grid_tooling"` covering every shot. Only the user may elect (b).
 
-**Render-ready handoff = five artifacts:** locked Bible, locked shot list, approved reference images, approved continuity packs + generation grids, completed Generation Grid Registry. No package-assembly step — upstream artifacts are scaffolding already extracted into Bible + shot list. On-demand export = concatenate locked artifacts verbatim, never rewrite.
+**Render-ready handoff = five artifacts:** locked Bible, locked shot list, approved reference images, approved continuity packs + motion sheets, completed Generation Grid Registry. No package-assembly step — upstream artifacts are scaffolding already extracted into Bible + shot list. On-demand export = concatenate locked artifacts verbatim, never rewrite.
 
 ## Standing craft rules (bake into Bible §3)
 
@@ -99,9 +99,9 @@ Full phrasing and failure lessons: `medium-constraints.md`. Carry these as globa
 - **Ambient-motion** — never lock organic/atmospheric elements; call for gentle life as seasoning, not the meal.
 - **Deliberate-motion** — things that should change on camera get explicit state-change (no second-marks).
 - **Reference-first** — recurring elements pull `@material` images, not text alone. One turnaround sheet per character is the default tested profile; extra identity refs only with a user-approved / documented model profile.
-- **One generation = one continuous take window.** Internal cuts between panels of the same generation grid are allowed; joins across generation grids use `extend_video` / footing locks.
+- **One generation = one shot = one continuous take.** Motion-sheet panels are temporal milestones to interpolate — not hard cuts. Joins across shots use `extend_video` / footing locks (next P1 inherits prior Pn).
 - **Hooks only on structural peaks.**
-- **Generation sizing** — 1–4 shots, ≤15s (prefer 8–12); solo (1-panel) for spectacle; multi-panel for low-motion connective beats (see `generation-grids.md`).
+- **Motion-sheet sizing** — one shot per sheet; **4–9 panels**; Dur ≤15s (prefer 8–12); more panels for motion-rich arcs, fewer for simple connective beats (see `generation-grids.md`).
 
 ## Output handling
 
@@ -119,10 +119,10 @@ Run SILENTLY — surface only failures:
 - Every shot row has: motion arc with delta, primary, scale, cut handoff, one lighting state, duration, camera move, mood, materials covering every arc entity.
 - Every scene has Delta + coverage + Space; no unmotivated rest-cut chains or single unvarying scale.
 - Bible carries craft rules + render-tier policy (finals at top tier; resolution/quality/aspect are API params, never prompt text).
-- Generation Grid Registry complete and passing (every shot covered by exactly one approved generation grid or valid skip via `recordGenerationGridEntry`).
+- Generation Grid Registry complete and passing (every shot covered by exactly one approved motion sheet or valid skip via `recordGenerationGridEntry`).
 - Silent coherence cross-check: no orphan/unused handles; arc entities bound; one light per shot; State Schedule complete; cut-ins answered; Space line honored; durations ≈ target runtime.
 
-**Hard line:** "story is written" ≠ Stage 1 complete. Stage 1 ends only when assets AND generation grids (registry passing) are done.
+**Hard line:** "story is written" ≠ Stage 1 complete. Stage 1 ends only when assets AND motion sheets (registry passing) are done.
 
 ## Stage 2 handoff
 
