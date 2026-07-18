@@ -3,6 +3,7 @@ import { z } from "zod";
 import { generateImage } from "@/server/services/media";
 import {
   validateContinuityChain,
+  validateLightingState,
   validateSceneAnchor,
 } from "./record-generation-grid-entry";
 import { mediaUrl } from "@/lib/storage";
@@ -48,7 +49,7 @@ const generateGenerationGridInputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Prior generationId in this scene. Required when isFirstInScene=false unless continuityBreakReason is set."
+      "Prior generationId in this scene. Required when isFirstInScene=false unless continuityBreakReason or matchCutSource_* is set."
     ),
   isFirstInScene: z
     .boolean()
@@ -83,20 +84,49 @@ const generateGenerationGridInputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Intentional continuity break (hard cut / time jump / new axis). When set, omit previousGenerationId and incomingAnchor_*. Scene anchor still required."
+      "Intentional continuity break (hard cut / time jump / new axis). When set, omit previousGenerationId and incomingAnchor_*. Scene anchor still required. May pair with matchCutSource_* for a declared twin."
+    ),
+  matchCutSourceGenerationId: z
+    .string()
+    .nullable()
+    .describe(
+      "Match-cut twin generationId (compositional lock across a break / lighting change). Omit previousGenerationId and incomingAnchor_*. Allowed on first-in-scene for cross-scene twins."
+    ),
+  matchCutSourceHandle: z
+    .string()
+    .nullable()
+    .describe(
+      "Match-cut source sheet handle or approved image URL. Required with matchCutSourceGenerationId — attach that image in referenceImageUrls."
+    ),
+  lightingState: z
+    .string()
+    .describe(
+      "Exactly ONE canonical Bible lighting state for this sheet. In-shot transitions require lightingTransitionException=true."
+    ),
+  lightingTransitionException: z
+    .boolean()
+    .nullable()
+    .describe(
+      "True ONLY when the locked row's point IS a lighting transition. Default false/null."
+    ),
+  lightingTransitionReason: z
+    .string()
+    .nullable()
+    .describe(
+      "Required when lightingTransitionException=true — cite the locked row / Bible §3D."
     ),
   imagePrompt: z
     .string()
     .describe(
       "Full motion-sheet image prompt per references/generation-grids.md. Honor the scene header's continuity block. " +
-        "For later sheets bind the scene anchor (first approved sheet) and the incoming anchor (prior terminal panel / last frame) " +
-        "unless continuityBreakReason is set (scene anchor still binds). Include interpolate / continuous-take / no-cuts language."
+      "For later sheets bind the scene anchor (first approved sheet) and the incoming anchor (prior terminal panel / last frame) " +
+      "unless continuityBreakReason is set (scene anchor still binds). Include interpolate / continuous-take / no-cuts language."
     ),
   referenceImageUrls: z
     .array(z.string())
     .describe(
       "Approved refs in order: characters → objects → location plate → scene anchor (later sheets) → " +
-        "incoming anchor image (mandatory for continuous later sheets)."
+      "incoming anchor image (mandatory for continuous later sheets)."
     ),
   panelCount: z
     .number()
@@ -149,7 +179,7 @@ export function validatePanelCaptionCount(
   return null;
 }
 
-/** Validate continuity chain + scene-anchor fields on generateGenerationGrid args. */
+/** Validate continuity chain + scene-anchor + lighting fields on generateGenerationGrid args. */
 export function validateGenerationGridContinuity(args: {
   isFirstInScene?: boolean | null;
   sceneAnchorHandle?: string | null;
@@ -158,6 +188,11 @@ export function validateGenerationGridContinuity(args: {
   incomingAnchorKind?: string | null;
   incomingAnchorPanel?: number | null;
   continuityBreakReason?: string | null;
+  matchCutSourceGenerationId?: string | null;
+  matchCutSourceHandle?: string | null;
+  lightingState?: string | null;
+  lightingTransitionException?: boolean | null;
+  lightingTransitionReason?: string | null;
   referenceImageUrls?: string[];
 }): string | null {
   const sceneErrors = validateSceneAnchor({
@@ -174,20 +209,39 @@ export function validateGenerationGridContinuity(args: {
     incoming_anchor_kind: args.incomingAnchorKind ?? null,
     incoming_anchor_panel: args.incomingAnchorPanel ?? null,
     continuity_break_reason: args.continuityBreakReason ?? null,
+    match_cut_source_generation_id: args.matchCutSourceGenerationId ?? null,
+    match_cut_source_handle: args.matchCutSourceHandle ?? null,
     requireForApproved: true,
   });
   if (chainErrors.length > 0) return chainErrors.join("; ");
 
+  const lightingErrors = validateLightingState({
+    status: "approved_grid",
+    lighting_state: args.lightingState ?? null,
+    lighting_transition_exception: args.lightingTransitionException ?? null,
+    lighting_transition_reason: args.lightingTransitionReason ?? null,
+    requireLightingState: true,
+    requireForApproved: true,
+  });
+  if (lightingErrors.length > 0) return lightingErrors.join("; ");
+
+  const hasMatchCut = !!(
+    args.matchCutSourceGenerationId?.trim() || args.matchCutSourceHandle?.trim()
+  );
   const needsIncoming =
     args.isFirstInScene === false &&
     !!args.previousGenerationId &&
-    !args.continuityBreakReason?.trim();
+    !args.continuityBreakReason?.trim() &&
+    !hasMatchCut;
   if (needsIncoming && (args.referenceImageUrls?.length ?? 0) === 0) {
     return "continuous later sheets require the scene anchor + incoming anchor images in referenceImageUrls";
   }
   const needsSceneAnchor = args.isFirstInScene === false;
   if (needsSceneAnchor && (args.referenceImageUrls?.length ?? 0) === 0) {
     return "later sheets require the scene anchor image in referenceImageUrls";
+  }
+  if (hasMatchCut && (args.referenceImageUrls?.length ?? 0) === 0) {
+    return "match-cut sheets require the match-cut source image in referenceImageUrls";
   }
   return null;
 }
@@ -197,44 +251,24 @@ export const generateGenerationGrid = tool({
     "Generate a candidate motion sheet for ONE shot / Seedance generation (Stage 1 Step 10). " +
     "One motion sheet = one uninterrupted shot: 4–9 temporal panels (Panel 1 = cut-in, middle = milestones only, " +
     "Panel n = cut-out). Estimated Dur ≤15s (prefer 8–12). Never pack multiple shots onto one sheet. " +
-    "Call once per shot, present it, wait for approval, record via recordGenerationGridEntry, then the next shot. " +
+    "Call once per shot, pre-screen the fresh image (vision), present it, wait for Approve-grid (never askQuestions), " +
+    "record via recordGenerationGridEntry, then the next shot. " +
     "Scene continuity comes from the scene header's continuity block (text) plus image anchors — there is no " +
-    "separate continuity-pack artifact. Later sheets in the same scene MUST pass sceneAnchorHandle (first " +
-    "approved sheet) and previousGenerationId + incomingAnchorHandle/Kind/Panel (prior terminal panel Pn; " +
-    "later prior last frame), attaching those images in referenceImageUrls — unless continuityBreakReason " +
-    "documents an intentional break (scene anchor still required). Always pass panelCount (4–9), " +
-    "panelCaptions (same length), and shotIds (exactly one shot). If this tool returns ok:false, fix the " +
-    "listed continuity/panel errors and call again in the same turn.",
+    "separate continuity-pack artifact. Later sheets MUST pass sceneAnchorHandle (first approved sheet) and either " +
+    "(1) previousGenerationId + incomingAnchorHandle/Kind/Panel, (2) continuityBreakReason, or " +
+    "(3) matchCutSourceGenerationId + matchCutSourceHandle for a declared twin across a break. " +
+    "Pass lightingState (one canonical state); in-shot transitions need lightingTransitionException. " +
+    "Always pass panelCount (4–9), panelCaptions (same length), and shotIds (exactly one shot). " +
+    "If this tool returns ok:false, fix the listed errors and call again in the same turn.",
   inputSchema: generateGenerationGridInputSchema,
   execute: async (args) => {
-    const captionError = validatePanelCaptionCount(
-      args.panelCount,
-      args.panelCaptions,
-      args.shotIds
-    );
-    if (captionError) {
+    const error =
+      validatePanelCaptionCount(args.panelCount, args.panelCaptions, args.shotIds) ??
+      validateGenerationGridContinuity(args);
+    if (error) {
       return {
         type: "text" as const,
-        value: JSON.stringify({ ok: false, errors: [captionError] }),
-      };
-    }
-    const continuityError = validateGenerationGridContinuity({
-      isFirstInScene: args.isFirstInScene,
-      sceneAnchorHandle: args.sceneAnchorHandle,
-      previousGenerationId: args.previousGenerationId,
-      incomingAnchorHandle: args.incomingAnchorHandle,
-      incomingAnchorKind: args.incomingAnchorKind,
-      incomingAnchorPanel: args.incomingAnchorPanel,
-      continuityBreakReason: args.continuityBreakReason,
-      referenceImageUrls: args.referenceImageUrls,
-    });
-    if (continuityError) {
-      return {
-        type: "text" as const,
-        value: JSON.stringify({
-          ok: false,
-          errors: continuityError.split("; ").filter(Boolean),
-        }),
+        value: JSON.stringify({ ok: false, errors: [error] }),
       };
     }
     return {

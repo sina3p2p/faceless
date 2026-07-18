@@ -63,6 +63,14 @@ export async function POST(
 
   if (!assistantRowId || !storedArgs) return notFound("Shot compile not found");
 
+  const { toCompileShotArgs } = await import("@/server/services/showrunner/tools/compile-shot");
+  const compiled = toCompileShotArgs({
+    ...storedArgs,
+    render_prompt: renderPrompt,
+    prompt: renderPrompt,
+  });
+  if (!compiled) return badRequest("Invalid compile package");
+
   // Patch the stored tool call: mark pending so the client shows a loading state
   // on reload, and record the actual prompt that will be rendered (may differ if
   // the user edited it).
@@ -76,7 +84,18 @@ export async function POST(
     const calls = (Array.isArray(d.toolCalls) ? d.toolCalls : []) as StoredTc[];
     const updatedCalls = calls.map((tc) =>
       tc.id === toolCallId
-        ? { ...tc, function: { ...tc.function, arguments: { ...tc.function.arguments, pending: true, prompt: renderPrompt } } }
+        ? {
+            ...tc,
+            function: {
+              ...tc.function,
+              arguments: {
+                ...tc.function.arguments,
+                pending: true,
+                render_prompt: renderPrompt,
+                prompt: renderPrompt,
+              },
+            },
+          }
         : tc
     );
     await db
@@ -88,12 +107,12 @@ export async function POST(
   await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_SHOT, {
     toolCallId,
     assistantMessageRowId: assistantRowId,
-    referenceImageUrls: (storedArgs.referenceImageUrls as string[]) ?? [],
+    referenceImageUrls: compiled.referenceImageUrls ?? [],
     prompt: renderPrompt,
-    aspectRatio: (storedArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
-    duration: storedArgs.duration as number,
-    continuityMode: (storedArgs.continuityMode as "fresh" | "extend_video") ?? "fresh",
-    sourceVideoUrl: storedArgs.sourceVideoUrl as string | undefined,
+    aspectRatio: compiled.aspectRatio ?? "16:9",
+    duration: compiled.duration,
+    continuityMode: compiled.continuityMode ?? "fresh",
+    sourceVideoUrl: compiled.sourceVideoUrl,
   });
 
   return NextResponse.json({ ok: true, queued: true });

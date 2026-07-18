@@ -35,8 +35,10 @@ export const generateAssetReferences = tool({
     "After the user approves the manifest list, call this ONCE with every asset expanded — characters " +
     "first, then objects, then locations. Assets are independent (each prompt derives only from its " +
     "locked spec + the locked Look). The app dispatches all generations together and presents ONE " +
-    "gallery. Wait for gallery approval (`asset_approval` with per-asset candidate ids) before " +
-    "proceeding — never treat free text as approval. Do not call this one asset at a time.",
+    "gallery with one candidate per asset. When vision_status:attached, pre-screen pixels (twin-bug / " +
+    "plate checks) in that turn. Wait for gallery Approve (`asset_approval` with per-asset candidate " +
+    "ids = storage keys) — never askQuestions for approval, never treat free text as approval. " +
+    "Do not call this one asset at a time.",
   inputSchema: z.object({
     assets: z
       .array(assetSpecSchema)

@@ -72,11 +72,18 @@ export function GenerationGridPanel({
     generationGrid.panelCount != null ? ` · ${generationGrid.panelCount} panels` : "";
   const chainLabel = generationGrid.continuityBreakReason
     ? ` · break: ${generationGrid.continuityBreakReason}`
-    : generationGrid.previousGenerationId
-      ? ` · from ${generationGrid.previousGenerationId}`
-      : "";
+    : generationGrid.matchCutSourceGenerationId
+      ? ` · match-cut from ${generationGrid.matchCutSourceGenerationId}`
+      : generationGrid.previousGenerationId
+        ? ` · from ${generationGrid.previousGenerationId}`
+        : "";
   const anchorLabel = generationGrid.sceneAnchorHandle
     ? ` · anchor ${generationGrid.sceneAnchorHandle}`
+    : "";
+  const lightLabel = generationGrid.lightingState
+    ? generationGrid.lightingTransitionException
+      ? ` · light ${generationGrid.lightingState} (transition)`
+      : ` · light ${generationGrid.lightingState}`
     : "";
 
   return (
@@ -89,6 +96,7 @@ export function GenerationGridPanel({
           {durationLabel}
           {chainLabel}
           {anchorLabel}
+          {lightLabel}
         </span>
         {isLocked && (
           <span className="ml-1 text-[10px] font-medium text-emerald-400 bg-emerald-400/10 border border-emerald-400/20 rounded-full px-2 py-0.5">

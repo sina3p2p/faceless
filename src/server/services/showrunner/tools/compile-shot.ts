@@ -16,7 +16,9 @@ const referenceSlotSchema = z.object({
   handle: z.string().describe('Bound @material or grid handle, e.g. "@hero_charsheet"'),
   kind: z
     .string()
-    .describe("character | object | location | scene_anchor | incoming_anchor | grid"),
+    .describe(
+      "character | object | location | scene_anchor | incoming_anchor | match_cut_source | grid"
+    ),
   controls: z.string().describe("What this reference governs"),
 });
 

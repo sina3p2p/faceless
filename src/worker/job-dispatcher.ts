@@ -3,7 +3,6 @@ import {
   generateAssetGallery,
   generateAssetImages,
 } from "@/server/services/showrunner/tools/generate-asset-references";
-import { generateContinuityPackImages } from "@/server/services/showrunner/tools/generate-continuity-pack";
 import { generateGenerationGridImages } from "@/server/services/showrunner/tools/generate-generation-grid";
 import { JOB_NAMES, type WorkerJobName } from "@/lib/worker-queue";
 import { logger } from "@/lib/logger";
@@ -50,15 +49,6 @@ export async function dispatchWorkerJob(
         });
         break;
       }
-      case JOB_NAMES.GENERATE_CONTINUITY_PACK: {
-        const result = await runGenerateContinuityPack(payload as PayloadBase & ContinuityPayload);
-        await setJobStatus(jobId, "succeeded", result);
-        await patchMessageToolCall(assistantMessageRowId, toolCallId, {
-          generatedImages: result.images,
-          pending: false,
-        });
-        break;
-      }
       case JOB_NAMES.GENERATE_GENERATION_GRID: {
         const result = await runGenerateGenerationGrid(payload as PayloadBase & GridPayload);
         await setJobStatus(jobId, "succeeded", result);
@@ -82,11 +72,9 @@ export async function dispatchWorkerJob(
     const failPatch =
       jobName === JOB_NAMES.GENERATE_SHOT
         ? { shotError: errorMsg, pending: false }
-        : jobName === JOB_NAMES.GENERATE_CONTINUITY_PACK
-          ? { packError: errorMsg, pending: false }
-          : jobName === JOB_NAMES.GENERATE_GENERATION_GRID
-            ? { gridError: errorMsg, pending: false }
-            : { pending: false, error: errorMsg };
+        : jobName === JOB_NAMES.GENERATE_GENERATION_GRID
+          ? { gridError: errorMsg, pending: false }
+          : { pending: false, error: errorMsg };
 
     await patchMessageToolCall(assistantMessageRowId, toolCallId, failPatch);
     throw err;
@@ -162,21 +150,6 @@ async function runGenerateAssetImages(payload: PayloadBase & AssetPayload) {
     generatedAssets,
     patch: { generatedAssets },
   };
-}
-
-type ContinuityPayload = {
-  keyframes: { imagePrompt: string }[];
-  referenceImageUrls: string[];
-  aspectRatio: "16:9" | "9:16" | "1:1";
-};
-
-async function runGenerateContinuityPack(payload: PayloadBase & ContinuityPayload) {
-  const images = await generateContinuityPackImages(
-    payload.keyframes,
-    payload.referenceImageUrls ?? [],
-    payload.aspectRatio ?? "16:9",
-  );
-  return { images };
 }
 
 type GridPayload = {

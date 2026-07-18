@@ -6,14 +6,26 @@ import { eq } from "drizzle-orm";
 import { enqueueWorkerJob, JOB_NAMES } from "@/lib/worker-queue";
 import {
   validatePanelCaptionCount,
-  validateContinuityPackKeyframes,
   validateGenerationGridContinuity,
+  toCompileShotArgs,
 } from "@/server/services/showrunner/tools";
 
 type StoredTc = {
   id: string;
   type: "function";
   function: { name: string; arguments: Record<string, unknown> };
+};
+
+type AssetSpec = {
+  assetHandle: string;
+  assetKind: "character" | "location" | "object";
+  imagePrompt: string;
+};
+
+type GeneratedAsset = {
+  assetHandle: string;
+  assetKind: "character" | "location" | "object";
+  candidates: Array<{ id: string; url: string }>;
 };
 
 export async function POST(
@@ -24,7 +36,13 @@ export async function POST(
   if (!user) return unauthorized();
 
   const { sessionId } = await params;
-  const { toolCallId } = (await req.json()) as { toolCallId: string };
+  const body = (await req.json()) as {
+    toolCallId: string;
+    /** Reject one asset in a gallery and regenerate with objection folded in. */
+    assetHandle?: string;
+    objection?: string;
+  };
+  const { toolCallId, assetHandle, objection } = body;
   if (!toolCallId) return badRequest("toolCallId required");
 
   const [session] = await db
@@ -45,7 +63,11 @@ export async function POST(
     const d = ((row.parts as unknown[])[0] ?? {}) as Record<string, unknown>;
     const calls = (Array.isArray(d.toolCalls) ? d.toolCalls : []) as StoredTc[];
     const found = calls.find((tc) => tc.id === toolCallId);
-    if (found) { targetRowId = row.id; targetTc = found; break; }
+    if (found) {
+      targetRowId = row.id;
+      targetTc = found;
+      break;
+    }
   }
   if (!targetTc || !targetRowId) return badRequest("Tool call not found");
 
@@ -56,76 +78,98 @@ export async function POST(
     const d = ((targetRow.parts as unknown[])[0]) as Record<string, unknown>;
     const updatedCalls = (d.toolCalls as StoredTc[]).map((tc) =>
       tc.id === toolCallId
-        ? { ...tc, function: { ...tc.function, arguments: { ...tc.function.arguments, ...newArgs } } }
+        ? {
+            ...tc,
+            function: {
+              ...tc.function,
+              arguments: { ...tc.function.arguments, ...newArgs },
+            },
+          }
         : tc
     );
-    await db.update(filmSessionMessages)
+    await db
+      .update(filmSessionMessages)
       .set({ parts: [{ ...d, toolCalls: updatedCalls }] })
       .where(eq(filmSessionMessages.id, targetRowId!));
   }
 
   if (toolName === "compileShot") {
+    const compiled = toCompileShotArgs(tcArgs);
+    if (!compiled) return badRequest("Cannot retry a gap compile — fix upstream and recompile");
     await patchRow({ pending: true, shotError: undefined, videoUrl: undefined });
     await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_SHOT, {
       toolCallId,
       assistantMessageRowId: targetRowId,
-      referenceImageUrls: (tcArgs.referenceImageUrls as string[]) ?? [],
-      prompt: tcArgs.prompt as string,
-      aspectRatio: (tcArgs.aspectRatio as "16:9" | "9:16" | "1:1") ?? "16:9",
-      duration: tcArgs.duration as number,
-      continuityMode: (tcArgs.continuityMode as "fresh" | "extend_video") ?? "fresh",
-      sourceVideoUrl: tcArgs.sourceVideoUrl as string | undefined,
+      referenceImageUrls: compiled.referenceImageUrls ?? [],
+      prompt: compiled.prompt,
+      aspectRatio: compiled.aspectRatio ?? "16:9",
+      duration: compiled.duration,
+      continuityMode: compiled.continuityMode ?? "fresh",
+      sourceVideoUrl: compiled.sourceVideoUrl,
     });
     return NextResponse.json({ queued: true });
   }
 
   if (toolName === "generateAssetReferences") {
-    const { assetHandle, assetKind, imagePrompt } = tcArgs as {
-      assetHandle: string;
-      assetKind: "character" | "location" | "object";
-      imagePrompt: string;
-    };
-    await patchRow({ pending: true, generatedImages: undefined, error: undefined });
+    const assets: AssetSpec[] =
+      Array.isArray(tcArgs.assets) && (tcArgs.assets as AssetSpec[]).length > 0
+        ? (tcArgs.assets as AssetSpec[])
+        : tcArgs.assetHandle && tcArgs.assetKind && tcArgs.imagePrompt
+          ? [
+              {
+                assetHandle: tcArgs.assetHandle as string,
+                assetKind: tcArgs.assetKind as AssetSpec["assetKind"],
+                imagePrompt: tcArgs.imagePrompt as string,
+              },
+            ]
+          : [];
+    if (!assets.length) return badRequest("No assets on tool call");
+
+    const existingGeneratedAssets = (tcArgs.generatedAssets as GeneratedAsset[] | undefined) ?? [];
+
+    // Single-asset reject → fold objection into that asset's prompt and regen only it
+    if (assetHandle) {
+      if (!objection?.trim()) return badRequest("objection required when regenerating one asset");
+      const spec = assets.find((a) => a.assetHandle === assetHandle);
+      if (!spec) return badRequest(`Asset ${assetHandle} not found in gallery`);
+      const imagePrompt = `${spec.imagePrompt}\n\nUSER OBJECTION (must fix): ${objection.trim()}`;
+      const updatedAssets = assets.map((a) =>
+        a.assetHandle === assetHandle ? { ...a, imagePrompt } : a
+      );
+      await patchRow({
+        assets: updatedAssets,
+        pending: true,
+        error: undefined,
+      });
+      await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_ASSET_IMAGES, {
+        toolCallId,
+        assistantMessageRowId: targetRowId,
+        assetHandle,
+        assetKind: spec.assetKind,
+        imagePrompt,
+        existingGeneratedAssets,
+        userId: session.userId,
+      });
+      return NextResponse.json({ queued: true, assetHandle });
+    }
+
+    // Full gallery retry
+    await patchRow({
+      pending: true,
+      generatedAssets: undefined,
+      generatedImages: undefined,
+      error: undefined,
+    });
     await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_ASSET_IMAGES, {
       toolCallId,
       assistantMessageRowId: targetRowId,
-      assetHandle,
-      assetKind,
-      imagePrompt,
+      assets,
       userId: session.userId,
     });
     return NextResponse.json({ queued: true });
   }
 
-  if (toolName === "generateContinuityPack") {
-    const {
-      keyframes,
-      referenceImageUrls,
-      aspectRatio,
-    } = tcArgs as {
-      keyframes?: { role: string; caption: string; imagePrompt: string }[];
-      referenceImageUrls: string[];
-      aspectRatio?: "16:9" | "9:16" | "1:1";
-    };
-    const keyframeError = validateContinuityPackKeyframes(keyframes);
-    if (keyframeError) {
-      return badRequest(keyframeError);
-    }
-    await patchRow({ pending: true, generatedImages: undefined, packError: undefined });
-    await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_CONTINUITY_PACK, {
-      toolCallId,
-      assistantMessageRowId: targetRowId,
-      sceneId: tcArgs.sceneId,
-      packHandle: tcArgs.packHandle,
-      notes: tcArgs.notes,
-      keyframes: keyframes!,
-      referenceImageUrls: referenceImageUrls ?? [],
-      aspectRatio: aspectRatio ?? "16:9",
-    });
-    return NextResponse.json({ queued: true });
-  }
-
-  if (toolName === "generateGenerationGrid" || toolName === "generateSceneGrid") {
+  if (toolName === "generateGenerationGrid") {
     const {
       sceneId,
       generationId,

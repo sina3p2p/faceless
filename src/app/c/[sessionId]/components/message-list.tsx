@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AssistantText } from "./assistant-text";
 import { AssetRefPanel } from "./asset-ref-panel";
-import { ContinuityPackPanel } from "./continuity-pack-panel";
 import { GenerationGridPanel } from "./generation-grid-panel";
 import { ShotCompilePanel } from "./shot-compile-panel";
 import type { ClientMessage } from "@/types/v2/story";
@@ -16,7 +15,7 @@ export function MessageList({
   loadingOlder = false,
   onLoadOlder,
   onAssetApproval,
-  onContinuityPackApproval,
+  onAssetReject,
   onGridApproval,
   onRetry,
   onRenderShot,
@@ -28,13 +27,11 @@ export function MessageList({
   hasMore?: boolean;
   loadingOlder?: boolean;
   onLoadOlder?: () => void;
-  onAssetApproval: (toolCallId: string, assetHandle: string, url: string) => void;
-  onContinuityPackApproval: (
+  onAssetApproval: (
     toolCallId: string,
-    sceneId: string | number,
-    packHandle: string,
-    approvedUrls: string[]
+    approvals: Array<{ assetHandle: string; candidateId: string; approvedUrl: string }>
   ) => void;
+  onAssetReject: (toolCallId: string, assetHandle: string, objection: string) => void;
   onGridApproval: (toolCallId: string, sceneId: string | number, url: string) => void;
   onRetry: (toolCallId: string) => void;
   onRenderShot: (toolCallId: string, renderPrompt: string) => void;
@@ -165,33 +162,20 @@ export function MessageList({
                   <AssetRefPanel
                     assetRef={msg.assetRef}
                     disabled={isStreaming}
-                    onApprove={
-                      msg.assetRef.approvedUrl
+                    onApproveRemaining={
+                      msg.assetRef.approved
                         ? undefined
-                        : (url: string) => onAssetApproval(msg.assetRef!.toolCallId, msg.assetRef!.assetHandle!, url)
+                        : (approvals) => onAssetApproval(msg.assetRef!.toolCallId, approvals)
                     }
-                    onRetry={!msg.assetRef.approvedUrl && !msg.assetRef.loading ? () => onRetry(msg.assetRef!.toolCallId) : undefined}
-                  />
-                )}
-
-                {msg.continuityPack && (
-                  <ContinuityPackPanel
-                    continuityPack={msg.continuityPack}
-                    disabled={isStreaming}
-                    onApprove={
-                      msg.continuityPack.approvedUrls?.length
+                    onReject={
+                      msg.assetRef.approved
                         ? undefined
-                        : (urls: string[]) =>
-                            onContinuityPackApproval(
-                              msg.continuityPack!.toolCallId,
-                              msg.continuityPack!.sceneId!,
-                              msg.continuityPack!.packHandle!,
-                              urls
-                            )
+                        : (handle, objection) =>
+                            onAssetReject(msg.assetRef!.toolCallId, handle, objection)
                     }
                     onRetry={
-                      !msg.continuityPack.approvedUrls?.length && !msg.continuityPack.loading
-                        ? () => onRetry(msg.continuityPack!.toolCallId)
+                      !msg.assetRef.approved && !msg.assetRef.loading
+                        ? () => onRetry(msg.assetRef!.toolCallId)
                         : undefined
                     }
                   />

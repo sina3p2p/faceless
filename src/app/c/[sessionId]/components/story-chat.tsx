@@ -9,7 +9,6 @@ import { MessageList } from "./message-list";
 import type {
   AssetRef,
   ClientMessage,
-  ContinuityPack,
   QuestionsCall,
   GenerationGrid,
   ShotCompile,
@@ -156,7 +155,7 @@ export function StoryChat({
         m.shotResult?.loading ||
         m.shotCompile?.rendering ||
         m.assetRef?.loading ||
-        m.continuityPack?.loading ||
+        m.assetRef?.items?.some((i) => i.loading) ||
         m.generationGrid?.loading
     );
   }
@@ -234,9 +233,25 @@ export function StoryChat({
                     assetRef: {
                       ...m.assetRef!,
                       loading: false,
-                      assetHandle: (event.assetHandle as string) ?? m.assetRef!.assetHandle,
-                      assetKind: (event.assetKind as AssetRef["assetKind"]) ?? m.assetRef!.assetKind,
-                      images: event.images as string[] | undefined,
+                      items: (event.items as AssetRef["items"] | undefined) ??
+                        (event.images
+                          ? [
+                              {
+                                assetHandle:
+                                  (event.assetHandle as string) ??
+                                  m.assetRef!.items?.[0]?.assetHandle ??
+                                  "asset",
+                                assetKind:
+                                  (event.assetKind as AssetRef["items"][0]["assetKind"]) ??
+                                  m.assetRef!.items?.[0]?.assetKind ??
+                                  "character",
+                                candidates: (event.images as string[]).map((url) => ({
+                                  id: url,
+                                  url,
+                                })),
+                              },
+                            ]
+                          : m.assetRef!.items),
                       error: event.error as string | undefined,
                     },
                   }
@@ -245,31 +260,7 @@ export function StoryChat({
             if (!hasPendingJobs(next)) closeJobEventsStream();
             return next;
           });
-        } else if (event.type === "continuity_pack") {
-          const toolCallId = event.toolCallId as string;
-          setMessages((prev) => {
-            const next = prev.map((m) =>
-              m.continuityPack?.toolCallId === toolCallId
-                ? {
-                    ...m,
-                    continuityPack: {
-                      ...m.continuityPack!,
-                      loading: false,
-                      sceneId: (event.sceneId as string | number) ?? m.continuityPack!.sceneId,
-                      packHandle: (event.packHandle as string) ?? m.continuityPack!.packHandle,
-                      notes: (event.notes as ContinuityPack["notes"]) ?? m.continuityPack!.notes,
-                      keyframes: (event.keyframes as ContinuityPack["keyframes"]) ?? m.continuityPack!.keyframes,
-                      aspectRatio: (event.aspectRatio as ContinuityPack["aspectRatio"]) ?? m.continuityPack!.aspectRatio,
-                      images: event.images as string[] | undefined,
-                      error: event.error as string | undefined,
-                    },
-                  }
-                : m
-            );
-            if (!hasPendingJobs(next)) closeJobEventsStream();
-            return next;
-          });
-        } else if (event.type === "generation_grid" || event.type === "scene_grid") {
+        } else if (event.type === "generation_grid") {
           const toolCallId = event.toolCallId as string;
           setMessages((prev) => {
             const next = prev.map((m) =>
@@ -405,55 +396,43 @@ export function StoryChat({
         prev.map((m) => (m.id === tempId ? { ...m, questions } : m))
       );
     } else if (event.type === "asset_ref_loading") {
-      const assetRef: AssetRef = { toolCallId: event.toolCallId as string, loading: true };
+      const assetRef: AssetRef = { toolCallId: event.toolCallId as string, loading: true, items: [] };
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, assetRef } : m))
       );
     } else if (event.type === "asset_ref") {
-      const pending = event.pending === true || !event.images;
+      const pending = event.pending === true || (!event.items && !event.images);
+      const items =
+        (event.items as AssetRef["items"] | undefined) ??
+        (event.assetHandle
+          ? [
+              {
+                assetHandle: event.assetHandle as string,
+                assetKind: (event.assetKind as AssetRef["items"][0]["assetKind"]) ?? "character",
+                loading: pending,
+                candidates: event.images
+                  ? (event.images as string[]).map((url) => ({ id: url, url }))
+                  : undefined,
+                error: event.error as string | undefined,
+              },
+            ]
+          : []);
       const assetRef: AssetRef = {
         toolCallId: event.toolCallId as string,
         loading: pending,
-        assetHandle: event.assetHandle as string | undefined,
-        assetKind: event.assetKind as AssetRef["assetKind"],
-        images: event.images as string[] | undefined,
+        items,
         error: event.error as string | undefined,
       };
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, assetRef } : m))
       );
       if (pending) openJobEventsStream();
-    } else if (event.type === "continuity_pack_loading") {
-      const continuityPack: ContinuityPack = {
-        toolCallId: event.toolCallId as string,
-        loading: true,
-      };
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, continuityPack } : m))
-      );
-    } else if (event.type === "continuity_pack") {
-      const pending = event.pending === true || (!event.images && !event.error);
-      const continuityPack: ContinuityPack = {
-        toolCallId: event.toolCallId as string,
-        loading: pending,
-        sceneId: event.sceneId as string | number,
-        packHandle: event.packHandle as string | undefined,
-        notes: event.notes as ContinuityPack["notes"],
-        keyframes: event.keyframes as ContinuityPack["keyframes"],
-        images: event.images as string[] | undefined,
-        aspectRatio: event.aspectRatio as ContinuityPack["aspectRatio"],
-        error: event.error as string | undefined,
-      };
-      setMessages((prev) =>
-        prev.map((m) => (m.id === tempId ? { ...m, continuityPack } : m))
-      );
-      if (pending) openJobEventsStream();
-    } else if (event.type === "generation_grid_loading" || event.type === "scene_grid_loading") {
+    } else if (event.type === "generation_grid_loading") {
       const generationGrid: GenerationGrid = { toolCallId: event.toolCallId as string, loading: true };
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, generationGrid } : m))
       );
-    } else if (event.type === "generation_grid" || event.type === "scene_grid") {
+    } else if (event.type === "generation_grid") {
       const pending = event.pending === true || (!event.images && !event.error);
       const generationGrid: GenerationGrid = {
         toolCallId: event.toolCallId as string,
@@ -491,6 +470,18 @@ export function StoryChat({
         aspectRatio: event.aspectRatio as ShotCompile["aspectRatio"],
         continuityMode: event.continuityMode as ShotCompile["continuityMode"],
         sourceVideoUrl: event.sourceVideoUrl as string | undefined,
+      };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, shotCompile } : m))
+      );
+    } else if (event.type === "shot_compile_gap" || event.type === "shot_compile_error") {
+      const gaps = event.gaps as string[] | undefined;
+      const shotCompile: ShotCompile = {
+        toolCallId: event.toolCallId as string,
+        loading: false,
+        error:
+          (event.error as string | undefined) ??
+          (gaps?.length ? gaps.join("; ") : "Compile gap"),
       };
       setMessages((prev) =>
         prev.map((m) => (m.id === tempId ? { ...m, shotCompile } : m))
@@ -691,7 +682,6 @@ export function StoryChat({
     const host = messages.find(
       (m) =>
         m.generationGrid?.toolCallId === toolCallId ||
-        m.continuityPack?.toolCallId === toolCallId ||
         m.assetRef?.toolCallId === toolCallId ||
         m.shotCompile?.toolCallId === toolCallId ||
         m.shotResult?.toolCallId === toolCallId
@@ -724,15 +714,18 @@ export function StoryChat({
           };
         }
         if (m.assetRef?.toolCallId === toolCallId)
-          return { ...m, assetRef: { ...m.assetRef!, loading: true, error: undefined, images: undefined } };
-        if (m.continuityPack?.toolCallId === toolCallId)
           return {
             ...m,
-            continuityPack: {
-              ...m.continuityPack!,
+            assetRef: {
+              ...m.assetRef!,
               loading: true,
               error: undefined,
-              images: undefined,
+              items: (m.assetRef!.items ?? []).map((i) => ({
+                ...i,
+                loading: true,
+                candidates: undefined,
+                error: undefined,
+              })),
             },
           };
         if (m.generationGrid?.toolCallId === toolCallId)
@@ -762,11 +755,14 @@ export function StoryChat({
             };
           }
           if (m.assetRef?.toolCallId === toolCallId)
-            return { ...m, assetRef: { ...m.assetRef!, loading: false, error: String(err) } };
-          if (m.continuityPack?.toolCallId === toolCallId)
             return {
               ...m,
-              continuityPack: { ...m.continuityPack!, loading: false, error: String(err) },
+              assetRef: {
+                ...m.assetRef!,
+                loading: false,
+                error: String(err),
+                items: (m.assetRef!.items ?? []).map((i) => ({ ...i, loading: false })),
+              },
             };
           if (m.generationGrid?.toolCallId === toolCallId)
             return { ...m, generationGrid: { ...m.generationGrid!, loading: false, error: String(err) } };
@@ -776,37 +772,82 @@ export function StoryChat({
     }
   }
 
-  async function handleAssetApproval(toolCallId: string, assetHandle: string, approvedUrl: string) {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.role === "assistant" && m.assetRef?.toolCallId === toolCallId
-          ? { ...m, assetRef: { ...m.assetRef!, approvedUrl } }
-          : m
-      )
-    );
-    await streamResponse({ type: "asset_approval", toolCallId, assetHandle, approvedUrl });
-  }
-
-  async function handleContinuityPackApproval(
+  async function handleAssetApproval(
     toolCallId: string,
-    sceneId: string | number,
-    packHandle: string,
-    approvedUrls: string[]
+    approvals: Array<{ assetHandle: string; candidateId: string; approvedUrl: string }>
   ) {
     setMessages((prev) =>
       prev.map((m) =>
-        m.role === "assistant" && m.continuityPack?.toolCallId === toolCallId
-          ? { ...m, continuityPack: { ...m.continuityPack!, approvedUrls } }
+        m.role === "assistant" && m.assetRef?.toolCallId === toolCallId
+          ? {
+              ...m,
+              assetRef: {
+                ...m.assetRef!,
+                approved: true,
+                items: (m.assetRef!.items ?? []).map((item) => {
+                  const a = approvals.find((x) => x.assetHandle === item.assetHandle);
+                  return a
+                    ? {
+                        ...item,
+                        approvedCandidateId: a.candidateId,
+                        approvedUrl: a.approvedUrl,
+                        rejected: false,
+                      }
+                    : item;
+                }),
+              },
+            }
           : m
       )
     );
-    await streamResponse({
-      type: "continuity_pack_approval",
-      toolCallId,
-      sceneId,
-      packHandle,
-      approvedUrls,
-    });
+    await streamResponse({ type: "asset_approval", toolCallId, approvals });
+  }
+
+  async function handleAssetReject(toolCallId: string, assetHandle: string, objection: string) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role === "assistant" && m.assetRef?.toolCallId === toolCallId
+          ? {
+              ...m,
+              assetRef: {
+                ...m.assetRef!,
+                items: (m.assetRef!.items ?? []).map((item) =>
+                  item.assetHandle === assetHandle
+                    ? { ...item, rejected: true, objection, loading: true, candidates: undefined }
+                    : item
+                ),
+              },
+            }
+          : m
+      )
+    );
+    try {
+      const res = await fetch(`/api/v2/story/${sessionId}/retry-tool`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toolCallId, assetHandle, objection }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      openJobEventsStream();
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.assetRef?.toolCallId === toolCallId
+            ? {
+                ...m,
+                assetRef: {
+                  ...m.assetRef!,
+                  items: (m.assetRef!.items ?? []).map((item) =>
+                    item.assetHandle === assetHandle
+                      ? { ...item, loading: false, rejected: false, error: String(err) }
+                      : item
+                  ),
+                },
+              }
+            : m
+        )
+      );
+    }
   }
 
   async function handleGridApproval(toolCallId: string, sceneId: string | number, approvedUrl: string) {
@@ -949,7 +990,7 @@ export function StoryChat({
             loadingOlder={loadingOlder}
             onLoadOlder={() => void loadOlderMessages()}
             onAssetApproval={handleAssetApproval}
-            onContinuityPackApproval={handleContinuityPackApproval}
+            onAssetReject={handleAssetReject}
             onGridApproval={handleGridApproval}
             onRetry={retryTool}
             onRenderShot={handleRenderShot}

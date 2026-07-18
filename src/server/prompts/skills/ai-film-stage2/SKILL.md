@@ -15,7 +15,7 @@ Before writing any shot prompt, `loadReference` `shot-compilation-recipe.md` —
 3. **Bible-verbatim binds:** SUBJECT DEFINITIONS paste Bible §2 lines exactly.
 4. **COMPOSITION LOCK (Panel 1) + END STATE LOCK (Panel n)** open every shot that consumes a sheet; the sheet is interpolated as one continuous take (recipe: Consuming the motion sheet). Unextractable locks → `status: "gap"`.
 5. **Approvals are buttons** — same rule as Stage 1.
-6. **Footing continuity via continuity modes:** `extend_video` + `sourceVideoUrl` for continuous walks/carries; `fresh` for scene opens and intentional breaks, with CONTEXT restating exact footing from the previous last frame (recipe: Continuity across shots).
+6. **Footing continuity via continuity modes:** `extend_video` + `sourceVideoUrl` for continuous walks/carries; `fresh` for scene opens, intentional breaks, and match-cut entries (attach `match_cut_source` as compositional ref), with CONTEXT restating exact footing from the previous last frame when geography must still match (recipe: Continuity across shots).
 
 Craft directives from Bible §3 apply to every compile; every value comes from the Bible or the shot row.
 

@@ -4,7 +4,7 @@ Per-step guidance for the 10-step pipeline in SKILL.md. Method everywhere: _dive
 
 ## Step 1 — Premise
 
-Lock the seed sentence plainly and name what it already fixes — genre, setting, any built-in "button" (recurring payoff); it's a coordinate, not a destination. URL in the seed → `webExtract` first; lock the seed with what the source actually says. Then offer ~6 distinct directions, each with a different protagonist AND a different engine (the mechanism that generates scenes/tension/humor/dread), plus each one's recurring payoff. Flag which options give a single clear protagonist (easiest consistency) and which are most purely visual (best for AI). Lock one direction or a splice.
+Lock the seed sentence plainly and name what it already fixes — genre, setting, any built-in "button" (recurring payoff); it's a coordinate, not a destination. URL in the seed → `webExtract` first; lock the seed with what the source actually says. **Screen-thesis / readable-UI climax:** if a direction's payoff requires the audience to read specific on-screen text or UI (not merely sense density/glow), flag it — current medium stance is Path A (implied-not-read). Redesign the button to implied UI, or get an explicit user ack that legibility is aspirational and will drift. Do not invent a "locked string" asset Seedance cannot honor. **Named real orgs:** if dramatization would invent incriminating depicted "evidence" about a real company, fork fictionalize / keep hypothetical / user ack before locking. Then offer ~6 distinct directions, each with a different protagonist AND a different engine (the mechanism that generates scenes/tension/humor/dread), plus each one's recurring payoff. Flag which options give a single clear protagonist (easiest consistency) and which are most purely visual (best for AI). Lock one direction or a splice.
 
 ## Step 2 — Story spine (logline + conflict + theme, one artifact)
 
@@ -38,7 +38,7 @@ THE deliverable, built **scene by scene**: for each beat, break it into scenes (
 
 While writing each header, apply the old outline's disciplines inline:
 
-- **Scene-delta rule:** every scene names its ONE job and its irreversible story-state change; a scene that can't state a new end state gets merged, cut, or rewritten, and consecutive scenes must differ visibly (a State Schedule value or the lighting state).
+- **Scene-delta rule:** every scene names its ONE job and its irreversible story-state change; a scene that can't state a new end state gets merged, cut, or rewritten, and consecutive scenes must differ visibly (a State Schedule value or the lighting state). **Do not open a new scene solely because lighting changes** — lighting progression belongs inside one scene's continuity block when location and geography stay continuous (match-cut pairs that only change light/scheduled content stay co-scenic).
 - **Running accounting:** track total locations and characters against the locked inventory as scenes accumulate; consolidate while it's still text; cut assets no scene uses.
 
 Header schema, column rules, and camera-choosing vocabulary: `deliverable-templates.md` §B and §B2. Keep a running total of shots and seconds against the target runtime.
@@ -55,20 +55,19 @@ Assemble §A from locked artifacts: §1 the Look verbatim (Step 5), §2 the mast
 
 Audit the manifest first: identity anchors only (characters, plates, recurring hero props in ONE neutral state), typically 4–8 images; strike disguised shots; fused entities get their own object refs; plates stay environment-only when a hero prop has its own ref; charsheets follow the held-tool policy in `medium-constraints.md`. Present the audited list as a fork — this is the taste decision; everything after it is verification.
 
-On manifest approval, run the batch: expand EVERY spec per `medium-constraints.md` (assets are independent — every expansion derives only from the locked spec + the locked Look, so nothing waits on anything), dispatch all generations together, and present ONE gallery of candidates labeled by handle.
+On manifest approval, run the batch: expand EVERY spec per `medium-constraints.md` (assets are independent — every expansion derives only from the locked spec + the locked Look, so nothing waits on anything), dispatch all generations together. The app returns **one candidate per asset** in ONE gallery.
 
-**Gallery review is per-item, by exception:**
+**Gallery review is per-item approve/reject (not choose-among):**
 
-- Before presenting, self-check every candidate against its approval checklist (`medium-constraints.md`) — candidates that fail a checklist item are regenerated before the user sees them, or shown pre-flagged with the failure named when regeneration budget is a concern.
-- The user REJECTS individual assets (each rejection names the objection; that asset regenerates with the objection folded into its expansion prompt and returns to the gallery) and APPROVES the remainder in one action.
-- Approval binds each approved image to its `@material` handle. Approval is the gallery's Approve button (`asset_approval` tool result carrying per-asset candidate ids) — never free text.
+- When the tool result shows `vision_status:attached`, pre-screen every candidate against its approval checklist (`medium-constraints.md`) — especially the twin-bug check on charsheets — in that turn. Failures regenerate before asking the user to approve, or show pre-flagged when regen budget is tight. Never claim a visual check on `vision_status:unverifiable`.
+- The user REJECTS individual assets (each rejection names the objection; that asset regenerates with the objection folded into its expansion prompt and returns to the gallery) and APPROVES the remainder via the gallery Approve button (`asset_approval` with per-asset candidate ids / storage keys) — never free text, never `askQuestions` for approval.
 - Regenerated assets come back as a small follow-up gallery; repeat until every manifest entry is bound.
 
 Characters still lead the gallery ordering (they're the highest-stakes identities and the most likely rejections — surfacing them first gets their re-roll cycle started earliest). Assets approved ≠ Stage 1 done — proceed to Step 10.
 
 ## Step 10 — Motion sheets
 
-With assets approved, load `generation-grids.md` and follow it: one motion sheet per shot, anchored for scene continuity by the header's continuity block + plate + the scene's first approved sheet + the prior terminal panel, recording every approval or skip via `recordGenerationGridEntry`. Stage 1 completes when every shot has a validated registry entry.
+With assets approved, load `generation-grids.md` and follow it: one motion sheet per shot, anchored for scene continuity by the header's continuity block + plate + the scene's first approved sheet + the prior terminal panel (or match-cut source), recording every approval or skip via `recordGenerationGridEntry`. Pre-screen each fresh sheet while `vision_status:attached`; Approve-grid only — no approval `askQuestions`. Stage 1 completes when every shot has a validated registry entry.
 
 ---
 

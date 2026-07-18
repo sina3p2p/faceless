@@ -19,7 +19,7 @@ Craft directives (Bible §3) are production defaults; controlled exceptions only
 
 ## Registry precondition (machine-checkable)
 
-Compilation input MUST include the passing Generation Grid Registry from Stage 1 Step 10. A missing/failing registry, or a shot without an `approved_grid` or `skip_recorded` entry, is a gap: `"Shot N: Generation Grid Registry missing/failing — run Stage 1 Step 10 before compiling."` **One `compileShot` = one motion sheet = one shot**, consumed exactly as recorded — sheet sizing and partitioning were Stage 1 decisions; a shot arriving unmarked is a Step 10 gap, never an invitation to re-partition here. Skip entries carry their `skip_reason` in the render package. Honor the registry's chain fields (`previous_generation_id` / `incoming_anchor_*` / `continuity_break_reason`): continuous later shots attach the incoming anchor (upgrade `incoming_anchor_kind` to `prior_render_last_frame` once the prior clip is approved — pixels beat the planned terminal panel); intentional breaks compile `fresh` and still honor the scene's continuity block + scene anchor for geography; first-in-scene compiles from the continuity block + identity refs.
+Compilation input MUST include the passing Generation Grid Registry from Stage 1 Step 10. A missing/failing registry, or a shot without an `approved_grid` or `skip_recorded` entry, is a gap: `"Shot N: Generation Grid Registry missing/failing — run Stage 1 Step 10 before compiling."` **One `compileShot` = one motion sheet = one shot**, consumed exactly as recorded — sheet sizing and partitioning were Stage 1 decisions; a shot arriving unmarked is a Step 10 gap, never an invitation to re-partition here. Skip entries carry their `skip_reason` in the render package. Honor the registry's chain fields (`previous_generation_id` / `incoming_anchor_*` / `continuity_break_reason` / `match_cut_source_*`): continuous later shots attach the incoming anchor (upgrade `incoming_anchor_kind` to `prior_render_last_frame` once the prior clip is approved — pixels beat the planned terminal panel); intentional breaks compile `fresh` and still honor the scene's continuity block + scene anchor for geography; **match-cut** entries compile `fresh` but attach `match_cut_source_handle` as a compositional reference (identical framing; only the scheduled delta differs); first-in-scene compiles from the continuity block + identity refs (and may still declare a cross-scene match-cut source). Resolve `approved_candidate_id` as a storage key / media URL to pixels — never as a toolCallId.
 
 ## Consuming the motion sheet
 
@@ -59,11 +59,11 @@ Seedance reference mode addresses uploaded images as `[Image1]`, `[Image2]`… *
 
 1. **Slot order = precision priority** (earlier = weighted more precisely). `referenceImageUrls` order:
 
-   **character → object/prop → location plate → scene anchor (scene's first approved sheet) → incoming anchor → motion sheet (last)**
+   **character → object/prop → location plate → scene anchor (scene's first approved sheet) → incoming anchor OR match-cut source → motion sheet (last)**
 
-   The motion sheet rides last because it is trajectory, not identity; the scene anchor and incoming anchor are geography references, never hard-cut sequences.
+   The motion sheet rides last because it is trajectory, not identity; the scene anchor, incoming anchor, and match-cut source are geography / compositional references, never hard-cut sequences.
 
-2. **Attach only assets appearing in this shot** plus required continuity refs (≤9 images; focused beats many). Always include on-screen identity refs, the registry's scene anchor, the registry-required incoming anchor, and this shot's sheet. If identity refs alone would blow the budget before continuity/sheet fit, the beat is too crowded — gap it, never silently drop continuity or the sheet.
+2. **Attach only assets appearing in this shot** plus required continuity refs (≤9 images; focused beats many). Always include on-screen identity refs, the registry's scene anchor, the registry-required incoming anchor or match-cut source, and this shot's sheet. If identity refs alone would blow the budget before continuity/sheet fit, the beat is too crowded — gap it, never silently drop continuity or the sheet.
 
 3. **Define up front, verbatim, then label everywhere.** Each asset's definition line is Bible §2 canonical text pasted VERBATIM — bind + govern + label:
    - `Define the [2–3 stable features, e.g. woman in the grey wool coat with the silver pendant] in [Image1] (facial features, styling, wardrobe, build) as **the detective**.`
@@ -155,7 +155,7 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
 - `cut_handoff_compiled`: the action ends at the row's cut-out; CONTEXT answers the previous cut-in including exact footing; vague cut-outs fail; a "rest" passes with a note.
 - `footing_continuity`: when the previous approved generation left a character on a named surface, CONTEXT restates that surface; A↔B teleports fail.
 - `continuity_mode_valid`: mode matches the join type; required URLs present; extend prompts open with `Extend <Video_1>:`.
-- `single_lighting_state`: exactly one canonical state; in-shot transitions fail ("time passes between shots").
+- `single_lighting_state`: exactly one canonical state; in-shot transitions fail ("time passes between shots") unless the Stage 1 registry entry has `lighting_transition_exception=true` with a reason.
 - `arc_entities_bound`: every character, hero prop, and location named in the action is bound in SUBJECT DEFINITIONS or explicitly background-tier.
 - `ambient_motion_present_if_organic`: organic/atmospheric elements in frame have ambient life named.
 - `no_invented_values`: every stateful claim traces to the Bible or the row.

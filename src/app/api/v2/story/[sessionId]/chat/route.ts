@@ -5,13 +5,15 @@ import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, asc } from "drizzle-orm";
 import { storyTools, MODEL, openrouter } from "@/server/services/showrunner";
-import { rowsToModelMessages } from "@/server/services/showrunner/messages";
-import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
 import {
-  validatePanelCaptionCount,
-  validateContinuityPackKeyframes,
-  validateGenerationGridContinuity,
-} from "@/server/services/showrunner/tools";
+  rowsToModelMessages,
+  lightingStateByGenerationId,
+} from "@/server/services/showrunner/messages";
+import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
+import { toCompileShotArgs } from "@/server/services/showrunner/tools";
+import type { AssetSpecInput } from "@/server/services/showrunner/tools/generate-asset-references";
+import type { GenerateGenerationGridInput } from "@/server/services/showrunner/tools/generate-generation-grid";
+import { createRecordGenerationGridEntryTool } from "@/server/services/showrunner/tools/record-generation-grid-entry";
 import { enqueueWorkerJob, JOB_NAMES, type WorkerJobName } from "@/lib/worker-queue";
 
 /** Parse `{ ok, errors? }` from tool execute() output (raw or AI SDK wrapped). */
@@ -64,6 +66,215 @@ function sseResponse(
   });
 }
 
+/**
+ * Map an incoming client message body to a filmSessionMessages row payload.
+ * Returns null for "trigger" (nothing to persist) and { error } for invalid bodies.
+ */
+async function buildUserMessage(
+  sessionId: string,
+  body: Record<string, unknown>
+): Promise<{ type: string; parts: object[] } | { error: string } | null> {
+  switch (body.type) {
+    case "trigger":
+      return null;
+
+    case "user": {
+      const text = (body.text as string)?.trim();
+      if (!text) return { error: "text required" };
+      return { type: "text", parts: [{ text }] };
+    }
+
+    case "questions_result": {
+      const answers = Array.isArray(body.answers)
+        ? (body.answers as string[])
+        : null;
+      if (!answers?.length) return { error: "answers required" };
+      return {
+        type: "questions_result",
+        parts: [{ toolCallId: body.toolCallId, answers }],
+      };
+    }
+
+    case "asset_approval": {
+      const approvals = Array.isArray(body.approvals)
+        ? (body.approvals as Array<{
+            assetHandle: string;
+            candidateId: string;
+            approvedUrl: string;
+          }>)
+        : body.assetHandle && body.approvedUrl
+          ? [
+              {
+                assetHandle: body.assetHandle as string,
+                candidateId: (body.candidateId as string) ?? (body.approvedUrl as string),
+                approvedUrl: body.approvedUrl as string,
+              },
+            ]
+          : null;
+      if (!approvals?.length) return { error: "approvals required" };
+      return {
+        type: "asset_approval",
+        parts: [{
+          toolCallId: body.toolCallId,
+          approvals,
+          // Legacy single-asset fields (first approval) for older readers
+          assetHandle: approvals[0]!.assetHandle,
+          approvedUrl: approvals[0]!.approvedUrl,
+        }],
+      };
+    }
+
+    case "grid_approval":
+      return {
+        type: "grid_approval",
+        parts: [{
+          toolCallId: body.toolCallId,
+          sceneId: body.sceneId,
+          approvedUrl: body.approvedUrl,
+        }],
+      };
+
+    case "shot_approval": {
+      const videoUrl = body.videoUrl as string;
+      let lastFrameUrl: string | undefined;
+      try {
+        const { extractLastFrameJpeg } = await import("@/lib/media-probe");
+        const { uploadFile } = await import("@/lib/storage");
+        const jpeg = await extractLastFrameJpeg(videoUrl);
+        const key = `v2/frames/${sessionId}/${crypto.randomUUID()}.jpg`;
+        await uploadFile(key, jpeg, "image/jpeg");
+        // Persist key; sign when hydrating model/client messages.
+        lastFrameUrl = key;
+      } catch (err) {
+        console.warn("[chat] last-frame extract on shot_approval failed", err);
+      }
+      return {
+        type: "shot_approval",
+        parts: [{
+          toolCallId: body.toolCallId,
+          videoUrl,
+          ...(lastFrameUrl ? { lastFrameUrl } : {}),
+        }],
+      };
+    }
+
+    default:
+      return { error: "Unknown message type" };
+  }
+}
+
+type Emit = (event: object) => void;
+
+type RawToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: Record<string, unknown> };
+};
+
+type QueuedImageJob = {
+  jobName: WorkerJobName;
+  toolCallId: string;
+  payload: Record<string, unknown>;
+};
+
+/** Loading event streamed to the client as soon as a tool call's input starts. */
+const TOOL_LOADING_EVENTS: Record<string, string> = {
+  askQuestions: "questions_loading",
+  generateAssetReferences: "asset_ref_loading",
+  generateGenerationGrid: "generation_grid_loading",
+  compileShot: "shot_compile_loading",
+};
+
+/** Auto-executed tools whose execute() output must be persisted for history replay. */
+const PERSISTED_RESULT_TOOLS = new Set([
+  "loadReference",
+  "loadApprovedImage",
+  "webExtract",
+  "recordGenerationGridEntry",
+  "generateGenerationGrid",
+  "compileShot",
+]);
+
+function gridEventPayload(toolCallId: string, args: GenerateGenerationGridInput) {
+  return {
+    type: "generation_grid" as const,
+    toolCallId,
+    sceneId: args.sceneId,
+    generationId: args.generationId,
+    shotIds: args.shotIds,
+    estimatedDurationSeconds: args.estimatedDurationSeconds,
+    previousGenerationId: args.previousGenerationId,
+    sceneAnchorHandle: args.sceneAnchorHandle,
+    incomingAnchorHandle: args.incomingAnchorHandle,
+    continuityBreakReason: args.continuityBreakReason,
+    panelCount: args.panelCount,
+    panelCaptions: args.panelCaptions,
+    aspectRatio: args.aspectRatio ?? "16:9",
+  };
+}
+
+function queueAssetRefJob(tc: RawToolCall, emit: Emit, userId: string): QueuedImageJob {
+  const args = tc.function.arguments as {
+    assets?: AssetSpecInput[];
+    // Legacy single-asset shape
+    assetHandle?: string;
+    assetKind?: AssetSpecInput["assetKind"];
+    imagePrompt?: string;
+  };
+  const assets: AssetSpecInput[] = args.assets?.length
+    ? args.assets
+    : args.assetHandle && args.assetKind && args.imagePrompt
+      ? [
+          {
+            assetHandle: args.assetHandle,
+            assetKind: args.assetKind,
+            imagePrompt: args.imagePrompt,
+          },
+        ]
+      : [];
+  tc.function.arguments = { ...args, assets, pending: true };
+  emit({
+    type: "asset_ref",
+    toolCallId: tc.id,
+    pending: true,
+    items: assets.map((a) => ({
+      assetHandle: a.assetHandle,
+      assetKind: a.assetKind,
+      loading: true,
+    })),
+  });
+  return {
+    jobName: JOB_NAMES.GENERATE_ASSET_IMAGES,
+    toolCallId: tc.id,
+    payload: { assets, userId },
+  };
+}
+
+function queueGenerationGridJob(tc: RawToolCall, emit: Emit): QueuedImageJob {
+  const args = tc.function.arguments as GenerateGenerationGridInput;
+  tc.function.arguments = { ...args, pending: true };
+  emit({ ...gridEventPayload(tc.id, args), pending: true });
+  return {
+    jobName: JOB_NAMES.GENERATE_GENERATION_GRID,
+    toolCallId: tc.id,
+    payload: {
+      sceneId: args.sceneId,
+      generationId: args.generationId,
+      shotIds: args.shotIds,
+      estimatedDurationSeconds: args.estimatedDurationSeconds,
+      previousGenerationId: args.previousGenerationId,
+      sceneAnchorHandle: args.sceneAnchorHandle,
+      incomingAnchorHandle: args.incomingAnchorHandle,
+      continuityBreakReason: args.continuityBreakReason,
+      panelCount: args.panelCount,
+      panelCaptions: args.panelCaptions,
+      imagePrompt: args.imagePrompt,
+      referenceImageUrls: args.referenceImageUrls ?? [],
+      aspectRatio: args.aspectRatio ?? "16:9",
+    },
+  };
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
@@ -81,109 +292,18 @@ export async function POST(
 
   if (!session || session.userId !== user.id) return notFound("Session not found");
 
-  if (body.type === "user") {
-    const text = (body.text as string)?.trim();
-    if (!text) return badRequest("text required");
+  const incoming = await buildUserMessage(sessionId, body);
+  if (incoming && "error" in incoming) return badRequest(incoming.error);
+  if (incoming) {
     await db.insert(filmSessionMessages).values({
       id: crypto.randomUUID(),
       messageId: crypto.randomUUID(),
       sessionId,
       role: "user",
-      type: "text",
-      parts: [{ text }],
+      type: incoming.type,
+      parts: incoming.parts,
       createdAt: new Date(),
     });
-  } else if (body.type === "questions_result" || body.type === "fork_result") {
-    const answers = Array.isArray(body.answers)
-      ? (body.answers as string[])
-      : typeof body.value === "string"
-        ? [body.value as string]
-        : null;
-    if (!answers?.length) return badRequest("answers required");
-    await db.insert(filmSessionMessages).values({
-      id: crypto.randomUUID(),
-      messageId: crypto.randomUUID(),
-      sessionId,
-      role: "user",
-      type: "questions_result",
-      parts: [{
-        toolCallId: body.toolCallId,
-        answers,
-      }],
-      createdAt: new Date(),
-    });
-  } else if (body.type === "asset_approval") {
-    await db.insert(filmSessionMessages).values({
-      id: crypto.randomUUID(),
-      messageId: crypto.randomUUID(),
-      sessionId,
-      role: "user",
-      type: "asset_approval",
-      parts: [{
-        toolCallId: body.toolCallId,
-        assetHandle: body.assetHandle,
-        approvedUrl: body.approvedUrl,
-      }],
-      createdAt: new Date(),
-    });
-  } else if (body.type === "continuity_pack_approval") {
-    await db.insert(filmSessionMessages).values({
-      id: crypto.randomUUID(),
-      messageId: crypto.randomUUID(),
-      sessionId,
-      role: "user",
-      type: "continuity_pack_approval",
-      parts: [{
-        toolCallId: body.toolCallId,
-        sceneId: body.sceneId,
-        packHandle: body.packHandle,
-        approvedUrls: body.approvedUrls,
-      }],
-      createdAt: new Date(),
-    });
-  } else if (body.type === "grid_approval") {
-    await db.insert(filmSessionMessages).values({
-      id: crypto.randomUUID(),
-      messageId: crypto.randomUUID(),
-      sessionId,
-      role: "user",
-      type: "grid_approval",
-      parts: [{
-        toolCallId: body.toolCallId,
-        sceneId: body.sceneId,
-        approvedUrl: body.approvedUrl,
-      }],
-      createdAt: new Date(),
-    });
-  } else if (body.type === "shot_approval") {
-    const videoUrl = body.videoUrl as string;
-    let lastFrameUrl: string | undefined;
-    try {
-      const { extractLastFrameJpeg } = await import("@/lib/media-probe");
-      const { uploadFile } = await import("@/lib/storage");
-      const jpeg = await extractLastFrameJpeg(videoUrl);
-      const key = `v2/frames/${sessionId}/${crypto.randomUUID()}.jpg`;
-      await uploadFile(key, jpeg, "image/jpeg");
-      // Persist key; sign when hydrating model/client messages.
-      lastFrameUrl = key;
-    } catch (err) {
-      console.warn("[chat] last-frame extract on shot_approval failed", err);
-    }
-    await db.insert(filmSessionMessages).values({
-      id: crypto.randomUUID(),
-      messageId: crypto.randomUUID(),
-      sessionId,
-      role: "user",
-      type: "shot_approval",
-      parts: [{
-        toolCallId: body.toolCallId,
-        videoUrl,
-        ...(lastFrameUrl ? { lastFrameUrl } : {}),
-      }],
-      createdAt: new Date(),
-    });
-  } else if (body.type !== "trigger") {
-    return badRequest("Unknown message type");
   }
 
   const rows = await db
@@ -195,6 +315,14 @@ export async function POST(
   const modelMessages = await rowsToModelMessages(rows);
   if (modelMessages.length === 0) return badRequest("No messages to process");
 
+  const lightingByGen = lightingStateByGenerationId(rows);
+  const tools = {
+    ...storyTools,
+    recordGenerationGridEntry: createRecordGenerationGridEntryTool({
+      resolveLightingState: (generationId) => lightingByGen.get(generationId),
+    }),
+  };
+
   const assistantMsgId = crypto.randomUUID();
 
   return sseResponse(async (emit) => {
@@ -202,7 +330,7 @@ export async function POST(
       model: openrouter.chat(MODEL, { extraBody: { session_id: sessionId, cache_control: { type: "ephemeral" } } }),
       system: AI_FILM_STAGE1_SKILL,
       messages: modelMessages,
-      tools: storyTools,
+      tools,
       seed: session.seed ?? undefined,
       // Allow the model to call loadReference / loadApprovedImage / webExtract (auto-executed)
       // and then continue responding in the same turn. Cap at 10 to prevent runaway loops.
@@ -215,19 +343,11 @@ export async function POST(
       }
     });
 
-    type RawToolCall = {
-      id: string;
-      type: "function";
-      function: { name: string; arguments: Record<string, unknown> };
-    };
-
     let fullText = "";
     const toolCalls: RawToolCall[] = [];
-    const pendingAssetIndices: number[] = [];
-    const pendingContinuityIndices: number[] = [];
-    const pendingGridIndices: number[] = [];
-    const pendingShotIndices: number[] = [];
-    // Auto-executed tools whose execute() output must be persisted for history replay
+    // Image-generating tool calls that passed validation — queued as worker jobs after the stream.
+    const pendingImageCalls: RawToolCall[] = [];
+    const pendingShotCalls: RawToolCall[] = [];
     const autoToolResults = new Map<string, unknown>(); // toolCallId → execute() return value
 
     for await (const chunk of result.fullStream) {
@@ -235,17 +355,8 @@ export async function POST(
         fullText += chunk.text;
         emit({ type: "text_delta", text: chunk.text });
       } else if (chunk.type === "tool-input-start") {
-        if (chunk.toolName === "askQuestions") {
-          emit({ type: "questions_loading", toolCallId: chunk.id });
-        } else if (chunk.toolName === "generateAssetReferences") {
-          emit({ type: "asset_ref_loading", toolCallId: chunk.id });
-        } else if (chunk.toolName === "generateContinuityPack") {
-          emit({ type: "continuity_pack_loading", toolCallId: chunk.id });
-        } else if (chunk.toolName === "generateGenerationGrid") {
-          emit({ type: "generation_grid_loading", toolCallId: chunk.id });
-        } else if (chunk.toolName === "compileShot") {
-          emit({ type: "shot_compile_loading", toolCallId: chunk.id });
-        }
+        const loadingEvent = TOOL_LOADING_EVENTS[chunk.toolName];
+        if (loadingEvent) emit({ type: loadingEvent, toolCallId: chunk.id });
       } else if (chunk.type === "tool-call") {
         const args = chunk.input as Record<string, unknown>;
         const rawCall: RawToolCall = {
@@ -258,255 +369,67 @@ export async function POST(
         if (chunk.toolName === "askQuestions") {
           emit({ type: "questions", toolCallId: chunk.toolCallId, ...args });
         } else if (chunk.toolName === "generateAssetReferences") {
-          pendingAssetIndices.push(toolCalls.length - 1);
-        } else if (chunk.toolName === "generateContinuityPack") {
-          pendingContinuityIndices.push(toolCalls.length - 1);
-        } else if (chunk.toolName === "compileShot") {
-          pendingShotIndices.push(toolCalls.length - 1);
+          pendingImageCalls.push(rawCall);
         }
-        // generateGenerationGrid is queued after its execute() validates (see tool-result)
+        // compileShot / generateGenerationGrid are queued after execute() validates (see tool-result)
       } else if (chunk.type === "tool-result") {
-        if (
-          chunk.toolName === "loadReference" ||
-          chunk.toolName === "loadApprovedImage" ||
-          chunk.toolName === "webExtract" ||
-          chunk.toolName === "recordContinuityPackEntry" ||
-          chunk.toolName === "recordGenerationGridEntry" ||
-          chunk.toolName === "generateGenerationGrid"
-        ) {
+        if (PERSISTED_RESULT_TOOLS.has(chunk.toolName)) {
           autoToolResults.set(chunk.toolCallId, chunk.output);
         }
-        if (chunk.toolName === "generateGenerationGrid") {
-          const idx = toolCalls.findIndex((tc) => tc.id === chunk.toolCallId);
-          if (idx < 0) continue;
-          const args = toolCalls[idx]!.function.arguments as {
-            sceneId: string | number;
-            generationId?: string;
-            shotIds?: number[];
-            estimatedDurationSeconds?: number;
-            previousGenerationId?: string | null;
-            isFirstInScene?: boolean;
-            sceneAnchorHandle?: string | null;
-            incomingAnchorHandle?: string | null;
-            incomingAnchorKind?: string | null;
-            incomingAnchorPanel?: number | null;
-            continuityBreakReason?: string | null;
-            panelCount?: number;
-            panelCaptions?: { motionArc: string; handoff: string }[];
-            aspectRatio?: "16:9" | "9:16" | "1:1";
-          };
+        const tc = toolCalls.find((c) => c.id === chunk.toolCallId);
+        if (!tc) continue;
+
+        if (chunk.toolName === "compileShot") {
+          const args = tc.function.arguments;
+          const parsed = parseToolOk(chunk.output);
+          if (parsed?.ok === false) {
+            const shotError =
+              Array.isArray(parsed.errors) && parsed.errors.length > 0
+                ? parsed.errors.join("; ")
+                : "Shot compile validation failed";
+            tc.function.arguments = { ...args, shotError };
+            emit({
+              type: "shot_compile_error",
+              toolCallId: chunk.toolCallId,
+              error: shotError,
+              gaps: args.gaps,
+            });
+          } else if ((args.status as string | undefined) === "gap") {
+            emit({
+              type: "shot_compile_gap",
+              toolCallId: chunk.toolCallId,
+              shotId: args.shot_id,
+              gaps: args.gaps ?? [],
+            });
+          } else {
+            pendingShotCalls.push(tc);
+          }
+        } else if (chunk.toolName === "generateGenerationGrid") {
+          const args = tc.function.arguments as GenerateGenerationGridInput;
           const parsed = parseToolOk(chunk.output);
           if (parsed?.ok === false) {
             const gridError =
               Array.isArray(parsed.errors) && parsed.errors.length > 0
                 ? parsed.errors.join("; ")
                 : "Generation grid validation failed";
-            toolCalls[idx]!.function.arguments = { ...args, gridError };
-            emit({
-              type: "generation_grid",
-              toolCallId: chunk.toolCallId,
-              sceneId: args.sceneId,
-              generationId: args.generationId,
-              shotIds: args.shotIds,
-              estimatedDurationSeconds: args.estimatedDurationSeconds,
-              previousGenerationId: args.previousGenerationId,
-              sceneAnchorHandle: args.sceneAnchorHandle,
-              incomingAnchorHandle: args.incomingAnchorHandle,
-              continuityBreakReason: args.continuityBreakReason,
-              error: gridError,
-              panelCount: args.panelCount,
-              panelCaptions: args.panelCaptions,
-              aspectRatio: args.aspectRatio ?? "16:9",
-            });
+            tc.function.arguments = { ...args, gridError };
+            emit({ ...gridEventPayload(chunk.toolCallId, args), error: gridError });
           } else {
-            pendingGridIndices.push(idx);
+            pendingImageCalls.push(tc);
           }
         }
       }
     }
 
     // Queue image jobs (do not await generation — worker continues if client disconnects).
-    type QueuedImageJob = {
-      jobName: WorkerJobName;
-      toolCallId: string;
-      payload: Record<string, unknown>;
+    const pendingHandlers: Record<string, (tc: RawToolCall) => QueuedImageJob | null> = {
+      generateAssetReferences: (tc) => queueAssetRefJob(tc, emit, session.userId),
+      generateGenerationGrid: (tc) => queueGenerationGridJob(tc, emit),
     };
     const queuedImageJobs: QueuedImageJob[] = [];
-
-    for (const idx of pendingAssetIndices) {
-      const tc = toolCalls[idx]!;
-      const args = tc.function.arguments as {
-        assetHandle: string;
-        assetKind: "character" | "location" | "object";
-        imagePrompt: string;
-      };
-      tc.function.arguments = { ...args, pending: true };
-      emit({
-        type: "asset_ref",
-        toolCallId: tc.id,
-        assetHandle: args.assetHandle,
-        assetKind: args.assetKind,
-        pending: true,
-      });
-      queuedImageJobs.push({
-        jobName: JOB_NAMES.GENERATE_ASSET_IMAGES,
-        toolCallId: tc.id,
-        payload: {
-          assetHandle: args.assetHandle,
-          assetKind: args.assetKind,
-          imagePrompt: args.imagePrompt,
-          userId: session.userId,
-        },
-      });
-    }
-
-    for (const idx of pendingContinuityIndices) {
-      const tc = toolCalls[idx]!;
-      const args = tc.function.arguments as {
-        sceneId: string | number;
-        packHandle: string;
-        notes: Record<string, string>;
-        keyframes?: { role: string; caption: string; imagePrompt: string }[];
-        referenceImageUrls: string[];
-        aspectRatio: "16:9" | "9:16" | "1:1";
-      };
-      const keyframeError = validateContinuityPackKeyframes(args.keyframes);
-      if (keyframeError) {
-        tc.function.arguments = { ...args, packError: keyframeError };
-        emit({
-          type: "continuity_pack",
-          toolCallId: tc.id,
-          sceneId: args.sceneId,
-          packHandle: args.packHandle,
-          notes: args.notes,
-          keyframes: args.keyframes,
-          error: keyframeError,
-          aspectRatio: args.aspectRatio ?? "16:9",
-        });
-        continue;
-      }
-      const aspectRatio = args.aspectRatio ?? "16:9";
-      tc.function.arguments = { ...args, pending: true };
-      emit({
-        type: "continuity_pack",
-        toolCallId: tc.id,
-        sceneId: args.sceneId,
-        packHandle: args.packHandle,
-        notes: args.notes,
-        keyframes: args.keyframes,
-        aspectRatio,
-        pending: true,
-      });
-      queuedImageJobs.push({
-        jobName: JOB_NAMES.GENERATE_CONTINUITY_PACK,
-        toolCallId: tc.id,
-        payload: {
-          sceneId: args.sceneId,
-          packHandle: args.packHandle,
-          notes: args.notes,
-          keyframes: args.keyframes!,
-          referenceImageUrls: args.referenceImageUrls ?? [],
-          aspectRatio,
-        },
-      });
-    }
-
-    for (const idx of pendingGridIndices) {
-      const tc = toolCalls[idx]!;
-      const args = tc.function.arguments as {
-        sceneId: string | number;
-        generationId?: string;
-        shotIds?: number[];
-        estimatedDurationSeconds?: number;
-        previousGenerationId?: string | null;
-        isFirstInScene?: boolean;
-        sceneAnchorHandle?: string | null;
-        incomingAnchorHandle?: string | null;
-        incomingAnchorKind?: string | null;
-        incomingAnchorPanel?: number | null;
-        continuityBreakReason?: string | null;
-        imagePrompt: string;
-        referenceImageUrls: string[];
-        panelCount?: number;
-        panelCaptions?: { motionArc: string; handoff: string }[];
-        aspectRatio: "16:9" | "9:16" | "1:1";
-      };
-      // Defense-in-depth: execute() already validated; skip enqueue if somehow invalid.
-      const captionError = validatePanelCaptionCount(
-        args.panelCount,
-        args.panelCaptions,
-        args.shotIds
-      );
-      const continuityError = captionError
-        ? null
-        : validateGenerationGridContinuity({
-          isFirstInScene: args.isFirstInScene,
-          sceneAnchorHandle: args.sceneAnchorHandle,
-          previousGenerationId: args.previousGenerationId,
-          incomingAnchorHandle: args.incomingAnchorHandle,
-          incomingAnchorKind: args.incomingAnchorKind,
-          incomingAnchorPanel: args.incomingAnchorPanel,
-          continuityBreakReason: args.continuityBreakReason,
-          referenceImageUrls: args.referenceImageUrls,
-        });
-      const gridError = captionError ?? continuityError;
-      if (gridError) {
-        tc.function.arguments = { ...args, gridError };
-        emit({
-          type: "generation_grid",
-          toolCallId: tc.id,
-          sceneId: args.sceneId,
-          generationId: args.generationId,
-          shotIds: args.shotIds,
-          estimatedDurationSeconds: args.estimatedDurationSeconds,
-          previousGenerationId: args.previousGenerationId,
-          sceneAnchorHandle: args.sceneAnchorHandle,
-          incomingAnchorHandle: args.incomingAnchorHandle,
-          continuityBreakReason: args.continuityBreakReason,
-          error: gridError,
-          panelCount: args.panelCount,
-          panelCaptions: args.panelCaptions,
-          aspectRatio: args.aspectRatio ?? "16:9",
-        });
-        continue;
-      }
-      const aspectRatio = args.aspectRatio ?? "16:9";
-      tc.function.arguments = { ...args, pending: true };
-      emit({
-        type: "generation_grid",
-        toolCallId: tc.id,
-        sceneId: args.sceneId,
-        generationId: args.generationId,
-        shotIds: args.shotIds,
-        estimatedDurationSeconds: args.estimatedDurationSeconds,
-        previousGenerationId: args.previousGenerationId,
-        sceneAnchorHandle: args.sceneAnchorHandle,
-        incomingAnchorHandle: args.incomingAnchorHandle,
-        continuityBreakReason: args.continuityBreakReason,
-        panelCount: args.panelCount,
-        panelCaptions: args.panelCaptions,
-        aspectRatio,
-        pending: true,
-      });
-      queuedImageJobs.push({
-        jobName: JOB_NAMES.GENERATE_GENERATION_GRID,
-        toolCallId: tc.id,
-        payload: {
-          sceneId: args.sceneId,
-          generationId: args.generationId,
-          shotIds: args.shotIds,
-          estimatedDurationSeconds: args.estimatedDurationSeconds,
-          previousGenerationId: args.previousGenerationId,
-          sceneAnchorHandle: args.sceneAnchorHandle,
-          incomingAnchorHandle: args.incomingAnchorHandle,
-          continuityBreakReason: args.continuityBreakReason,
-          panelCount: args.panelCount,
-          panelCaptions: args.panelCaptions,
-          imagePrompt: args.imagePrompt,
-          referenceImageUrls: args.referenceImageUrls ?? [],
-          aspectRatio,
-        },
-      });
+    for (const tc of pendingImageCalls) {
+      const job = pendingHandlers[tc.function.name]?.(tc);
+      if (job) queuedImageJobs.push(job);
     }
 
     // Save the assistant message before enqueueing so the worker can patch it.
@@ -536,25 +459,23 @@ export async function POST(
     // Emit the compiled prompt for each shot so the client can show it for
     // user review. No render is started here — the client calls /render-shot
     // after the user approves (or edits) the prompt.
-    for (const idx of pendingShotIndices) {
-      const tc = toolCalls[idx]!;
-      const args = tc.function.arguments as {
-        prompt: string;
-        referenceImageUrls: string[];
-        duration: number;
-        aspectRatio: "16:9" | "9:16" | "1:1";
-        continuityMode?: "fresh" | "extend_video";
-        sourceVideoUrl?: string;
-      };
+    for (const tc of pendingShotCalls) {
+      const args = tc.function.arguments;
+      const compiled = toCompileShotArgs(args);
+      if (!compiled) continue;
       emit({
         type: "shot_compiled",
         toolCallId: tc.id,
-        renderPrompt: args.prompt,
-        referenceImageUrls: args.referenceImageUrls ?? [],
-        duration: args.duration,
-        aspectRatio: args.aspectRatio ?? "16:9",
-        continuityMode: args.continuityMode ?? "fresh",
-        sourceVideoUrl: args.sourceVideoUrl,
+        renderPrompt: compiled.prompt,
+        referenceImageUrls: compiled.referenceImageUrls ?? [],
+        duration: compiled.duration,
+        aspectRatio: compiled.aspectRatio ?? "16:9",
+        continuityMode: compiled.continuityMode ?? "fresh",
+        sourceVideoUrl: compiled.sourceVideoUrl,
+        shotId: args.shot_id,
+        gridReference: args.grid_reference,
+        references: args.references,
+        checks: args.checks,
       });
     }
 

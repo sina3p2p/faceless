@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
+import { storageKeyFrom } from "@/lib/storage";
 
 const SKIP_REASONS = [
   "insert_only_scene",
@@ -13,18 +14,112 @@ const ANCHOR_KINDS = ["prior_grid_terminal_panel", "prior_render_last_frame"] as
 const MIN_PANELS = 4;
 const MAX_PANELS = 9;
 
+/**
+ * approved_candidate_id must dereference to pixels (storage key / media URL).
+ * toolCallId is ephemeral and must never be stored here — see MAINTENANCE.md.
+ */
+export function validateApprovedCandidateId(id: string | null | undefined): string[] {
+  const errors: string[] = [];
+  if (id == null || !String(id).trim()) {
+    errors.push("approved_grid requires approved_candidate_id (storage key or media URL)");
+    return errors;
+  }
+  const trimmed = String(id).trim();
+  if (/^call_[a-zA-Z0-9_-]+$/.test(trimmed)) {
+    errors.push(
+      "approved_candidate_id must be a storage key or media URL, not a toolCallId (call_…)"
+    );
+    return errors;
+  }
+  if (
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)
+  ) {
+    errors.push(
+      "approved_candidate_id must be a storage key or media URL, not a bare toolCallId UUID"
+    );
+    return errors;
+  }
+  const key = storageKeyFrom(trimmed);
+  if (!key) {
+    errors.push(
+      "approved_candidate_id must resolve to a storage key or app media URL (pixels), not an opaque id"
+    );
+    return errors;
+  }
+  // storageKeyFrom echoes bare strings — require path-like keys or http(s) media refs
+  if (!/^https?:\/\//i.test(trimmed) && !key.includes("/")) {
+    errors.push(
+      "approved_candidate_id must be a path-like storage key or media URL (got a bare token)"
+    );
+  }
+  return errors;
+}
+
+/** Normalize candidate id to a stable storage key when possible. */
+export function normalizeApprovedCandidateId(id: string): string {
+  return storageKeyFrom(id.trim()) ?? id.trim();
+}
+
+/**
+ * generateGenerationGrid uses camelCase; the registry uses snake_case.
+ * Models often re-send camelCase on record — map aliases before strict parse.
+ */
+const CAMEL_TO_SNAKE: Record<string, string> = {
+  sceneId: "scene_id",
+  generationId: "generation_id",
+  shotIds: "shot_ids",
+  estimatedDurationSeconds: "estimated_duration_seconds",
+  gridHandle: "grid_handle",
+  approvedCandidateId: "approved_candidate_id",
+  skipReason: "skip_reason",
+  panelCount: "panel_count",
+  lightingState: "lighting_state",
+  lightingTransitionException: "lighting_transition_exception",
+  lightingTransitionReason: "lighting_transition_reason",
+  sceneAnchorHandle: "scene_anchor_handle",
+  isFirstInScene: "is_first_in_scene",
+  previousGenerationId: "previous_generation_id",
+  incomingAnchorHandle: "incoming_anchor_handle",
+  incomingAnchorKind: "incoming_anchor_kind",
+  incomingAnchorPanel: "incoming_anchor_panel",
+  continuityBreakReason: "continuity_break_reason",
+  matchCutSourceGenerationId: "match_cut_source_generation_id",
+  matchCutSourceHandle: "match_cut_source_handle",
+};
+
+function coerceRegistryInput(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+  const src = raw as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...src };
+  for (const [camel, snake] of Object.entries(CAMEL_TO_SNAKE)) {
+    if (
+      (out[snake] === undefined || out[snake] === null || out[snake] === "") &&
+      src[camel] !== undefined &&
+      src[camel] !== null &&
+      src[camel] !== ""
+    ) {
+      out[snake] = src[camel];
+    }
+  }
+  return out;
+}
+
 /** Loose input schema for the tool (JSON-schema friendly). Strict checks run in execute. */
-const inputSchema = z.object({
+const entryFieldsSchema = z.object({
   scene_id: z.number().int().positive(),
   generation_id: z.string().min(1),
   shot_ids: z.array(z.number().int().positive()).min(1),
   estimated_duration_seconds: z.number().min(4).max(15),
   status: z.enum(["approved_grid", "skip_recorded"]),
   grid_handle: z.string().nullable(),
-  approved_candidate_id: z.string().nullable(),
+  approved_candidate_id: z
+    .string()
+    .nullable()
+    .describe(
+      "Storage key or media URL of the approved sheet image (from grid_approval). " +
+      "NOT a toolCallId — Stage 2 resolves this to pixels."
+    ),
   skip_reason: z.enum(SKIP_REASONS).nullable(),
-  /** Optional — app fills shot→panel 1 for approved_grid when omitted (one sheet = one shot). */
-  panel_map: z.record(z.string(), z.number().int().positive().nullable()).optional(),
   panel_count: z
     .number()
     .int()
@@ -34,12 +129,37 @@ const inputSchema = z.object({
     .describe(
       "Temporal panel count on the motion sheet (4–9). Required for approved_grid; null for skips."
     ),
+  lighting_state: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "Canonical Bible lighting state for this sheet (same as generateGenerationGrid.lightingState). " +
+        "Optional on record — auto-filled from the generate call when omitted. " +
+        "In-shot transitions still need lighting_transition_exception=true + reason."
+    ),
+  lighting_transition_exception: z
+    .boolean()
+    .nullable()
+    .optional()
+    .describe(
+      "True ONLY when the locked row's point IS a lighting transition (rare carve-out). " +
+      "Default false/null. When true, lighting_transition_reason is required."
+    ),
+  lighting_transition_reason: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      "Why this sheet is allowed an in-shot lighting transition; must cite the locked row / Bible §3D. " +
+      "Required when lighting_transition_exception=true."
+    ),
   scene_anchor_handle: z
     .string()
     .nullable()
     .describe(
       "The scene's FIRST approved motion-sheet handle (e.g. @scene3_gen3A_grid). " +
-        "Required for later generations in the scene (including continuity breaks). Null when is_first_in_scene=true."
+      "Required for later generations in the scene (including continuity breaks). Null when is_first_in_scene=true."
     ),
   is_first_in_scene: z
     .boolean()
@@ -50,7 +170,8 @@ const inputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Prior generation_id in this scene (e.g. '3A'). Required when is_first_in_scene=false unless continuity_break_reason is set. Null when first or breaking."
+      "Prior generation_id in this scene (e.g. '3A'). Required when is_first_in_scene=false unless " +
+      "continuity_break_reason or match_cut_source_* is set. Null when first, breaking, or match-cutting."
     ),
   incoming_anchor_handle: z
     .string()
@@ -76,11 +197,30 @@ const inputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "If set, this generation intentionally does NOT continue the prior generation (hard cut / time jump / new axis). Omit previous_generation_id and incoming_anchor_* when set. Not allowed when is_first_in_scene=true. Scene anchor still required."
+      "If set, this generation intentionally does NOT continue the prior generation (hard cut / time jump / new axis). " +
+      "Omit previous_generation_id and incoming_anchor_* when set. Not allowed when is_first_in_scene=true " +
+      "(unless only match_cut_source_* is used for a cross-scene twin). Scene anchor still required for later gens. " +
+      "May pair with match_cut_source_* for a declared compositional twin across the break."
+    ),
+  match_cut_source_generation_id: z
+    .string()
+    .nullable()
+    .describe(
+      "Declared match-cut twin: prior generation_id whose framing this sheet must match. " +
+      "Use when composition must match but the chain is broken (e.g. lighting-state change). " +
+      "Omit previous_generation_id / incoming_anchor_*. Allowed on first-in-scene for cross-scene twins."
+    ),
+  match_cut_source_handle: z
+    .string()
+    .nullable()
+    .describe(
+      "Motion-sheet handle (or approved image URL) of the match-cut source. Required with match_cut_source_generation_id."
     ),
 });
 
-export type GenerationGridRegistryEntry = z.infer<typeof inputSchema>;
+const inputSchema = entryFieldsSchema.passthrough();
+
+export type GenerationGridRegistryEntry = z.infer<typeof entryFieldsSchema>;
 
 /** Scene-anchor rules: first sheet IS the anchor; later sheets must cite it. */
 export function validateSceneAnchor(fields: {
@@ -105,6 +245,57 @@ export function validateSceneAnchor(fields: {
   return errors;
 }
 
+export function validateMatchCut(fields: {
+  match_cut_source_generation_id: string | null | undefined;
+  match_cut_source_handle: string | null | undefined;
+}): string[] {
+  const errors: string[] = [];
+  const srcId = fields.match_cut_source_generation_id?.trim() || null;
+  const srcHandle = fields.match_cut_source_handle?.trim() || null;
+  if (!srcId && !srcHandle) return errors;
+  if (!srcId || !srcHandle) {
+    errors.push(
+      "match_cut requires both match_cut_source_generation_id and match_cut_source_handle"
+    );
+  }
+  return errors;
+}
+
+export function validateLightingState(fields: {
+  status?: string;
+  lighting_state: string | null | undefined;
+  lighting_transition_exception: boolean | null | undefined;
+  lighting_transition_reason: string | null | undefined;
+  /** When true (generateGenerationGrid), lighting_state itself is required. Record only checks exception consistency. */
+  requireLightingState?: boolean;
+  requireForApproved?: boolean;
+}): string[] {
+  const errors: string[] = [];
+  if (fields.requireForApproved === false) return errors;
+  if (fields.status !== "approved_grid") return errors;
+
+  const state = fields.lighting_state?.trim() || null;
+  if (fields.requireLightingState && !state) {
+    errors.push(
+      "lightingState is required (exactly one canonical Bible lighting state)"
+    );
+  }
+
+  const exception = fields.lighting_transition_exception === true;
+  const reason = fields.lighting_transition_reason?.trim() || null;
+  if (exception && !reason) {
+    errors.push(
+      "lighting_transition_exception=true requires lighting_transition_reason (cite locked row / Bible §3D)"
+    );
+  }
+  if (!exception && reason) {
+    errors.push(
+      "lighting_transition_reason must not be set unless lighting_transition_exception=true"
+    );
+  }
+  return errors;
+}
+
 /** Shared continuity-chain rules for registry + generate tool. */
 export function validateContinuityChain(fields: {
   status?: string;
@@ -114,6 +305,8 @@ export function validateContinuityChain(fields: {
   incoming_anchor_kind: string | null | undefined;
   incoming_anchor_panel: number | null | undefined;
   continuity_break_reason: string | null | undefined;
+  match_cut_source_generation_id?: string | null | undefined;
+  match_cut_source_handle?: string | null | undefined;
   requireForApproved?: boolean;
 }): string[] {
   const errors: string[] = [];
@@ -123,6 +316,9 @@ export function validateContinuityChain(fields: {
   const kind = fields.incoming_anchor_kind ?? null;
   const panel = fields.incoming_anchor_panel ?? null;
   const breakReason = fields.continuity_break_reason?.trim() || null;
+  const matchId = fields.match_cut_source_generation_id?.trim() || null;
+  const matchHandle = fields.match_cut_source_handle?.trim() || null;
+  const hasMatchCut = !!(matchId || matchHandle);
   const enforce = fields.requireForApproved !== false;
 
   if (!enforce) return errors;
@@ -132,6 +328,13 @@ export function validateContinuityChain(fields: {
     return errors;
   }
 
+  errors.push(
+    ...validateMatchCut({
+      match_cut_source_generation_id: matchId,
+      match_cut_source_handle: matchHandle,
+    })
+  );
+
   if (isFirst) {
     if (prev != null || anchor != null || kind != null || panel != null) {
       errors.push("first generation in scene must not set previous_generation_id or incoming_anchor_*");
@@ -139,10 +342,23 @@ export function validateContinuityChain(fields: {
     if (breakReason) {
       errors.push("first generation in scene must not set continuity_break_reason");
     }
+    // match_cut_source_* allowed on first-in-scene for cross-scene compositional twins
     return errors;
   }
 
-  // Later generation
+  // Later generation — match-cut is a break-with-declared-source (no footing chain)
+  if (hasMatchCut && matchId && matchHandle) {
+    if (prev != null) {
+      errors.push(
+        "match_cut must not set previous_generation_id (compositional twin, not footing continuity)"
+      );
+    }
+    if (anchor != null || kind != null || panel != null) {
+      errors.push("match_cut must not set incoming_anchor_* fields");
+    }
+    return errors;
+  }
+
   if (breakReason) {
     if (prev != null) {
       errors.push("continuity_break_reason must not set previous_generation_id (break resets the chain)");
@@ -155,7 +371,8 @@ export function validateContinuityChain(fields: {
 
   if (!prev) {
     errors.push(
-      "later generation requires previous_generation_id + incoming_anchor_handle, or continuity_break_reason"
+      "later generation requires previous_generation_id + incoming_anchor_handle, " +
+      "continuity_break_reason, or match_cut_source_*"
     );
   }
   if (!anchor) {
@@ -180,18 +397,10 @@ export function validateContinuityChain(fields: {
 
 function validateEntry(entry: GenerationGridRegistryEntry): string[] {
   const errors: string[] = [];
-  const panel_map =
-    entry.panel_map ??
-    Object.fromEntries(
-      entry.shot_ids.map((id) => [
-        String(id),
-        entry.status === "approved_grid" ? 1 : null,
-      ])
-    );
 
   if (entry.status === "approved_grid") {
     if (!entry.grid_handle) errors.push("approved_grid requires grid_handle");
-    if (!entry.approved_candidate_id) errors.push("approved_grid requires approved_candidate_id");
+    errors.push(...validateApprovedCandidateId(entry.approved_candidate_id));
     if (entry.skip_reason != null) errors.push("approved_grid must not set skip_reason");
     if (entry.shot_ids.length !== 1) {
       errors.push("approved_grid requires exactly one shot_id (one motion sheet = one shot)");
@@ -204,6 +413,16 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
     ) {
       errors.push(`approved_grid requires panel_count from ${MIN_PANELS} to ${MAX_PANELS}`);
     }
+    errors.push(
+      ...validateLightingState({
+        status: entry.status,
+        lighting_state: entry.lighting_state,
+        lighting_transition_exception: entry.lighting_transition_exception,
+        lighting_transition_reason: entry.lighting_transition_reason,
+        requireLightingState: false,
+        requireForApproved: true,
+      })
+    );
     errors.push(
       ...validateSceneAnchor({
         is_first_in_scene: entry.is_first_in_scene,
@@ -222,6 +441,9 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
     if (!entry.skip_reason) errors.push("skip_recorded requires skip_reason");
     if (entry.grid_handle != null) errors.push("skip_recorded must not set grid_handle");
     if (entry.panel_count != null) errors.push("skip_recorded must not set panel_count");
+    if (entry.approved_candidate_id != null) {
+      errors.push("skip_recorded must not set approved_candidate_id");
+    }
   }
 
   if (entry.estimated_duration_seconds > 15) {
@@ -231,74 +453,68 @@ function validateEntry(entry: GenerationGridRegistryEntry): string[] {
     errors.push("estimated_duration_seconds must be ≥4 for approved grids");
   }
 
-  for (const id of entry.shot_ids) {
-    if (!(String(id) in panel_map)) {
-      errors.push(`panel_map missing shot_ids entry ${id}`);
-    }
-  }
-  for (const key of Object.keys(panel_map)) {
-    if (!entry.shot_ids.includes(Number(key))) {
-      errors.push(`panel_map has shot ${key} not in shot_ids`);
-    }
-  }
-
-  const panels = entry.shot_ids
-    .map((id) => panel_map[String(id)])
-    .filter((p): p is number => p != null);
-  const unique = new Set(panels);
-  if (unique.size !== panels.length) {
-    errors.push("panel_map panel numbers must be unique within the generation");
-  }
-  if (entry.status === "approved_grid") {
-    if (panels.length !== entry.shot_ids.length) {
-      errors.push("approved_grid requires a non-null panel for every shot_id");
-    }
-    // Cut-in index on the sheet is always panel 1
-    for (const p of panels) {
-      if (p !== 1) {
-        errors.push("approved_grid panel_map must map the shot to cut-in panel 1");
-      }
-    }
-  }
-
   return errors;
 }
 
-function withDefaultPanelMap(entry: GenerationGridRegistryEntry): GenerationGridRegistryEntry {
-  if (entry.panel_map) return entry;
+function normalizeEntry(entry: GenerationGridRegistryEntry): GenerationGridRegistryEntry {
+  const lightingException = entry.lighting_transition_exception === true;
   return {
     ...entry,
-    panel_map: Object.fromEntries(
-      entry.shot_ids.map((id) => [
-        String(id),
-        entry.status === "approved_grid" ? 1 : null,
-      ])
-    ),
+    lighting_state: entry.lighting_state?.trim() || null,
+    approved_candidate_id:
+      entry.approved_candidate_id != null && String(entry.approved_candidate_id).trim()
+        ? normalizeApprovedCandidateId(String(entry.approved_candidate_id))
+        : entry.approved_candidate_id,
+    lighting_transition_exception: lightingException ? true : false,
+    lighting_transition_reason: lightingException
+      ? entry.lighting_transition_reason?.trim() || null
+      : null,
+    match_cut_source_generation_id: entry.match_cut_source_generation_id?.trim() || null,
+    match_cut_source_handle: entry.match_cut_source_handle?.trim() || null,
   };
 }
 
-export const recordGenerationGridEntry = tool({
-  description:
-    "Record ONE motion-sheet registry entry after approval or an explicit skip (Stage 1 Step 10). " +
-    "One approved entry = one shot = one Seedance generation (4–9 temporal panels, estimated Dur ≤15s). " +
-    "Requires panel_count for approved_grid. Later sheets MUST set scene_anchor_handle (the scene's first " +
-    "approved sheet) plus previous_generation_id + incoming_anchor_handle (prior terminal panel Pn, later " +
-    "prior last frame) unless continuity_break_reason documents an intentional break (scene anchor still " +
-    "required on breaks). Stage 1 is incomplete until every shot is covered by exactly one passing entry. " +
-    "Stage 2 preflight reads these validated entries.",
-  inputSchema,
-  execute: async (entry) => {
-    const normalized = withDefaultPanelMap(entry);
-    const errors = validateEntry(normalized);
-    if (errors.length > 0) {
+export function createRecordGenerationGridEntryTool(options?: {
+  /** Fallback when the model omits lighting_state — usually from generateGenerationGrid.lightingState. */
+  resolveLightingState?: (generationId: string) => string | null | undefined;
+}) {
+  return tool({
+    description:
+      "Record ONE motion-sheet registry entry after approval or an explicit skip (Stage 1 Step 10). " +
+      "One approved entry = one shot = one Seedance generation (4–9 temporal panels, estimated Dur ≤15s). " +
+      "Requires panel_count and approved_candidate_id (storage key / media URL — NOT a toolCallId). " +
+      "lighting_state is optional (auto-filled from generateGenerationGrid.lightingState when omitted). " +
+      "CamelCase aliases (lightingState, panelCount, …) are accepted. In-shot lighting transitions require " +
+      "lighting_transition_exception=true + reason. Later sheets MUST set scene_anchor_handle plus either " +
+      "(1) previous_generation_id + incoming_anchor_* , (2) continuity_break_reason, or (3) match_cut_source_* " +
+      "for a declared compositional twin across a break. Stage 1 is incomplete until every shot is covered. " +
+      "Stage 2 preflight reads these validated entries.",
+    inputSchema,
+    execute: async (raw) => {
+      const normalized = normalizeEntry(
+        coerceRegistryInput(raw) as GenerationGridRegistryEntry
+      );
+      if (
+        normalized.status === "approved_grid" &&
+        !normalized.lighting_state?.trim() &&
+        options?.resolveLightingState
+      ) {
+        const fallback = options.resolveLightingState(normalized.generation_id)?.trim();
+        if (fallback) normalized.lighting_state = fallback;
+      }
+      const errors = validateEntry(normalized);
+      if (errors.length > 0) {
+        return {
+          type: "text" as const,
+          value: JSON.stringify({ ok: false, errors }),
+        };
+      }
       return {
         type: "text" as const,
-        value: JSON.stringify({ ok: false, errors }),
+        value: JSON.stringify({ ok: true, entry: normalized }),
       };
-    }
-    return {
-      type: "text" as const,
-      value: JSON.stringify({ ok: true, entry: normalized }),
-    };
-  },
-});
+    },
+  });
+}
+
+export const recordGenerationGridEntry = createRecordGenerationGridEntryTool();

@@ -63,9 +63,13 @@ values-from-locked-artifacts-only, COMPOSITION LOCK, footing continuity — are 
   reference image; static-lock applies to rigid things, characters get verbs.
 - C — Static-lock (targeted): name the specific rigid thing that must not morph ("the
   [structure] is FIXED at [state]; only the camera moves, the [structure] unchanged").
-  The lock always names its target. Time passes BETWEEN shots, never within one.
+  The lock always names its target. Time passes BETWEEN shots, never within one —
+  default ONE lighting state per shot. In-shot lighting transitions are rare controlled
+  exceptions only when locked on the row AND recorded with lighting_transition_exception
+  on the motion-sheet registry entry (Bible §3D deliberate-motion list).
 - D — Deliberate-motion list: [the shots where something SHOULD change on camera — a
-  beam firing, a ship lifting]; give these explicit state-change in event order.
+  beam firing, a ship lifting, a lighting transition that IS the beat]; give these
+  explicit state-change in event order.
 - E — Reference-first: every recurring element pulls its @material image; recurring
   identity by text alone is drift.
 - F — One generation = one shot = one continuous take; motion-sheet panels are
@@ -104,7 +108,7 @@ SCENE [n] — [location] — [lighting state(s), in order]
   Fixed props: [what must not teleport across the scene's shots]
 ```
 
-This header is the scene's **continuity block** — the single text source for scene-level geography, blocking, and screen direction that every motion sheet and compiled prompt honors (there is no separate continuity-pack artifact). The Delta line comes from the scene-delta rule applied while building the scene (Step 7) and feeds the grid prompt's what-is-new clause. Space + Axis keep geography and screen direction coherent across the scene's rows: props stay where they were, a distant landmark stays on the same side of frame, a movement exiting right enters the next frame moving right. When a scene spans multiple lighting states, list them in order — each individual shot row still carries exactly ONE. A beat spanning two locations cutting against each other is TWO scenes with alternating rows.
+This header is the scene's **continuity block** — the single text source for scene-level geography, blocking, and screen direction that every motion sheet and compiled prompt honors (there is no separate continuity-pack artifact). The Delta line comes from the scene-delta rule applied while building the scene (Step 7) and feeds the grid prompt's what-is-new clause. Space + Axis keep geography and screen direction coherent across the scene's rows: props stay where they were, a distant landmark stays on the same side of frame, a movement exiting right enters the next frame moving right. When a scene spans multiple lighting states, list them in order — each individual shot row still carries exactly ONE (unless a locked transition exception). **A lighting-state change alone is not a scene boundary** — keep match-cut pairs and continuous geography in one scene; register a lighting break between shots with `match_cut_source_*` when composition must still match. A beat spanning two locations cutting against each other is TWO scenes with alternating rows.
 
 One row per shot:
 
@@ -118,7 +122,7 @@ One row per shot:
 - **Primary (SUBJ/CAM)** — the single source carrying the shot's motion. Exactly one.
 - **Camera move** — chosen from §B2 to match the mood. Primary = SUBJ → the camera calms or locks; Primary = CAM → the subject calms.
 - **Cut-out → Cut-in** — the edit written into the rows so it survives independent generation. Cut-out locks **footing/surface/position**, not intent: "she stands ON the stone staircase, mid-flight, facing up" — never "she walks toward the stairs." Cut-in of the next shot restates that same footing before new action. Named handoffs: eyeline, cut-on-action, exit/enter (with direction), match, POV-answer, or "rest" (a deliberate held cut — fine alone; a chain of them is the slideshow flag). Final shot's cut-out is "end". Continuous walks across generations prefer video extension (Stage 2) over text cut-ins.
-- **Light** — exactly ONE canonical state per row. Time passes between shots: a lighting transition splits into two rows.
+- **Light** — exactly ONE canonical state per row by default. Time passes between shots: a lighting change across a cut is two rows (or a match-cut pair) inside the same scene when geography continues. An in-shot lighting transition is allowed only when that transition IS the locked beat — list it in Bible §3D and set `lighting_transition_exception` on the sheet registry entry.
 - **Dur** — seconds, an ESTIMATE used for the Seedance duration parameter and the runtime total; it never appears in prompt text.
 - **Materials** — every asset that APPEARS IN THE MOTION ARC: characters, plates (at which version), AND hero props. If the arc lifts the ship, `ship_object_ref` is in this cell; an arc entity absent from materials gets invented fresh at render time.
 

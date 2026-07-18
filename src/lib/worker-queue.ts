@@ -8,7 +8,6 @@ export const WORKER_QUEUE_NAME = "worker-jobs";
 export const JOB_NAMES = {
   GENERATE_SHOT: "generate-shot",
   GENERATE_ASSET_IMAGES: "generate-asset-images",
-  GENERATE_CONTINUITY_PACK: "generate-continuity-pack",
   GENERATE_GENERATION_GRID: "generate-generation-grid",
 } as const;
 

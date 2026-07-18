@@ -13,6 +13,11 @@ const MAX_WAIT_MS = 10 * 60 * 1_000;
 
 type JobResult = {
   images?: string[];
+  generatedAssets?: Array<{
+    assetHandle: string;
+    assetKind: "character" | "location" | "object";
+    candidates: Array<{ id: string; url: string }>;
+  }>;
   videoUrl?: string;
   filmstripUrl?: string;
   filmstripTiles?: number;
@@ -25,6 +30,11 @@ type JobPayload = {
   toolCallId?: string;
   assetHandle?: string;
   assetKind?: string;
+  assets?: Array<{
+    assetHandle: string;
+    assetKind: "character" | "location" | "object";
+    imagePrompt: string;
+  }>;
   sceneId?: string | number;
   packHandle?: string;
   notes?: Record<string, string>;
@@ -153,17 +163,11 @@ export async function GET(
                 toolCallId,
                 assetHandle: payload.assetHandle,
                 assetKind: payload.assetKind,
-                error,
-              });
-            } else if (job.jobName === JOB_NAMES.GENERATE_CONTINUITY_PACK) {
-              enqueue({
-                type: "continuity_pack",
-                toolCallId,
-                sceneId: payload.sceneId,
-                packHandle: payload.packHandle,
-                notes: payload.notes,
-                keyframes: payload.keyframes,
-                aspectRatio: payload.aspectRatio ?? "16:9",
+                items: payload.assets?.map((a) => ({
+                  assetHandle: a.assetHandle,
+                  assetKind: a.assetKind,
+                  error,
+                })),
                 error,
               });
             } else if (job.jobName === JOB_NAMES.GENERATE_GENERATION_GRID) {
@@ -189,22 +193,28 @@ export async function GET(
 
           const images = await mediaUrls(result?.images ?? []);
           if (job.jobName === JOB_NAMES.GENERATE_ASSET_IMAGES) {
+            const rawItems = result?.generatedAssets;
+            const items = rawItems
+              ? await Promise.all(
+                  rawItems.map(async (item) => ({
+                    assetHandle: item.assetHandle,
+                    assetKind: item.assetKind,
+                    candidates: await Promise.all(
+                      item.candidates.map(async (c) => ({
+                        id: c.id,
+                        url: (await mediaUrl(c.id)) || c.url,
+                      }))
+                    ),
+                  }))
+                )
+              : undefined;
             enqueue({
               type: "asset_ref",
               toolCallId,
               assetHandle: payload.assetHandle,
               assetKind: payload.assetKind,
-              images,
-            });
-          } else if (job.jobName === JOB_NAMES.GENERATE_CONTINUITY_PACK) {
-            enqueue({
-              type: "continuity_pack",
-              toolCallId,
-              sceneId: payload.sceneId,
-              packHandle: payload.packHandle,
-              notes: payload.notes,
-              keyframes: payload.keyframes,
-              aspectRatio: payload.aspectRatio ?? "16:9",
+              items,
+              // Legacy single-asset clients
               images,
             });
           } else if (job.jobName === JOB_NAMES.GENERATE_GENERATION_GRID) {

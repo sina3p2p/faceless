@@ -13,40 +13,30 @@ export type QuestionsCall = {
   answers?: string[];
 };
 
-export type AssetRef = {
-  toolCallId: string;
-  loading: boolean;
-  assetHandle?: string;
-  assetKind?: "character" | "location" | "object";
-  images?: string[];
+export type AssetCandidate = {
+  id: string;
+  url: string;
+};
+
+export type AssetGalleryItem = {
+  assetHandle: string;
+  assetKind: "character" | "location" | "object";
+  loading?: boolean;
+  candidates?: AssetCandidate[];
+  approvedCandidateId?: string;
   approvedUrl?: string;
+  rejected?: boolean;
+  objection?: string;
   error?: string;
 };
 
-export type ContinuityPackNotes = {
-  roomGeography: string;
-  characterBlocking: string;
-  cameraAxis: string;
-  lightingProgression: string;
-  screenDirection: string;
-  fixedProps: string;
-};
-
-export type ContinuityPackKeyframe = {
-  role: "establishing" | "blocking" | "eyeline_props" | "other";
-  caption: string;
-};
-
-export type ContinuityPack = {
+export type AssetRef = {
   toolCallId: string;
   loading: boolean;
-  sceneId?: string | number;
-  packHandle?: string;
-  notes?: ContinuityPackNotes;
-  keyframes?: ContinuityPackKeyframe[];
-  images?: string[];
-  aspectRatio?: "16:9" | "9:16" | "1:1";
-  approvedUrls?: string[];
+  /** Full manifest gallery (Step 9). */
+  items: AssetGalleryItem[];
+  /** True after the user taps Approve remaining. */
+  approved?: boolean;
   error?: string;
 };
 
@@ -66,6 +56,10 @@ export type GenerationGrid = {
   sceneAnchorHandle?: string | null;
   incomingAnchorHandle?: string | null;
   continuityBreakReason?: string | null;
+  matchCutSourceGenerationId?: string | null;
+  matchCutSourceHandle?: string | null;
+  lightingState?: string | null;
+  lightingTransitionException?: boolean | null;
   images?: string[];
   panelCount?: number;
   panelCaptions?: PanelCaption[];
@@ -115,7 +109,6 @@ export type ClientMessage = {
   reasoning?: string;
   questions?: QuestionsCall;
   assetRef?: AssetRef;
-  continuityPack?: ContinuityPack;
   generationGrid?: GenerationGrid;
   shotResult?: ShotResult;
   shotCompile?: ShotCompile;

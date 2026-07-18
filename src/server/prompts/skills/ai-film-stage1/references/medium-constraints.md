@@ -8,7 +8,7 @@ Atmosphere, weather, particles (dust, haze, spray, smoke); striking single image
 
 ## Steer AWAY (current failure modes)
 
-Long takes of plot-critical lip-synced dialogue; complex hand manipulation / fine finger work; readable on-screen text (signs, documents, UI — dramatize as short labels, blurred tables, implied UI); large crowds that must stay consistent shot to shot; tightly choreographed continuous action across a long take; exact repeatable likeness of a real person (also a legal/ethical minefield — prefer fully synthetic faces).
+Long takes of plot-critical lip-synced dialogue; complex hand manipulation / fine finger work; readable on-screen text (signs, documents, UI — dramatize as short labels, blurred tables, implied UI / density; do **not** promise locked legible strings Seedance will regenerate every frame); large crowds that must stay consistent shot to shot; tightly choreographed continuous action across a long take; exact repeatable likeness of a real person (also a legal/ethical minefield — prefer fully synthetic faces). If the film's climax *is* readable screen content, flag at premise — Path A (implied) is the honest Stage 1 stance until a composite overlay path exists.
 
 **The two structural consequences (enforce in Steps 3–4):** tiny cast (2–3 hero faces; everyone else disposable background) and few, consolidated locations (one master location with zones; keep offscreen what can stay offscreen). Each recurring face and each distinct location is a reference image and a drift risk.
 
@@ -38,7 +38,7 @@ A spec is written for a human ("frail, sympathetic grey alien with a teal chest 
 - **Default:** empty hands on the sheet + a separate `*_object_ref` for the recurring tool. Story shots attach both.
 - **Wardrobe exception:** only when the tool is inseparable identity (part of the silhouette, always carried) AND no object ref will exist for it — bake it into the sheet as locked wardrobe. The two policies never mix on one asset; "tool never puts down" in the design + empty hands on the sheet + a separate object ref is a three-way identity fight.
 
-**Charsheet approval checklist (applied twice: as the model's pre-screen before the gallery, and as the user's rejection guide in it) — REJECT (never "close enough") on any of:** views not reading as the SAME person (the sheet's cardinal failure); anything held or worn that isn't locked wardrobe under the empty-hands policy; an environment or scene lighting instead of flat studio; a tinted/gradient background; a non-neutral pose or expression; the face obscured in the front view.
+**Charsheet approval checklist (applied when `vision_status:attached` on the fresh gallery result, and as the user's rejection guide) — REJECT (never "close enough") on any of:** views not reading as the SAME person (the sheet's cardinal failure — the twin bug); anything held or worn that isn't locked wardrobe under the empty-hands policy; an environment or scene lighting instead of flat studio; a tinted/gradient background; a non-neutral pose or expression; the face obscured in the front view. Never claim this checklist passed on an unseen / `vision_status:unverifiable` image.
 
 **The ten-generations test for any reference prompt:** if you generated this same prompt ten times, would all ten be recognizably the same character/place? Looseness that lets them diverge is exactly what becomes drift downstream — tighten the anchors before generating.
 
@@ -55,7 +55,7 @@ Native-audio models weaken the old "avoid dialogue" rule. The durable pattern: g
 
 ## Showing time pass without a montage
 
-**Match-cut pairs:** two shots, identical framing/lens/position, where only a scheduled element differs (a structure higher, a detail dimmer) — the cut reads as elapsed time, cheaply, with no extra location. Put every changing element on the State Schedule (Bible §4) so its progression is planned across shots.
+**Match-cut pairs:** two shots, identical framing/lens/position, where only a scheduled element differs (a structure higher, a detail dimmer, lighting state) — the cut reads as elapsed time, cheaply, with no extra location. Put every changing element on the State Schedule (Bible §4) so its progression is planned across shots. Keep match-cut pairs in the **same scene** when geography is continuous; registry mode `match_cut_source_*` records the twin when footing continuity is broken (e.g. lighting-state change) but composition must still match.
 
 ## Turn invisible stakes into visible ones
 

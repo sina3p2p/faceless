@@ -119,7 +119,7 @@ export function QuestionsPicker({
               </span>
               <span className="flex-1 min-w-0 text-[14px] text-foreground/90 leading-snug whitespace-normal">
                 {option}
-                {isRecommended && (
+                {isRecommended && !option.toLocaleLowerCase().includes("recommended") && (
                   <span className="text-muted-foreground"> (Recommended)</span>
                 )}
               </span>
