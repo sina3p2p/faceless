@@ -1,6 +1,6 @@
 # Generation Grids — motion sheets, continuity anchoring, approval, registry (Stage 1 Step 10)
 
-**This file is the canonical home for all grid sizing, chaining, skip, and registry rules.** Prerequisites: locked shot list with full scene continuity blocks (Delta / Coverage / Space / Axis / Lighting progression / Fixed props), locked Bible, APPROVED asset images.
+**This file is the canonical home for all grid sizing, chaining, skip, and registry rules.** Prerequisites: locked shot list with full scene continuity blocks (Delta / Coverage / Space / Axis / Blocking / Fixed props, plus the scene header's lighting states), locked Bible, APPROVED asset images.
 
 ## The unit
 
@@ -20,12 +20,13 @@ ONE photoreal image = exactly one uninterrupted shot. Shared latent → coherent
 | Panel              | Role                                                                                                                                                                                                                 |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Panel 1**        | Exact **cut-in** state. Continuous later sheets inherit footing/geography/screen direction from the prior sheet's Pn (or the prior render's last frame); scene opens inherit from the continuity block + row cut-in. |
-| **Panels 2…(n−1)** | Real action/camera **milestones only** — near-duplicates and invented motion are regeneration triggers.                                                                                                              |
-| **Panel n**        | Exact **cut-out** state of THIS shot — what the next sheet's Panel 1 must match.                                                                                                                                     |
+| **Panels 2…(n−1)** | Real action/camera **milestones only** — each adjacent pair must show a **visible pose/position delta** (including background figures). Near-duplicates and invented motion are regeneration triggers. |
+| **Panel n**        | Exact **cut-out** state of THIS shot — what the next sheet's Panel 1 must match.                                                                                                                         |
 
-- **Panel count 4–9**; more (toward 9) for motion-rich / timing-critical arcs, fewer (toward 4) for simple connective beats.
-- **Estimated Dur ≤15s, prefer 8–12** — this estimate becomes the API duration parameter.
-- Reading order left-to-right, top-to-bottom; same character, environment, lighting state throughout; panels in the film's TRUE aspect ratio.
+- **Panel count 4–9**, tied to duration: ~1 milestone per 1.5–2s of estimated Dur (e.g. 8s ≈ 5–6 panels; 12s ≈ 7–8). More (toward 9) for motion-rich / timing-critical arcs, fewer (toward 4) for short connective beats — never pad with near-identical panels.
+- **Estimated Dur ≤15s; prefer 8–12 for multi-beat arcs, 4–6 for single-beat connective shots** — this estimate becomes the API duration parameter. Match Dur to beat density (~1 real beat / 2–3s); a single verb over 10s reads as slo-mo downstream.
+- **Visible pose deltas required** between adjacent panels for every human figure in frame (heroes and extras). Near-identical adjacent panels interpolate into near-static video.
+- Reading order left-to-right, top-to-bottom; same character, environment, lighting state throughout; panels in 16:9 — the show's fixed aspect ratio (the tool's `aspectRatio` default; never pass another value).
 - The approved STILL has thin white gutters so humans can read panels; the eventual VIDEO is one continuous take — the Seedance prompt says to interpolate between panel states, no cuts, never showing grid or gutters.
 
 **Cross-shot chain (later sheets in a scene) — pick exactly one mode:**
@@ -40,10 +41,10 @@ A different location breaks the chain (usually a scene boundary). Cross-shot mot
 
 Assembled from locked artifacts only:
 
-1. **References attached**: character ref(s) earliest, then location plate, then the scene anchor (the scene's first approved sheet — omit on the first sheet itself), then the incoming anchor (continuous later sheets) or match-cut source (match-cut mode). Open with verbatim Bible §2 SUBJECT DEFINITIONS. Label the scene anchor and prior-sheet / match-cut anchors as **continuity geography / cut-in / compositional anchors only**.
-2. **Layout spec** (mandatory): `"[N] panels (N between 4 and 9), each an individual [film aspect] frame, arranged in a [layout] grid reading left-to-right, top-to-bottom, with thin uniform white gutters. NO text, NO captions, NO panel numbers, NO borders drawn inside frames."`
-3. **Per panel** (enumerated "Panel 1: …"): Panel 1 = cut-in moment + Scale + composition (from prior Pn / continuity block / row / match-cut source); middle = real milestones; Panel n = cut-out prepared for the next shot.
-4. **Novelty / beat clause**: this shot's continuous dramatic beat (from the scene's Delta line).
+1. **References attached**: character ref(s) earliest, then object refs (hero props/vehicles named in this shot's motion arc), then location plate, then the scene anchor (the scene's first approved sheet — omit on the first sheet itself), then the incoming anchor (continuous later sheets) or match-cut source (match-cut mode). Open with verbatim Bible §2 SUBJECT DEFINITIONS. Label the scene anchor and prior-sheet / match-cut anchors as **continuity geography / cut-in / compositional anchors only**.
+2. **Layout spec** (mandatory): `"[N] panels (N between 4 and 9), each an individual 16:9 frame, arranged in a [layout] grid reading left-to-right, top-to-bottom, with thin uniform white gutters. NO text, NO captions, NO panel numbers, NO borders drawn inside frames."`
+3. **Per panel** (enumerated "Panel 1: …"): Panel 1 = cut-in moment + Scale + composition (from prior Pn / continuity block / row / match-cut source); middle = real milestones with **readable pose/position deltas** from the previous panel (heroes and any background figures); Panel n = cut-out prepared for the next shot.
+4. **Novelty / beat clause**: this shot's continuous dramatic beat as a **2–4 beat arc** (from the scene's Delta line + row) — not a single verb; match beat count to Dur.
 5. **Continuity + motion instruction**: `"All panels depict the SAME uninterrupted shot — same characters, environment, lighting, and continuous camera trajectory. Reading order is left-to-right, top-to-bottom. Panel 1 is the cut-in; Panel N is the cut-out; middle panels are milestones only. Interpolate naturally between these states; one continuous take; no cuts."` With an incoming anchor: `"Panel 1 continues from the incoming anchor — same footing, screen direction, and geography."` With a match-cut source: `"Panel 1 matches the match-cut source framing/lens/position — only the scheduled delta differs."`
 6. **The Look** as grade/lens character. ONE lighting state per sheet (`lightingState` on the tool call). A lighting transition as the beat itself is rare: set `lightingTransitionException=true` + reason citing the locked row / Bible §3D — never a silent contradiction with §3C. Geography, axis, and screen direction wording comes from the scene's continuity block.
 
@@ -63,8 +64,10 @@ Four `skip_reason` values. The model may PROPOSE: (1) `insert_only_scene`; (2) `
 | Order ignored          | Panels out of sequence                                    | Regenerate with more explicit per-panel enumeration                                                                        |
 | Geometry contradiction | A landmark/prop switches sides                            | Check the continuity block — ambiguous headers/rows get fixed first (backflow), else regenerate citing geography per panel |
 | Wrong panel ratio      | Square/portrait panels despite the spec                   | Regenerate with the ratio stated per panel                                                                                 |
-| Filler milestones      | Near-duplicate middles or invented motion                 | Regenerate with fewer panels; real deltas only                                                                             |
+| Filler milestones      | Near-duplicate middles, invented motion, or no readable pose delta between adjacent panels | Regenerate with fewer panels or stronger per-panel deltas; real pose/position changes only |
+| Frozen extras          | Background / unbound figures identical across panels (heroes move, extras don't) | Regenerate naming group motion per panel for every human in frame |
 | Over-budget duration   | Estimated Dur >15s                                        | Shorten the row or split the beat into two shots first                                                                     |
+| Thin beat density      | Single-verb arc over a long Dur (e.g. one action across 10–12s) | Enrich to 2–4 beats or shorten Dur to 4–6s                                                                                |
 | Row mismatch           | A panel contradicts its shot row                          | Regenerate from the row; a wrong ROW backflows first                                                                       |
 | Missing prior anchor   | Later sheet lacks chain, break, or match-cut fields       | Reject — set continuous fields, break reason, or match_cut_source_*                                                        |
 | Continuity drift       | Sheet geography fights the scene anchor or prior Pn       | Strengthen the anchor binds in the sheet prompt; a wrong first sheet regenerates first (it anchors the whole scene)        |
@@ -79,7 +82,7 @@ One candidate per shot (staging is locked in the prompt — not a choose-among g
 
 **Vision at generation time:** when the tool result carries `vision_status:attached`, pre-screen the pixels in that turn (ONE lighting state, panel roles, continuity). Never claim a vision check on `vision_status:unverifiable`. The UI Approve-grid button (`grid_approval`) is the only approval — **never** spawn `askQuestions` for sheet approval.
 
-**Before presenting a sheet, confirm:** chain / break / match-cut fields set (later sheets); the scene anchor attached (later sheets); Dur estimate in range; Panel 1 / Pn handoff roles correct; middles are real milestones; every panel matches its row (cast/state/ratio) and the scene's continuity block; ONE lighting state (or explicit transition exception).
+**Before presenting a sheet, confirm:** chain / break / match-cut fields set (later sheets); the scene anchor attached (later sheets); Dur estimate in range and matched to beat density (~1 real beat / 2–3s); Panel 1 / Pn handoff roles correct; middles are real milestones with readable pose/position deltas for every figure (extras included — no frozen extras); every panel matches its row (cast/state/ratio) and the scene's continuity block; ONE lighting state (or explicit transition exception).
 
 **Backflow:** spoken edits flow INTO THE ROW (or the scene's continuity block) first, then the image regenerates — headers and rows stay current with pixels.
 
@@ -87,14 +90,14 @@ Approved sheets bind to `@scene{N}_gen{generationId}_grid`.
 
 ## Generation Grid Registry (app-validated)
 
-After each approval or skip, call `recordGenerationGridEntry` with one entry — the app validates and stores it (registry JSON is never authored freeform in chat). Step 10 is complete when every shot appears in exactly one passing entry. Stage 2 preflight reads the stored registry.
+After each approval or skip, call `recordGenerationGridEntry` with one entry — the app validates and stores it (registry JSON is never authored freeform in chat). Field casing: `generateGenerationGrid` inputs are camelCase; stored registry entries (and this table) are snake_case — `recordGenerationGridEntry` accepts either. Step 10 is complete when every shot appears in exactly one passing entry. Stage 2 preflight reads the stored registry.
 
 | Field                            | Required                | Notes                                                                                          |
 | -------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------- |
 | `scene_id`                       | yes                     | Scene number                                                                                   |
 | `generation_id`                  | yes                     | e.g. `3A`                                                                                      |
 | `shot_ids`                       | yes                     | Exactly one shot for `approved_grid`; skip entries may cover several                           |
-| `estimated_duration_seconds`     | yes                     | 4–15                                                                                           |
+| `estimated_duration_seconds`     | if approved             | 4–15 for `approved_grid`; skips: total seconds covered (any positive) or null                  |
 | `status`                         | yes                     | `approved_grid` \| `skip_recorded`                                                             |
 | `grid_handle`                    | if approved             | `@scene3_gen3A_grid`                                                                           |
 | `approved_candidate_id`          | if approved             | Storage key or media URL of the approved sheet image (from `grid_approval`) — **not** a toolCallId |

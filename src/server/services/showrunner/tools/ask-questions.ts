@@ -4,9 +4,9 @@ import { z } from "zod";
 export const askQuestions = tool({
   description:
     "Ask the collaborator one or more multiple-choice questions at a decision point. " +
-    "Call this after your narrative introduction. Bundle 1–5 related questions in one call. " +
-    "Each question needs short tap-label options that are genuinely distinct directions. " +
-    "You MUST call this tool to ask; never list options in plain text, and never " +
+    "Call this after a short framing message (context + optional lean only). Bundle 1–5 related questions in one call. " +
+    "Each option's tap label carries the direction and its brief trade-off. " +
+    "You MUST call this tool to ask; never number or list options in plain text, and never " +
     "mention this tool or your option-count reasoning in your visible message.",
   inputSchema: z.object({
     questions: z
@@ -20,7 +20,7 @@ export const askQuestions = tool({
             .min(2)
             .max(6)
             .describe(
-              "Full tap labels for each option, e.g. '16:9 — widescreen, cinematic'"
+              "Tap labels with direction + trade-off, e.g. '16:9 — widescreen, cinematic'"
             ),
           recommendedIndex: z
             .number()

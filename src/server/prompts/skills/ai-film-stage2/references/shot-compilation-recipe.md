@@ -39,7 +39,11 @@ PRIMARY ACTION: … (middle-panel milestones as continuous beats)
 
 The locks are extraction from the approved trajectory, never a second authorship pass that fights the pixels; unextractable locks → gap. The scene anchor and incoming anchor attach as geography / cut-in references, labeled reference-only. Hard-cut language between panels ("render all panels in order", "ignore other panels") never appears.
 
-**Duration and pace:** the row's Dur is planning data — the API `duration` parameter (= the registry estimate, ≤15s) — and never prompt text. Pace lives in RELATIVE words along the trajectory ("lingers on the open, accelerates through the turn") and in event order. **No second-marks anywhere** — Seedance's in-prompt timing is officially unstable. If pacing fails, reroll with stronger pace words or regenerate the sheet with clearer milestones.
+**Duration and pace:** the row's Dur is planning data — the API `duration` parameter (= the registry estimate, ≤15s) — and never prompt text. Pace lives in RELATIVE words along the trajectory and in event order. **No second-marks anywhere** — Seedance's in-prompt timing is officially unstable.
+
+**Beat-density rule:** roughly one real beat per 2–3 seconds of duration. PRIMARY ACTION is a **2–4 beat arc in event order** (start → development(s) → end), not a single verb stretched across the whole clip. A single-beat row either shortens to 4–6s or is a gap: `"Shot N: row too thin for its duration — enrich the arc (2–4 beats) or shorten Dur."` A 10–12s clip with one verb reads as slow motion.
+
+**Pace calibration:** default pace is **natural real-time**, not slow. "Slow" / "lingers" / "gently" are deliberate row-level choices — never the silent default. **Anti-stacking:** never combine more than one slow-word per prompt ("lingers" + "gently" + "slow dolly" compounds into slo-mo). Keep the existing warning that "fast" degrades quality — reserve speed for one deliberate isolated moment. If pacing fails, reroll with clearer beat density or regenerate the sheet with visible pose deltas between panels.
 
 ## Continuity across shots — footing, modes, extension
 
@@ -66,21 +70,21 @@ Seedance reference mode addresses uploaded images as `[Image1]`, `[Image2]`… *
 2. **Attach only assets appearing in this shot** plus required continuity refs (≤9 images; focused beats many). Always include on-screen identity refs, the registry's scene anchor, the registry-required incoming anchor or match-cut source, and this shot's sheet. If identity refs alone would blow the budget before continuity/sheet fit, the beat is too crowded — gap it, never silently drop continuity or the sheet.
 
 3. **Define up front, verbatim, then label everywhere.** Each asset's definition line is Bible §2 canonical text pasted VERBATIM — bind + govern + label:
-   - `Define the [2–3 stable features, e.g. woman in the grey wool coat with the silver pendant] in [Image1] (facial features, styling, wardrobe, build) as **the detective**.`
+   - `Define the [2–3 stable features, e.g. woman in the grey wool coat with the silver pendant] in [Image1] (facial features, styling, wardrobe, build) as **the detective** — this reference governs identity, wardrobe, and proportions only; pose and motion follow PRIMARY ACTION and PERFORMANCE, never the reference pose.`
    - `Define the environment in [Image2] as **the alley**; it governs environment, architecture, and composition.`
-     Every later mention uses the exact label — an unbound "the woman"/"she" where ambiguity could arise is how identity drift starts, and a re-worded definition is two identities competing for one face (per-shot ADDITIONS are appended clauses only, e.g. a hand-relevant anchor for an insert). Inline `detective@Image1` exists for one-offs; film work uses explicit definitions.
+     Every later mention uses the exact label — an unbound "the woman"/"she" where ambiguity could arise is how identity drift starts, and a re-worded definition is two identities competing for one face (per-shot ADDITIONS are appended clauses only, e.g. a hand-relevant anchor for an insert). Inline `detective@Image1` exists for one-offs; film work uses explicit definitions. **Identity-not-pose:** character/object refs never dictate pose — without this clause, figures freeze in the reference still's stance.
 
-4. **State what each reference governs** (facial features / styling / environment / object form) — a silently attached image merges attributes unpredictably.
+4. **State what each reference governs** (facial features / styling / environment / object form — never pose for living subjects) — a silently attached image merges attributes unpredictably.
 
 ## Static-lock and performance — the three motion tiers
 
 Every prompt's motion has three tiers:
 
-- **(a) The dominant motion** — the row's Primary: SUBJECT action with a real start→end verb, or a CAMERA move developing the frame while characters hold micro-performance. Always present; secondary motion only when slower, smaller, subordinate. Ambient life never counts as (a). Neither-source and both-fast are gaps.
-- **(b) Ambient life** — organic/atmospheric elements always breathing, requested explicitly: "leaves and vines sway gently in a soft breeze" / "the stream flows steadily, surface catching light" / "mist drifts slowly across the ground" / "dappled light shafts shimmer as the canopy stirs" / "flames flicker, embers drift; fabric stirs." A locked environment is the #1 cause of "the background looks AI."
+- **(a) The dominant motion** — the row's Primary: SUBJECT action as a **2–4 beat arc** (start → development(s) → end) with real verbs, or a CAMERA move developing the frame while characters hold micro-performance. Always present; secondary motion only when smaller and subordinate. Ambient life never counts as (a). Neither-source and both-fast are gaps. A single verb stretched across a long Dur fails beat-density.
+- **(b) Ambient life** — organic/atmospheric elements always breathing, requested explicitly: "leaves and vines sway in a soft breeze" / "the stream flows steadily, surface catching light" / "mist drifts across the ground" / "dappled light shafts shimmer as the canopy stirs" / "flames flicker, embers drift; fabric stirs." A locked environment is the #1 cause of "the background looks AI." **Unnamed / background-tier humans also live here** — treat them like ambient life: explicitly requested group motion, never silent.
 - **(c) The targeted rigid lock** — only when flagged, in **positive phrasing naming its target**: `CRITICAL: the [named structure/object] is FIXED — it remains exactly as shown in [Image#] throughout this shot; only the camera moves, the [named thing] unchanged.` Plus the identity anchor: `Stable identity, natural proportions, clean edges throughout.` Negatives backfire ("no morphing" cues morphing); write the fixed state as a present fact. The blanket "only the camera moves, subject unchanged" freezes characters into mannequins — the lock always names its rigid target.
 
-**Characters live in tiers (a)/(b), never (c).** Identity comes from the verbatim definition + reference binding; motion comes from written performance: the scripted action when dominant (`she pushes herself back into the roots, heels dragging through the soil`), micro-performance when secondary (`his chest rises with quickened breath; his eyes track the figure; his fingers tighten in the dirt`), or an intentional written hold (breath, gaze, tension, posture, deadpan). The model does not invent blocking — a character with no written verb stands like a wax figure.
+**Characters live in tiers (a)/(b), never (c).** Identity comes from the verbatim definition + reference binding (identity/wardrobe/proportions only — not pose); motion comes from written performance: the scripted action when dominant (`she pushes herself back into the roots, heels dragging through the soil`), micro-performance when secondary (`his chest rises with quickened breath; his eyes track the figure; his fingers tighten in the dirt`), or an intentional written hold (breath, gaze, tension, posture, deadpan). The model does not invent blocking — a character with no written verb stands like a wax figure. **Every human figure in frame moves** — bound heroes and unbound extras alike; frozen extras are a reject.
 
 **The lock-vs-motion tension:** a shot with BOTH a thing that must move AND a large locked structure tempts the model to barely move anything. Two fixes: **frame tighter** (if the motion is a block and a hand, frame on the block-and-hand so the monument isn't fighting the motion) and **lock only what's in frame and at drift risk** (reserve the full structure-lock for wides where the structure is the subject).
 
@@ -93,9 +97,9 @@ Read the shot's scheduled values and state them as present facts: `Structure at 
 1. **SUBJECT DEFINITIONS (first)** — Define-as-label bindings for every attached reference, in slot order (early placement = precision weighting); the motion-sheet definition includes the interpolate clause; scene-anchor/incoming-anchor definitions state reference-only.
 2. **CONTEXT** — one line: what this shot is, where it sits — opening by ANSWERING the previous row's cut-in when one exists ("From her point of view: the empty doorway…"), and restating exact footing verbatim when a character continues across generations: `Continuing: the hero is still standing ON the stone staircase, mid-flight, facing up — same footing as the previous shot's last frame.` Honor the scene header's continuity block (Space / Axis / Blocking / Fixed props). A continuation, never a hook.
 3. **COMPOSITION LOCK + END STATE LOCK** — per the worked form above, when a sheet is attached.
-4. **PRIMARY ACTION** — the dominant motion as a start→end arc with a real verb, ending at the row's cut-out state written explicitly as the final sentence with footing locked. **State scale relationships whenever proportion matters** — "limestone blocks" alone renders person-height boulders and a toy monument; write the relationship: "blocks roughly waist-to-chest height, the structure rising hundreds of feet, human figures tiny against it."
-5. **PERFORMANCE** — explicit direction for every character in frame, by label. Three phrasing traps: **(a) partial figures need explicit ownership** — a hand/foot/shadow entering frame says whose it is; anonymous limbs are phrased to exclude the defined subjects ("another bystander's shoe, visible only from the shin down") with internally consistent attributes — an unowned limb next to a defined character reads as that character's and can invert a scene's meaning. **(b) Reactions to sound/off-screen events are reactions, not forces** — "at the offscreen shout, her hand flinches back," never "her hand is yanked back by the shout" (physical-causation phrasing renders physical contact). **(c) Eyeline is mandatory on any reaction/discovery beat** — who looks → at what (by label) → where in frame / height relationship: `the detective's eyes lock DOWN and RIGHT onto the child at waist height in the mid-ground — looking AT the child, not past them.` Emotion without a gaze target is a face of terror looking past the subject.
-6. **CAMERA** — the row's move phrased per the craft reference; stillness stated explicitly when locked.
+4. **PRIMARY ACTION** — the dominant motion as a **2–4 beat arc in event order** (start → development(s) → end) with real verbs, ending at the row's cut-out state written explicitly as the final sentence with footing locked. Match beat count to duration (~1 beat / 2–3s). **State scale relationships whenever proportion matters** — "limestone blocks" alone renders person-height boulders and a toy monument; write the relationship: "blocks roughly waist-to-chest height, the structure rising hundreds of feet, human figures tiny against it."
+5. **PERFORMANCE** — explicit direction for every human figure in frame. Bound characters by label; unbound / background-tier figures with concrete group-motion phrasing. Four phrasing traps: **(a) partial figures need explicit ownership** — a hand/foot/shadow entering frame says whose it is; anonymous limbs are phrased to exclude the defined subjects ("another bystander's shoe, visible only from the shin down") with internally consistent attributes — an unowned limb next to a defined character reads as that character's and can invert a scene's meaning. **(b) Reactions to sound/off-screen events are reactions, not forces** — "at the offscreen shout, her hand flinches back," never "her hand is yanked back by the shout" (physical-causation phrasing renders physical contact). **(c) Eyeline is mandatory on any reaction/discovery beat** — who looks → at what (by label) → where in frame / height relationship: `the detective's eyes lock DOWN and RIGHT onto the child at waist height in the mid-ground — looking AT the child, not past them.` Emotion without a gaze target is a face of terror looking past the subject. **(d) every human figure in frame moves** — including unbound background figures: `"the two workers behind continue hauling rope, arms and shoulders working; a passerby crosses the background left-to-right."` Treat unnamed humans like ambient life (tier b): explicitly requested motion, never silent. An unperformed extra freezes in the reference pose — the #1 cause of "only one person moves."
+6. **CAMERA** — the row's move phrased per the craft reference at natural real-time pace unless the row deliberately calls for slow; stillness stated explicitly when locked.
 7. **STATE** — the State Schedule values as present facts.
 8. **STATIC-LOCK** — if flagged, the targeted positive clause.
 9. **GLOBAL RENDER NOTES** — the Look (grade + lens/stock character) and the shot's lighting state, at the END (Seedance weights closing notes most for look).
@@ -117,7 +121,7 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
   "duration_seconds": 8,
   "resolution": "1080p",
   "references": [
-    {"slot": "Image1", "handle": "@hero_charsheet", "kind": "character", "controls": "identity and wardrobe"},
+    {"slot": "Image1", "handle": "@hero_charsheet", "kind": "character", "controls": "identity, wardrobe, and proportions — never pose"},
     {"slot": "Image2", "handle": "@site_plate", "kind": "location", "controls": "environment, architecture, composition"},
     {"slot": "Image3", "handle": "@scene3_gen3A_grid", "kind": "scene_anchor", "controls": "scene geography / blocking from the scene's first approved sheet (reference only)"},
     {"slot": "Image4", "handle": "@scene3_gen3A_grid", "kind": "incoming_anchor", "controls": "prior terminal panel cut-in (reference only)"},
@@ -147,8 +151,11 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
 - `constraint_tail_present`: the suppression tail is the last line.
 - `no_second_marks`: no timestamps/second-counts; pace by words and event order.
 - `positive_lock_only`: any lock names its rigid target as a fixed present fact; no "no X" phrasing; no blanket "subject unchanged".
-- `primary_motion_present`: one dominant motion source (real verb or written hold / developing move); ambient-only, both-fast, and locked-camera-plus-unperformed-subject fail.
+- `primary_motion_present`: one dominant motion source as a 2–4 beat arc (or written hold / developing move); ambient-only, both-fast, single-verb-stretched-across-long-Dur, and locked-camera-plus-unperformed-subject fail.
+- `beat_density_ok`: roughly one real beat per 2–3s of `duration_seconds`; a single-beat row at >6s fails (shorten Dur or enrich the arc).
 - `character_performance_present`: every on-screen character has performance direction; no character is static-locked.
+- `background_figures_alive`: any additional / unbound humans in frame have named group motion; silent extras fail.
+- `no_slow_word_stacking`: at most one of {slow, gently, lingers, gradual} per prompt unless the row deliberately locks a slow beat; default pace is natural real-time.
 - `eyeline_target_named`: any reaction/"sees"/"shocked"/"stares"/"looks" beat names the gaze target by label + screen direction/height.
 - `motion_sheet_interpolated`: the sheet definition instructs continuous-take interpolation; hard-cut / render-panels-as-shots / ignore-panels language fails.
 - `composition_lock_present` / `end_state_lock_present`: non-empty locks on Panel 1 / Panel n when a sheet is attached; soft citations fail; unextractable → gap.
@@ -165,6 +172,9 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
 - `"Shot 14: no State Schedule lighting value for this beat — needs a lighting state."`
 - `"Shot 9: references @ship but no approved image is bound to that handle."`
 - `"Shot 7: no dominant motion — the row is an unperformed static tableau; it needs a delta or a written performance hold."`
+- `"Shot 11: row too thin for its duration — enrich the arc (2–4 beats) or shorten Dur to 4–6s."`
+- `"Shot 8: background figures present with no performance — give every human in frame a verb or group motion."`
+- `"Shot 6: slow-word stacking (lingers + gently + slow dolly) — keep at most one slow-word; default is natural real-time."`
 - `"Shot 14: lighting written as a transition (Golden Hour → dusk) — pick ONE state; time passes between shots."`
 - `"Shot 22: the arc lifts the ship but @ship_object_ref is not in materials — bind it or the ship renders invented."`
 - `"Shot 5: COMPOSITION LOCK or END STATE LOCK missing — extract from Panel 1 / Panel N + row; soft citations are insufficient."`
@@ -176,23 +186,23 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
 
 ## Camera phrasing — the five rules that prevent the most common failures
 
-1. **One primary camera move per shot.** Compound moves are sequenced as beats in event order ("Begins as a slow dolly-in, then eases into a gentle pan right for the closing moment"), never stacked and never timestamped.
-2. **Rhythmic plain words, not technical specs.** "slow, smooth, steady, gradual, gentle, drifting" work; "24fps, f/2.8, ISO 800, 85mm" is ignored decoration — as are output specs in prompt text ("1080p", "4K", "2.39:1 anamorphic widescreen framing intent" — the last risks baked-in letterbox bars; anamorphic LENS character is legitimate Look language, the RATIO is not). Describe the feel you'd give an operator, not a camera-body setup.
-3. **One thing moves fast at a time.** "The dancer spins; the camera holds a fixed frame" works; "camera spins around a spinning dancer" is chaos. Dominant subject → calm/locked camera; dominant camera → calm subject; secondary motion slower, smaller, subordinate.
-4. **"Fast" is the single most quality-degrading word.** Default slow/medium; reserve speed for one deliberate isolated moment.
+1. **One primary camera move per shot.** Compound moves are sequenced as beats in event order ("Begins as a steady dolly-in, then eases into a pan right for the closing moment"), never stacked and never timestamped.
+2. **Rhythmic plain words, not technical specs.** Prefer "smooth, steady, constant, drifting" for natural real-time; "slow / gentle / gradual / lingers" only when the row deliberately calls for slow (and at most one per prompt — see anti-stacking). "24fps, f/2.8, ISO 800, 85mm" is ignored decoration — as are output specs in prompt text ("1080p", "4K", "2.39:1 anamorphic widescreen framing intent" — the last risks baked-in letterbox bars; anamorphic LENS character is legitimate Look language, the RATIO is not). Describe the feel you'd give an operator, not a camera-body setup.
+3. **One thing moves fast at a time.** "The dancer spins; the camera holds a fixed frame" works; "camera spins around a spinning dancer" is chaos. Dominant subject → calm/locked camera; dominant camera → calm subject; secondary motion smaller and subordinate.
+4. **"Fast" is the single most quality-degrading word.** Default is **natural real-time** (not slow); reserve speed for one deliberate isolated moment. Stacking slow-words is the opposite failure — clips that read as slo-mo.
 5. **A reference video beats text for an exact camera move.** Text carries spatial decisions; a short stabilized clip (`@Video1 for camera movement`) carries a precise trajectory (a shaky reference copies the shake).
 
 **Shot size** — state it explicitly (extreme wide / wide / full / medium-wide / medium / medium close-up / close-up / extreme close-up): wide for scale and place, medium for behavior, close for emotion.
 **Angle** — state only when it carries meaning: low (power/scale), high (vulnerability), overhead (layout), over-the-shoulder (two-person space), Dutch (unease); eye-level is the silent default.
 **Lens character** comes from the Look, identical every shot; depth of field varies by intent, phrased as feel ("shallow focus, soft background"), never f-numbers.
-**A camera line reads:** [size] + [angle if non-neutral] + [one movement, rhythmic] + [focus feel] — "Medium close-up, slight low angle, slow dolly-in over the shot, shallow focus with a soft background."
+**A camera line reads:** [size] + [angle if non-neutral] + [one movement, rhythmic] + [focus feel] — "Medium close-up, slight low angle, steady dolly-in over the shot, shallow focus with a soft background."
 
 ## Camera Movement Encyclopedia (phrasing for the move chosen at Step 7)
 
 | Movement                      | When it fits                                    | Seedance phrasing                                                                                                       |
 | ----------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| **Dolly Forward / Push-In**   | rising tension, intimacy, focus                 | "Camera dollies forward at constant slow speed, subject centered, sharp focus maintained, no focus breathing."          |
-| **Dolly Back / Pull-Out**     | reveal, release, isolation, context             | "Camera pulls back steadily, subject anchored in frame, background gradually revealed."                                 |
+| **Dolly Forward / Push-In**   | rising tension, intimacy, focus                 | "Camera dollies forward at constant speed, subject centered, sharp focus maintained, no focus breathing."               |
+| **Dolly Back / Pull-Out**     | reveal, release, isolation, context             | "Camera pulls back steadily, subject anchored in frame, background revealed."                                           |
 | **Truck Left/Right**          | lateral reveal, following without reframing     | "Camera trucks [left/right] smoothly, subject holds frame position, parallax: background moves slower than foreground." |
 | **Pan / Tilt**                | survey a space, reveal scale                    | "Camera [pans/tilts] smoothly with eased start and stop, no jerk, ending on [subject]."                                 |
 | **Handheld**                  | urgency, documentary unease                     | "Handheld micro-vibration, subtle breathing motion, not locked-off; human imperfection."                                |

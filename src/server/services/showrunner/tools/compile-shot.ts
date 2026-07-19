@@ -43,7 +43,7 @@ const compileShotInputSchema = z.object({
     .enum(CONTINUITY_MODES)
     .describe(
       "fresh = stills-only (scene open / clean break / new take). " +
-        "extend_video = continue from previous approved clip (walks / continuous action)."
+      "extend_video = continue from previous approved clip (walks / continuous action)."
     ),
   source_video_url: z
     .string()
@@ -54,8 +54,8 @@ const compileShotInputSchema = z.object({
     .nullable()
     .describe(
       "Full Seedance 2.0 prompt when status=ok; null when status=gap. " +
-        "For extend_video, open with Extend <Video_1>: … (never say 'reference <Video_1>'). " +
-        "When continuing across clips, CONTEXT must restate footing from the previous last frame."
+      "For extend_video, open with Extend <Video_1>: … (never say 'reference <Video_1>'). " +
+      "When continuing across clips, CONTEXT must restate footing from the previous last frame."
     ),
   duration_seconds: z
     .number()
@@ -67,27 +67,22 @@ const compileShotInputSchema = z.object({
   resolution: z
     .string()
     .default("1080p")
-    .describe("Structured API field only — never words inside render_prompt."),
-  aspect_ratio: z
-    .enum(["16:9", "9:16", "1:1"])
-    .default("16:9")
-    .describe("Locked Look aspect ratio — structured API field, not prompt text."),
-  references: z
-    .array(referenceSlotSchema)
-    .max(9)
-    .default([])
-    .describe(
-      "Slot metadata in precision order: character → object → location → scene anchor → " +
+    .describe("Structured API field only — never words inside render_prompt."), references: z
+      .array(referenceSlotSchema)
+      .max(9)
+      .default([])
+      .describe(
+        "Slot metadata in precision order: character → object → location → scene anchor → " +
         "incoming anchor → motion sheet. Must match reference_image_urls length/order."
-    ),
+      ),
   reference_image_urls: z
     .array(z.string())
     .max(9)
     .default([])
     .describe(
       "Resolved approved image URLs in the same order as references. Required for fresh; " +
-        "optional for extend_video when identity is carried by the source clip " +
-        "(still attach sheet + scene/incoming anchors when available)."
+      "optional for extend_video when identity is carried by the source clip " +
+      "(still attach sheet + scene/incoming anchors when available)."
     ),
   checks: z
     .record(z.string(), z.unknown())
@@ -148,10 +143,7 @@ export function toCompileShotArgs(
     prompt,
     referenceImageUrls: refs,
     duration,
-    aspectRatio:
-      ((a.aspect_ratio as CompileShotArgs["aspectRatio"] | undefined) ??
-        (a.aspectRatio as CompileShotArgs["aspectRatio"] | undefined) ??
-        "16:9"),
+    aspectRatio: "16:9",
     continuityMode,
     sourceVideoUrl: sourceVideoUrl || undefined,
     resolution: (a.resolution as string | undefined) ?? "1080p",
@@ -179,7 +171,7 @@ export function validateCompilePackage(args: CompileShotToolInput): string[] {
       prompt: args.render_prompt ?? "",
       referenceImageUrls: args.reference_image_urls,
       duration: args.duration_seconds ?? 0,
-      aspectRatio: args.aspect_ratio,
+      aspectRatio: '16:9',
       continuityMode: args.continuity_mode,
       sourceVideoUrl: args.source_video_url ?? undefined,
     })

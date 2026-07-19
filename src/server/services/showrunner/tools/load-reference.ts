@@ -7,7 +7,9 @@ const SKILLS_BASE = resolve(process.cwd(), "src/server/prompts/skills");
 
 const STAGE1_REFS = new Set([
   "pipeline-steps.md",
-  "deliverable-templates.md",
+  "look-template.md",
+  "bible-template.md",
+  "shot-list-template.md",
   "medium-constraints.md",
   "generation-grids.md",
 ]);
@@ -32,13 +34,15 @@ export const loadReference = tool({
   description:
     "Read a detailed reference file from the skill. Call this when the " +
     "instructions tell you to consult a references/ file (e.g. " +
-    "'see references/deliverable-templates.md'). Returns that file's full text. " +
+    "'see references/shot-list-template.md'). Returns that file's full text. " +
     "Use stage2-skill.md only after Stage 1's Generation Grid Registry is complete and passing.",
   inputSchema: z.object({
     file: z
       .enum([
         "pipeline-steps.md",
-        "deliverable-templates.md",
+        "look-template.md",
+        "bible-template.md",
+        "shot-list-template.md",
         "medium-constraints.md",
         "generation-grids.md",
         "stage2-skill.md",
@@ -49,18 +53,11 @@ export const loadReference = tool({
   execute: async ({ file }: { file: string }) => {
     const target = resolveReference(file);
     if (!target || !target.startsWith(SKILLS_BASE + "/")) {
-      return {
-        type: "text" as const,
-        value: `Access denied or unknown file: ${file}.`,
-      };
+      return `Access denied or unknown file: ${file}.`;
     }
     if (!existsSync(target)) {
-      return {
-        type: "text" as const,
-        value: `File not found: ${file}.`,
-      };
+      return `File not found: ${file}.`;
     }
-    const content = readFileSync(target, "utf-8");
-    return { type: "text" as const, value: content };
+    return readFileSync(target, "utf-8");
   },
 });

@@ -16,7 +16,7 @@ const MAX_PANELS = 9;
 
 /**
  * approved_candidate_id must dereference to pixels (storage key / media URL).
- * toolCallId is ephemeral and must never be stored here — see MAINTENANCE.md.
+ * toolCallId is ephemeral and must never be stored here.
  */
 export function validateApprovedCandidateId(id: string | null | undefined): string[] {
   const errors: string[] = [];
@@ -135,8 +135,8 @@ const entryFieldsSchema = z.object({
     .optional()
     .describe(
       "Canonical Bible lighting state for this sheet (same as generateGenerationGrid.lightingState). " +
-        "Optional on record — auto-filled from the generate call when omitted. " +
-        "In-shot transitions still need lighting_transition_exception=true + reason."
+      "Optional on record — auto-filled from the generate call when omitted. " +
+      "In-shot transitions still need lighting_transition_exception=true + reason."
     ),
   lighting_transition_exception: z
     .boolean()

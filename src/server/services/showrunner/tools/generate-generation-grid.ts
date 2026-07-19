@@ -143,10 +143,6 @@ const generateGenerationGridInputSchema = z.object({
     .describe(
       "One caption per panel, in reading order (L→R, T→B). Length MUST equal panelCount. Shown under the sheet as a caption strip."
     ),
-  aspectRatio: z
-    .enum(["16:9", "9:16", "1:1"])
-    .default("16:9")
-    .describe("The film's LOCKED aspect ratio from the Look — panels must render in the film's true ratio."),
 });
 
 export type GenerateGenerationGridInput = z.infer<typeof generateGenerationGridInputSchema>;
@@ -288,7 +284,6 @@ export const generateGenerationGrid = tool({
 export async function generateGenerationGridImages(
   imagePrompt: string,
   referenceImageUrls: string[],
-  aspectRatio: "16:9" | "9:16" | "1:1"
 ): Promise<string[]> {
   const results = await Promise.all(
     Array.from({ length: GRID_CANDIDATE_COUNT }, () =>
@@ -296,7 +291,7 @@ export async function generateGenerationGridImages(
         model: "gpt-image-2",
         prompt: imagePrompt,
         referenceImages: referenceImageUrls,
-        aspectRatio,
+        aspectRatio: "16:9",
       })
     )
   );

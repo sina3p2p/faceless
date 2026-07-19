@@ -1,88 +1,219 @@
-# Pipeline Steps — Detailed Guidance
+# Pipeline Steps — Stage 1
 
-Per-step guidance for the 10-step pipeline in SKILL.md. Method everywhere: _diverge → user converges → lock → advance._ Number the options, give a reasoned recommendation, stop and let the user choose. Worked fragments from past runs are FORM models (specificity, motion arcs, cut handoffs), never content or genre to reuse — adapt option labels to the locked tone. Steps 1–5 stay short: options + one ask.
+This file is authoritative for Stage 1 order, artifacts, forks, completion criteria, reference timing, final audit, and Stage 2 handoff.
 
-## Step 1 — Premise
+Read the complete file before starting. Apply the interaction contract from `SKILL.md`: _diverge → user converges → lock → validate → advance_. Do not advance until the current step’s **Done when** gate passes.
 
-Lock the seed sentence plainly and name what it already fixes — genre, setting, any built-in "button" (recurring payoff); it's a coordinate, not a destination. URL in the seed → `webExtract` first; lock the seed with what the source actually says. **Screen-thesis / readable-UI climax:** if a direction's payoff requires the audience to read specific on-screen text or UI (not merely sense density/glow), flag it — current medium stance is Path A (implied-not-read). Redesign the button to implied UI, or get an explicit user ack that legibility is aspirational and will drift. Do not invent a "locked string" asset Seedance cannot honor. **Named real orgs:** if dramatization would invent incriminating depicted "evidence" about a real company, fork fictionalize / keep hypothetical / user ack before locking. Then offer ~6 distinct directions, each with a different protagonist AND a different engine (the mechanism that generates scenes/tension/humor/dread), plus each one's recurring payoff. Flag which options give a single clear protagonist (easiest consistency) and which are most purely visual (best for AI). Lock one direction or a splice.
+## Reference rule
 
-## Step 2 — Story spine (logline + conflict + theme, one artifact)
+When a step names a reference, ensure its complete contents are active before executing that step. Otherwise call `loadReference`, read the complete result, and stop if it fails. Never reconstruct a reference from memory. This file alone owns reference timing.
 
-Prove the story has a spine, in one bundled turn.
+## Fast path
 
-- **Logline:** offer several on different axes — tone-forward, irony-forward, lean one-liner, character-stakes-forward (smuggles in a ticking clock). Judge each: would a stranger want to watch this? Recommend blending real stakes/clock with the clean statement of the core irony. If no version is compelling, STOP and rework the premise.
-- **Conflict:** separate the external _want_ (conscious goal, drives plot) from the deeper _need_ (internal lack the story resolves) — the gap between them is where drama lives. Define the opposing force concretely and why it's hard to beat (the best obstacles don't know what they're obstructing). Build in any "why can't they just…" trap that keeps a powerful character stuck at human scale. Offer 2–3 candidates for the deeper need — each colors the ending differently; recommend the need the plot already dramatizes.
-- **Theme:** offer ~5 one-sentence _claims_ about life (not topics). The theme's flavor sets the mood vocabulary that later picks lighting and color. Recommend the claim the ending will literally prove.
-
-Bundle the asks (logline choice, need choice, theme choice) in ONE `askQuestions` call. Lock the spine as one block: protagonist + goal + obstacle + stakes + irony; want vs need; the claim.
-
-## Step 3 — Character design
-
-First audit the cast to the minimum viable set; name hero faces (each earns a reference image at Step 9) vs disposable background (no reference). For each main character offer the consequential forks: look/design (2–4 options, explicitly trading expressiveness against consistency — simple distinctive silhouettes drift least), any constraint the premise needs, supporting characters' flavor. Then write the locked result as a renderable `@material` spec: species/build, fixed proportions, silhouette anchor, **fixed wardrobe** + one instantly-readable detail, signature expression, 2–3 never-drift anchor features, and a handle name (`hero_charsheet`). The spec is the source for Step 9 expansion, written for a human — expansion turns it into the image prompt. Tip: turn invisible stakes into a visible on-character detail.
-
-## Step 4 — World & locations
-
-Write each location as a named renderable plate spec (geometry, light direction, atmosphere), then consolidate ruthlessly: one master location with zones beats many places. Offer the time-of-day structure: a single day (visible sky-clock, most consistent) vs multiple days (more scale, more lighting variation — tame it with a small set of canonical lighting states and a clock that changes _between_ shots). Lock the plate list + time structure.
-
-## Step 5 — The Look [critical]
-
-The #1 consistency tool: the renderer re-specifies lighting/grade/lens on every prompt, so drift here disintegrates the film. Draft ONE reusable block per the Bible §1 template (`deliverable-templates.md`) and offer only the genuine forks inside it (typically dialogue register and aspect ratio — aspect must be an API-supported value; anamorphic FEEL is lens character, not a ratio). Recommend deriving it from theme + genre + the premise's natural setting. Lock verbatim.
-
-## Step 6 — Beat sheet (with the connective read)
-
-List the structural turns in order (opening image, inciting event, midpoint shift, low point, climax, resolution — compressed for shorts), threaded with short connective prose between beats so the whole story reads continuously — this replaces a standalone synopsis. Tag every beat: MOOD word, LIGHT state, HOOK yes/no (almost none), MATERIALS needed. Interrogate here for the saggy middle and the unearned ending — this is the last cheap place to fix story; check the mood tags trace a deliberate emotional curve; flag any beat leaning toward a theme that was set aside. Give dramatic irony its own beat when the film runs on the audience knowing more than the hero. End with the continuous-read sanity check (does it flow, does the click land, is the tone arc intact?). Size to runtime (below).
-
-## Step 7 — Shot list (scenes built with outline logic inline)
-
-THE deliverable, built **scene by scene**: for each beat, break it into scenes (one location + one continuous time span; an intercut beat = two scenes with alternating rows), write the scene's full continuity-block header, then its rows — and only then move to the next beat's scenes.
-
-While writing each header, apply the old outline's disciplines inline:
-
-- **Scene-delta rule:** every scene names its ONE job and its irreversible story-state change; a scene that can't state a new end state gets merged, cut, or rewritten, and consecutive scenes must differ visibly (a State Schedule value or the lighting state). **Do not open a new scene solely because lighting changes** — lighting progression belongs inside one scene's continuity block when location and geography stay continuous (match-cut pairs that only change light/scheduled content stay co-scenic).
-- **Running accounting:** track total locations and characters against the locked inventory as scenes accumulate; consolidate while it's still text; cut assets no scene uses.
-
-Header schema, column rules, and camera-choosing vocabulary: `deliverable-templates.md` §B and §B2. Keep a running total of shots and seconds against the target runtime.
-
-**Dialogue pass (conditional):** for dialogue-driven scenes, write the lean dialogue beats directly into the rows' motion arcs; when spoken flow needs judging on the page, draft a short screenplay-format excerpt for just those scenes and lock the lines before the rows. A full formatted screenplay is produced only if the user asks for one as a deliverable.
-
-Author rows only — prompt assembly is Stage 2's job.
-
-## Step 8 — The Bible (assembly + State Schedule fork)
-
-Assemble §A from locked artifacts: §1 the Look verbatim (Step 5), §2 the master `@material` list with canonical definition lines (Steps 3–4 specs), §3 the standing directives from the template (fill G's hook shots and D's deliberate-motion list from the beat sheet and rows). The one authored part is **§4 the State Schedule** — every changing element's progression across shots, the lighting progression, and match-cut pairs. Present the State Schedule as this step's fork (the rest is a silent concatenation check), lock, and the Bible is done.
-
-## Step 9 — Asset reference generation
-
-Audit the manifest first: identity anchors only (characters, plates, recurring hero props in ONE neutral state), typically 4–8 images; strike disguised shots; fused entities get their own object refs; plates stay environment-only when a hero prop has its own ref; charsheets follow the held-tool policy in `medium-constraints.md`. Present the audited list as a fork — this is the taste decision; everything after it is verification.
-
-On manifest approval, run the batch: expand EVERY spec per `medium-constraints.md` (assets are independent — every expansion derives only from the locked spec + the locked Look, so nothing waits on anything), dispatch all generations together. The app returns **one candidate per asset** in ONE gallery.
-
-**Gallery review is per-item approve/reject (not choose-among):**
-
-- When the tool result shows `vision_status:attached`, pre-screen every candidate against its approval checklist (`medium-constraints.md`) — especially the twin-bug check on charsheets — in that turn. Failures regenerate before asking the user to approve, or show pre-flagged when regen budget is tight. Never claim a visual check on `vision_status:unverifiable`.
-- The user REJECTS individual assets (each rejection names the objection; that asset regenerates with the objection folded into its expansion prompt and returns to the gallery) and APPROVES the remainder via the gallery Approve button (`asset_approval` with per-asset candidate ids / storage keys) — never free text, never `askQuestions` for approval.
-- Regenerated assets come back as a small follow-up gallery; repeat until every manifest entry is bound.
-
-Characters still lead the gallery ordering (they're the highest-stakes identities and the most likely rejections — surfacing them first gets their re-roll cycle started earliest). Assets approved ≠ Stage 1 done — proceed to Step 10.
-
-## Step 10 — Motion sheets
-
-With assets approved, load `generation-grids.md` and follow it: one motion sheet per shot, anchored for scene continuity by the header's continuity block + plate + the scene's first approved sheet + the prior terminal panel (or match-cut source), recording every approval or skip via `recordGenerationGridEntry`. Pre-screen each fresh sheet while `vision_status:attached`; Approve-grid only — no approval `askQuestions`. Stage 1 completes when every shot has a validated registry entry.
+Audit supplied material against the relevant gates, lock what passes, and resume from the earliest missing or contradictory dependency. Existing story documents never eliminate the asset-reference or motion-sheet registry phases.
 
 ---
 
-## Runtime sizing (apply at Step 6, re-check at 7)
+## Step 1 — Premise
 
-Shot budget = total seconds ÷ average clip length.
+**Reference:** `medium-constraints.md`  
+**Artifact:** locked seed and direction  
+**Fork:** direction
 
-- ~2–3 min short ≈ 20–26 shots ≈ a 7-beat spine (compress multi-day grinds into ONE time-passing beat: match-cut + a scheduled changing element).
-- ~8–12 min short ≈ ~13 beats, room for a real escalation montage.
-  To lengthen, give the middle and climax more shots rather than adding beats.
+Load the reference before the first fork and keep it available throughout Stage 1.
 
-## The interrogation prompts (use after each artifact)
+Restate the seed and name what it fixes: genre, setting, required elements, source, format, or runtime. Resolve any medium, readable-UI, or real-organization dramatization issue before locking.
 
-- What's the most clichéd choice here, and what's the surprising alternative?
-- What's the weakest link — the thing that would make a viewer disengage?
-- Is each beat doing a _different_ job, or are two beats the same energy?
-- Does the ending _prove_ the theme, or just stop?
-- Is anything here expensive for AI video, and can we rewrite toward the medium's strengths without losing the point?
+Offer about six genuinely different directions. Each needs a distinct protagonist, story engine, and recurring visual payoff.
+
+**Done when:** seed, direction, protagonist, engine, and payoff are locked; medium and dramatization risks are resolved.
+
+---
+
+## Step 2 — Story spine
+
+**Reference:** `medium-constraints.md`
+**Artifact:** locked logline + conflict + theme  
+**Fork:** logline, deeper need, and thematic claim
+
+Offer loglines on different axes such as tone, irony, brevity, stakes, and visual appeal. Every viable version identifies protagonist, goal, obstacle, stakes, and central irony.
+
+Separate external **want** from internal **need**. Define the opposing force, why it is hard to beat, and why the obvious shortcut fails. Offer two or three needs and about five one-sentence thematic claims; recommend the claim the ending can visibly prove.
+
+Bundle the three decisions in one `askQuestions` call. If no spine is compelling, return to Step 1.
+
+**Done when:** protagonist, goal, obstacle, stakes, irony, want, need, opposing force, theme, and a theme-proving ending direction are locked.
+
+---
+
+## Step 3 — Character design
+
+**Reference:** `medium-constraints.md`  
+**Artifact:** minimal cast and renderable character specs  
+**Fork:** consequential visual and character choices
+
+Separate recurring hero faces from disposable background figures and minimize the cast. For each hero, offer choices that materially affect silhouette, expressiveness versus consistency, fixed wardrobe, premise constraints, or visible stakes.
+
+Write each locked hero as a human-readable `@material` spec: identity/species, build and proportions, silhouette anchor, fixed wardrobe, one readable detail, performance register, two or three never-drift features, and a unique handle. Do not expand image prompts until Step 9.
+
+**Done when:** cast tiers are clear and minimal; every hero has one unique, internally consistent, renderable specification; recurring-prop policy agrees with `medium-constraints.md`.
+
+---
+
+## Step 4 — World and locations
+
+**Reference:** `medium-constraints.md`  
+**Artifact:** locked plate inventory and time structure  
+**Fork:** single-day or multi-day structure
+
+Write each recurring location as a named plate spec: geometry, landmarks, depth planes, light direction, atmosphere, fixed features, zones, and handle.
+
+For multiple days, use a small set of canonical lighting states. Convert invisible stakes into scheduled visible changes where possible.
+
+**Done when:** every recurring location has a plate spec; time structure is locked; lighting and changing environmental states can feed the State Schedule; hero props remain separable from plates.
+
+---
+
+## Step 5 — The Look
+
+**References:** `look-template.md` and `medium-constraints.md`  
+**Artifact:** one verbatim locked Look block  
+**Fork:** genuine choices such as grade, lens character, or dialogue register
+
+Load `look-template.md` before drafting. Derive the Look from theme, genre, emotional arc, setting, and medium constraints.
+
+Complete every template field: aspect ratio (fixed at 16:9 — never a fork), lens/stock character, show grade, bounded named trims if needed, three or four canonical lighting states, sound approach, and tone north-star. Anamorphic qualities are lens character, not an invented ratio.
+
+**Done when:** every Look field is complete and compatible; the full Look is locked verbatim.
+
+---
+
+## Step 6 — Beat sheet
+
+**Reference:** `medium-constraints.md`  
+**Artifact:** locked beat sheet with connective read  
+**Fork:** structural repairs that require taste
+
+Build runtime-appropriate turns: opening, inciting event, escalation, midpoint, low point, climax, and resolution. Thread connective prose between them so the story reads continuously.
+
+Tag every beat **MOOD**, **LIGHT**, **HOOK yes/no**, and **MATERIALS**. Keep hooks rare. Give dramatic irony its own beat when it drives the story.
+
+Repair repeated energy, a sagging middle, invisible stakes, costly action, and any ending that does not prove the theme. Apply runtime sizing below.
+
+**Done when:** every beat has a distinct job and all four tags; the middle escalates; climax resolves the conflict; ending proves the theme; the beat count fits runtime.
+
+---
+
+## Step 7 — Shot list
+
+**Reference:** `shot-list-template.md`  
+**Artifact:** locked annotated shot list  
+**Fork:** scene structure, coverage, and dialogue choices
+
+Build scene by scene: divide the beat, write the complete continuity-block header, write its rows, validate, then continue. A scene is one location, one continuous time span, and stable geography; intercuts use separate alternating scenes.
+
+Every scene must name one job, one irreversible delta, and its visible end-state difference. Merge, cut, or rewrite scenes without a delta. Do not split only because lighting changes.
+
+Use the exact template schemas and camera vocabulary. Track locations, cast, props, shot count, and estimated runtime while authoring. Produce a full screenplay only on request. Author rows only; final video prompt assembly belongs to Stage 2.
+
+**Done when:** every beat has coverage; every scene has a valid delta and continuity block; every row passes the row template, describes start → change → end, has one dominant motion source and one lighting state unless excepted, binds every recurring visible entity, and provides usable cut handoffs; runtime fits and the list is locked.
+
+---
+
+## Step 8 — The Bible
+
+**Reference:** `bible-template.md`  
+**Artifact:** locked Visual and Tone Bible  
+**Fork:** State Schedule
+
+Assemble, do not rewrite:
+
+- §1 — Step 5 Look verbatim;
+- §2 — canonical `@material` definitions from Steps 3–4;
+- §3 — template directives completed from locked beats and rows;
+- §4 — State Schedule authored now.
+
+The State Schedule covers every changing physical, wardrobe, prop, location, lighting, clock, damage, depletion, and match-cut state. Present only this schedule as the creative fork, then run contradiction checks and lock the Bible.
+
+**Done when:** §1 is verbatim; §2 covers every image-bound material; §3 preserves canonical directives; §4 covers every changing element and match cut; Bible and shot list agree; the Bible is locked.
+
+---
+
+## Step 9 — Asset references
+
+**Reference:** `medium-constraints.md`  
+**Artifact:** approved reference-image set with all required handles bound  
+**Fork:** audited asset manifest
+
+Audit identity anchors only: hero characters, recurring plates, recurring hero props/vehicles, and required location-state versions. Remove disguised shots, one-off figures, redundant views, and plate/object identity conflicts. Apply the held-tool policy.
+
+Expand each spec into its image prompt using only its locked definition, the locked Look, and the expansion method in `medium-constraints.md`; dispatch independent generations together; return one candidate per item; pre-screen visible pixels.
+
+The user rejects individual candidates with an objection and approves acceptable ones through `asset_approval`. Regenerate only rejected items.
+
+**Done when:** the manifest is approved; every item has one approved reference; character sheets pass their checklist; plates and objects do not conflict; every Bible §2 image handle resolves; no rejection remains unresolved.
+
+---
+
+## Step 10 — Motion sheets and registry
+
+**Reference:** `generation-grids.md`  
+**Artifact:** approved motion sheets and passing Generation Grid Registry  
+**Fork:** only user-controlled exceptions allowed by the reference
+
+Load and follow the complete reference. Prerequisites are a locked Bible, locked shot list, complete continuity blocks, and approved assets.
+
+Generate one sheet per shot unless the reference permits a valid recorded skip. Follow it for panels, anchors, continuity chains, breaks, match cuts, lighting, approvals, and skips. Sheet approval must arrive through `grid_approval`.
+
+**Done when:** every shot appears exactly once; every non-skipped shot has an approved sheet; every approval or skip is recorded; continuity and lighting fields validate; the registry passes.
+
+---
+
+## Runtime sizing
+
+Apply at Step 6 and recheck at Step 7, for any target runtime:
+
+```text
+shot budget = target runtime in seconds ÷ intended average shot length
+```
+
+- Scale the beat count to the runtime; shorter films compress the spine, longer films deepen it.
+- Add shots to important middle or climax beats rather than repetitive beats.
+- Compress long time passage with scheduled changes and match cuts.
+- Each shot must satisfy `generation-grids.md` duration limits.
+
+## Interrogation
+
+Before locking, identify the most clichéd choice, weakest link, repeated energy, ending/theme mismatch, avoidable generation cost, and contradictions with locked material. Surface actual failures only.
+
+## Final Stage 1 audit
+
+Run silently after Step 10. Confirm:
+
+- Bible and shot list are locked.
+- Every image-bound material resolves to one approved asset.
+- Every shot resolves to exactly one approved-sheet or valid-skip entry.
+- No orphan handles or unbound motion-arc entities exist.
+- State Schedule, lighting, continuity, cut handoffs, and match cuts agree.
+- Estimated durations fit the target.
+- No Stage 2 creative decision remains.
+- The Generation Grid Registry passes.
+
+Stage 1 produces: locked Bible, locked shot list, approved reference images, approved motion sheets, and a passing registry.
+
+## Stage 2 handoff
+
+Only after the final audit passes:
+
+1. In the same turn call:
+
+   ```text
+   loadReference("stage2-skill.md")
+   loadReference("shot-compilation-recipe.md")
+   ```
+
+2. Read both complete files.
+3. Do not compile or render during that loading turn.
+4. Begin Stage 2 on the next turn with both references active.
+
+If either load fails, report the missing file and stop. Stage 2 must not invent missing creative decisions.

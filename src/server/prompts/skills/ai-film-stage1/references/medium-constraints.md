@@ -1,16 +1,16 @@
 # Medium Constraints — Writing for AI Video
 
-Consult whenever a creative choice has a generation cost. Craft rules here are production defaults for the tested model profile (canonical statements: Bible template §A.3 in `deliverable-templates.md`); this file carries the writing guidance and the asset-expansion method. Extended failure histories and rationale live in `MAINTENANCE.md` (not loaded at runtime).
+Consult whenever a creative choice has a generation cost. Craft rules here are production defaults for the tested model profile (canonical statements: Bible template §3 in `bible-template.md`); this file carries the writing guidance and the asset-expansion method.
 
 ## Lean INTO (AI does these beautifully)
 
-Atmosphere, weather, particles (dust, haze, spray, smoke); striking single images and surreal/impossible visuals; slow deliberate camera movement; physical comedy and big visual gags; big landscapes, skies, water; strongly-characterized light of any kind; silhouettes and scale contrast (tiny figure in vast space).
+Atmosphere, weather, particles (dust, haze, spray, smoke); striking single images and surreal/impossible visuals; slow deliberate camera movement (as a deliberate row-level choice — subject pace still defaults to natural real-time; see the motion lessons below); physical comedy and big visual gags; big landscapes, skies, water; strongly-characterized light of any kind; silhouettes and scale contrast (tiny figure in vast space).
 
 ## Steer AWAY (current failure modes)
 
-Long takes of plot-critical lip-synced dialogue; complex hand manipulation / fine finger work; readable on-screen text (signs, documents, UI — dramatize as short labels, blurred tables, implied UI / density; do **not** promise locked legible strings Seedance will regenerate every frame); large crowds that must stay consistent shot to shot; tightly choreographed continuous action across a long take; exact repeatable likeness of a real person (also a legal/ethical minefield — prefer fully synthetic faces). If the film's climax *is* readable screen content, flag at premise — Path A (implied) is the honest Stage 1 stance until a composite overlay path exists.
+complex hand manipulation / fine finger work; readable on-screen text (signs, documents, UI — dramatize as short labels, blurred tables, implied UI / density; do **not** promise locked legible strings Seedance will regenerate every frame); large crowds that must stay consistent shot to shot; tightly choreographed continuous action across a long take; exact repeatable likeness of a real person (also a legal/ethical minefield — prefer fully synthetic faces). If the film's climax _is_ readable screen content, flag at premise — Path A (implied) is the honest Stage 1 stance until a composite overlay path exists.
 
-**The two structural consequences (enforce in Steps 3–4):** tiny cast (2–3 hero faces; everyone else disposable background) and few, consolidated locations (one master location with zones; keep offscreen what can stay offscreen). Each recurring face and each distinct location is a reference image and a drift risk.
+**Cast guidance:** keep the recurring hero cast intentionally small; background figures do not need identity references.
 
 ## Character drift is the #1 failure mode
 
@@ -42,9 +42,9 @@ A spec is written for a human ("frail, sympathetic grey alien with a teal chest 
 
 **The ten-generations test for any reference prompt:** if you generated this same prompt ten times, would all ten be recognizably the same character/place? Looseness that lets them diverge is exactly what becomes drift downstream — tighten the anchors before generating.
 
-## Dialogue: when it's safe
+## Dialogue
 
-Native-audio models weaken the old "avoid dialogue" rule. The durable pattern: generate the **voice once** in an external tool, feed it to the video model as an **audio reference** so the voice is fixed and visuals sync to it — per-clip fresh synthesis drifts. This also fixes timing and word precision. Still keep dialogue lean; physical/visual storytelling is more robust.
+Dialogue is allowed, including plot-critical and multi-turn scenes. Preferred production path: generate the **voice once** in an external tool, feed it to the video model as an **audio reference** so the voice is fixed and visuals sync to it — per-clip fresh synthesis drifts. Match shot Dur to the spoken line (don't stretch a short line across a long take). Coverage can cut mid-conversation; one continuous lip-synced take is fine when Dur ≤15s.
 
 ## The two foundational motion lessons (compressed)
 
@@ -52,6 +52,8 @@ Native-audio models weaken the old "avoid dialogue" rule. The durable pattern: g
 
 - **The morphing pyramid (too little lock):** a text-driven pull-back with no plate and no fixed-state instruction let the model grow a structure from ~70% to finished inside one 9-second shot. Fix: state the exact fixed state as a present fact in CONTEXT, add the targeted static-lock clause naming the structure, and bind the location plate at the correct version so the model anchors to pixels, not invention. Deliberate on-camera changes (a beam firing, a ship lifting) get the opposite — explicit state-change in event order (never second-marks), listed in Bible §3D.
 - **The frozen tableau (too much lock):** a beautiful night shot rendered as a living photograph — the row described an _image_ instead of an _event_ (no verb), a blanket "subject unchanged" froze the characters, the camera was also locked, and drifting mist can't carry a shot. Fix: **no-delta-no-shot** (every row is a motion arc or a written performance hold), **one dominant motion source per shot**, and characters always performed — the lock names its rigid target, never "subject unchanged."
+- **The stretched single-beat (too thin for its Dur):** one action stretched across 8–12s reads as slow motion. Fix: enrich PRIMARY ACTION to a **2–4 beat arc** (~1 beat / 2–3s) or shorten Dur to 4–6s; default pace is natural real-time — never stack slow-words ("lingers" + "gently" + "slow dolly").
+- **Frozen extras (unperformed figures):** three people in frame, only the hero moves — unbound / background-tier figures inherit the reference still's pose and freeze. Fix: every human in frame gets a verb or group motion (`"the two workers behind continue hauling rope"`); treat unnamed humans like ambient life — explicitly requested, never silent. Reference images govern identity/wardrobe/proportions only, never pose.
 
 ## Showing time pass without a montage
 
@@ -66,6 +68,8 @@ A clock the audience can't see does nothing for the image. Bind stakes to an on-
 When the user shares a clip that's "off":
 
 - Extract frames (`ffmpeg -i clip.mp4 -vf fps=1 frame_%02d.jpg`) and inspect the progression.
-- Decide: **prompt wording** (needs a lock or a state instruction) or **missing reference** (needs an `@material` image)? Most "the model did something weird" problems are "we let it invent because we fed text, not a reference."
+- Decide: **prompt wording** (needs a lock, a state instruction, more beats, or background-figure verbs) or **missing reference** (needs an `@material` image)? Most "the model did something weird" problems are "we let it invent because we fed text, not a reference."
+- **Stretched single-beat:** one action over a long duration → shorten Dur or enrich the arc to 2–4 beats; strip stacked slow-words.
+- **Frozen extras:** unperformed figures freeze in the reference pose → give every human in frame a verb / group motion; confirm the identity-not-pose clause is on character definitions.
 - Feed the lesson back into the Bible as a directive so it can't silently recur.
 - Sometimes a "bug" is beautiful — offer to repurpose it as a deliberate special shot (vision/dream/transformation) rather than forcing it into a continuous-realism slot.
