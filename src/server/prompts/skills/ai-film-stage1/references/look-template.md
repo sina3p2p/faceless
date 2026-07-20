@@ -14,7 +14,7 @@ The Show Look block authored at Step 5 and locked verbatim. At Step 8 it is past
   cooler trim"; per-shot freestyle grading is not a thing]
 - Lighting — canonical states ONLY: [STATE: Kelvin, shadow behavior, intended use] × 3–4
 - Sound: [one recurring score idea + arrangements; ambient bed; foley; dialogue approach
-  + named voices if using an external voice tool]
+  + named `@*_vo` handles from `generateVoiceAnchors`]
 - Tone north-star: [one sentence]
 ```
 

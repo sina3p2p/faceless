@@ -12,6 +12,7 @@ import type {
   QuestionsCall,
   GenerationGrid,
   ShotCompile,
+  VoiceAnchor,
 } from "@/types/v2/story";
 import { useMobileTab } from "@/components/story-shell";
 import { cn } from "@/lib/utils";
@@ -156,6 +157,8 @@ export function StoryChat({
         m.shotCompile?.rendering ||
         m.assetRef?.loading ||
         m.assetRef?.items?.some((i) => i.loading) ||
+        m.voiceAnchor?.loading ||
+        m.voiceAnchor?.items?.some((i) => i.loading) ||
         m.generationGrid?.loading
     );
   }
@@ -252,6 +255,26 @@ export function StoryChat({
                               },
                             ]
                           : m.assetRef!.items),
+                      error: event.error as string | undefined,
+                    },
+                  }
+                : m
+            );
+            if (!hasPendingJobs(next)) closeJobEventsStream();
+            return next;
+          });
+        } else if (event.type === "voice_anchor") {
+          const toolCallId = event.toolCallId as string;
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.voiceAnchor?.toolCallId === toolCallId
+                ? {
+                    ...m,
+                    voiceAnchor: {
+                      ...m.voiceAnchor!,
+                      loading: false,
+                      items: (event.items as VoiceAnchor["items"] | undefined) ??
+                        m.voiceAnchor!.items,
                       error: event.error as string | undefined,
                     },
                   }
@@ -427,6 +450,27 @@ export function StoryChat({
         prev.map((m) => (m.id === tempId ? { ...m, assetRef } : m))
       );
       if (pending) openJobEventsStream();
+    } else if (event.type === "voice_anchor_loading") {
+      const voiceAnchor: VoiceAnchor = {
+        toolCallId: event.toolCallId as string,
+        loading: true,
+        items: [],
+      };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, voiceAnchor } : m))
+      );
+    } else if (event.type === "voice_anchor") {
+      const pending = event.pending === true || !event.items;
+      const voiceAnchor: VoiceAnchor = {
+        toolCallId: event.toolCallId as string,
+        loading: pending,
+        items: (event.items as VoiceAnchor["items"] | undefined) ?? [],
+        error: event.error as string | undefined,
+      };
+      setMessages((prev) =>
+        prev.map((m) => (m.id === tempId ? { ...m, voiceAnchor } : m))
+      );
+      if (pending) openJobEventsStream();
     } else if (event.type === "generation_grid_loading") {
       const generationGrid: GenerationGrid = { toolCallId: event.toolCallId as string, loading: true };
       setMessages((prev) =>
@@ -466,6 +510,7 @@ export function StoryChat({
         loading: false,
         renderPrompt: event.renderPrompt as string,
         referenceImageUrls: event.referenceImageUrls as string[],
+        referenceAudioUrls: event.referenceAudioUrls as string[] | undefined,
         duration: event.duration as number,
         aspectRatio: event.aspectRatio as ShotCompile["aspectRatio"],
         continuityMode: event.continuityMode as ShotCompile["continuityMode"],
@@ -683,6 +728,7 @@ export function StoryChat({
       (m) =>
         m.generationGrid?.toolCallId === toolCallId ||
         m.assetRef?.toolCallId === toolCallId ||
+        m.voiceAnchor?.toolCallId === toolCallId ||
         m.shotCompile?.toolCallId === toolCallId ||
         m.shotResult?.toolCallId === toolCallId
     );
@@ -728,6 +774,22 @@ export function StoryChat({
               })),
             },
           };
+        if (m.voiceAnchor?.toolCallId === toolCallId)
+          return {
+            ...m,
+            voiceAnchor: {
+              ...m.voiceAnchor!,
+              loading: true,
+              error: undefined,
+              items: (m.voiceAnchor!.items ?? []).map((i) => ({
+                ...i,
+                loading: true,
+                url: undefined,
+                id: undefined,
+                error: undefined,
+              })),
+            },
+          };
         if (m.generationGrid?.toolCallId === toolCallId)
           return { ...m, generationGrid: { ...m.generationGrid!, loading: true, error: undefined, images: undefined } };
         return m;
@@ -762,6 +824,16 @@ export function StoryChat({
                 loading: false,
                 error: String(err),
                 items: (m.assetRef!.items ?? []).map((i) => ({ ...i, loading: false })),
+              },
+            };
+          if (m.voiceAnchor?.toolCallId === toolCallId)
+            return {
+              ...m,
+              voiceAnchor: {
+                ...m.voiceAnchor!,
+                loading: false,
+                error: String(err),
+                items: (m.voiceAnchor!.items ?? []).map((i) => ({ ...i, loading: false })),
               },
             };
           if (m.generationGrid?.toolCallId === toolCallId)
@@ -801,6 +873,85 @@ export function StoryChat({
       )
     );
     await streamResponse({ type: "asset_approval", toolCallId, approvals });
+  }
+
+  async function handleVoiceApproval(
+    toolCallId: string,
+    approvals: Array<{ handle: string; candidateId: string; approvedUrl: string }>
+  ) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role === "assistant" && m.voiceAnchor?.toolCallId === toolCallId
+          ? {
+              ...m,
+              voiceAnchor: {
+                ...m.voiceAnchor!,
+                approved: true,
+                items: (m.voiceAnchor!.items ?? []).map((item) => {
+                  const a = approvals.find((x) => x.handle === item.handle);
+                  return a
+                    ? {
+                        ...item,
+                        id: a.candidateId,
+                        approvedUrl: a.approvedUrl,
+                        url: a.approvedUrl,
+                        rejected: false,
+                      }
+                    : item;
+                }),
+              },
+            }
+          : m
+      )
+    );
+    await streamResponse({ type: "voice_approval", toolCallId, approvals });
+  }
+
+  async function handleVoiceReject(toolCallId: string, handle: string, objection: string) {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.role === "assistant" && m.voiceAnchor?.toolCallId === toolCallId
+          ? {
+              ...m,
+              voiceAnchor: {
+                ...m.voiceAnchor!,
+                items: (m.voiceAnchor!.items ?? []).map((item) =>
+                  item.handle === handle
+                    ? { ...item, rejected: true, objection, loading: true, url: undefined, id: undefined }
+                    : item
+                ),
+              },
+            }
+          : m
+      )
+    );
+    try {
+      const res = await fetch(`/api/v2/story/${sessionId}/retry-tool`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toolCallId, assetHandle: handle, objection }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      openJobEventsStream();
+    } catch (err) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.voiceAnchor?.toolCallId === toolCallId
+            ? {
+                ...m,
+                voiceAnchor: {
+                  ...m.voiceAnchor!,
+                  items: (m.voiceAnchor!.items ?? []).map((item) =>
+                    item.handle === handle
+                      ? { ...item, loading: false, rejected: false, error: String(err) }
+                      : item
+                  ),
+                },
+              }
+            : m
+        )
+      );
+    }
   }
 
   async function handleAssetReject(toolCallId: string, assetHandle: string, objection: string) {
@@ -991,6 +1142,8 @@ export function StoryChat({
             onLoadOlder={() => void loadOlderMessages()}
             onAssetApproval={handleAssetApproval}
             onAssetReject={handleAssetReject}
+            onVoiceApproval={handleVoiceApproval}
+            onVoiceReject={handleVoiceReject}
             onGridApproval={handleGridApproval}
             onRetry={retryTool}
             onRenderShot={handleRenderShot}

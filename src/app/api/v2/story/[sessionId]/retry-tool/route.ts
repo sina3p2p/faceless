@@ -22,6 +22,13 @@ type AssetSpec = {
   imagePrompt: string;
 };
 
+type VoiceSpec = {
+  handle: string;
+  characterHandle?: string;
+  sampleText: string;
+  voiceId?: string;
+};
+
 type GeneratedAsset = {
   assetHandle: string;
   assetKind: "character" | "location" | "object";
@@ -101,11 +108,68 @@ export async function POST(
       toolCallId,
       assistantMessageRowId: targetRowId,
       referenceImageUrls: compiled.referenceImageUrls ?? [],
+      referenceAudioUrls: compiled.referenceAudioUrls ?? [],
       prompt: compiled.prompt,
       aspectRatio: compiled.aspectRatio ?? "16:9",
       duration: compiled.duration,
       continuityMode: compiled.continuityMode ?? "fresh",
       sourceVideoUrl: compiled.sourceVideoUrl,
+    });
+    return NextResponse.json({ queued: true });
+  }
+
+  if (toolName === "generateVoiceAnchors") {
+    const voices = Array.isArray(tcArgs.voices) ? (tcArgs.voices as VoiceSpec[]) : [];
+    if (!voices.length) return badRequest("No voices on tool call");
+    const existingGeneratedVoices =
+      (tcArgs.generatedVoices as
+        | Array<{
+            handle: string;
+            characterHandle?: string;
+            voiceId: string;
+            sampleText: string;
+            id: string;
+            url: string;
+          }>
+        | undefined) ?? [];
+
+    // Single-voice reject → fold objection into sampleText and regen only that handle
+    if (assetHandle) {
+      if (!objection?.trim()) return badRequest("objection required when regenerating one voice");
+      const spec = voices.find((v) => v.handle === assetHandle);
+      if (!spec) return badRequest(`Voice ${assetHandle} not found`);
+      const sampleText = `${spec.sampleText}\n\nUSER OBJECTION (must fix delivery): ${objection.trim()}`;
+      const updatedVoices = voices.map((v) =>
+        v.handle === assetHandle ? { ...v, sampleText } : v
+      );
+      await patchRow({
+        voices: updatedVoices,
+        pending: true,
+        error: undefined,
+      });
+      await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_VOICE_ANCHORS, {
+        toolCallId,
+        assistantMessageRowId: targetRowId,
+        handle: assetHandle,
+        sampleText,
+        voiceId: spec.voiceId,
+        characterHandle: spec.characterHandle,
+        existingGeneratedVoices,
+        userId: session.userId,
+      });
+      return NextResponse.json({ queued: true, handle: assetHandle });
+    }
+
+    await patchRow({
+      pending: true,
+      generatedVoices: undefined,
+      error: undefined,
+    });
+    await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_VOICE_ANCHORS, {
+      toolCallId,
+      assistantMessageRowId: targetRowId,
+      voices,
+      userId: session.userId,
     });
     return NextResponse.json({ queued: true });
   }

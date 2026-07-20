@@ -27,11 +27,14 @@ The Bible is ASSEMBLED at Step 8, not authored: §1–§3 concatenate from locke
   view, neutral background). An object named in a motion arc but absent here will be
   invented fresh at render time. When an object has a ref, location plates stay
   environment-only.
-- Voices: [hero_vo, ...] (if an external voice tool feeds back as reference)
+- Voices: [hero_vo, ...] — AUDIO-BOUND (not image slots). Each speaking hero / recurring
+  VO gets one approved sample from `generateVoiceAnchors` (`@*_vo`). Stage 2 attaches
+  these as reference_audio on dialogue shots. Background one-offs: omit.
 - Background-tier (no reference image): [crowds, one-off figures]
 
-§2 lists IMAGE-BOUND assets only — each entry resolves to an approved image and a
-reference slot. The Look is TEXT (§1, pasted into every prompt's global notes); it never
+§2 image list = IMAGE-BOUND assets only — each image entry resolves to an approved image and a
+reference slot. Voices are AUDIO-BOUND handles listed above; they never occupy an image slot.
+The Look is TEXT (§1, pasted into every prompt's global notes); it never
 occupies a slot or appears here. A "style_board" entry is a category error.
 
 ### 3. Standing directives (canonical craft rules — production defaults for the tested

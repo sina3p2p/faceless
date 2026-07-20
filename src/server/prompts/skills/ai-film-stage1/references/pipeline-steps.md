@@ -155,6 +155,20 @@ The user rejects individual candidates with an objection and approves acceptable
 
 ---
 
+## Step 9b — Voice anchors
+
+**Reference:** `medium-constraints.md` (Dialogue)  
+**Artifact:** approved `@*_vo` audio samples for every recurring speaking character / VO  
+**Fork:** only when voice casting is a genuine creative choice (otherwise pick and proceed)
+
+After image assets are approved (or in the same pre-grid window), call `generateVoiceAnchors` once with every Bible §2 Voices entry that speaks on camera or as recurring VO. Use a short in-character sample (1–2 sentences), one distinct ElevenLabs `voiceId` per hero when known. Background one-offs: skip.
+
+The user rejects individuals with an objection and approves via `voice_approval`. Regenerate only rejected handles.
+
+**Done when:** every speaking hero / recurring VO has one approved `@*_vo` URL; Bible §2 Voices resolves; no rejection remains unresolved.
+
+---
+
 ## Step 10 — Motion sheets and registry
 
 **Reference:** `generation-grids.md`  
@@ -192,6 +206,7 @@ Run silently after Step 10. Confirm:
 
 - Bible and shot list are locked.
 - Every image-bound material resolves to one approved asset.
+- Every speaking hero / recurring VO resolves to one approved `@*_vo` (or the film is silent / dialogue-free by design).
 - Every shot resolves to exactly one approved-sheet or valid-skip entry.
 - No orphan handles or unbound motion-arc entities exist.
 - State Schedule, lighting, continuity, cut handoffs, and match cuts agree.
@@ -199,7 +214,7 @@ Run silently after Step 10. Confirm:
 - No Stage 2 creative decision remains.
 - The Generation Grid Registry passes.
 
-Stage 1 produces: locked Bible, locked shot list, approved reference images, approved motion sheets, and a passing registry.
+Stage 1 produces: locked Bible, locked shot list, approved reference images, approved voice anchors (when the film has dialogue), approved motion sheets, and a passing registry.
 
 ## Stage 2 handoff
 

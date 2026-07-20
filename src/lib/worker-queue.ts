@@ -9,6 +9,7 @@ export const JOB_NAMES = {
   GENERATE_SHOT: "generate-shot",
   GENERATE_ASSET_IMAGES: "generate-asset-images",
   GENERATE_GENERATION_GRID: "generate-generation-grid",
+  GENERATE_VOICE_ANCHORS: "generate-voice-anchors",
 } as const;
 
 export type WorkerJobName = (typeof JOB_NAMES)[keyof typeof JOB_NAMES];

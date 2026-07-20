@@ -8,6 +8,8 @@ import type {
   GenerationGrid,
   ShotCompile,
   ShotResult,
+  VoiceAnchor,
+  VoiceGalleryItem,
 } from "@/types/v2/story";
 import { mediaUrl, mediaUrls, agentMediaUrl, storageKeyFrom } from "@/lib/storage";
 import { filmstripTileCount } from "@/lib/filmstrip";
@@ -127,6 +129,7 @@ function parseAnswers(d: Record<string, unknown>): string[] | undefined {
 const USER_RESULT_TYPES = new Set([
   "questions_result",
   "asset_approval",
+  "voice_approval",
   "grid_approval",
   "shot_approval",
 ]);
@@ -136,6 +139,10 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
   const assetApprovals = new Map<
     string,
     Array<{ assetHandle: string; candidateId: string; approvedUrl: string }>
+  >();
+  const voiceApprovals = new Map<
+    string,
+    Array<{ handle: string; candidateId: string; approvedUrl: string }>
   >();
   const gridApprovals = new Map<string, string>();
   const shotApprovals = new Set<string>();
@@ -163,6 +170,16 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
             ]
           : [];
       if (approvals.length) assetApprovals.set(d.toolCallId as string, approvals);
+    } else if (row.role === "user" && row.type === "voice_approval") {
+      const d = rowData(row);
+      const approvals = Array.isArray(d.approvals)
+        ? (d.approvals as Array<{
+            handle: string;
+            candidateId: string;
+            approvedUrl: string;
+          }>)
+        : [];
+      if (approvals.length) voiceApprovals.set(d.toolCallId as string, approvals);
     } else if (row.role === "user" && row.type === "grid_approval") {
       const d = rowData(row);
       gridApprovals.set(d.toolCallId as string, d.approvedUrl as string);
@@ -184,6 +201,7 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
       const calls = getToolCalls(d);
       let questions: QuestionsCall | undefined;
       let assetRef: AssetRef | undefined;
+      let voiceAnchor: VoiceAnchor | undefined;
       let generationGrid: GenerationGrid | undefined;
       let shotResult: ShotResult | undefined;
       let shotCompile: ShotCompile | undefined;
@@ -273,6 +291,64 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
             approved: approvals.length > 0,
             error: args.error as string | undefined,
           };
+        } else if (tc.function.name === "generateVoiceAnchors") {
+          const isPending = (args.pending as boolean | undefined) === true;
+          const approvals = voiceApprovals.get(tc.id) ?? [];
+          const approvalByHandle = new Map(approvals.map((a) => [a.handle, a]));
+          const generatedVoices = args.generatedVoices as
+            | Array<{
+                handle: string;
+                characterHandle?: string;
+                voiceId: string;
+                sampleText: string;
+                id: string;
+                url: string;
+              }>
+            | undefined;
+          const voicesArg = args.voices as
+            | Array<{
+                handle: string;
+                characterHandle?: string;
+                sampleText: string;
+                voiceId?: string;
+              }>
+            | undefined;
+
+          let voiceItems: VoiceGalleryItem[];
+          if (generatedVoices?.length) {
+            voiceItems = await Promise.all(
+              generatedVoices.map(async (g) => {
+                const approval = approvalByHandle.get(g.handle);
+                return {
+                  handle: g.handle,
+                  characterHandle: g.characterHandle,
+                  voiceId: g.voiceId,
+                  sampleText: g.sampleText,
+                  id: g.id,
+                  url: (await mediaUrl(g.id)) || g.url,
+                  approvedUrl: approval ? await mediaUrl(approval.approvedUrl) : undefined,
+                };
+              })
+            );
+          } else if (voicesArg?.length) {
+            voiceItems = voicesArg.map((v) => ({
+              handle: v.handle,
+              characterHandle: v.characterHandle,
+              sampleText: v.sampleText,
+              voiceId: v.voiceId,
+              loading: isPending,
+            }));
+          } else {
+            voiceItems = [];
+          }
+
+          voiceAnchor = {
+            toolCallId: tc.id,
+            loading: isPending,
+            items: voiceItems,
+            approved: approvals.length > 0,
+            error: args.error as string | undefined,
+          };
         } else if (tc.function.name === "generateGenerationGrid") {
           const isPending = (args.pending as boolean | undefined) === true;
           const rawImages = (args.generatedImages ?? args.images) as string[] | undefined;
@@ -325,6 +401,15 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
               (args.render_prompt as string | undefined) ??
               (args.prompt as string | undefined),
             referenceImageUrls: refs ? await mediaUrls(refs) : [],
+            referenceAudioUrls: compiled?.referenceAudioUrls?.length
+              ? await mediaUrls(compiled.referenceAudioUrls)
+              : ((args.reference_audio_urls as string[] | undefined) ??
+                  (args.referenceAudioUrls as string[] | undefined))
+                ? await mediaUrls(
+                    ((args.reference_audio_urls as string[] | undefined) ??
+                      (args.referenceAudioUrls as string[] | undefined))!
+                  )
+                : [],
             duration:
               compiled?.duration ??
               (args.duration_seconds as number | undefined) ??
@@ -400,6 +485,7 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
         createdAt,
         questions,
         assetRef,
+        voiceAnchor,
         generationGrid,
         shotResult,
         shotCompile,
@@ -581,6 +667,25 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
             : "vision_status:unverifiable — no approved URLs to attach."),
         imageUrls,
         pin: true,
+      });
+    } else if (row.role === "user" && row.type === "voice_approval") {
+      const d = rowData(row);
+      const approvals = Array.isArray(d.approvals)
+        ? (d.approvals as Array<{
+            handle: string;
+            candidateId: string;
+            approvedUrl: string;
+          }>)
+        : [];
+      const lines = approvals.map(
+        (a) =>
+          `"@${a.handle}" → ${a.candidateId} (${agentMediaUrl(a.approvedUrl)})`
+      );
+      collectedResults.set(d.toolCallId as string, {
+        text:
+          `User approved voice anchors (${approvals.length} bound): ${lines.join("; ")}. ` +
+          `Attach these URLs as reference_audio_urls on dialogue compileShot calls. ` +
+          `Bible §2 Voices handles now resolve.`,
       });
     } else if (row.role === "user" && row.type === "grid_approval") {
       const d = rowData(row);
@@ -803,6 +908,14 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
                           .join(", ")
                       : (tc.function.arguments.assetHandle as string | undefined) ?? "assets"
                   }. User has not yet approved (Approve remaining / reject individuals).`
+                : tc.function.name === "generateVoiceAnchors"
+                  ? `Voice anchors generated for ${
+                      Array.isArray(tc.function.arguments.voices)
+                        ? (tc.function.arguments.voices as { handle: string }[])
+                            .map((v) => v.handle)
+                            .join(", ")
+                        : "voices"
+                    }. User has not yet approved (Approve voices / reject individuals).`
                 : tc.function.name === "generateGenerationGrid"
                   ? `A motion sheet candidate has been generated for ${
                       (tc.function.arguments.generationId as string | undefined) ??

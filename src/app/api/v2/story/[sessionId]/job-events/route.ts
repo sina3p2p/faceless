@@ -18,6 +18,14 @@ type JobResult = {
     assetKind: "character" | "location" | "object";
     candidates: Array<{ id: string; url: string }>;
   }>;
+  generatedVoices?: Array<{
+    handle: string;
+    characterHandle?: string;
+    voiceId: string;
+    sampleText: string;
+    id: string;
+    url: string;
+  }>;
   videoUrl?: string;
   filmstripUrl?: string;
   filmstripTiles?: number;
@@ -170,6 +178,16 @@ export async function GET(
                 })),
                 error,
               });
+            } else if (job.jobName === JOB_NAMES.GENERATE_VOICE_ANCHORS) {
+              enqueue({
+                type: "voice_anchor",
+                toolCallId,
+                items: (payload as { voices?: Array<{ handle: string }> }).voices?.map((v) => ({
+                  handle: v.handle,
+                  error,
+                })),
+                error,
+              });
             } else if (job.jobName === JOB_NAMES.GENERATE_GENERATION_GRID) {
               enqueue({
                 type: "generation_grid",
@@ -216,6 +234,25 @@ export async function GET(
               items,
               // Legacy single-asset clients
               images,
+            });
+          } else if (job.jobName === JOB_NAMES.GENERATE_VOICE_ANCHORS) {
+            const rawVoices = result?.generatedVoices;
+            const items = rawVoices
+              ? await Promise.all(
+                  rawVoices.map(async (v) => ({
+                    handle: v.handle,
+                    characterHandle: v.characterHandle,
+                    voiceId: v.voiceId,
+                    sampleText: v.sampleText,
+                    id: v.id,
+                    url: (await mediaUrl(v.id)) || v.url,
+                  }))
+                )
+              : undefined;
+            enqueue({
+              type: "voice_anchor",
+              toolCallId,
+              items,
             });
           } else if (job.jobName === JOB_NAMES.GENERATE_GENERATION_GRID) {
             enqueue({

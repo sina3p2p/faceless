@@ -127,6 +127,11 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
     {"slot": "Image4", "handle": "@scene3_gen3A_grid", "kind": "incoming_anchor", "controls": "prior terminal panel cut-in (reference only)"},
     {"slot": "Image5", "handle": "@scene3_gen3B_grid", "kind": "grid", "controls": "motion-sheet trajectory to interpolate"}
   ],
+  "reference_image_urls": ["…"],
+  "audio_references": [
+    {"slot": "Audio1", "handle": "@hero_vo", "kind": "voice", "controls": "speaker timbre / lip-sync identity"}
+  ],
+  "reference_audio_urls": ["…"],
   "checks": { "…": "every assertion below, self-verified before emitting" },
   "gaps": []
 }
@@ -134,6 +139,7 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
 
 - `continuity_mode` maps to `compileShot.continuityMode`; `extend_video` requires `source_video_url` (prior approved clip) and an `Extend <Video_1>:` opening; `fresh` requires stills.
 - `generation_shot_ids` lists exactly one shot. `duration_seconds` = the registry estimate.
+- `reference_audio_urls` / `audio_references` — required when the shot has spoken dialogue; empty for silent / ambient-only shots.
 - `resolution` (with quality and aspect ratio) is a STRUCTURED FIELD the app passes as API parameters — never words inside `render_prompt`. Preview tier only for explicitly-labeled preview passes; approved/final = top tier.
 - On any missing/ambiguous/over-budget input: `status: "gap"`, `render_prompt: null`, each problem named in `gaps`. Never a prompt and a gap together.
 
@@ -244,4 +250,6 @@ State the Bible's film-stock/lens character in the same global block every shot.
 
 ## Sound
 
-Reference mode generates synchronized ambient audio by default — acceptable for film. Shots wanting a specific anchored sound name it concretely ("the crack of stone settling," "wind over sand"). Dialogue/voice consistency is deferred to the later audio phase (voice fed as reference there) — per-clip fresh-synthesized dialogue drifts.
+Reference mode generates synchronized ambient audio by default — acceptable for film. Shots wanting a specific anchored sound name it concretely ("the crack of stone settling," "wind over sand").
+
+**Dialogue:** attach approved Bible §2 `@*_vo` samples via `reference_audio_urls` / `audio_references` (kind `voice`, slots `Audio1`…). Name the speaker in PERFORMANCE and keep Dur matched to the line. Per-clip fresh-synthesized dialogue without a voice ref drifts — do not invent a new voice per shot.

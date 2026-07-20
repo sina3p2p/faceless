@@ -12,14 +12,23 @@ export const CONTINUITY_MODES = ["fresh", "extend_video"] as const;
 type ContinuityMode = (typeof CONTINUITY_MODES)[number];
 
 const referenceSlotSchema = z.object({
-  slot: z.string().describe('Seedance slot label, e.g. "Image1"'),
-  handle: z.string().describe('Bound @material or grid handle, e.g. "@hero_charsheet"'),
+  slot: z.string().describe('Seedance slot label, e.g. "Image1" or "Audio1"'),
+  handle: z.string().describe('Bound @material or grid handle, e.g. "@hero_charsheet" or "@hero_vo"'),
   kind: z
     .string()
     .describe(
-      "character | object | location | scene_anchor | incoming_anchor | match_cut_source | grid"
+      "character | object | location | scene_anchor | incoming_anchor | match_cut_source | grid | voice"
     ),
   controls: z.string().describe("What this reference governs"),
+});
+
+const audioReferenceSlotSchema = z.object({
+  slot: z.string().describe('Seedance audio slot, e.g. "Audio1"'),
+  handle: z.string().describe('Approved voice handle, e.g. "@hero_vo"'),
+  kind: z.literal("voice").describe("Always voice for audio references"),
+  controls: z
+    .string()
+    .describe("What this audio governs — typically timbre / speaker identity for lip-synced dialogue"),
 });
 
 /**
@@ -67,12 +76,13 @@ const compileShotInputSchema = z.object({
   resolution: z
     .string()
     .default("1080p")
-    .describe("Structured API field only — never words inside render_prompt."), references: z
+    .describe("Structured API field only — never words inside render_prompt."),
+  references: z
       .array(referenceSlotSchema)
       .max(9)
       .default([])
       .describe(
-        "Slot metadata in precision order: character → object → location → scene anchor → " +
+        "Image slot metadata in precision order: character → object → location → scene anchor → " +
         "incoming anchor → motion sheet. Must match reference_image_urls length/order."
       ),
   reference_image_urls: z
@@ -83,6 +93,22 @@ const compileShotInputSchema = z.object({
       "Resolved approved image URLs in the same order as references. Required for fresh; " +
       "optional for extend_video when identity is carried by the source clip " +
       "(still attach sheet + scene/incoming anchors when available)."
+    ),
+  audio_references: z
+    .array(audioReferenceSlotSchema)
+    .max(3)
+    .default([])
+    .describe(
+      "Voice slots for dialogue shots. Must match reference_audio_urls length/order. " +
+      "Attach approved @*_vo samples for every on-screen / VO speaker in the shot."
+    ),
+  reference_audio_urls: z
+    .array(z.string())
+    .max(3)
+    .default([])
+    .describe(
+      "Resolved approved voice audio URLs in the same order as audio_references. " +
+      "Required when the shot has spoken dialogue."
     ),
   checks: z
     .record(z.string(), z.unknown())
@@ -100,6 +126,7 @@ export type CompileShotToolInput = z.infer<typeof compileShotInputSchema>;
 export type CompileShotArgs = {
   prompt: string;
   referenceImageUrls: string[];
+  referenceAudioUrls?: string[];
   duration: number;
   aspectRatio: "16:9" | "9:16" | "1:1";
   continuityMode?: ContinuityMode;
@@ -125,6 +152,11 @@ export function toCompileShotArgs(
     (a.referenceImageUrls as string[] | undefined) ??
     [];
 
+  const audioRefs =
+    (a.reference_audio_urls as string[] | undefined) ??
+    (a.referenceAudioUrls as string[] | undefined) ??
+    [];
+
   const duration =
     (a.duration_seconds as number | null | undefined) ??
     (a.duration as number | undefined);
@@ -142,6 +174,7 @@ export function toCompileShotArgs(
   return {
     prompt,
     referenceImageUrls: refs,
+    referenceAudioUrls: audioRefs,
     duration,
     aspectRatio: "16:9",
     continuityMode,
@@ -166,10 +199,14 @@ export function validateCompilePackage(args: CompileShotToolInput): string[] {
   if (args.references.length !== args.reference_image_urls.length) {
     errors.push("references length must match reference_image_urls length");
   }
+  if ((args.audio_references?.length ?? 0) !== (args.reference_audio_urls?.length ?? 0)) {
+    errors.push("audio_references length must match reference_audio_urls length");
+  }
   errors.push(
     ...validateCompileContinuity({
       prompt: args.render_prompt ?? "",
       referenceImageUrls: args.reference_image_urls,
+      referenceAudioUrls: args.reference_audio_urls,
       duration: args.duration_seconds ?? 0,
       aspectRatio: '16:9',
       continuityMode: args.continuity_mode,
@@ -187,7 +224,8 @@ export const compileShot = tool({
     "One compile = one motion sheet = one shot. Emit status=ok with the full package, or " +
     "status=gap naming missing Bible/row values (never invent). " +
     "continuity_mode extend_video requires source_video_url; fresh requires reference_image_urls. " +
-    "Slot order: character → object → location → scene anchor → incoming anchor → motion sheet. " +
+    "Slot order (images): character → object → location → scene anchor → incoming anchor → motion sheet. " +
+    "Dialogue shots: attach approved @*_vo URLs in reference_audio_urls / audio_references. " +
     "Prompt must interpolate the motion sheet (continuous take; COMPOSITION LOCK on Panel 1, " +
     "END STATE LOCK on Panel n). Wait for shot approval before compiling the next shot.",
   inputSchema: compileShotInputSchema,
@@ -257,6 +295,10 @@ export async function generateShotWithFallback(
       model: "seedance-2-mini",
       referenceImages: urls,
       referenceVideos: mode === "extend_video" && args.sourceVideoUrl ? [args.sourceVideoUrl] : undefined,
+      referenceAudios:
+        args.referenceAudioUrls && args.referenceAudioUrls.length > 0
+          ? args.referenceAudioUrls
+          : undefined,
       prompt: args.prompt,
       duration: args.duration,
       aspectRatio,

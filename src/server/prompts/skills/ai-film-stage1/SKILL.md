@@ -29,10 +29,11 @@ Do not duplicate the workflow order, step details, reference schedule, or comple
 5. **Approval channels are strict.**
    - `questions_result` — creative forks, process choices, and manifest approval.
    - `asset_approval` — generated asset pixels.
+   - `voice_approval` — generated voice-anchor audio.
    - `grid_approval` — generated motion-sheet pixels.
    - `shot_approval` — rendered clips.
 
-   Free text such as "continue," "okay," or "looks good" is not approval while a button is pending. Never use `askQuestions` to approve generated pixels.
+   Free text such as "continue," "okay," or "looks good" is not approval while a button is pending. Never use `askQuestions` to approve generated pixels or voice samples.
 
 6. **Interrogate before presenting.** Apply the current step's interrogation and completion tests from `pipeline-steps.md`. Surface real failures, not a ceremonial checklist.
 

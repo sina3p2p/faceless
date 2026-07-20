@@ -108,6 +108,7 @@ export async function POST(
     toolCallId,
     assistantMessageRowId: assistantRowId,
     referenceImageUrls: compiled.referenceImageUrls ?? [],
+    referenceAudioUrls: compiled.referenceAudioUrls ?? [],
     prompt: renderPrompt,
     aspectRatio: compiled.aspectRatio ?? "16:9",
     duration: compiled.duration,

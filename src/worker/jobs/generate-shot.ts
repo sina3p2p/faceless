@@ -4,6 +4,7 @@ import type { JobRunContext, PayloadBase, WorkerJob } from "./types";
 
 type ShotPayload = {
   referenceImageUrls: string[];
+  referenceAudioUrls?: string[];
   prompt: string;
   aspectRatio: "16:9" | "9:16" | "1:1";
   duration: number;
@@ -20,6 +21,7 @@ export const generateShotJob: WorkerJob = {
         {
           prompt: p.prompt,
           referenceImageUrls: p.referenceImageUrls ?? [],
+          referenceAudioUrls: p.referenceAudioUrls ?? [],
           aspectRatio: p.aspectRatio,
           duration: p.duration,
           continuityMode: p.continuityMode,

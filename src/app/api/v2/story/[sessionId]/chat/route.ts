@@ -12,6 +12,7 @@ import {
 import { AI_FILM_STAGE1_SKILL } from "@/server/services/showrunner/system-prompt";
 import { toCompileShotArgs } from "@/server/services/showrunner/tools";
 import type { AssetSpecInput } from "@/server/services/showrunner/tools/generate-asset-references";
+import type { VoiceSpecInput } from "@/server/services/showrunner/tools/generate-voice-anchors";
 import type { GenerateGenerationGridInput } from "@/server/services/showrunner/tools/generate-generation-grid";
 import { createRecordGenerationGridEntryTool } from "@/server/services/showrunner/tools/record-generation-grid-entry";
 import { enqueueWorkerJob, JOB_NAMES, type WorkerJobName } from "@/lib/worker-queue";
@@ -20,9 +21,9 @@ import { enqueueWorkerJob, JOB_NAMES, type WorkerJobName } from "@/lib/worker-qu
 function parseToolOk(output: unknown): { ok: boolean; errors?: string[] } | null {
   const raw =
     typeof output === "object" &&
-    output !== null &&
-    "value" in output &&
-    typeof (output as { value: unknown }).value === "string"
+      output !== null &&
+      "value" in output &&
+      typeof (output as { value: unknown }).value === "string"
       ? (output as { value: string }).value
       : typeof output === "string"
         ? output
@@ -98,18 +99,18 @@ async function buildUserMessage(
     case "asset_approval": {
       const approvals = Array.isArray(body.approvals)
         ? (body.approvals as Array<{
-            assetHandle: string;
-            candidateId: string;
-            approvedUrl: string;
-          }>)
+          assetHandle: string;
+          candidateId: string;
+          approvedUrl: string;
+        }>)
         : body.assetHandle && body.approvedUrl
           ? [
-              {
-                assetHandle: body.assetHandle as string,
-                candidateId: (body.candidateId as string) ?? (body.approvedUrl as string),
-                approvedUrl: body.approvedUrl as string,
-              },
-            ]
+            {
+              assetHandle: body.assetHandle as string,
+              candidateId: (body.candidateId as string) ?? (body.approvedUrl as string),
+              approvedUrl: body.approvedUrl as string,
+            },
+          ]
           : null;
       if (!approvals?.length) return { error: "approvals required" };
       return {
@@ -121,6 +122,21 @@ async function buildUserMessage(
           assetHandle: approvals[0]!.assetHandle,
           approvedUrl: approvals[0]!.approvedUrl,
         }],
+      };
+    }
+
+    case "voice_approval": {
+      const approvals = Array.isArray(body.approvals)
+        ? (body.approvals as Array<{
+          handle: string;
+          candidateId: string;
+          approvedUrl: string;
+        }>)
+        : null;
+      if (!approvals?.length) return { error: "approvals required" };
+      return {
+        type: "voice_approval",
+        parts: [{ toolCallId: body.toolCallId, approvals }],
       };
     }
 
@@ -181,6 +197,7 @@ type QueuedImageJob = {
 const TOOL_LOADING_EVENTS: Record<string, string> = {
   askQuestions: "questions_loading",
   generateAssetReferences: "asset_ref_loading",
+  generateVoiceAnchors: "voice_anchor_loading",
   generateGenerationGrid: "generation_grid_loading",
   compileShot: "shot_compile_loading",
 };
@@ -209,7 +226,6 @@ function gridEventPayload(toolCallId: string, args: GenerateGenerationGridInput)
     continuityBreakReason: args.continuityBreakReason,
     panelCount: args.panelCount,
     panelCaptions: args.panelCaptions,
-    aspectRatio: args.aspectRatio ?? "16:9",
   };
 }
 
@@ -225,12 +241,12 @@ function queueAssetRefJob(tc: RawToolCall, emit: Emit, userId: string): QueuedIm
     ? args.assets
     : args.assetHandle && args.assetKind && args.imagePrompt
       ? [
-          {
-            assetHandle: args.assetHandle,
-            assetKind: args.assetKind,
-            imagePrompt: args.imagePrompt,
-          },
-        ]
+        {
+          assetHandle: args.assetHandle,
+          assetKind: args.assetKind,
+          imagePrompt: args.imagePrompt,
+        },
+      ]
       : [];
   tc.function.arguments = { ...args, assets, pending: true };
   emit({
@@ -247,6 +263,27 @@ function queueAssetRefJob(tc: RawToolCall, emit: Emit, userId: string): QueuedIm
     jobName: JOB_NAMES.GENERATE_ASSET_IMAGES,
     toolCallId: tc.id,
     payload: { assets, userId },
+  };
+}
+
+function queueVoiceAnchorJob(tc: RawToolCall, emit: Emit, userId: string): QueuedImageJob {
+  const args = tc.function.arguments as { voices?: VoiceSpecInput[] };
+  const voices = args.voices ?? [];
+  tc.function.arguments = { ...args, voices, pending: true };
+  emit({
+    type: "voice_anchor",
+    toolCallId: tc.id,
+    pending: true,
+    items: voices.map((v) => ({
+      handle: v.handle,
+      characterHandle: v.characterHandle,
+      loading: true,
+    })),
+  });
+  return {
+    jobName: JOB_NAMES.GENERATE_VOICE_ANCHORS,
+    toolCallId: tc.id,
+    payload: { voices, userId },
   };
 }
 
@@ -270,7 +307,6 @@ function queueGenerationGridJob(tc: RawToolCall, emit: Emit): QueuedImageJob {
       panelCaptions: args.panelCaptions,
       imagePrompt: args.imagePrompt,
       referenceImageUrls: args.referenceImageUrls ?? [],
-      aspectRatio: args.aspectRatio ?? "16:9",
     },
   };
 }
@@ -370,6 +406,8 @@ export async function POST(
           emit({ type: "questions", toolCallId: chunk.toolCallId, ...args });
         } else if (chunk.toolName === "generateAssetReferences") {
           pendingImageCalls.push(rawCall);
+        } else if (chunk.toolName === "generateVoiceAnchors") {
+          pendingImageCalls.push(rawCall);
         }
         // compileShot / generateGenerationGrid are queued after execute() validates (see tool-result)
       } else if (chunk.type === "tool-result") {
@@ -424,6 +462,7 @@ export async function POST(
     // Queue image jobs (do not await generation — worker continues if client disconnects).
     const pendingHandlers: Record<string, (tc: RawToolCall) => QueuedImageJob | null> = {
       generateAssetReferences: (tc) => queueAssetRefJob(tc, emit, session.userId),
+      generateVoiceAnchors: (tc) => queueVoiceAnchorJob(tc, emit, session.userId),
       generateGenerationGrid: (tc) => queueGenerationGridJob(tc, emit),
     };
     const queuedImageJobs: QueuedImageJob[] = [];
@@ -468,6 +507,7 @@ export async function POST(
         toolCallId: tc.id,
         renderPrompt: compiled.prompt,
         referenceImageUrls: compiled.referenceImageUrls ?? [],
+        referenceAudioUrls: compiled.referenceAudioUrls ?? [],
         duration: compiled.duration,
         aspectRatio: compiled.aspectRatio ?? "16:9",
         continuityMode: compiled.continuityMode ?? "fresh",
@@ -475,6 +515,7 @@ export async function POST(
         shotId: args.shot_id,
         gridReference: args.grid_reference,
         references: args.references,
+        audioReferences: args.audio_references,
         checks: args.checks,
       });
     }

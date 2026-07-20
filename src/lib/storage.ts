@@ -191,6 +191,12 @@ function contentTypeFromKey(key: string): string | null {
       return "video/mp4";
     case "webm":
       return "video/webm";
+    case "mp3":
+      return "audio/mpeg";
+    case "wav":
+      return "audio/wav";
+    case "m4a":
+      return "audio/mp4";
     default:
       return null;
   }

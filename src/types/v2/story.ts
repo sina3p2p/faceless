@@ -40,6 +40,28 @@ export type AssetRef = {
   error?: string;
 };
 
+export type VoiceGalleryItem = {
+  handle: string;
+  characterHandle?: string;
+  voiceId?: string;
+  sampleText?: string;
+  loading?: boolean;
+  id?: string;
+  url?: string;
+  approvedUrl?: string;
+  rejected?: boolean;
+  objection?: string;
+  error?: string;
+};
+
+export type VoiceAnchor = {
+  toolCallId: string;
+  loading: boolean;
+  items: VoiceGalleryItem[];
+  approved?: boolean;
+  error?: string;
+};
+
 export type PanelCaption = {
   motionArc: string;
   handoff: string;
@@ -88,6 +110,7 @@ export type ShotCompile = {
   rendering?: boolean;
   renderPrompt?: string;
   referenceImageUrls?: string[];
+  referenceAudioUrls?: string[];
   duration?: number;
   aspectRatio?: "16:9" | "9:16" | "1:1";
   continuityMode?: "fresh" | "extend_video";
@@ -109,6 +132,7 @@ export type ClientMessage = {
   reasoning?: string;
   questions?: QuestionsCall;
   assetRef?: AssetRef;
+  voiceAnchor?: VoiceAnchor;
   generationGrid?: GenerationGrid;
   shotResult?: ShotResult;
   shotCompile?: ShotCompile;
