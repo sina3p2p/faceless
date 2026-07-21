@@ -31,9 +31,9 @@ ONE photoreal image = exactly one uninterrupted shot. Shared latent → coherent
 
 **Cross-shot chain (later sheets in a scene) — pick exactly one mode:**
 
-1. **Continuous:** `previousGenerationId` + `incomingAnchorHandle` + `incomingAnchorKind: prior_grid_terminal_panel` + `incomingAnchorPanel` (attach that sheet in `referenceImageUrls`), upgrading to `prior_render_last_frame` once the prior clip is approved.
-2. **Break:** `continuityBreakReason` (hard cut / time jump / new axis) with previous/anchor fields omitted — deliberate, recorded. Scene anchor still attaches.
-3. **Match-cut (break with declared source):** `matchCutSourceGenerationId` + `matchCutSourceHandle` — compositional twin (identical framing; only a scheduled element or lighting state differs). Omit previous/incoming anchors. Attach the source sheet in `referenceImageUrls`. Allowed on first-in-scene for a cross-scene twin. Use this when a lighting-state change (or other scheduled delta) severs footing continuity but Bible §4 still names a match-cut pair.
+1. **Continuous:** `previousGenerationId` + `incomingAnchorHandle` + `incomingAnchorKind: prior_grid_terminal_panel` + `incomingAnchorPanel` (list that sheet handle in `referenceHandles`), upgrading to `prior_render_last_frame` once the prior clip is approved.
+2. **Break:** `continuityBreakReason` (hard cut / time jump / new axis) with previous/anchor fields omitted — deliberate, recorded. Scene anchor still listed in `referenceHandles`.
+3. **Match-cut (break with declared source):** `matchCutSourceGenerationId` + `matchCutSourceHandle` — compositional twin (identical framing; only a scheduled element or lighting state differs). Omit previous/incoming anchors. List the source sheet handle in `referenceHandles`. Allowed on first-in-scene for a cross-scene twin. Use this when a lighting-state change (or other scheduled delta) severs footing continuity but Bible §4 still names a match-cut pair.
 
 A different location breaks the chain (usually a scene boundary). Cross-shot motion joins additionally use Stage 2 `extend_video` + footing locks.
 
@@ -41,7 +41,7 @@ A different location breaks the chain (usually a scene boundary). Cross-shot mot
 
 Assembled from locked artifacts only:
 
-1. **References attached**: character ref(s) earliest, then object refs (hero props/vehicles named in this shot's motion arc), then location plate, then the scene anchor (the scene's first approved sheet — omit on the first sheet itself), then the incoming anchor (continuous later sheets) or match-cut source (match-cut mode). Open with verbatim Bible §2 SUBJECT DEFINITIONS. Label the scene anchor and prior-sheet / match-cut anchors as **continuity geography / cut-in / compositional anchors only**.
+1. **References listed by handle**: character ref(s) earliest, then object refs (hero props/vehicles named in this shot's motion arc), then location plate, then the scene anchor (the scene's first approved sheet — omit on the first sheet itself), then the incoming anchor (continuous later sheets) or match-cut source (match-cut mode). Pass these as named handles in `referenceHandles` — the app attaches pixels. Open with verbatim Bible §2 SUBJECT DEFINITIONS. Label the scene anchor and prior-sheet / match-cut anchors as **continuity geography / cut-in / compositional anchors only**.
 2. **Layout spec** (mandatory): `"[N] panels (N between 4 and 9), each an individual 16:9 frame, arranged in a [layout] grid reading left-to-right, top-to-bottom, with thin uniform white gutters. NO text, NO captions, NO panel numbers, NO borders drawn inside frames."`
 3. **Per panel** (enumerated "Panel 1: …"): Panel 1 = cut-in moment + Scale + composition (from prior Pn / continuity block / row / match-cut source); middle = real milestones with **readable pose/position deltas** from the previous panel (heroes and any background figures); Panel n = cut-out prepared for the next shot.
 4. **Novelty / beat clause**: this shot's continuous dramatic beat as a **2–4 beat arc** (from the scene's Delta line + row) — not a single verb; match beat count to Dur.
@@ -82,7 +82,7 @@ One candidate per shot (staging is locked in the prompt — not a choose-among g
 
 **Vision at generation time:** when the tool result carries `vision_status:attached`, pre-screen the pixels in that turn (ONE lighting state, panel roles, continuity). Never claim a vision check on `vision_status:unverifiable`. The UI Approve-grid button (`grid_approval`) is the only approval — **never** spawn `askQuestions` for sheet approval.
 
-**Before presenting a sheet, confirm:** chain / break / match-cut fields set (later sheets); the scene anchor attached (later sheets); Dur estimate in range and matched to beat density (~1 real beat / 2–3s); Panel 1 / Pn handoff roles correct; middles are real milestones with readable pose/position deltas for every figure (extras included — no frozen extras); every panel matches its row (cast/state/ratio) and the scene's continuity block; ONE lighting state (or explicit transition exception).
+**Before presenting a sheet, confirm:** chain / break / match-cut fields set (later sheets); the scene anchor listed in `referenceHandles` (later sheets); Dur estimate in range and matched to beat density (~1 real beat / 2–3s); Panel 1 / Pn handoff roles correct; middles are real milestones with readable pose/position deltas for every figure (extras included — no frozen extras); every panel matches its row (cast/state/ratio) and the scene's continuity block; ONE lighting state (or explicit transition exception).
 
 **Backflow:** spoken edits flow INTO THE ROW (or the scene's continuity block) first, then the image regenerates — headers and rows stay current with pixels.
 
@@ -109,12 +109,12 @@ After each approval or skip, call `recordGenerationGridEntry` with one entry —
 | `scene_anchor_handle`            | later gens in scene     | The scene's FIRST approved sheet handle (omit on first-in-scene)                               |
 | `is_first_in_scene`              | yes                     | `true` only for the scene's first generation (forbids chain/break fields; match-cut OK)        |
 | `previous_generation_id`         | if continuous later gen | Prior `generation_id` in this scene                                                            |
-| `incoming_anchor_handle`         | with previous           | Prior sheet handle or prior last-frame handle/URL                                              |
+| `incoming_anchor_handle`         | with previous           | Prior sheet handle or prior last-frame handle (`@gen{id}_last_frame`) |
 | `incoming_anchor_kind`           | with previous           | `prior_grid_terminal_panel` \| `prior_render_last_frame`                                       |
 | `incoming_anchor_panel`          | if terminal panel       | Prior sheet's LAST panel number                                                                |
-| `continuity_break_reason`        | if break                | Set instead of previous + incoming anchors (scene anchor still attaches)                       |
+| `continuity_break_reason`        | if break                | Set instead of previous + incoming anchors (scene anchor still listed in `referenceHandles`) |
 | `match_cut_source_generation_id` | if match-cut            | Declared twin `generation_id` (with `match_cut_source_handle`; no previous/incoming)           |
-| `match_cut_source_handle`        | if match-cut            | Source sheet handle or approved image URL                                                      |
+| `match_cut_source_handle`        | if match-cut            | Source sheet handle                                                                            |
 
 ## Consumption (Stage 2 — pointer)
 

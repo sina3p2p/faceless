@@ -61,15 +61,21 @@ export class OpenAIVideoProvider extends BaseVideoProvider {
 
         const items = response.data ?? [];
 
-        const results = await Promise.all(items.map(async (item) => {
+        const results = await Promise.all(items.map(async (item, i) => {
             if (!item) return null;
             const b64 = item.b64_json;
             const remoteUrl = item.url;
+            const path =
+                req.storageKey && i === 0
+                    ? req.storageKey
+                    : req.storageKey
+                      ? req.storageKey.replace(/(\.[^.]+)$/, `_${i}$1`)
+                      : `ai/${req.model}/${Date.now()}_${i}.png`;
             if (b64) {
-                return await this.saveBase64ToR2(`ai/${req.model}/${Date.now()}.png`, b64);
+                return await this.saveBase64ToR2(path, b64);
             }
             if (remoteUrl) {
-                return await this.saveUrlToR2(`ai/${req.model}/${Date.now()}.png`, remoteUrl);
+                return await this.saveUrlToR2(path, remoteUrl);
             }
             return null;
         }));

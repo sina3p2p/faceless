@@ -50,9 +50,9 @@ The locks are extraction from the approved trajectory, never a second authorship
 **The #1 cross-clip failure is the geography teleport:** shot N ends on surface A, shot N+1 opens on surface B, because text like "toward the stairs" under-specifies footing and Seedance invents a floor. Three layers:
 
 1. **Position-locked cut-out / cut-in (always).** Cut-out names exact footing at the last frame: `the hero stands ON the stone staircase, mid-flight, facing up toward the landing`. The next shot's CONTEXT opens by restating that footing before any new action. Vague handoffs ("toward the stairs", "near the entrance") are gaps.
-2. **Continuity modes on `compileShot` (URLs come from the app, never invented).** After each approved clip the app returns the clip URL + a last-frame still.
-   - `continuityMode: "extend_video"` + `sourceVideoUrl` = prior approved clip — for continuous walks, approaches, same-surface carries, and hard joins that must keep pose. The prompt opens `Extend <Video_1>: [next beat]` — saying "reference `<Video_1>`" instead flips the model into reference-transfer mode. Optional stills OK.
-   - `continuityMode: "fresh"` — scene opens, intentional breaks, new takes; stills in `referenceImageUrls`. When geography must still match, restate footing in CONTEXT from the last-frame still (text only — it is not a first-frame API input; no first-frame mode exists).
+2. **Continuity modes on `compileShot` (pixels come from the app via named handles, never invent URLs).** After each approved clip the app mints `@shot{N}_clip` and `@gen{id}_last_frame`.
+   - `continuity_mode: "extend_video"` + `source_clip_handle` = prior approved clip handle (e.g. `@shot13_clip`) — for continuous walks, approaches, same-surface carries, and hard joins that must keep pose. The prompt opens `Extend <Video_1>: [next beat]` — saying "reference `<Video_1>`" instead flips the model into reference-transfer mode. Optional stills via `references[]` handles OK.
+   - `continuity_mode: "fresh"` — scene opens, intentional breaks, new takes; stills listed as named handles in `references[]`. When geography must still match, restate footing in CONTEXT from the last-frame still (text only — it is not a first-frame API input; no first-frame mode exists).
 3. **Pixel truth beats the planned row.** If the approved last frame disagrees with the written cut-out (row said "approaching the stairs", pixels show them ON the stairs), the next CONTEXT is written from the PIXELS. Stale cut-ins are how teleports happen.
 
 Extension caveats: **quality degrades over repeated extensions** (artifacts accumulate, especially faces) — keep chains to 2–3 links, never the whole film; **joins can jump-cut** — standard post fix trims ~6 frames from the earlier clip's end and ~1 from the later clip's start; **track completion** stitches approved clips (up to 3 video inputs, ≤15s combined, `<Video_1> + [transition] + followed by <Video_2>`) to bridge two shots with a generated connective beat; **trajectory drift inside a sheet** (milestones inventing a new floor/axis) teleports mid-take — fewer, real milestones, continuous walks on one surface. Extension is a continuity tool, not a sizing tool — correctly sized sheets joined by modes, never multi-shot boards.
@@ -61,7 +61,7 @@ Extension caveats: **quality degrades over repeated extensions** (artifacts accu
 
 Seedance reference mode addresses uploaded images as `[Image1]`, `[Image2]`… **in attachment order**. Compilation resolves each handle to its approved image. A character handle is one slot — the turnaround sheet (extra identity refs only under a user-approved documented profile; never invent a second character image at compile time).
 
-1. **Slot order = precision priority** (earlier = weighted more precisely). `referenceImageUrls` order:
+1. **Slot order = precision priority** (earlier = weighted more precisely). `references[]` handle order (the app attaches pixels — do NOT pass URLs):
 
    **character → object/prop → location plate → scene anchor (scene's first approved sheet) → incoming anchor OR match-cut source → motion sheet (last)**
 
@@ -116,7 +116,7 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
   "generation_shot_ids": ["14"],
   "grid_reference": "@scene3_gen3A_grid" | null,
   "continuity_mode": "fresh" | "extend_video",
-  "source_video_url": null,
+  "source_clip_handle": null,
   "render_prompt": "SUBJECT DEFINITIONS: … CONTEXT: … COMPOSITION LOCK: … END STATE LOCK: … PRIMARY ACTION: … PERFORMANCE: … CAMERA: … STATE: … [STATIC-LOCK: …] GLOBAL RENDER NOTES: … CONSTRAINT TAIL: …",
   "duration_seconds": 8,
   "resolution": "1080p",
@@ -127,19 +127,17 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
     {"slot": "Image4", "handle": "@scene3_gen3A_grid", "kind": "incoming_anchor", "controls": "prior terminal panel cut-in (reference only)"},
     {"slot": "Image5", "handle": "@scene3_gen3B_grid", "kind": "grid", "controls": "motion-sheet trajectory to interpolate"}
   ],
-  "reference_image_urls": ["…"],
   "audio_references": [
     {"slot": "Audio1", "handle": "@hero_vo", "kind": "voice", "controls": "speaker timbre / lip-sync identity"}
   ],
-  "reference_audio_urls": ["…"],
   "checks": { "…": "every assertion below, self-verified before emitting" },
   "gaps": []
 }
 ```
 
-- `continuity_mode` maps to `compileShot.continuityMode`; `extend_video` requires `source_video_url` (prior approved clip) and an `Extend <Video_1>:` opening; `fresh` requires stills.
+- `continuity_mode` maps to `compileShot.continuity_mode`; `extend_video` requires `source_clip_handle` (e.g. `@shot13_clip`) and an `Extend <Video_1>:` opening; `fresh` requires stills via `references[]` handles. **The app resolves handles to pixels — never invent or echo URLs.**
 - `generation_shot_ids` lists exactly one shot. `duration_seconds` = the registry estimate.
-- `reference_audio_urls` / `audio_references` — required when the shot has spoken dialogue; empty for silent / ambient-only shots.
+- `audio_references` — required when the shot has spoken dialogue; empty for silent / ambient-only shots.
 - `resolution` (with quality and aspect ratio) is a STRUCTURED FIELD the app passes as API parameters — never words inside `render_prompt`. Preview tier only for explicitly-labeled preview passes; approved/final = top tier.
 - On any missing/ambiguous/over-budget input: `status: "gap"`, `render_prompt: null`, each problem named in `gaps`. Never a prompt and a gap together.
 
@@ -149,9 +147,9 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
 - `reference_count_ok`: ≤9 images.
 - `all_assets_onscreen`: every attached asset appears in the shot.
 - `every_reference_has_controls`: each definition states what it governs.
-- `reference_images_distinct`: every slot resolves to a DIFFERENT image (a duplicated URL wastes a slot → gap).
+- `reference_images_distinct`: every slot resolves to a DIFFERENT handle (a duplicated handle wastes a slot → gap).
 - `definitions_verbatim`: every definition line matches Bible §2 exactly (appended clauses allowed; substitutions fail).
-- `subjects_defined_first`: prompt opens with the definitions in slot order (character earliest → motion sheet last, matching `referenceImageUrls`); scene anchor + incoming anchor marked reference-only; sheet definition carries the interpolate clause.
+- `subjects_defined_first`: prompt opens with the definitions in slot order (character earliest → motion sheet last, matching `references[]` handle order); scene anchor + incoming anchor marked reference-only; sheet definition carries the interpolate clause.
 - `labels_consistent`: every mention of a defined subject uses its exact label.
 - `global_notes_last`: Look/grade/lighting at the end.
 - `constraint_tail_present`: the suppression tail is the last line.
@@ -167,7 +165,7 @@ Every compile emits ONE structured object (never loose prose), machine-checkable
 - `composition_lock_present` / `end_state_lock_present`: non-empty locks on Panel 1 / Panel n when a sheet is attached; soft citations fail; unextractable → gap.
 - `cut_handoff_compiled`: the action ends at the row's cut-out; CONTEXT answers the previous cut-in including exact footing; vague cut-outs fail; a "rest" passes with a note.
 - `footing_continuity`: when the previous approved generation left a character on a named surface, CONTEXT restates that surface; A↔B teleports fail.
-- `continuity_mode_valid`: mode matches the join type; required URLs present; extend prompts open with `Extend <Video_1>:`.
+- `continuity_mode_valid`: mode matches the join type; required handles present (`source_clip_handle` for extend); extend prompts open with `Extend <Video_1>:`.
 - `single_lighting_state`: exactly one canonical state; in-shot transitions fail ("time passes between shots") unless the Stage 1 registry entry has `lighting_transition_exception=true` with a reason.
 - `arc_entities_bound`: every character, hero prop, and location named in the action is bound in SUBJECT DEFINITIONS or explicitly background-tier.
 - `ambient_motion_present_if_organic`: organic/atmospheric elements in frame have ambient life named.

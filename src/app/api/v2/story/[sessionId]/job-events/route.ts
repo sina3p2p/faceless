@@ -15,16 +15,9 @@ type JobResult = {
   images?: string[];
   generatedAssets?: Array<{
     assetHandle: string;
-    assetKind: "character" | "location" | "object";
+    assetKind: "character" | "location" | "object" | "voice";
     candidates: Array<{ id: string; url: string }>;
-  }>;
-  generatedVoices?: Array<{
-    handle: string;
-    characterHandle?: string;
-    voiceId: string;
-    sampleText: string;
-    id: string;
-    url: string;
+    sampleText?: string;
   }>;
   videoUrl?: string;
   filmstripUrl?: string;
@@ -180,10 +173,12 @@ export async function GET(
               });
             } else if (job.jobName === JOB_NAMES.GENERATE_VOICE_ANCHORS) {
               enqueue({
-                type: "voice_anchor",
+                type: "asset_ref",
                 toolCallId,
-                items: (payload as { voices?: Array<{ handle: string }> }).voices?.map((v) => ({
-                  handle: v.handle,
+                items: (payload as { voices?: Array<{ handle: string; sampleText?: string }> }).voices?.map((v) => ({
+                  assetHandle: v.handle,
+                  assetKind: "voice" as const,
+                  sampleText: v.sampleText,
                   error,
                 })),
                 error,
@@ -210,13 +205,14 @@ export async function GET(
           }
 
           const images = await mediaUrls(result?.images ?? []);
-          if (job.jobName === JOB_NAMES.GENERATE_ASSET_IMAGES) {
+          if (job.jobName === JOB_NAMES.GENERATE_ASSET_IMAGES || job.jobName === JOB_NAMES.GENERATE_VOICE_ANCHORS) {
             const rawItems = result?.generatedAssets;
             const items = rawItems
               ? await Promise.all(
                   rawItems.map(async (item) => ({
                     assetHandle: item.assetHandle,
                     assetKind: item.assetKind,
+                    sampleText: (item as { sampleText?: string }).sampleText,
                     candidates: await Promise.all(
                       item.candidates.map(async (c) => ({
                         id: c.id,
@@ -234,25 +230,6 @@ export async function GET(
               items,
               // Legacy single-asset clients
               images,
-            });
-          } else if (job.jobName === JOB_NAMES.GENERATE_VOICE_ANCHORS) {
-            const rawVoices = result?.generatedVoices;
-            const items = rawVoices
-              ? await Promise.all(
-                  rawVoices.map(async (v) => ({
-                    handle: v.handle,
-                    characterHandle: v.characterHandle,
-                    voiceId: v.voiceId,
-                    sampleText: v.sampleText,
-                    id: v.id,
-                    url: (await mediaUrl(v.id)) || v.url,
-                  }))
-                )
-              : undefined;
-            enqueue({
-              type: "voice_anchor",
-              toolCallId,
-              items,
             });
           } else if (job.jobName === JOB_NAMES.GENERATE_GENERATION_GRID) {
             enqueue({

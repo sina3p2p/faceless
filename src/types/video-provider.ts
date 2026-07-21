@@ -29,6 +29,8 @@ export interface IImageRequest {
   n?: number;
   quality?: "low" | "medium" | "high" | null;
   referenceImages?: string[];
+  /** When set, upload the first result to this exact storage key (handle-derived). */
+  storageKey?: string;
 }
 
 export interface IProvider {

@@ -28,8 +28,7 @@ Do not duplicate the workflow order, step details, reference schedule, or comple
 
 5. **Approval channels are strict.**
    - `questions_result` — creative forks, process choices, and manifest approval.
-   - `asset_approval` — generated asset pixels.
-   - `voice_approval` — generated voice-anchor audio.
+   - `asset_approval` — generated asset pixels and voice-anchor audio (same Approve remaining button).
    - `grid_approval` — generated motion-sheet pixels.
    - `shot_approval` — rendered clips.
 

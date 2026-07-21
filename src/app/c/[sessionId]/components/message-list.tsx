@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AssistantText } from "./assistant-text";
 import { AssetRefPanel } from "./asset-ref-panel";
-import { VoiceAnchorPanel } from "./voice-anchor-panel";
 import { GenerationGridPanel } from "./generation-grid-panel";
 import { ShotCompilePanel } from "./shot-compile-panel";
 import type { ClientMessage } from "@/types/v2/story";
@@ -17,8 +16,6 @@ export function MessageList({
   onLoadOlder,
   onAssetApproval,
   onAssetReject,
-  onVoiceApproval,
-  onVoiceReject,
   onGridApproval,
   onRetry,
   onRenderShot,
@@ -35,11 +32,6 @@ export function MessageList({
     approvals: Array<{ assetHandle: string; candidateId: string; approvedUrl: string }>
   ) => void;
   onAssetReject: (toolCallId: string, assetHandle: string, objection: string) => void;
-  onVoiceApproval: (
-    toolCallId: string,
-    approvals: Array<{ handle: string; candidateId: string; approvedUrl: string }>
-  ) => void;
-  onVoiceReject: (toolCallId: string, handle: string, objection: string) => void;
   onGridApproval: (toolCallId: string, sceneId: string | number, url: string) => void;
   onRetry: (toolCallId: string) => void;
   onRenderShot: (toolCallId: string, renderPrompt: string) => void;
@@ -184,29 +176,6 @@ export function MessageList({
                     onRetry={
                       !msg.assetRef.approved && !msg.assetRef.loading
                         ? () => onRetry(msg.assetRef!.toolCallId)
-                        : undefined
-                    }
-                  />
-                )}
-
-                {msg.voiceAnchor && (
-                  <VoiceAnchorPanel
-                    voiceAnchor={msg.voiceAnchor}
-                    disabled={isStreaming}
-                    onApproveRemaining={
-                      msg.voiceAnchor.approved
-                        ? undefined
-                        : (approvals) => onVoiceApproval(msg.voiceAnchor!.toolCallId, approvals)
-                    }
-                    onReject={
-                      msg.voiceAnchor.approved
-                        ? undefined
-                        : (handle, objection) =>
-                            onVoiceReject(msg.voiceAnchor!.toolCallId, handle, objection)
-                    }
-                    onRetry={
-                      !msg.voiceAnchor.approved && !msg.voiceAnchor.loading
-                        ? () => onRetry(msg.voiceAnchor!.toolCallId)
                         : undefined
                     }
                   />

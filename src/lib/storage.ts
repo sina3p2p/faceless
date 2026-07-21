@@ -2,6 +2,9 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  CopyObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -216,6 +219,51 @@ export async function uploadFile(
     })
   );
   return key;
+}
+
+/** Bucket-internal copy (no download). Overwrites dest if it already exists. */
+export async function copyFile(srcKey: string, destKey: string): Promise<string> {
+  // CopySource must be URL-encoded (slashes preserved as path separators via encodeURI).
+  const encodedSource = `${BUCKET}/${srcKey.split("/").map(encodeURIComponent).join("/")}`;
+  await s3.send(
+    new CopyObjectCommand({
+      Bucket: BUCKET,
+      CopySource: encodedSource,
+      Key: destKey,
+    })
+  );
+  return destKey;
+}
+
+/** True when the object exists in the bucket. */
+export async function objectExists(key: string): Promise<boolean> {
+  try {
+    await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * List object keys under a prefix (non-recursive by delimiter when provided).
+ * Returns at most `maxKeys` keys (default 1000).
+ */
+export async function listObjectKeys(
+  prefix: string,
+  options?: { delimiter?: string; maxKeys?: number }
+): Promise<string[]> {
+  const out = await s3.send(
+    new ListObjectsV2Command({
+      Bucket: BUCKET,
+      Prefix: prefix,
+      Delimiter: options?.delimiter,
+      MaxKeys: options?.maxKeys ?? 1000,
+    })
+  );
+  return (out.Contents ?? [])
+    .map((o) => o.Key)
+    .filter((k): k is string => !!k);
 }
 
 // R2/S3 SigV4 hard limit — cannot do "never" or 99 years.

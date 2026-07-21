@@ -8,8 +8,6 @@ import type {
   GenerationGrid,
   ShotCompile,
   ShotResult,
-  VoiceAnchor,
-  VoiceGalleryItem,
 } from "@/types/v2/story";
 import { mediaUrl, mediaUrls, agentMediaUrl, storageKeyFrom } from "@/lib/storage";
 import { filmstripTileCount } from "@/lib/filmstrip";
@@ -129,7 +127,7 @@ function parseAnswers(d: Record<string, unknown>): string[] | undefined {
 const USER_RESULT_TYPES = new Set([
   "questions_result",
   "asset_approval",
-  "voice_approval",
+  "voice_approval", // legacy — remapped onto assetApprovals
   "grid_approval",
   "shot_approval",
 ]);
@@ -139,10 +137,6 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
   const assetApprovals = new Map<
     string,
     Array<{ assetHandle: string; candidateId: string; approvedUrl: string }>
-  >();
-  const voiceApprovals = new Map<
-    string,
-    Array<{ handle: string; candidateId: string; approvedUrl: string }>
   >();
   const gridApprovals = new Map<string, string>();
   const shotApprovals = new Set<string>();
@@ -171,15 +165,21 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
           : [];
       if (approvals.length) assetApprovals.set(d.toolCallId as string, approvals);
     } else if (row.role === "user" && row.type === "voice_approval") {
+      // Legacy: map old voice_approval rows onto assetApprovals
       const d = rowData(row);
       const approvals = Array.isArray(d.approvals)
         ? (d.approvals as Array<{
-            handle: string;
+            handle?: string;
+            assetHandle?: string;
             candidateId: string;
             approvedUrl: string;
-          }>)
+          }>).map((a) => ({
+            assetHandle: a.assetHandle ?? a.handle ?? "",
+            candidateId: a.candidateId,
+            approvedUrl: a.approvedUrl,
+          })).filter((a) => a.assetHandle)
         : [];
-      if (approvals.length) voiceApprovals.set(d.toolCallId as string, approvals);
+      if (approvals.length) assetApprovals.set(d.toolCallId as string, approvals);
     } else if (row.role === "user" && row.type === "grid_approval") {
       const d = rowData(row);
       gridApprovals.set(d.toolCallId as string, d.approvedUrl as string);
@@ -201,7 +201,6 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
       const calls = getToolCalls(d);
       let questions: QuestionsCall | undefined;
       let assetRef: AssetRef | undefined;
-      let voiceAnchor: VoiceAnchor | undefined;
       let generationGrid: GenerationGrid | undefined;
       let shotResult: ShotResult | undefined;
       let shotCompile: ShotCompile | undefined;
@@ -215,22 +214,32 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
             questions: args.questions as QuestionItem[],
             answers: questionAnswers.get(tc.id),
           };
-        } else if (tc.function.name === "generateAssetReferences") {
+        } else if (
+          tc.function.name === "generateAssetReferences" ||
+          tc.function.name === "generateVoiceAnchors"
+        ) {
           const isPending = (args.pending as boolean | undefined) === true;
           const approvals = assetApprovals.get(tc.id) ?? [];
           const approvalByHandle = new Map(approvals.map((a) => [a.assetHandle, a]));
           const generatedAssets = args.generatedAssets as
             | Array<{
                 assetHandle: string;
-                assetKind: "character" | "location" | "object";
+                assetKind: AssetGalleryItem["assetKind"];
                 candidates: Array<{ id: string; url: string }>;
+                sampleText?: string;
               }>
             | undefined;
           const assetsArg = args.assets as
             | Array<{
                 assetHandle: string;
-                assetKind: "character" | "location" | "object";
+                assetKind: AssetGalleryItem["assetKind"];
                 imagePrompt: string;
+              }>
+            | undefined;
+          const voicesArg = args.voices as
+            | Array<{
+                handle: string;
+                sampleText: string;
               }>
             | undefined;
 
@@ -242,6 +251,7 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
                 return {
                   assetHandle: g.assetHandle,
                   assetKind: g.assetKind,
+                  sampleText: g.sampleText,
                   candidates: await Promise.all(
                     g.candidates.map(async (c) => ({
                       id: c.id,
@@ -257,6 +267,13 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
             items = assetsArg.map((a) => ({
               assetHandle: a.assetHandle,
               assetKind: a.assetKind,
+              loading: isPending,
+            }));
+          } else if (voicesArg?.length) {
+            items = voicesArg.map((v) => ({
+              assetHandle: v.handle,
+              assetKind: "voice" as const,
+              sampleText: v.sampleText,
               loading: isPending,
             }));
           } else if (args.assetHandle) {
@@ -288,64 +305,6 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
             toolCallId: tc.id,
             loading: isPending,
             items,
-            approved: approvals.length > 0,
-            error: args.error as string | undefined,
-          };
-        } else if (tc.function.name === "generateVoiceAnchors") {
-          const isPending = (args.pending as boolean | undefined) === true;
-          const approvals = voiceApprovals.get(tc.id) ?? [];
-          const approvalByHandle = new Map(approvals.map((a) => [a.handle, a]));
-          const generatedVoices = args.generatedVoices as
-            | Array<{
-                handle: string;
-                characterHandle?: string;
-                voiceId: string;
-                sampleText: string;
-                id: string;
-                url: string;
-              }>
-            | undefined;
-          const voicesArg = args.voices as
-            | Array<{
-                handle: string;
-                characterHandle?: string;
-                sampleText: string;
-                voiceId?: string;
-              }>
-            | undefined;
-
-          let voiceItems: VoiceGalleryItem[];
-          if (generatedVoices?.length) {
-            voiceItems = await Promise.all(
-              generatedVoices.map(async (g) => {
-                const approval = approvalByHandle.get(g.handle);
-                return {
-                  handle: g.handle,
-                  characterHandle: g.characterHandle,
-                  voiceId: g.voiceId,
-                  sampleText: g.sampleText,
-                  id: g.id,
-                  url: (await mediaUrl(g.id)) || g.url,
-                  approvedUrl: approval ? await mediaUrl(approval.approvedUrl) : undefined,
-                };
-              })
-            );
-          } else if (voicesArg?.length) {
-            voiceItems = voicesArg.map((v) => ({
-              handle: v.handle,
-              characterHandle: v.characterHandle,
-              sampleText: v.sampleText,
-              voiceId: v.voiceId,
-              loading: isPending,
-            }));
-          } else {
-            voiceItems = [];
-          }
-
-          voiceAnchor = {
-            toolCallId: tc.id,
-            loading: isPending,
-            items: voiceItems,
             approved: approvals.length > 0,
             error: args.error as string | undefined,
           };
@@ -485,7 +444,6 @@ export async function rowsToClientMessages(rows: DbRow[]): Promise<ClientMessage
         createdAt,
         questions,
         assetRef,
-        voiceAnchor,
         generationGrid,
         shotResult,
         shotCompile,
@@ -657,30 +615,36 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
       );
       const imageUrls = approvals
         .map((a) => agentMediaUrl(a.approvedUrl))
-        .filter((u): u is string => !!u);
+        .filter((u): u is string => !!u)
+        .filter((u) => !/\.(mp3|wav|m4a)(\?|$)/i.test(u));
       collectedResults.set(d.toolCallId as string, {
         text:
           `User approved the asset gallery (${approvals.length} bound): ${lines.join("; ")}. ` +
           `Each handle is bound to its approved candidate id (storage key / media URL). ` +
+          `Voice handles (@*_vo) attach as reference_audio_urls on dialogue compileShot calls. ` +
           (imageUrls.length
             ? "vision_status:attached — identity pixels pinned for verification."
-            : "vision_status:unverifiable — no approved URLs to attach."),
+            : approvals.length
+              ? "Audio-only / no image URLs to attach."
+              : "vision_status:unverifiable — no approved URLs to attach."),
         imageUrls,
         pin: true,
       });
     } else if (row.role === "user" && row.type === "voice_approval") {
+      // Legacy sessions — same binding semantics as asset_approval for voices
       const d = rowData(row);
       const approvals = Array.isArray(d.approvals)
         ? (d.approvals as Array<{
-            handle: string;
+            handle?: string;
+            assetHandle?: string;
             candidateId: string;
             approvedUrl: string;
           }>)
         : [];
-      const lines = approvals.map(
-        (a) =>
-          `"@${a.handle}" → ${a.candidateId} (${agentMediaUrl(a.approvedUrl)})`
-      );
+      const lines = approvals.map((a) => {
+        const handle = a.assetHandle ?? a.handle ?? "?";
+        return `"@${handle}" → ${a.candidateId} (${agentMediaUrl(a.approvedUrl)})`;
+      });
       collectedResults.set(d.toolCallId as string, {
         text:
           `User approved voice anchors (${approvals.length} bound): ${lines.join("; ")}. ` +
@@ -707,7 +671,7 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
           lightingHint +
           `The first approved sheet in a scene becomes the scene anchor for later sheets; later sheets must ` +
           `set previous_generation_id + incoming_anchor_* , continuity_break_reason, or match_cut_source_* ` +
-          `and attach those images.`,
+          `and list those named handles in referenceHandles (the app attaches pixels).`,
         imageUrls: approvedUrl ? [approvedUrl] : undefined,
         pin: false,
       });
@@ -717,15 +681,24 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
       const lastFrameUrl = d.lastFrameUrl
         ? agentMediaUrl(d.lastFrameUrl as string)
         : undefined;
+      const clipHandle = (d.clipHandle as string | undefined) ?? null;
+      const frameHandle = (d.lastFrameHandle as string | undefined) ?? null;
+      const extendHint = clipHandle
+        ? `For continuity into the next beat use continuity_mode "extend_video" with source_clip_handle=${clipHandle} (app attaches the clip). `
+        : `For continuity into the next beat use continuity_mode "extend_video" with source_clip_handle=@shot{N}_clip. `;
+      const frameHint = frameHandle
+        ? `Last-frame handle for CONTEXT footing / incoming anchors: ${frameHandle}. `
+        : "";
       collectedResults.set(d.toolCallId as string, {
         text: lastFrameUrl
           ? `Shot rendered and approved by user: ${videoUrl}. Last frame (for CONTEXT footing only): ${lastFrameUrl}. ` +
-            `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${videoUrl}. ` +
-            `For a clean break / new take use continuityMode "fresh" with stills. ` +
+            frameHint +
+            extendHint +
+            `For a clean break / new take use continuity_mode "fresh" with named reference handles. ` +
             `CONTEXT must restate footing from the last frame before new action.`
           : `Shot rendered and approved by user: ${videoUrl}. ` +
-            `For continuity into the next beat use continuityMode "extend_video" with sourceVideoUrl=${videoUrl}. ` +
-            `For a clean break / new take use continuityMode "fresh" with stills.`,
+            extendHint +
+            `For a clean break / new take use continuity_mode "fresh" with named reference handles.`,
         imageUrls: lastFrameUrl ? [lastFrameUrl] : undefined,
       });
     }
@@ -915,7 +888,7 @@ export async function rowsToModelMessages(rows: DbRow[]): Promise<ModelMessage[]
                             .map((v) => v.handle)
                             .join(", ")
                         : "voices"
-                    }. User has not yet approved (Approve voices / reject individuals).`
+                    }. User has not yet approved (Approve remaining / reject individuals).`
                 : tc.function.name === "generateGenerationGrid"
                   ? `A motion sheet candidate has been generated for ${
                       (tc.function.arguments.generationId as string | undefined) ??

@@ -9,6 +9,11 @@ import {
   validateGenerationGridContinuity,
   toCompileShotArgs,
 } from "@/server/services/showrunner/tools";
+import { effectiveGridRefs } from "@/server/services/showrunner/tools/generate-generation-grid";
+import {
+  resolveHandles,
+  unknownHandlesError,
+} from "@/server/services/showrunner/handle-resolver";
 
 type StoredTc = {
   id: string;
@@ -31,8 +36,9 @@ type VoiceSpec = {
 
 type GeneratedAsset = {
   assetHandle: string;
-  assetKind: "character" | "location" | "object";
+  assetKind: "character" | "location" | "object" | "voice";
   candidates: Array<{ id: string; url: string }>;
+  sampleText?: string;
 };
 
 export async function POST(
@@ -101,6 +107,46 @@ export async function POST(
   }
 
   if (toolName === "compileShot") {
+    // Re-resolve handles in case approvals landed since the original compile
+    const references = (tcArgs.references as Array<{ handle: string }> | undefined) ?? [];
+    const audioRefs =
+      (tcArgs.audio_references as Array<{ handle: string }> | undefined) ?? [];
+    const imageHandles = references.map((r) => r.handle).filter(Boolean);
+    const audioHandles = audioRefs.map((r) => r.handle).filter(Boolean);
+    const sourceClip =
+      (tcArgs.source_clip_handle as string | null | undefined)?.trim() || null;
+    const allHandles = [
+      ...imageHandles,
+      ...audioHandles,
+      ...(sourceClip ? [sourceClip] : []),
+    ];
+    if (allHandles.length > 0) {
+      const { keys, unknown } = await resolveHandles(sessionId, allHandles);
+      if (unknown.length > 0) {
+        const err = await unknownHandlesError(sessionId, unknown);
+        return badRequest(err.errors.join("; "));
+      }
+      const imageKeys = keys.slice(0, imageHandles.length);
+      const audioKeys = keys.slice(
+        imageHandles.length,
+        imageHandles.length + audioHandles.length
+      );
+      const sourceKey =
+        sourceClip != null
+          ? keys[imageHandles.length + audioHandles.length]
+          : undefined;
+      await patchRow({
+        resolvedReferenceUrls: imageKeys,
+        resolvedAudioUrls: audioKeys,
+        ...(sourceKey ? { resolvedSourceVideoUrl: sourceKey } : {}),
+      });
+      Object.assign(tcArgs, {
+        resolvedReferenceUrls: imageKeys,
+        resolvedAudioUrls: audioKeys,
+        ...(sourceKey ? { resolvedSourceVideoUrl: sourceKey } : {}),
+      });
+    }
+
     const compiled = toCompileShotArgs(tcArgs);
     if (!compiled) return badRequest("Cannot retry a gap compile — fix upstream and recompile");
     await patchRow({ pending: true, shotError: undefined, videoUrl: undefined });
@@ -121,17 +167,8 @@ export async function POST(
   if (toolName === "generateVoiceAnchors") {
     const voices = Array.isArray(tcArgs.voices) ? (tcArgs.voices as VoiceSpec[]) : [];
     if (!voices.length) return badRequest("No voices on tool call");
-    const existingGeneratedVoices =
-      (tcArgs.generatedVoices as
-        | Array<{
-            handle: string;
-            characterHandle?: string;
-            voiceId: string;
-            sampleText: string;
-            id: string;
-            url: string;
-          }>
-        | undefined) ?? [];
+    const existingGeneratedAssets =
+      (tcArgs.generatedAssets as GeneratedAsset[] | undefined) ?? [];
 
     // Single-voice reject → fold objection into sampleText and regen only that handle
     if (assetHandle) {
@@ -154,7 +191,7 @@ export async function POST(
         sampleText,
         voiceId: spec.voiceId,
         characterHandle: spec.characterHandle,
-        existingGeneratedVoices,
+        existingGeneratedAssets,
         userId: session.userId,
       });
       return NextResponse.json({ queued: true, handle: assetHandle });
@@ -162,7 +199,7 @@ export async function POST(
 
     await patchRow({
       pending: true,
-      generatedVoices: undefined,
+      generatedAssets: undefined,
       error: undefined,
     });
     await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_VOICE_ANCHORS, {
@@ -245,8 +282,11 @@ export async function POST(
       incomingAnchorKind,
       incomingAnchorPanel,
       continuityBreakReason,
+      matchCutSourceGenerationId,
+      matchCutSourceHandle,
       isFirstInScene,
       imagePrompt,
+      referenceHandles,
       referenceImageUrls,
       panelCount,
       panelCaptions,
@@ -262,9 +302,12 @@ export async function POST(
       incomingAnchorKind?: string | null;
       incomingAnchorPanel?: number | null;
       continuityBreakReason?: string | null;
+      matchCutSourceGenerationId?: string | null;
+      matchCutSourceHandle?: string | null;
       isFirstInScene?: boolean;
       imagePrompt: string;
-      referenceImageUrls: string[];
+      referenceHandles?: string[];
+      referenceImageUrls?: string[];
       panelCount?: number;
       panelCaptions?: { motionArc: string; handoff: string }[];
       aspectRatio?: "16:9" | "9:16" | "1:1";
@@ -281,12 +324,28 @@ export async function POST(
       incomingAnchorKind,
       incomingAnchorPanel,
       continuityBreakReason,
+      matchCutSourceGenerationId,
+      matchCutSourceHandle,
+      referenceHandles,
       referenceImageUrls,
     });
     if (continuityError) {
       return badRequest(continuityError);
     }
-    await patchRow({ pending: true, generatedImages: undefined, gridError: undefined });
+
+    const handleList = effectiveGridRefs({ referenceHandles, referenceImageUrls });
+    const { keys, unknown } = await resolveHandles(sessionId, handleList);
+    if (unknown.length > 0) {
+      const err = await unknownHandlesError(sessionId, unknown);
+      return badRequest(err.errors.join("; "));
+    }
+
+    await patchRow({
+      pending: true,
+      generatedImages: undefined,
+      gridError: undefined,
+      resolvedReferenceUrls: keys,
+    });
     await enqueueWorkerJob(sessionId, JOB_NAMES.GENERATE_GENERATION_GRID, {
       toolCallId,
       assistantMessageRowId: targetRowId,
@@ -301,7 +360,7 @@ export async function POST(
       panelCount,
       panelCaptions,
       imagePrompt,
-      referenceImageUrls: referenceImageUrls ?? [],
+      referenceImageUrls: keys,
       aspectRatio: aspectRatio ?? "16:9",
     });
     return NextResponse.json({ queued: true });

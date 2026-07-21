@@ -5,6 +5,11 @@ import { uploadFile, mediaUrl } from "@/lib/storage";
 import { media } from "@/server/db/schema";
 import { db } from "@/server/db";
 import { TTS } from "@/lib/constants";
+import type { GeneratedAssetItem } from "./generate-asset-references";
+import {
+  candidateKey,
+  normalizeHandle,
+} from "@/server/services/showrunner/handle-resolver";
 
 const voiceSpecSchema = z.object({
   handle: z
@@ -32,21 +37,13 @@ const voiceSpecSchema = z.object({
 
 export type VoiceSpecInput = z.infer<typeof voiceSpecSchema>;
 
-export type GeneratedVoiceItem = {
-  handle: string;
-  characterHandle?: string;
-  voiceId: string;
-  sampleText: string;
-  id: string;
-  url: string;
-};
-
 export const generateVoiceAnchors = tool({
   description:
     "Generate voice-anchor audio for recurring speaking characters (Stage 1, after Look / with " +
     "or after Step 9 image assets). Call ONCE with every Bible §2 Voices entry that speaks on " +
-    "camera or as recurring VO. Each sample locks timbre for Seedance reference_audio. Wait for " +
-    "`voice_approval` — never askQuestions for approval. Background one-off figures do not need voices.",
+    "camera or as recurring VO. Each sample locks timbre for Seedance reference_audio. Presented " +
+    "in the same asset gallery — wait for `asset_approval` (Approve remaining), never askQuestions. " +
+    "Background one-off figures do not need voices.",
   inputSchema: z.object({
     voices: z
       .array(voiceSpecSchema)
@@ -55,15 +52,19 @@ export const generateVoiceAnchors = tool({
   }),
 });
 
-/** Synthesize one voice sample, upload to R2, insert media row. */
+/** Synthesize one voice sample as an asset-gallery row (kind: voice). */
 export async function generateVoiceSample(
   spec: VoiceSpecInput,
   userId: string,
   sessionId: string
-): Promise<GeneratedVoiceItem> {
+): Promise<GeneratedAssetItem & { sampleText: string }> {
   const voiceId = spec.voiceId?.trim() || TTS.defaultVoiceId;
   const result = await generateSpeech(spec.sampleText, { voiceId });
-  const key = `v2/voices/${sessionId}/${spec.handle}.mp3`;
+  const handle = normalizeHandle(spec.handle);
+  if (!handle) {
+    throw new Error(`Invalid voice handle "${spec.handle}" — must be @?[a-z0-9_]+`);
+  }
+  const key = candidateKey(sessionId, handle, "mp3");
   await uploadFile(key, result.audioBuffer, result.contentType);
 
   await db.insert(media).values({
@@ -80,12 +81,10 @@ export async function generateVoiceSample(
   });
 
   return {
-    handle: spec.handle,
-    characterHandle: spec.characterHandle,
-    voiceId,
+    assetHandle: spec.handle,
+    assetKind: "voice",
     sampleText: spec.sampleText,
-    id: key,
-    url: await mediaUrl(key),
+    candidates: [{ id: key, url: await mediaUrl(key) }],
   };
 }
 
@@ -93,7 +92,7 @@ export async function generateVoiceGallery(
   voices: VoiceSpecInput[],
   userId: string,
   sessionId: string
-): Promise<GeneratedVoiceItem[]> {
+): Promise<Array<GeneratedAssetItem & { sampleText: string }>> {
   return Promise.all(
     voices.map((v) => generateVoiceSample(v, userId, sessionId))
   );

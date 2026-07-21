@@ -33,7 +33,8 @@ const audioReferenceSlotSchema = z.object({
 
 /**
  * Recipe render package (shot-compilation-recipe.md). The model emits this
- * structured object; the app maps it onto Seedance API params.
+ * structured object; the app maps it onto Seedance API params — resolving
+ * named handles to pixels itself (do NOT pass URLs).
  */
 const compileShotInputSchema = z.object({
   status: z
@@ -54,10 +55,19 @@ const compileShotInputSchema = z.object({
       "fresh = stills-only (scene open / clean break / new take). " +
       "extend_video = continue from previous approved clip (walks / continuous action)."
     ),
+  source_clip_handle: z
+    .string()
+    .nullable()
+    .describe(
+      "Required for extend_video: prior approved clip handle e.g. @shot13_clip. Null for fresh. " +
+      "The app resolves the handle — do NOT pass a URL."
+    ),
+  /** @deprecated Prefer source_clip_handle. Accepted for legacy stored args. */
   source_video_url: z
     .string()
     .nullable()
-    .describe("Required for extend_video: the previous approved clip URL. Null for fresh."),
+    .optional()
+    .describe("Legacy URL for extend_video. Prefer source_clip_handle."),
   render_prompt: z
     .string()
     .nullable()
@@ -83,33 +93,28 @@ const compileShotInputSchema = z.object({
       .default([])
       .describe(
         "Image slot metadata in precision order: character → object → location → scene anchor → " +
-        "incoming anchor → motion sheet. Must match reference_image_urls length/order."
+        "incoming anchor → motion sheet. Named handles only — the app attaches pixels."
       ),
+  /** @deprecated Prefer references[].handle. Kept so legacy stored args still replay. */
   reference_image_urls: z
     .array(z.string())
     .max(9)
-    .default([])
-    .describe(
-      "Resolved approved image URLs in the same order as references. Required for fresh; " +
-      "optional for extend_video when identity is carried by the source clip " +
-      "(still attach sheet + scene/incoming anchors when available)."
-    ),
+    .optional()
+    .describe("Legacy resolved URLs. Prefer references[].handle; app resolves handles itself."),
   audio_references: z
     .array(audioReferenceSlotSchema)
     .max(3)
     .default([])
     .describe(
-      "Voice slots for dialogue shots. Must match reference_audio_urls length/order. " +
-      "Attach approved @*_vo samples for every on-screen / VO speaker in the shot."
+      "Voice slots for dialogue shots. Named handles only — the app attaches audio. " +
+      "Attach approved @*_vo handles for every on-screen / VO speaker in the shot."
     ),
+  /** @deprecated Prefer audio_references[].handle. */
   reference_audio_urls: z
     .array(z.string())
     .max(3)
-    .default([])
-    .describe(
-      "Resolved approved voice audio URLs in the same order as audio_references. " +
-      "Required when the shot has spoken dialogue."
-    ),
+    .optional()
+    .describe("Legacy resolved audio URLs. Prefer audio_references[].handle."),
   checks: z
     .record(z.string(), z.unknown())
     .optional()
@@ -147,12 +152,15 @@ export function toCompileShotArgs(
     (a.prompt as string | undefined);
   if (!prompt?.trim()) return null;
 
+  // Prefer server-resolved keys patched onto the tool-call args after handle resolution.
   const refs =
+    (a.resolvedReferenceUrls as string[] | undefined) ??
     (a.reference_image_urls as string[] | undefined) ??
     (a.referenceImageUrls as string[] | undefined) ??
     [];
 
   const audioRefs =
+    (a.resolvedAudioUrls as string[] | undefined) ??
     (a.reference_audio_urls as string[] | undefined) ??
     (a.referenceAudioUrls as string[] | undefined) ??
     [];
@@ -167,6 +175,7 @@ export function toCompileShotArgs(
     "fresh") as ContinuityMode;
 
   const sourceVideoUrl =
+    (a.resolvedSourceVideoUrl as string | null | undefined) ??
     (a.source_video_url as string | null | undefined) ??
     (a.sourceVideoUrl as string | undefined) ??
     undefined;
@@ -196,23 +205,23 @@ export function validateCompilePackage(args: CompileShotToolInput): string[] {
   if (args.generation_shot_ids.length !== 1) {
     errors.push("generation_shot_ids must contain exactly one shot");
   }
-  if (args.references.length !== args.reference_image_urls.length) {
-    errors.push("references length must match reference_image_urls length");
+  const continuityMode = args.continuity_mode;
+  if (continuityMode === "extend_video") {
+    const hasSource =
+      !!(args.source_clip_handle?.trim()) ||
+      !!(args.source_video_url?.trim());
+    if (!hasSource) {
+      errors.push("extend_video requires source_clip_handle (e.g. @shot13_clip)");
+    }
   }
-  if ((args.audio_references?.length ?? 0) !== (args.reference_audio_urls?.length ?? 0)) {
-    errors.push("audio_references length must match reference_audio_urls length");
+  if (continuityMode === "fresh") {
+    const hasRefs =
+      args.references.length > 0 ||
+      (args.reference_image_urls?.length ?? 0) > 0;
+    if (!hasRefs) {
+      errors.push("fresh mode requires at least one entry in references (named handles)");
+    }
   }
-  errors.push(
-    ...validateCompileContinuity({
-      prompt: args.render_prompt ?? "",
-      referenceImageUrls: args.reference_image_urls,
-      referenceAudioUrls: args.reference_audio_urls,
-      duration: args.duration_seconds ?? 0,
-      aspectRatio: '16:9',
-      continuityMode: args.continuity_mode,
-      sourceVideoUrl: args.source_video_url ?? undefined,
-    })
-  );
   return errors;
 }
 
@@ -223,9 +232,10 @@ export const compileShot = tool({
     "passing): load stage2-skill.md and shot-compilation-recipe.md, then call this tool. " +
     "One compile = one motion sheet = one shot. Emit status=ok with the full package, or " +
     "status=gap naming missing Bible/row values (never invent). " +
-    "continuity_mode extend_video requires source_video_url; fresh requires reference_image_urls. " +
+    "continuity_mode extend_video requires source_clip_handle (e.g. @shot13_clip); fresh requires " +
+    "references[] with named handles. The app resolves handles to pixels — do NOT pass URLs. " +
     "Slot order (images): character → object → location → scene anchor → incoming anchor → motion sheet. " +
-    "Dialogue shots: attach approved @*_vo URLs in reference_audio_urls / audio_references. " +
+    "Dialogue shots: list approved @*_vo handles in audio_references. " +
     "Prompt must interpolate the motion sheet (continuous take; COMPOSITION LOCK on Panel 1, " +
     "END STATE LOCK on Panel n). Wait for shot approval before compiling the next shot.",
   inputSchema: compileShotInputSchema,
@@ -266,10 +276,10 @@ export function validateCompileContinuity(args: CompileShotArgs): string[] {
   const mode = args.continuityMode ?? "fresh";
   const errors: string[] = [];
   if (mode === "extend_video" && !args.sourceVideoUrl) {
-    errors.push("extend_video requires sourceVideoUrl (the previous approved clip URL).");
+    errors.push("extend_video requires sourceVideoUrl / source_clip_handle (the previous approved clip).");
   }
   if (mode === "fresh" && (!args.referenceImageUrls || args.referenceImageUrls.length === 0)) {
-    errors.push("fresh mode requires at least one referenceImageUrl.");
+    errors.push("fresh mode requires at least one reference (named handle).");
   }
   return errors;
 }

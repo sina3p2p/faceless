@@ -15,15 +15,15 @@ Before writing any shot prompt, `loadReference` `shot-compilation-recipe.md` —
 3. **Bible-verbatim binds:** SUBJECT DEFINITIONS paste Bible §2 lines exactly.
 4. **COMPOSITION LOCK (Panel 1) + END STATE LOCK (Panel n)** open every shot that consumes a sheet; the sheet is interpolated as one continuous take (recipe: Consuming the motion sheet). Unextractable locks → `status: "gap"`.
 5. **Approvals are buttons** — same rule as Stage 1.
-6. **Footing continuity via continuity modes:** `extend_video` + `sourceVideoUrl` for continuous walks/carries; `fresh` for scene opens, intentional breaks, and match-cut entries (attach `match_cut_source` as compositional ref), with CONTEXT restating exact footing from the previous last frame when geography must still match (recipe: Continuity across shots).
-7. **Dialogue shots bind voice:** attach approved `@*_vo` URLs in `reference_audio_urls` / `audio_references` for every on-screen or VO speaker in the shot (recipe: Sound).
+6. **Footing continuity via continuity modes:** `extend_video` + `source_clip_handle` (e.g. `@shot13_clip`) for continuous walks/carries; `fresh` for scene opens, intentional breaks, and match-cut entries (list `match_cut_source` handle in `references[]`), with CONTEXT restating exact footing from the previous last frame when geography must still match (recipe: Continuity across shots). Named handles only — the app attaches pixels; never pass URLs.
+7. **Dialogue shots bind voice:** list approved `@*_vo` handles in `audio_references` for every on-screen or VO speaker in the shot (recipe: Sound).
 
 Craft directives from Bible §3 apply to every compile; every value comes from the Bible or the shot row.
 
 ## Flow (one shot at a time)
 
-1. **Compile ONE shot** per the recipe into a structured render package via `compileShot` — correct slot order, `continuityMode` (+ `sourceVideoUrl` when extending), locks, interpolate language.
+1. **Compile ONE shot** per the recipe into a structured render package via `compileShot` — correct slot order, `continuity_mode` (+ `source_clip_handle` when extending), locks, interpolate language. Pass named handles in `references[]` / `audio_references` — the app resolves them.
 2. **User reviews** the prompt (approve / edit / reject); edits re-run assertion checks before render.
-3. **On approval, render.** The system owns dispatch. Shot approval returns the clip URL + last-frame still — use them for the next continuous beat (`extend_video`, footing CONTEXT).
+3. **On approval, render.** The system owns dispatch. Shot approval mints `@shot{N}_clip` + `@gen{id}_last_frame` — use those handles for the next continuous beat (`extend_video`, footing CONTEXT).
 4. **On a rejected clip:** fix via the Bible or the prompt, then re-render a fresh generation.
 5. **If uncompilable from Bible + row alone:** emit `status: "gap"` naming the missing item; fix upstream; recompile.

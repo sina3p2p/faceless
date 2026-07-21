@@ -6,7 +6,7 @@ import {
   validateLightingState,
   validateSceneAnchor,
 } from "./record-generation-grid-entry";
-import { mediaUrl } from "@/lib/storage";
+import { candidateKey } from "@/server/services/showrunner/handle-resolver";
 
 const GRID_CANDIDATE_COUNT = 1;
 const MIN_PANELS = 4;
@@ -64,7 +64,7 @@ const generateGenerationGridInputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Prior motion sheet handle (terminal panel) or prior render last-frame URL/handle. Required when previousGenerationId is set — attach its image in referenceImageUrls."
+      "Prior motion sheet handle (terminal panel) or prior render last-frame handle. Required when previousGenerationId is set — list that handle in referenceHandles."
     ),
   incomingAnchorKind: z
     .enum(["prior_grid_terminal_panel", "prior_render_last_frame"])
@@ -96,7 +96,7 @@ const generateGenerationGridInputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      "Match-cut source sheet handle or approved image URL. Required with matchCutSourceGenerationId — attach that image in referenceImageUrls."
+      "Match-cut source sheet handle. Required with matchCutSourceGenerationId — list that handle in referenceHandles."
     ),
   lightingState: z
     .string()
@@ -122,12 +122,18 @@ const generateGenerationGridInputSchema = z.object({
       "For later sheets bind the scene anchor (first approved sheet) and the incoming anchor (prior terminal panel / last frame) " +
       "unless continuityBreakReason is set (scene anchor still binds). Include interpolate / continuous-take / no-cuts language."
     ),
+  referenceHandles: z
+    .array(z.string())
+    .default([])
+    .describe(
+      "Approved named handles in order: characters → objects → location plate → scene anchor (later sheets) → " +
+      "incoming anchor (mandatory for continuous later sheets). The app resolves handles to pixels — do NOT pass URLs."
+    ),
+  /** @deprecated Legacy alias — prefer referenceHandles. Accepted so old stored args still replay. */
   referenceImageUrls: z
     .array(z.string())
-    .describe(
-      "Approved refs in order: characters → objects → location plate → scene anchor (later sheets) → " +
-      "incoming anchor image (mandatory for continuous later sheets)."
-    ),
+    .optional()
+    .describe("Legacy: resolved URLs. Prefer referenceHandles; app ignores URLs when handles are present."),
   panelCount: z
     .number()
     .int()
@@ -175,6 +181,17 @@ export function validatePanelCaptionCount(
   return null;
 }
 
+/** Effective reference list: prefer handles; fall back to legacy URLs for replay. */
+export function effectiveGridRefs(args: {
+  referenceHandles?: string[] | null;
+  referenceImageUrls?: string[] | null;
+}): string[] {
+  if (args.referenceHandles && args.referenceHandles.length > 0) {
+    return args.referenceHandles;
+  }
+  return args.referenceImageUrls ?? [];
+}
+
 /** Validate continuity chain + scene-anchor + lighting fields on generateGenerationGrid args. */
 export function validateGenerationGridContinuity(args: {
   isFirstInScene?: boolean | null;
@@ -189,6 +206,8 @@ export function validateGenerationGridContinuity(args: {
   lightingState?: string | null;
   lightingTransitionException?: boolean | null;
   lightingTransitionReason?: string | null;
+  referenceHandles?: string[];
+  /** @deprecated legacy alias */
   referenceImageUrls?: string[];
 }): string | null {
   const sceneErrors = validateSceneAnchor({
@@ -221,6 +240,7 @@ export function validateGenerationGridContinuity(args: {
   });
   if (lightingErrors.length > 0) return lightingErrors.join("; ");
 
+  const refs = effectiveGridRefs(args);
   const hasMatchCut = !!(
     args.matchCutSourceGenerationId?.trim() || args.matchCutSourceHandle?.trim()
   );
@@ -229,15 +249,15 @@ export function validateGenerationGridContinuity(args: {
     !!args.previousGenerationId &&
     !args.continuityBreakReason?.trim() &&
     !hasMatchCut;
-  if (needsIncoming && (args.referenceImageUrls?.length ?? 0) === 0) {
-    return "continuous later sheets require the scene anchor + incoming anchor images in referenceImageUrls";
+  if (needsIncoming && refs.length === 0) {
+    return "continuous later sheets require the scene anchor + incoming anchor handles in referenceHandles";
   }
   const needsSceneAnchor = args.isFirstInScene === false;
-  if (needsSceneAnchor && (args.referenceImageUrls?.length ?? 0) === 0) {
-    return "later sheets require the scene anchor image in referenceImageUrls";
+  if (needsSceneAnchor && refs.length === 0) {
+    return "later sheets require the scene anchor handle in referenceHandles";
   }
-  if (hasMatchCut && (args.referenceImageUrls?.length ?? 0) === 0) {
-    return "match-cut sheets require the match-cut source image in referenceImageUrls";
+  if (hasMatchCut && refs.length === 0) {
+    return "match-cut sheets require the match-cut source handle in referenceHandles";
   }
   return null;
 }
@@ -254,6 +274,7 @@ export const generateGenerationGrid = tool({
     "(1) previousGenerationId + incomingAnchorHandle/Kind/Panel, (2) continuityBreakReason, or " +
     "(3) matchCutSourceGenerationId + matchCutSourceHandle for a declared twin across a break. " +
     "Pass lightingState (one canonical state); in-shot transitions need lightingTransitionException. " +
+    "Pass referenceHandles (named labels like @hero_charsheet) — the app attaches pixels; do NOT pass URLs. " +
     "Always pass panelCount (4–9), panelCaptions (same length), and shotIds (exactly one shot). " +
     "If this tool returns ok:false, fix the listed errors and call again in the same turn.",
   inputSchema: generateGenerationGridInputSchema,
@@ -284,7 +305,10 @@ export const generateGenerationGrid = tool({
 export async function generateGenerationGridImages(
   imagePrompt: string,
   referenceImageUrls: string[],
+  sessionId: string,
+  gridHandle: string,
 ): Promise<string[]> {
+  const storageKey = candidateKey(sessionId, gridHandle, "png");
   const results = await Promise.all(
     Array.from({ length: GRID_CANDIDATE_COUNT }, () =>
       generateImage({
@@ -292,8 +316,10 @@ export async function generateGenerationGridImages(
         prompt: imagePrompt,
         referenceImages: referenceImageUrls,
         aspectRatio: "16:9",
+        storageKey,
       })
     )
   );
-  return Promise.all(results.flat().map((img) => mediaUrl(img)));
+  // Return storage keys (not signed URLs) so approval can copy to the canonical key.
+  return results.flat();
 }

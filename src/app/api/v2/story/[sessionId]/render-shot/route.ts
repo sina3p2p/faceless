@@ -4,6 +4,10 @@ import { filmSessions, filmSessionMessages } from "@/server/db/schema";
 import { getAuthUser, unauthorized, notFound, badRequest } from "@/lib/api-utils";
 import { eq, and } from "drizzle-orm";
 import { enqueueWorkerJob, JOB_NAMES } from "@/lib/worker-queue";
+import {
+  resolveHandles,
+  unknownHandlesError,
+} from "@/server/services/showrunner/handle-resolver";
 
 type StoredTc = {
   id: string;
@@ -63,6 +67,44 @@ export async function POST(
 
   if (!assistantRowId || !storedArgs) return notFound("Shot compile not found");
 
+  // Re-resolve handles at render time (fresh signed keys; approvals may have landed).
+  const references = (storedArgs.references as Array<{ handle: string }> | undefined) ?? [];
+  const audioRefs =
+    (storedArgs.audio_references as Array<{ handle: string }> | undefined) ?? [];
+  const imageHandles = references.map((r) => r.handle).filter(Boolean);
+  const audioHandles = audioRefs.map((r) => r.handle).filter(Boolean);
+  const sourceClip =
+    (storedArgs.source_clip_handle as string | null | undefined)?.trim() || null;
+  const allHandles = [
+    ...imageHandles,
+    ...audioHandles,
+    ...(sourceClip ? [sourceClip] : []),
+  ];
+
+  let resolvedPatch: Record<string, unknown> = {};
+  if (allHandles.length > 0) {
+    const { keys, unknown } = await resolveHandles(sessionId, allHandles);
+    if (unknown.length > 0) {
+      const err = await unknownHandlesError(sessionId, unknown);
+      return badRequest(err.errors.join("; "));
+    }
+    const imageKeys = keys.slice(0, imageHandles.length);
+    const audioKeys = keys.slice(
+      imageHandles.length,
+      imageHandles.length + audioHandles.length
+    );
+    const sourceKey =
+      sourceClip != null
+        ? keys[imageHandles.length + audioHandles.length]
+        : undefined;
+    resolvedPatch = {
+      resolvedReferenceUrls: imageKeys,
+      resolvedAudioUrls: audioKeys,
+      ...(sourceKey ? { resolvedSourceVideoUrl: sourceKey } : {}),
+    };
+    Object.assign(storedArgs, resolvedPatch);
+  }
+
   const { toCompileShotArgs } = await import("@/server/services/showrunner/tools/compile-shot");
   const compiled = toCompileShotArgs({
     ...storedArgs,
@@ -90,6 +132,7 @@ export async function POST(
               ...tc.function,
               arguments: {
                 ...tc.function.arguments,
+                ...resolvedPatch,
                 pending: true,
                 render_prompt: renderPrompt,
                 prompt: renderPrompt,

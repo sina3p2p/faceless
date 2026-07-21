@@ -20,9 +20,11 @@ export type AssetCandidate = {
 
 export type AssetGalleryItem = {
   assetHandle: string;
-  assetKind: "character" | "location" | "object";
+  assetKind: "character" | "location" | "object" | "voice";
   loading?: boolean;
   candidates?: AssetCandidate[];
+  /** Voice sample script (voice kind only). */
+  sampleText?: string;
   approvedCandidateId?: string;
   approvedUrl?: string;
   rejected?: boolean;
@@ -33,31 +35,9 @@ export type AssetGalleryItem = {
 export type AssetRef = {
   toolCallId: string;
   loading: boolean;
-  /** Full manifest gallery (Step 9). */
+  /** Full manifest gallery (Step 9 / 9b). */
   items: AssetGalleryItem[];
   /** True after the user taps Approve remaining. */
-  approved?: boolean;
-  error?: string;
-};
-
-export type VoiceGalleryItem = {
-  handle: string;
-  characterHandle?: string;
-  voiceId?: string;
-  sampleText?: string;
-  loading?: boolean;
-  id?: string;
-  url?: string;
-  approvedUrl?: string;
-  rejected?: boolean;
-  objection?: string;
-  error?: string;
-};
-
-export type VoiceAnchor = {
-  toolCallId: string;
-  loading: boolean;
-  items: VoiceGalleryItem[];
   approved?: boolean;
   error?: string;
 };
@@ -132,7 +112,6 @@ export type ClientMessage = {
   reasoning?: string;
   questions?: QuestionsCall;
   assetRef?: AssetRef;
-  voiceAnchor?: VoiceAnchor;
   generationGrid?: GenerationGrid;
   shotResult?: ShotResult;
   shotCompile?: ShotCompile;

@@ -138,7 +138,7 @@ export function AssetRefPanel({
             </button>
           )}
           <p className="text-xs text-muted-foreground/40 w-full">
-            Reject individuals with an objection (they regenerate). Approve remaining locks the rest.
+            Reject individuals with an objection (they regenerate). Approve remaining locks images and voices.
           </p>
         </div>
       )}
@@ -193,9 +193,38 @@ function GalleryItem({
       </div>
 
       {item.loading ? (
-        <div className="aspect-square max-w-[140px] rounded-lg bg-white/5 animate-pulse" />
+        item.assetKind === "voice" ? (
+          <div className="h-12 max-w-md rounded-lg bg-white/5 animate-pulse" />
+        ) : (
+          <div className="aspect-square max-w-[140px] rounded-lg bg-white/5 animate-pulse" />
+        )
       ) : item.error ? (
         <p className="text-xs text-red-400">{item.error}</p>
+      ) : item.assetKind === "voice" ? (
+        <div className="space-y-1.5">
+          {(item.candidates ?? []).map((c) => {
+            const isApproved = c.url === approved || c.id === item.approvedCandidateId;
+            return (
+              <div
+                key={c.id}
+                className={`rounded-lg border p-2 transition-all ${
+                  isApproved
+                    ? "border-emerald-500 ring-2 ring-emerald-500/30"
+                    : locked
+                      ? "border-white/10 opacity-60"
+                      : "border-white/10"
+                }`}
+              >
+                <audio controls preload="none" src={c.url} className="w-full h-8" />
+                {item.sampleText && (
+                  <p className="mt-1.5 text-[11px] text-muted-foreground/70 line-clamp-2">
+                    {item.sampleText}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
           {(item.candidates ?? []).map((c) => {

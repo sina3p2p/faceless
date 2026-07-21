@@ -4,6 +4,7 @@ import { generateImage } from "@/server/services/media";
 import { mediaUrl } from "@/lib/storage";
 import { media } from "@/server/db/schema";
 import { db } from "@/server/db";
+import { candidateKey, normalizeHandle } from "@/server/services/showrunner/handle-resolver";
 
 const ASSET_CANDIDATE_COUNT = 1;
 
@@ -25,8 +26,9 @@ export type AssetCandidate = { id: string; url: string };
 
 export type GeneratedAssetItem = {
   assetHandle: string;
-  assetKind: "character" | "location" | "object";
+  assetKind: "character" | "location" | "object" | "voice";
   candidates: AssetCandidate[];
+  sampleText?: string;
 };
 
 export const generateAssetReferences = tool({
@@ -53,8 +55,16 @@ export const generateAssetReferences = tool({
 export async function generateAssetImages(
   imagePrompt: string,
   assetKind: "character" | "location" | "object",
-  userId: string
+  userId: string,
+  sessionId: string,
+  assetHandle: string
 ): Promise<AssetCandidate[]> {
+  const handle = normalizeHandle(assetHandle);
+  if (!handle) {
+    throw new Error(
+      `Invalid assetHandle "${assetHandle}" — must be @?[a-z0-9_]+`
+    );
+  }
   const aspectRatio = assetKind === "location" ? ("16:9" as const) : ("1:1" as const);
   const results = await Promise.all(
     Array.from({ length: ASSET_CANDIDATE_COUNT }, () =>
@@ -62,6 +72,7 @@ export async function generateAssetImages(
         model: "gpt-image-2",
         prompt: imagePrompt,
         aspectRatio,
+        storageKey: candidateKey(sessionId, handle, "png"),
       })
     )
   );
@@ -74,7 +85,7 @@ export async function generateAssetImages(
       url: img,
       prompt: imagePrompt,
       modelUsed: "gpt-image-2",
-      metadata: { aspectRatio },
+      metadata: { aspectRatio, handle },
     }))
   );
 
@@ -89,13 +100,20 @@ export async function generateAssetImages(
 /** Parallel gallery generation — one result row per manifest entry. */
 export async function generateAssetGallery(
   assets: AssetSpecInput[],
-  userId: string
+  userId: string,
+  sessionId: string
 ): Promise<GeneratedAssetItem[]> {
   return Promise.all(
     assets.map(async (asset) => ({
       assetHandle: asset.assetHandle,
       assetKind: asset.assetKind,
-      candidates: await generateAssetImages(asset.imagePrompt, asset.assetKind, userId),
+      candidates: await generateAssetImages(
+        asset.imagePrompt,
+        asset.assetKind,
+        userId,
+        sessionId,
+        asset.assetHandle
+      ),
     }))
   );
 }

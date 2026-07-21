@@ -44,7 +44,7 @@ A spec is written for a human ("frail, sympathetic grey alien with a teal chest 
 
 ## Dialogue
 
-Dialogue is allowed, including plot-critical and multi-turn scenes. Preferred production path: call `generateVoiceAnchors` once per speaking hero / recurring VO (Bible §2 `*_vo`), approve via `voice_approval`, then attach those approved audio URLs as `reference_audio_urls` on dialogue `compileShot` calls so Seedance locks timbre — per-clip fresh synthesis drifts. Match shot Dur to the spoken line (don't stretch a short line across a long take). Coverage can cut mid-conversation; one continuous lip-synced take is fine when Dur ≤15s. Background one-off figures do not need voice anchors.
+Dialogue is allowed, including plot-critical and multi-turn scenes. Preferred production path: call `generateVoiceAnchors` once per speaking hero / recurring VO (Bible §2 `*_vo`), approve via the same gallery `asset_approval` (Approve remaining), then attach those approved audio URLs as `reference_audio_urls` on dialogue `compileShot` calls so Seedance locks timbre — per-clip fresh synthesis drifts. Match shot Dur to the spoken line (don't stretch a short line across a long take). Coverage can cut mid-conversation; one continuous lip-synced take is fine when Dur ≤15s. Background one-off figures do not need voice anchors.
 
 ## The two foundational motion lessons (compressed)
 

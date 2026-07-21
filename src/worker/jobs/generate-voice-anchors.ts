@@ -2,27 +2,27 @@ import {
   generateVoiceGallery,
   generateVoiceSample,
   type VoiceSpecInput,
-  type GeneratedVoiceItem,
 } from "@/server/services/showrunner/tools/generate-voice-anchors";
+import type { GeneratedAssetItem } from "@/server/services/showrunner/tools/generate-asset-references";
 import { patchMessageToolCall, setJobStatus } from "../job-helpers";
 import type { JobRunContext, PayloadBase, WorkerJob } from "./types";
 
 type VoicePayload = {
   userId: string;
   voices?: VoiceSpecInput[];
-  /** Single-voice regen */
+  /** Single-voice regen (reuses assetHandle field from retry-tool). */
   handle?: string;
   sampleText?: string;
   voiceId?: string;
   characterHandle?: string;
-  existingGeneratedVoices?: GeneratedVoiceItem[];
+  existingGeneratedAssets?: GeneratedAssetItem[];
 };
 
 export const generateVoiceAnchorsJob: WorkerJob = {
   async run({ jobId, sessionId, toolCallId, assistantMessageRowId, payload }: JobRunContext) {
     const p = payload as PayloadBase & VoicePayload;
 
-    let generatedVoices: GeneratedVoiceItem[];
+    let generatedAssets: GeneratedAssetItem[];
 
     if (p.handle && p.sampleText) {
       const item = await generateVoiceSample(
@@ -35,17 +35,20 @@ export const generateVoiceAnchorsJob: WorkerJob = {
         p.userId,
         sessionId,
       );
-      const existing = p.existingGeneratedVoices ?? [];
-      generatedVoices = existing.some((v) => v.handle === p.handle)
-        ? existing.map((v) => (v.handle === p.handle ? item : v))
+      const existing = p.existingGeneratedAssets ?? [];
+      generatedAssets = existing.some((v) => v.assetHandle === p.handle)
+        ? existing.map((v) => (v.assetHandle === p.handle ? item : v))
         : [...existing, item];
     } else {
-      generatedVoices = await generateVoiceGallery(p.voices ?? [], p.userId, sessionId);
+      generatedAssets = await generateVoiceGallery(p.voices ?? [], p.userId, sessionId);
     }
 
-    await setJobStatus(jobId, "succeeded", { generatedVoices });
+    await setJobStatus(jobId, "succeeded", {
+      generatedAssets,
+      images: generatedAssets.flatMap((a) => a.candidates.map((c) => c.id)),
+    });
     await patchMessageToolCall(assistantMessageRowId, toolCallId, {
-      generatedVoices,
+      generatedAssets,
       pending: false,
       error: undefined,
     });

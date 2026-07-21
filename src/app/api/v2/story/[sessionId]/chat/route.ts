@@ -14,8 +14,21 @@ import { toCompileShotArgs } from "@/server/services/showrunner/tools";
 import type { AssetSpecInput } from "@/server/services/showrunner/tools/generate-asset-references";
 import type { VoiceSpecInput } from "@/server/services/showrunner/tools/generate-voice-anchors";
 import type { GenerateGenerationGridInput } from "@/server/services/showrunner/tools/generate-generation-grid";
+import {
+  effectiveGridRefs,
+} from "@/server/services/showrunner/tools/generate-generation-grid";
 import { createRecordGenerationGridEntryTool } from "@/server/services/showrunner/tools/record-generation-grid-entry";
+import { createLoadApprovedImageTool } from "@/server/services/showrunner/tools/load-approved-image";
 import { enqueueWorkerJob, JOB_NAMES, type WorkerJobName } from "@/lib/worker-queue";
+import { storageKeyFrom } from "@/lib/storage";
+import {
+  approveHandle,
+  gridHandleFromIds,
+  lastFrameHandle,
+  resolveHandles,
+  shotClipHandle,
+  unknownHandlesError,
+} from "@/server/services/showrunner/handle-resolver";
 
 /** Parse `{ ok, errors? }` from tool execute() output (raw or AI SDK wrapped). */
 function parseToolOk(output: unknown): { ok: boolean; errors?: string[] } | null {
@@ -39,6 +52,31 @@ function parseToolOk(output: unknown): { ok: boolean; errors?: string[] } | null
   } catch {
     return null;
   }
+}
+
+type StoredTc = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: Record<string, unknown> };
+};
+
+/** Look up a tool call's arguments from session message history. */
+async function findToolCallArgs(
+  sessionId: string,
+  toolCallId: string
+): Promise<Record<string, unknown> | null> {
+  const rows = await db
+    .select()
+    .from(filmSessionMessages)
+    .where(eq(filmSessionMessages.sessionId, sessionId));
+  for (const row of rows) {
+    if (row.role !== "assistant") continue;
+    const d = ((row.parts as unknown[])[0] ?? {}) as Record<string, unknown>;
+    const calls = (Array.isArray(d.toolCalls) ? d.toolCalls : []) as StoredTc[];
+    const found = calls.find((tc) => tc.id === toolCallId);
+    if (found) return found.function.arguments;
+  }
+  return null;
 }
 
 function sseResponse(
@@ -113,63 +151,117 @@ async function buildUserMessage(
           ]
           : null;
       if (!approvals?.length) return { error: "approvals required" };
+
+      // Canonicalize each approved candidate under refs/{handle}.{ext}
+      const canonicalized = await Promise.all(
+        approvals.map(async (a) => {
+          const src = a.candidateId || a.approvedUrl;
+          try {
+            const key = await approveHandle(sessionId, a.assetHandle, src);
+            return { ...a, approvedUrl: key, candidateId: a.candidateId || src };
+          } catch (err) {
+            console.warn("[chat] approveHandle failed for asset", a.assetHandle, err);
+            return a;
+          }
+        })
+      );
+
       return {
         type: "asset_approval",
         parts: [{
           toolCallId: body.toolCallId,
-          approvals,
+          approvals: canonicalized,
           // Legacy single-asset fields (first approval) for older readers
-          assetHandle: approvals[0]!.assetHandle,
-          approvedUrl: approvals[0]!.approvedUrl,
+          assetHandle: canonicalized[0]!.assetHandle,
+          approvedUrl: canonicalized[0]!.approvedUrl,
         }],
       };
     }
 
-    case "voice_approval": {
-      const approvals = Array.isArray(body.approvals)
-        ? (body.approvals as Array<{
-          handle: string;
-          candidateId: string;
-          approvedUrl: string;
-        }>)
-        : null;
-      if (!approvals?.length) return { error: "approvals required" };
-      return {
-        type: "voice_approval",
-        parts: [{ toolCallId: body.toolCallId, approvals }],
-      };
-    }
-
-    case "grid_approval":
+    case "grid_approval": {
+      const approvedUrl = body.approvedUrl as string;
+      const toolCallId = body.toolCallId as string;
+      let canonicalUrl = approvedUrl;
+      try {
+        const args = await findToolCallArgs(sessionId, toolCallId);
+        const sceneId =
+          (args?.sceneId as string | number | undefined) ??
+          (typeof body.sceneId === "string" || typeof body.sceneId === "number"
+            ? body.sceneId
+            : undefined);
+        const generationId = args?.generationId as string | undefined;
+        if (sceneId != null && generationId) {
+          const handle = gridHandleFromIds(sceneId, generationId);
+          canonicalUrl = await approveHandle(sessionId, handle, approvedUrl);
+        }
+      } catch (err) {
+        console.warn("[chat] approveHandle failed for grid", err);
+      }
       return {
         type: "grid_approval",
         parts: [{
-          toolCallId: body.toolCallId,
+          toolCallId,
           sceneId: body.sceneId,
-          approvedUrl: body.approvedUrl,
+          approvedUrl: canonicalUrl,
         }],
       };
+    }
 
     case "shot_approval": {
       const videoUrl = body.videoUrl as string;
+      const toolCallId = body.toolCallId as string;
       let lastFrameUrl: string | undefined;
+      let clipHandle: string | undefined;
+      let frameHandle: string | undefined;
+
+      const args = await findToolCallArgs(sessionId, toolCallId);
+      const shotId = (args?.shot_id as string | undefined) ?? undefined;
+      // Prefer explicit generation id from grid_reference (@scene3_gen3A_grid → 3A)
+      const gridRef = args?.grid_reference as string | null | undefined;
+      const genFromGrid = gridRef
+        ? String(gridRef).match(/_gen([^_]+)_grid$/i)?.[1]
+        : undefined;
+      const generationId = genFromGrid;
+
+      try {
+        if (shotId) {
+          clipHandle = shotClipHandle(shotId);
+          const videoKey = storageKeyFrom(videoUrl) ?? videoUrl;
+          await approveHandle(sessionId, clipHandle, videoKey, "mp4");
+        }
+      } catch (err) {
+        console.warn("[chat] shot clip alias failed", err);
+      }
+
       try {
         const { extractLastFrameJpeg } = await import("@/lib/media-probe");
         const { uploadFile } = await import("@/lib/storage");
         const jpeg = await extractLastFrameJpeg(videoUrl);
-        const key = `v2/frames/${sessionId}/${crypto.randomUUID()}.jpg`;
-        await uploadFile(key, jpeg, "image/jpeg");
-        // Persist key; sign when hydrating model/client messages.
-        lastFrameUrl = key;
+        if (generationId) {
+          frameHandle = lastFrameHandle(generationId);
+          // Upload to candidate then approve to canonical
+          const { candidateKey } = await import(
+            "@/server/services/showrunner/handle-resolver"
+          );
+          const cand = candidateKey(sessionId, frameHandle, "jpg");
+          await uploadFile(cand, jpeg, "image/jpeg");
+          lastFrameUrl = await approveHandle(sessionId, frameHandle, cand, "jpg");
+        } else {
+          const key = `v2/frames/${sessionId}/${crypto.randomUUID()}.jpg`;
+          await uploadFile(key, jpeg, "image/jpeg");
+          lastFrameUrl = key;
+        }
       } catch (err) {
         console.warn("[chat] last-frame extract on shot_approval failed", err);
       }
       return {
         type: "shot_approval",
         parts: [{
-          toolCallId: body.toolCallId,
+          toolCallId,
           videoUrl,
           ...(lastFrameUrl ? { lastFrameUrl } : {}),
+          ...(clipHandle ? { clipHandle: `@${clipHandle}` } : {}),
+          ...(frameHandle ? { lastFrameHandle: `@${frameHandle}` } : {}),
         }],
       };
     }
@@ -197,7 +289,7 @@ type QueuedImageJob = {
 const TOOL_LOADING_EVENTS: Record<string, string> = {
   askQuestions: "questions_loading",
   generateAssetReferences: "asset_ref_loading",
-  generateVoiceAnchors: "voice_anchor_loading",
+  generateVoiceAnchors: "asset_ref_loading",
   generateGenerationGrid: "generation_grid_loading",
   compileShot: "shot_compile_loading",
 };
@@ -271,12 +363,13 @@ function queueVoiceAnchorJob(tc: RawToolCall, emit: Emit, userId: string): Queue
   const voices = args.voices ?? [];
   tc.function.arguments = { ...args, voices, pending: true };
   emit({
-    type: "voice_anchor",
+    type: "asset_ref",
     toolCallId: tc.id,
     pending: true,
     items: voices.map((v) => ({
-      handle: v.handle,
-      characterHandle: v.characterHandle,
+      assetHandle: v.handle,
+      assetKind: "voice" as const,
+      sampleText: v.sampleText,
       loading: true,
     })),
   });
@@ -287,9 +380,30 @@ function queueVoiceAnchorJob(tc: RawToolCall, emit: Emit, userId: string): Queue
   };
 }
 
-function queueGenerationGridJob(tc: RawToolCall, emit: Emit): QueuedImageJob {
-  const args = tc.function.arguments as GenerateGenerationGridInput;
-  tc.function.arguments = { ...args, pending: true };
+async function queueGenerationGridJob(
+  tc: RawToolCall,
+  emit: Emit,
+  sessionId: string
+): Promise<QueuedImageJob | null> {
+  const args = tc.function.arguments as GenerateGenerationGridInput & {
+    resolvedReferenceUrls?: string[];
+  };
+  const handleList = effectiveGridRefs(args);
+  const { keys, unknown } = await resolveHandles(sessionId, handleList);
+  if (unknown.length > 0) {
+    const err = await unknownHandlesError(sessionId, unknown);
+    const gridError = err.errors.join("; ");
+    tc.function.arguments = { ...args, gridError };
+    emit({ ...gridEventPayload(tc.id, args), error: gridError });
+    // Patch the auto tool result so the model sees the failure on replay
+    return null;
+  }
+
+  tc.function.arguments = {
+    ...args,
+    pending: true,
+    resolvedReferenceUrls: keys,
+  };
   emit({ ...gridEventPayload(tc.id, args), pending: true });
   return {
     jobName: JOB_NAMES.GENERATE_GENERATION_GRID,
@@ -306,9 +420,71 @@ function queueGenerationGridJob(tc: RawToolCall, emit: Emit): QueuedImageJob {
       panelCount: args.panelCount,
       panelCaptions: args.panelCaptions,
       imagePrompt: args.imagePrompt,
-      referenceImageUrls: args.referenceImageUrls ?? [],
+      referenceImageUrls: keys,
     },
   };
+}
+
+/** Resolve compileShot handles → storage keys; patch onto args. Returns false on unknown. */
+async function resolveCompileHandles(
+  tc: RawToolCall,
+  sessionId: string,
+  emit: Emit
+): Promise<boolean> {
+  const args = tc.function.arguments;
+  const references = (args.references as Array<{ handle: string }> | undefined) ?? [];
+  const audioRefs =
+    (args.audio_references as Array<{ handle: string }> | undefined) ?? [];
+  const imageHandles = references.map((r) => r.handle).filter(Boolean);
+  const audioHandles = audioRefs.map((r) => r.handle).filter(Boolean);
+  const sourceClip =
+    (args.source_clip_handle as string | null | undefined)?.trim() || null;
+
+  const allHandles = [
+    ...imageHandles,
+    ...audioHandles,
+    ...(sourceClip ? [sourceClip] : []),
+  ];
+
+  // Legacy URL packages: nothing to resolve
+  if (
+    allHandles.length === 0 &&
+    ((args.reference_image_urls as string[] | undefined)?.length ?? 0) > 0
+  ) {
+    return true;
+  }
+
+  const { keys, unknown } = await resolveHandles(sessionId, allHandles);
+  if (unknown.length > 0) {
+    const err = await unknownHandlesError(sessionId, unknown);
+    const shotError = err.errors.join("; ");
+    tc.function.arguments = { ...args, shotError };
+    emit({
+      type: "shot_compile_error",
+      toolCallId: tc.id,
+      error: shotError,
+      gaps: args.gaps,
+    });
+    return false;
+  }
+
+  const imageKeys = keys.slice(0, imageHandles.length);
+  const audioKeys = keys.slice(
+    imageHandles.length,
+    imageHandles.length + audioHandles.length
+  );
+  const sourceKey =
+    sourceClip != null
+      ? keys[imageHandles.length + audioHandles.length]
+      : undefined;
+
+  tc.function.arguments = {
+    ...args,
+    resolvedReferenceUrls: imageKeys,
+    resolvedAudioUrls: audioKeys,
+    ...(sourceKey ? { resolvedSourceVideoUrl: sourceKey } : {}),
+  };
+  return true;
 }
 
 export async function POST(
@@ -354,6 +530,7 @@ export async function POST(
   const lightingByGen = lightingStateByGenerationId(rows);
   const tools = {
     ...storyTools,
+    loadApprovedImage: createLoadApprovedImageTool(sessionId),
     recordGenerationGridEntry: createRecordGenerationGridEntryTool({
       resolveLightingState: (generationId) => lightingByGen.get(generationId),
     }),
@@ -460,15 +637,25 @@ export async function POST(
     }
 
     // Queue image jobs (do not await generation — worker continues if client disconnects).
-    const pendingHandlers: Record<string, (tc: RawToolCall) => QueuedImageJob | null> = {
+    const pendingHandlers: Record<
+      string,
+      (tc: RawToolCall) => QueuedImageJob | null | Promise<QueuedImageJob | null>
+    > = {
       generateAssetReferences: (tc) => queueAssetRefJob(tc, emit, session.userId),
       generateVoiceAnchors: (tc) => queueVoiceAnchorJob(tc, emit, session.userId),
-      generateGenerationGrid: (tc) => queueGenerationGridJob(tc, emit),
+      generateGenerationGrid: (tc) => queueGenerationGridJob(tc, emit, sessionId),
     };
     const queuedImageJobs: QueuedImageJob[] = [];
     for (const tc of pendingImageCalls) {
-      const job = pendingHandlers[tc.function.name]?.(tc);
+      const job = await pendingHandlers[tc.function.name]?.(tc);
       if (job) queuedImageJobs.push(job);
+    }
+
+    // Resolve compileShot handles before persisting / emitting for review.
+    const resolvedShotCalls: RawToolCall[] = [];
+    for (const tc of pendingShotCalls) {
+      const ok = await resolveCompileHandles(tc, sessionId, emit);
+      if (ok) resolvedShotCalls.push(tc);
     }
 
     // Save the assistant message before enqueueing so the worker can patch it.
@@ -498,7 +685,7 @@ export async function POST(
     // Emit the compiled prompt for each shot so the client can show it for
     // user review. No render is started here — the client calls /render-shot
     // after the user approves (or edits) the prompt.
-    for (const tc of pendingShotCalls) {
+    for (const tc of resolvedShotCalls) {
       const args = tc.function.arguments;
       const compiled = toCompileShotArgs(args);
       if (!compiled) continue;

@@ -23,7 +23,7 @@ type AssetPayload = {
 };
 
 export const generateAssetImagesJob: WorkerJob = {
-  async run({ jobId, toolCallId, assistantMessageRowId, payload }: JobRunContext) {
+  async run({ jobId, sessionId, toolCallId, assistantMessageRowId, payload }: JobRunContext) {
     const p = payload as PayloadBase & AssetPayload;
 
     let result: {
@@ -33,7 +33,7 @@ export const generateAssetImagesJob: WorkerJob = {
     };
 
     if (p.assets?.length) {
-      const generatedAssets = await generateAssetGallery(p.assets, p.userId);
+      const generatedAssets = await generateAssetGallery(p.assets, p.userId, sessionId);
       result = {
         images: generatedAssets.flatMap((a) => a.candidates.map((c) => c.id)),
         generatedAssets,
@@ -43,7 +43,7 @@ export const generateAssetImagesJob: WorkerJob = {
       const handle = p.assetHandle!;
       const kind = p.assetKind!;
       const prompt = p.imagePrompt!;
-      const candidates = await generateAssetImages(prompt, kind, p.userId);
+      const candidates = await generateAssetImages(prompt, kind, p.userId, sessionId, handle);
       const existing = p.existingGeneratedAssets ?? [];
       const generatedAssets = existing.some((a) => a.assetHandle === handle)
         ? existing.map((a) =>

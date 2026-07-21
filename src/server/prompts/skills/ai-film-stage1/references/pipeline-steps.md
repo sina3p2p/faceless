@@ -163,7 +163,7 @@ The user rejects individual candidates with an objection and approves acceptable
 
 After image assets are approved (or in the same pre-grid window), call `generateVoiceAnchors` once with every Bible §2 Voices entry that speaks on camera or as recurring VO. Use a short in-character sample (1–2 sentences), one distinct ElevenLabs `voiceId` per hero when known. Background one-offs: skip.
 
-The user rejects individuals with an objection and approves via `voice_approval`. Regenerate only rejected handles.
+The user rejects individuals with an objection and approves via the same gallery `asset_approval` (Approve remaining). Regenerate only rejected handles.
 
 **Done when:** every speaking hero / recurring VO has one approved `@*_vo` URL; Bible §2 Voices resolves; no rejection remains unresolved.
 
